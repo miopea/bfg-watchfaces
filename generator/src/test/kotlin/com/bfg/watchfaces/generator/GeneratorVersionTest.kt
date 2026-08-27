@@ -84,10 +84,20 @@ class GeneratorVersionCompatibilityTest {
     }
 
     @Test
-    fun `KNOTWORK freq selects a different arrangement, not a different density`() {
+    fun `KNOTWORK freq reseeds the tiling rather than acting as a density knob`() {
         val a = PatternEngines.paths(DialParams(engine = Engine.KNOTWORK, freq = 3))
         val b = PatternEngines.paths(DialParams(engine = Engine.KNOTWORK, freq = 9))
-        assertEquals(a.size, b.size) { "freq should re-seed the tiling, not change how much of it there is" }
         assertTrue(a != b) { "freq did not change the arrangement at all" }
+
+        // The motif vocabulary emits different polyline counts per tile, so the
+        // totals will not match exactly -- but freq picks a different MIX of the
+        // same vocabulary over the same grid, so they must stay close. A large
+        // divergence would mean freq had quietly become a density control, and
+        // `scale` is the parameter for that.
+        val ratio = a.size.toDouble() / b.size
+        assertTrue(ratio in 0.75..1.33) {
+            "freq changed geometry volume by more than a third (${a.size} vs ${b.size}); " +
+            "it should re-seed the tiling, not control how much of it there is"
+        }
     }
 }

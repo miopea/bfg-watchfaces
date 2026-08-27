@@ -224,56 +224,108 @@ object PatternEngines {
         val a = p.rotate * PI / 180
         val m = { x: Double, y: Double -> rot(x, y, a) }
 
-        // Ribbon half-width. Clamped well inside the cell or neighbouring straps
-        // merge into a blob and the interlace stops reading.
-        val w = (step * 0.10 + p.depth * 0.55).coerceIn(1.0, step * 0.30)
-        val r = step / 2
+        // Ribbon half-width. Clamped well inside the cell, or neighbouring
+        // straps merge into a blob and the interlace stops reading.
+        val w = (step * 0.075 + p.depth * 0.40).coerceIn(0.7, step * 0.20)
+        val latticeW = w * 0.62   // quilting reads lighter than the motifs on it
 
-        fun strap(cx: Double, cy: Double, fromDeg: Double) {
-            for (edge in listOf(-w, w)) {
+        // ---- strap primitives: everything is a PAIR of edges, never a wire ----
+
+        fun arcStrap(cx: Double, cy: Double, r: Double, fromDeg: Double, sweepDeg: Double, halfW: Double) {
+            val stepDeg = if (sweepDeg > 180) 6.0 else 7.5
+            for (edge in listOf(-halfW, halfW)) {
                 val rr = r + edge
-                if (rr <= 0.5) continue
-                val pts = ArrayList<Pt>(13)
+                if (rr <= 0.4) continue
+                val pts = ArrayList<Pt>()
                 var t = 0.0
-                while (t <= 90.0001) {
+                while (t <= sweepDeg + 1e-6) {
                     val ang = (fromDeg + t) * PI / 180
                     pts.add(m(cx + rr * cos(ang), cy + rr * sin(ang)))
-                    t += 7.5
+                    t += stepDeg
                 }
                 out.add(pts)
             }
         }
 
+        fun lineStrap(x1: Double, y1: Double, x2: Double, y2: Double, halfW: Double) {
+            val dx = x2 - x1; val dy = y2 - y1
+            val len = hypot(dx, dy)
+            if (len < 1e-6) return
+            val nx = -dy / len * halfW; val ny = dx / len * halfW
+            for (s in listOf(-1.0, 1.0)) {
+                out.add(listOf(m(x1 + nx * s, y1 + ny * s), m(x2 + nx * s, y2 + ny * s)))
+            }
+        }
+
         val half = SPAN / 2
 
-        // Diamond lattice under the strapwork. The reference dial has a
-        // cross-hatch through the cell corners with the knot motifs riding on
-        // it; without it a Truchet tiling reads as bubbles rather than
-        // engine-turning. Single lines, so the doubled straps still dominate.
+        // Quilted diamond lattice. The reference reads as fine diagonal
+        // quilting with ornament sitting on it, so the grid is a RIBBON too --
+        // a single hairline made the motifs float instead of being woven in.
         var g = -half
         while (g <= half) {
-            out.add(listOf(m(g, -half), m(g, half)))
-            out.add(listOf(m(-half, g), m(half, g)))
+            lineStrap(g, -half, g, half, latticeW)
+            lineStrap(-half, g, half, g, latticeW)
             g += step
         }
 
+        val r = step / 2
         var gx = -half
         var i = 0
         while (gx <= half) {
             var gy = -half
             var j = 0
             while (gy <= half) {
-                // Deterministic tile choice. Integer mixing, no Random anywhere.
+                // Deterministic tile choice. Integer mixing, no Random anywhere:
+                // a stored face must re-render identically years later.
                 var h = i * 374761393 + j * 668265263 + p.freq * 1274126177
                 h = (h xor (h shr 13)) * 1274126177
                 h = h xor (h shr 16)
+                val cx = gx + r; val cy = gy + r   // cell centre
 
-                if (h and 1 == 0) {
-                    strap(gx, gy, 0.0)                       // top-left corner
-                    strap(gx + step, gy + step, 180.0)       // bottom-right corner
-                } else {
-                    strap(gx + step, gy, 90.0)               // top-right corner
-                    strap(gx, gy + step, 270.0)              // bottom-left corner
+                // Six motifs, not two. The reference is not one shape repeated
+                // in two rotations -- it is a small vocabulary of loops, hooks
+                // and lozenges scattered over the grid, and matching that
+                // needed variety rather than a finer version of the same tile.
+                when (((h % 6) + 6) % 6) {
+                    // Truchet arc pair, both diagonals. The flowing element.
+                    0 -> { arcStrap(gx, gy, r, 0.0, 90.0, w); arcStrap(gx + step, gy + step, r, 180.0, 90.0, w) }
+                    1 -> { arcStrap(gx + step, gy, r, 90.0, 90.0, w); arcStrap(gx, gy + step, r, 270.0, 90.0, w) }
+
+                    // Angular crossing. The reference has straight runs and hard
+                    // corners mixed with the curves; pure arcs read as bubbles.
+                    2 -> {
+                        lineStrap(gx, gy + r, cx, gy, w)
+                        lineStrap(cx, gy, gx + step, gy + r, w)
+                        lineStrap(gx, gy + r, cx, gy + step, w)
+                        lineStrap(cx, gy + step, gx + step, gy + r, w)
+                    }
+
+                    // Lozenge through the edge midpoints -- the quilted diamond.
+                    3 -> {
+                        val d = r * 0.62
+                        lineStrap(cx - d, cy, cx, cy - d, w)
+                        lineStrap(cx, cy - d, cx + d, cy, w)
+                        lineStrap(cx + d, cy, cx, cy + d, w)
+                        lineStrap(cx, cy + d, cx - d, cy, w)
+                    }
+
+                    // Closed ring with four stubs -- the small eyelet motif.
+                    4 -> {
+                        arcStrap(cx, cy, r * 0.40, 0.0, 360.0, w * 0.85)
+                        for (k in 0 until 4) {
+                            val ang = k * PI / 2 + PI / 4
+                            lineStrap(cx + r * 0.58 * cos(ang), cy + r * 0.58 * sin(ang),
+                                      cx + r * 0.95 * cos(ang), cy + r * 0.95 * sin(ang), w * 0.8)
+                        }
+                    }
+
+                    // Facing hooks -- three-quarter turns that terminate, which
+                    // is what gives the reference its rune-like broken shapes.
+                    else -> {
+                        arcStrap(gx + r * 0.5, gy + r * 0.5, r * 0.5, 90.0, 250.0, w * 0.9)
+                        arcStrap(gx + step - r * 0.5, gy + step - r * 0.5, r * 0.5, 270.0, 250.0, w * 0.9)
+                    }
                 }
                 gy += step; j++
             }
