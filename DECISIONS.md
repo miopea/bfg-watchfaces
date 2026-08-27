@@ -1,5 +1,130 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-27 — Wear emulator: API 36, and what an install actually proves
+
+`scripts/setup-emulators.sh` pinned `system-images;android-34;android-wear`.
+That is **Wear OS 5**, and Watch Face Push is Wear OS 6+. A WFF face sideloads
+and appears in the carousel there, so it was fine for step one, but
+`WatchFacePushManager` does not exist on it — the emulator was silently capped
+below the product, and the one feature the architecture depends on could never
+have been exercised on it.
+
+Now `system-images;android-36;android-wear-signed;x86_64`, which `avdmanager`
+reports as **Wear OS 6.0**. `-signed` is the variant carrying Play services.
+`WEAR_IMG` is overridable for testing the sideload path on an older platform.
+
+The SPEC's caveat that "the emulator cannot exercise Watch Face Push end to end"
+was written against the API 34 image and should be re-tested on API 36 before it
+is trusted. It has not been.
+
+### Measured: the APK installs on Wear OS 6
+
+`adb install -r` returned **Success** against the API 36 emulator, and
+`pm list packages` confirms `com.bfg.watchfaces.watchfacepush.silver_sand`
+present, signed, minSdk 33. First time anything from this repo has been on a
+Wear OS device.
+
+**That is NOT the same as appearing in the carousel, and this repo has said so
+from the beginning.** A schema-invalid face installs, reports Success, and never
+appears. The install therefore proves packaging, signing and the Push path
+allowlist — nothing about whether the face renders. Confirming the carousel
+needs the watch face picker, and the emulator never got there: it sits in the
+Wear setup wizard, and `device_provisioned` / `user_setup_complete` do not move
+it past that.
+
+### Blocked on KVM, which is why the above stops where it does
+
+The emulator ran under pure software emulation (`/dev/kvm` is
+`root:kvm 0660`, and the developer account is not in the `kvm` group).
+Measured cost: **~5 min to adb-online, ~16 min to zygote, ~4 min for a single
+`adb install`.** Completing a setup wizard at that speed is not a reasonable
+verification path.
+
+The fix is one line and needs root, so it is recorded here rather than applied:
+
+```bash
+sudo usermod -aG kvm "$USER"    # then log out and back in, or: newgrp kvm
+```
+
+With KVM the same image boots in well under a minute. Nothing else about the
+pipeline is waiting on anything.
+
+## 2026-08-27 — The workbench: a localhost design loop, and one rasterizer
+
+`build.sh` referred to "the workbench" and `.gitignore` referred to "the
+workbench or the generator", but no such thing existed. The gap it left was
+structural, not cosmetic: **nothing in the repo could produce `dial_bg.png`.**
+`:generator` emitted polylines and XML and stopped there. So the build that
+`CLAUDE.md` listed as verified could not actually be reproduced from a clean
+checkout — the artwork had been made somewhere else, correctly gitignored as
+generated output, and the thing that generated it was never committed.
+
+`preview.png` was missing the same way, and worse: `build.sh` did not check for
+it, so the failure surfaced as an aapt2 link error about an unresolved
+`@drawable/preview` rather than as the missing-artwork problem it was.
+
+**Added `:workbench`** — pure JVM, depends on `:generator`, never the reverse:
+
+- `DialRenderer` — the rasterizer. Strokes engine polylines three times for the
+  engraved look, exactly as `CLAUDE.md` specifies, and keeps that in the
+  renderer rather than the engines.
+- `Quantizer` — median-cut to ≤64 colours, as `docs/SPEC.md` requires on every
+  dial. Measured here: mean error 0.51/255, and the dial lands at 77,271 bytes
+  in the APK against the spec's measured ~77KB.
+- `FacePreview` — composites the dial with the text layers, interactive and
+  ambient, mirroring `WffEmitter`'s arithmetic.
+- An HTTP server on `localhost:7777` and a headless `bake` task.
+
+### The browser does not draw the pattern, and that was the point
+
+The obvious build is a JS canvas that redraws the guilloché client-side. It
+would have been faster to write and much faster to drag a slider against. It was
+rejected: `docs/SPEC.md` commits to one geometry implementation and to "what the
+user sees is what ships, by construction," and a JS reimplementation is a second
+renderer that starts identical and drifts. Every pixel in the browser is a PNG
+produced by the same `DialRenderer.render` call that bakes the shipped file, so
+the preview cannot disagree with the artefact. The cost is a round trip per
+edit, which on loopback is imperceptible.
+
+For the same reason the server and the `bake` CLI both call
+`Workbench.exportTo`. There is no fast path that can emit different bytes than
+the UI showed.
+
+### Live schema validation is the feature that matters
+
+A schema-invalid face compiles, links, signs, installs, reports Success, and
+then never appears in the carousel with no runtime error anywhere. That failure
+used to cost a full build-sign-sideload-squint cycle to notice. The workbench
+runs the same XSD 1.1 validation `WffSchemaTest` runs, against Google's schema,
+on every parameter change, and shows it as a banner. `bake` refuses to write a
+schema-invalid face at all.
+
+### Open: this is now a second rasterizer, by the SPEC's reckoning
+
+`docs/SPEC.md` planned for `:phone`'s Android `Canvas` to drive both the live
+preview and the baked PNG. `DialRenderer` is AWT `Graphics2D`, so when `:phone`
+is built there will be two rasterizers unless they are deliberately unified —
+most cleanly by extracting a small drawing interface into `:generator` that AWT
+and Android `Canvas` both implement, leaving stroke order and compositing
+defined once. **Not done now**, because writing that abstraction before the
+Android side exists would be guessing at its shape. Recording it as the known
+cost of unblocking hardware testing today.
+
+### Found while building: `lens` and `lensAmount` are not in the file format
+
+`DialParams.lens` documents itself as drawing the pattern *over* the numerals.
+`WffEmitter` never reads either field. It cannot: in WFF the dial `<PartImage>`
+sits below the `<DigitalClock>` in the scene, so a texture baked into
+`dial_bg.png` is always behind the time.
+
+It *is* expressible — a second transparent `<PartImage>` emitted after the clock
+would do it — but that changes what a stored parameter set renders as, for every
+existing face, which is exactly what `generatorVersion` exists to prevent. So
+nothing was changed. `DialRenderer` implements the shippable half (a localised
+lift in relief and brightness under the time, which reads as a lens), and the
+decision about the other half is left open deliberately. Two parameters
+currently affect the preview and the bake but not the emitted WFF.
+
 ## 2026-08-26 — Renamed from "Silver Sand" to "BFG Watch Faces"
 
 The project inherited its name from the mockup that started it: her ChatGPT

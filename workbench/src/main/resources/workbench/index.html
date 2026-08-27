@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BFG Watch Faces — Workbench</title>
+<style>
+  :root{
+    --bg:#14161a; --panel:#1b1e24; --panel2:#22262e; --line:#2e333d;
+    --ink:#e8e6e1; --dim:#9aa1ad; --accent:#c9a227; --ok:#4ea96b; --bad:#e0655a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,"DejaVu Sans Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;align-items:baseline;gap:14px;padding:14px 20px;
+         border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.02em}
+  header .sub{color:var(--dim);font-size:12.5px}
+  .wrap{display:grid;grid-template-columns:minmax(500px,1fr) 420px;gap:20px;padding:20px;align-items:start}
+  @media (max-width:1100px){.wrap{grid-template-columns:1fr}}
+
+  .stage{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .faces{display:flex;gap:22px;flex-wrap:wrap;justify-content:center}
+  .face{text-align:center}
+  .face img{width:320px;height:320px;border-radius:50%;display:block;background:#000;
+            box-shadow:0 10px 34px rgba(0,0,0,.55)}
+  .face .cap{margin-top:9px;color:var(--dim);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+  .bezel{padding:9px;border-radius:50%;background:linear-gradient(145deg,#3a3f48,#15171b);display:inline-block}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:14px;overflow:hidden}
+  .panel h2{margin:0;padding:11px 14px;font-size:12px;text-transform:uppercase;letter-spacing:.09em;
+            color:var(--dim);background:var(--panel2);border-bottom:1px solid var(--line);font-weight:600}
+  .body{padding:12px 14px}
+
+  .row{display:grid;grid-template-columns:104px 1fr 56px;gap:9px;align-items:center;margin-bottom:9px}
+  .row label{color:var(--dim);font-size:12.5px}
+  .row output{font-family:var(--mono);font-size:12px;text-align:right;color:var(--ink)}
+  input[type=range]{width:100%;accent-color:var(--accent);height:20px}
+  input[type=color]{width:100%;height:28px;padding:0;border:1px solid var(--line);
+                    border-radius:6px;background:none;cursor:pointer}
+  select,button{font:inherit;color:var(--ink);background:var(--panel2);
+                border:1px solid var(--line);border-radius:7px;padding:7px 10px}
+  select{width:100%;cursor:pointer}
+  button{cursor:pointer;transition:.12s}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#1b1500;border-color:var(--accent);font-weight:600}
+  button.primary:hover{filter:brightness(1.1)}
+  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .toggle{display:flex;gap:8px;align-items:center;margin-bottom:10px;color:var(--dim);font-size:12.5px}
+
+  .status{display:flex;align-items:center;gap:9px;padding:11px 14px;border-radius:9px;
+          font-size:13px;border:1px solid var(--line);background:var(--panel2);margin-bottom:14px}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--dim)}
+  .status.ok .dot{background:var(--ok);box-shadow:0 0 9px var(--ok)}
+  .status.bad .dot{background:var(--bad);box-shadow:0 0 9px var(--bad)}
+  .status.ok{border-color:#2c5c3e} .status.bad{border-color:#6d3630}
+
+  table.stats{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.stats td{padding:3.5px 0;border-bottom:1px solid #23272f}
+  table.stats td:last-child{text-align:right;font-family:var(--mono);color:var(--dim)}
+  table.stats tr:last-child td{border-bottom:none}
+
+  pre{margin:0;padding:12px 14px;background:#101216;border-top:1px solid var(--line);
+      font-family:var(--mono);font-size:11.5px;line-height:1.5;color:#c8ccd4;
+      max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+  .note{color:var(--dim);font-size:11.5px;padding:0 14px 12px;line-height:1.5}
+  .hint{color:var(--dim);font-size:11.5px;margin-top:8px;line-height:1.5}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>BFG Watch Faces — Workbench</h1>
+  <span class="sub">localhost design loop · no APK, no sideload</span>
+</header>
+
+<div class="wrap">
+  <!-- ---------------- preview stage ---------------- -->
+  <div>
+    <div class="stage">
+      <div class="faces">
+        <div class="face">
+          <div class="bezel"><img id="imgFace" alt="interactive face"></div>
+          <div class="cap">Interactive</div>
+        </div>
+        <div class="face">
+          <div class="bezel"><img id="imgAmbient" alt="ambient face"></div>
+          <div class="cap">Ambient</div>
+        </div>
+        <div class="face">
+          <div class="bezel"><img id="imgDial" alt="dial texture"></div>
+          <div class="cap">dial_bg.png</div>
+        </div>
+      </div>
+      <div class="hint" style="text-align:center;max-width:640px;margin:16px auto 0">
+        The dial is exact — these are the same bytes <code>DialRenderer</code> bakes into the APK.
+        The text is an approximation: positions mirror <code>WffEmitter</code>'s arithmetic exactly,
+        but glyphs are drawn with a local font, while the watch uses <code>SYNC_TO_DEVICE</code>.
+        Judge composition and contrast here; judge kerning on the wrist.
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2>Emitted WFF <span style="text-transform:none;letter-spacing:0">— validated live against Google's XSD 1.1</span></h2>
+      <pre id="wff">loading…</pre>
+    </div>
+  </div>
+
+  <!-- ---------------- controls ---------------- -->
+  <div>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">validating…</span></div>
+
+    <div class="panel">
+      <h2>Preset</h2>
+      <div class="body">
+        <select id="preset"><option value="">— choose a starting point —</option></select>
+        <div class="btns" style="margin-top:10px">
+          <button class="primary" id="btnExport">Export to template</button>
+          <button id="btnBuild">Build APK</button>
+          <button id="btnCopy">Copy link</button>
+        </div>
+        <div class="hint" id="actionResult"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Pattern</h2>
+      <div class="body">
+        <div class="row"><label for="engine">Engine</label>
+          <span style="grid-column:2/4"><select id="engine"></select></span></div>
+        <div id="patternRows"></div>
+        <div class="toggle"><input type="checkbox" id="lens"><label for="lens">Lens over centre</label></div>
+        <div id="lensRow"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Colour</h2>
+      <div class="body">
+        <div class="row"><label for="dialColor">Dial</label>
+          <span style="grid-column:2/4"><input type="color" id="dialColor"></span></div>
+        <div class="row"><label for="inkColor">Ink</label>
+          <span style="grid-column:2/4"><input type="color" id="inkColor"></span></div>
+        <div id="colorRows"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Layout</h2>
+      <div class="body"><div id="layoutRows"></div>
+        <div class="row"><label for="fontWeight">Weight</label>
+          <span style="grid-column:2/4"><select id="fontWeight">
+            <option>MEDIUM</option><option>THIN</option><option>NORMAL</option><option>BOLD</option>
+          </select></span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Measured</h2>
+      <div class="body"><table class="stats" id="stats"><tr><td>—</td><td>—</td></tr></table></div>
+      <div class="note">
+        Framebuffer is 4 bytes/pixel/frame on the watch and does not change with PNG size —
+        quantizing buys Bluetooth transfer time, not memory budget.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ENGINES = ["BOTANICAL","LATTICE","CLOUS","ROSETTE","BARLEYCORN","SUNBURST","NONE"];
+
+// Slider definitions: [key, label, min, max, step, group]
+const SLIDERS = [
+  ["scale","Scale",4,80,0.5,"pattern"],
+  ["depth","Depth",0,20,0.1,"pattern"],
+  ["freq","Frequency",1,24,1,"pattern"],
+  ["stroke","Stroke",0.2,4,0.05,"pattern"],
+  ["relief","Relief",0,6,0.1,"pattern"],
+  ["rotate","Rotate",0,360,1,"pattern"],
+  ["contrast","Contrast",0,100,1,"color"],
+  ["sheen","Sheen",0,100,1,"color"],
+  ["vignette","Vignette",0,100,1,"color"],
+  ["lensAmount","Lens amount",0,100,1,"lens"],
+  ["dateY","Date Y",40,220,1,"layout"],
+  ["dateSize","Date size",10,44,1,"layout"],
+  ["timeY","Time Y",80,380,1,"layout"],
+  ["timeSize","Time size",40,170,1,"layout"],
+  ["complicationY","Compl. Y",140,410,1,"layout"],
+  ["complicationSpread","Compl. spread",40,170,1,"layout"],
+  ["complicationSize","Compl. size",10,40,1,"layout"],
+  ["batteryY","Battery Y",200,436,1,"layout"],
+];
+
+const state = {
+  engine:"BOTANICAL", scale:40, depth:5, freq:7, stroke:1.2, relief:1.4, contrast:30,
+  rotate:45, vignette:18, dialColor:"#7D7369", inkColor:"#FCF9F1", sheen:30,
+  lens:true, lensAmount:38, dateY:118, dateSize:21, timeY:196, timeSize:104,
+  complicationY:286, complicationSpread:86, complicationSize:19, batteryY:348,
+  fontFamily:"SYNC_TO_DEVICE", fontWeight:"MEDIUM"
+};
+
+const $ = s => document.querySelector(s);
+const qs = () => new URLSearchParams(state).toString();
+
+// ---- build the controls -------------------------------------------------
+const groups = {pattern:$("#patternRows"), color:$("#colorRows"), layout:$("#layoutRows"), lens:$("#lensRow")};
+for (const [key,label,min,max,step,group] of SLIDERS){
+  const row = document.createElement("div"); row.className = "row";
+  row.innerHTML = `<label for="${key}">${label}</label>
+    <input type="range" id="${key}" min="${min}" max="${max}" step="${step}">
+    <output id="out_${key}"></output>`;
+  groups[group].appendChild(row);
+}
+const eng = $("#engine");
+ENGINES.forEach(e => { const o = document.createElement("option"); o.value = o.textContent = e; eng.appendChild(o); });
+
+// ---- wiring -------------------------------------------------------------
+function syncInputs(){
+  for (const [key] of SLIDERS){
+    const el = document.getElementById(key);
+    el.value = state[key];
+    document.getElementById("out_"+key).textContent = state[key];
+  }
+  eng.value = state.engine;
+  $("#dialColor").value = state.dialColor;
+  $("#inkColor").value = state.inkColor;
+  $("#lens").checked = state.lens;
+  $("#fontWeight").value = state.fontWeight;
+}
+
+let timer = null;
+function schedule(){ clearTimeout(timer); timer = setTimeout(refresh, 110); }
+
+for (const [key] of SLIDERS){
+  document.getElementById(key).addEventListener("input", e => {
+    state[key] = parseFloat(e.target.value);
+    document.getElementById("out_"+key).textContent = e.target.value;
+    schedule();
+  });
+}
+eng.addEventListener("change", e => { state.engine = e.target.value; schedule(); });
+$("#dialColor").addEventListener("input", e => { state.dialColor = e.target.value.toUpperCase(); schedule(); });
+$("#inkColor").addEventListener("input", e => { state.inkColor = e.target.value.toUpperCase(); schedule(); });
+$("#lens").addEventListener("change", e => { state.lens = e.target.checked; schedule(); });
+$("#fontWeight").addEventListener("change", e => { state.fontWeight = e.target.value; schedule(); });
+
+// ---- refresh ------------------------------------------------------------
+// Swap images only once decoded, so dragging a slider never flashes a blank dial.
+function swap(imgEl, url){
+  const probe = new Image();
+  probe.onload = () => { imgEl.src = url; };
+  probe.src = url;
+}
+
+let seq = 0;
+async function refresh(){
+  const mine = ++seq;
+  const q = qs();
+  swap($("#imgFace"),    `/api/face.png?${q}&size=640`);
+  swap($("#imgAmbient"), `/api/face.png?${q}&size=640&ambient=true`);
+  swap($("#imgDial"),    `/api/dial.png?${q}&size=640`);
+
+  try{
+    const [v, s, x] = await Promise.all([
+      fetch(`/api/validate?${q}`).then(r=>r.json()),
+      fetch(`/api/stats?${q}`).then(r=>r.json()),
+      fetch(`/api/wff.xml?${q}`).then(r=>r.text()),
+    ]);
+    if (mine !== seq) return;               // a newer drag already superseded this
+    renderStatus(v); renderStats(s); $("#wff").textContent = x;
+  }catch(err){
+    if (mine === seq) setStatus("bad", "workbench error: " + err.message);
+  }
+}
+
+function setStatus(cls, text){
+  const el = $("#status");
+  el.className = "status" + (cls ? " " + cls : "");
+  $("#statusText").textContent = text;
+}
+
+function renderStatus(v){
+  if (!v.available){ setStatus("", v.reason); return; }
+  if (v.valid){ setStatus("ok", "Schema valid — this face will appear in the carousel"); return; }
+  setStatus("bad", `${v.issues.length} schema error(s): ` + v.issues.map(i=>`line ${i.line}: ${i.message}`).join(" · "));
+}
+
+const kb = n => (n/1024).toFixed(1) + " KB";
+function renderStats(s){
+  $("#stats").innerHTML = `
+    <tr><td>Polylines</td><td>${s.polylines.toLocaleString()}</td></tr>
+    <tr><td>Points</td><td>${s.points.toLocaleString()}</td></tr>
+    <tr><td>Dial coverage</td><td>${(s.coverage*100).toFixed(1)}%</td></tr>
+    <tr><td>PNG, full colour</td><td>${kb(s.pngBytes)}</td></tr>
+    <tr><td>PNG, quantized</td><td>${kb(s.quantizedBytes)} · ${s.quantizedColors} colours</td></tr>
+    <tr><td>Quantization error</td><td>${s.meanError}/255</td></tr>
+    <tr><td>Watch framebuffer</td><td>${kb(s.framebufferBytes)}</td></tr>`;
+}
+
+// ---- actions ------------------------------------------------------------
+$("#btnExport").addEventListener("click", async () => {
+  $("#actionResult").textContent = "exporting…";
+  const r = await fetch(`/api/export?${qs()}`).then(r=>r.json());
+  $("#actionResult").innerHTML = r.ok
+    ? "Wrote:<br>" + r.written.join("<br>") + "<br>Now: <code>cd watchface-template && ./build.sh</code>"
+    : "failed: " + (r.error||"unknown");
+});
+
+$("#btnBuild").addEventListener("click", async () => {
+  $("#actionResult").textContent = "building APK… (aapt2, zipalign, apksigner)";
+  const r = await fetch(`/api/build?${qs()}`).then(r=>r.json());
+  $("#actionResult").innerHTML = r.ok
+    ? `Built <code>watchface-template/build/silver-sand.apk</code> — ${kb(r.apkBytes)}<br>
+       <code>adb install -r watchface-template/build/silver-sand.apk</code>`
+    : "build failed (exit " + r.exit + "):<br><code>" + (r.output||"").replace(/</g,"&lt;").slice(-700) + "</code>";
+});
+
+$("#btnCopy").addEventListener("click", () => {
+  const url = location.origin + "/?" + qs();
+  navigator.clipboard.writeText(url);
+  $("#actionResult").textContent = "Link copied — it encodes the full parameter set.";
+});
+
+$("#preset").addEventListener("change", e => {
+  if (!e.target.value) return;
+  const p = new URLSearchParams(e.target.value);
+  for (const [k,v] of p) state[k] = (v==="true") ? true : (v==="false" ? false : (isNaN(v) ? v : parseFloat(v)));
+  syncInputs(); refresh();
+});
+
+// ---- boot ---------------------------------------------------------------
+(async function boot(){
+  // A shared link restores the full design.
+  const incoming = new URLSearchParams(location.search);
+  for (const [k,v] of incoming) if (k in state)
+    state[k] = (v==="true") ? true : (v==="false" ? false : (isNaN(v) ? v : parseFloat(v)));
+
+  const {presets} = await fetch("/api/presets").then(r=>r.json());
+  const sel = $("#preset");
+  presets.forEach(p => { const o = document.createElement("option"); o.value = p.query; o.textContent = p.name; sel.appendChild(o); });
+
+  syncInputs();
+  refresh();
+})();
+</script>
+</body>
+</html>

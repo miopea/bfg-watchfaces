@@ -21,10 +21,25 @@ else
   echo "WARNING: validator not available. Run scripts/bootstrap.sh." >&2
 fi
 
-# The dial artwork is generated, not source. Fail loudly if it is missing.
-if [ ! -f res/drawable-nodpi/dial_bg.png ]; then
-  echo "ERROR: res/drawable-nodpi/dial_bg.png missing." >&2
-  echo "Export one from the workbench, or generate it from :generator." >&2
+# The artwork is generated, not source, and is gitignored. Fail loudly and with
+# a command that actually works if it is missing.
+#
+# preview.png matters as much as dial_bg.png: res/xml/watch_face_info.xml
+# requires a <Preview>, and without the file aapt2 link fails on an unresolved
+# @drawable/preview rather than on anything that names the real problem.
+MISSING=""
+for f in dial_bg preview; do
+  [ -f "res/drawable-nodpi/$f.png" ] || MISSING="$MISSING res/drawable-nodpi/$f.png"
+done
+if [ -n "$MISSING" ]; then
+  echo "ERROR: missing generated artwork:$MISSING" >&2
+  echo >&2
+  echo "Bake it from the parameters:" >&2
+  echo "    ./gradlew :workbench:bake" >&2
+  echo "    ./gradlew :workbench:bake --args=\"--preset=Rosette Noir\"" >&2
+  echo >&2
+  echo "Or design it interactively:" >&2
+  echo "    ./gradlew :workbench:workbench   # then http://localhost:7777" >&2
   exit 1
 fi
 

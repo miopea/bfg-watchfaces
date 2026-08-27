@@ -27,6 +27,18 @@ dependency, runs in seconds without an emulator. Geometry, params, and WFF
 emission all belong there. Only reach for `:phone` or `:wear` when the task
 genuinely needs Android APIs.
 
+**Use the workbench instead of building an APK.** `./gradlew
+:workbench:workbench` serves a live design loop on localhost with schema
+validation on every change. Almost nothing about geometry, colour, layout or
+ambient needs a device to judge. `:workbench` is also pure JVM and depends on
+`:generator`, never the reverse — the generator stays the dependency-free
+definition of the file format.
+
+**There is one rasterizer, and it is `DialRenderer`.** The browser preview, the
+`bake` task and the shipped `dial_bg.png` are all the same call. Do not add a
+second one — in particular, do not "speed up" the preview by redrawing the
+pattern in JavaScript. See `DECISIONS.md` 2026-08-27.
+
 **Never change engine geometry in place.** Community faces are stored as
 parameters, so `PatternEngines` IS the renderer for the stored file format.
 Changing an engine's output silently rewrites every existing face. Add a branch
@@ -50,6 +62,13 @@ rejected — not a changelog.
 ```bash
 ./gradlew :generator:test
 ./gradlew :generator:test --tests '*WffSchema*'
+./gradlew :workbench:test
+
+./gradlew :workbench:workbench          # design loop at http://localhost:7777
+./gradlew :workbench:bake               # dial_bg.png + preview.png + watchface.xml
+./gradlew :workbench:bake --args="--preset=Rosette Noir"
+
+make docs-check                         # markdownlint + cspell over the docs
 
 cd watchface-template && ./build.sh    # validates + builds build/silver-sand.apk
 cd watchface-template && ./reskin.sh <template.apk> <bg.png> <wff.xml> <out.apk>
@@ -73,15 +92,25 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 ## State of play
 
 Verified — built and run, not assumed:
+
 - `:generator` — 35 tests green, including validation against Google's official XSD.
-- `watchface-template` — builds a signed APK containing exactly the four paths
-  Watch Face Push permits.
+- `:workbench` — 23 tests green. Serves the design loop; bakes `dial_bg.png`,
+  `preview.png` and `watchface.xml` from parameters. Quantization measured at
+  64 colours, mean error 0.51/255.
+- `watchface-template` — builds a signed 157KB APK containing exactly the four
+  paths Watch Face Push permits, from artwork baked by `:workbench`. Verified by
+  `unzip -l` and `apksigner verify` on 2026-08-27.
 - `reskin.sh` — swaps resources into a built APK without recompiling.
+  (Written and read, but not exercised since the workbench landed.)
 
 Scaffolded, never built or run:
+
 - `:phone`, `:wear` — build files and a manifest only. Commented out of
   `settings.gradle.kts`. Uncomment as you implement them.
 
 Never tested on hardware:
+
 - Everything. No watch face from this repo has been confirmed to appear on a
-  real watch. That is step one and it gates all of the rest.
+  real watch. That is step one and it gates all of the rest. The APK now exists
+  and is installable; what is missing is a Wear OS device or emulator to install
+  it onto.

@@ -1,0 +1,267 @@
+package com.bfg.watchfaces.workbench
+
+import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.PatternEngines
+import com.bfg.watchfaces.generator.WffEmitter
+import com.sun.net.httpserver.HttpExchange
+import com.sun.net.httpserver.HttpServer
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
+import javax.imageio.ImageIO
+
+/**
+ * The workbench: a localhost design loop for watch faces.
+ *
+ * The problem it solves is the round trip. Judging a dial used to mean bake a
+ * PNG by hand, run aapt2, sign, sideload, long-press the watch, squint. That is
+ * minutes per iteration, and it needs a watch. This is milliseconds, and it
+ * needs a browser.
+ *
+ * Design rule that matters: the BROWSER NEVER DRAWS THE PATTERN. It asks this
+ * server for a PNG produced by [DialRenderer] -- the same code, the same call,
+ * that bakes the shipped dial_bg.png. A JS canvas reimplementation would have
+ * been faster to write and would have quietly become a second renderer that
+ * drifts from the shipped one. docs/SPEC.md is explicit that there is one
+ * geometry implementation and what you see is what ships; this preserves that.
+ *
+ * Binds to loopback only. It writes into your working tree and shells out to
+ * build.sh -- it is a dev tool, not a service, and must not be reachable off
+ * the machine.
+ */
+object Workbench {
+
+    private val root: File by lazy { findRoot() }
+
+    private fun findRoot(): File {
+        var d: File? = File(System.getProperty("user.dir")).absoluteFile
+        while (d != null) {
+            if (File(d, "settings.gradle.kts").isFile) return d
+            d = d.parentFile
+        }
+        return File(System.getProperty("user.dir")).absoluteFile
+    }
+
+    @JvmStatic
+    fun main(args: Array<String>) {
+        System.setProperty("java.awt.headless", "true")
+        val port = args.firstOrNull { it.startsWith("--port=") }?.removePrefix("--port=")?.toIntOrNull() ?: 7777
+
+        val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0)
+        server.executor = Executors.newFixedThreadPool(4)
+
+        server.createContext("/") { ex -> safe(ex) { serveIndex(ex) } }
+        server.createContext("/api/dial.png") { ex -> safe(ex) { serveDial(ex) } }
+        server.createContext("/api/face.png") { ex -> safe(ex) { serveFace(ex) } }
+        server.createContext("/api/wff.xml") { ex -> safe(ex) { serveWff(ex) } }
+        server.createContext("/api/validate") { ex -> safe(ex) { serveValidate(ex) } }
+        server.createContext("/api/stats") { ex -> safe(ex) { serveStats(ex) } }
+        server.createContext("/api/presets") { ex -> safe(ex) { servePresets(ex) } }
+        server.createContext("/api/export") { ex -> safe(ex) { serveExport(ex) } }
+        server.createContext("/api/build") { ex -> safe(ex) { serveBuild(ex) } }
+        server.start()
+
+        println()
+        println("  BFG Watch Faces -- workbench")
+        println("  http://localhost:$port")
+        println()
+        println("  repo root : ${root.absolutePath}")
+        println("  schema    : " + if (WffValidator.validate(root, "<x/>") != null) "loaded (live validation on)"
+                                    else "MISSING -- run scripts/bootstrap.sh")
+        println("  ANDROID_HOME : " + (System.getenv("ANDROID_HOME") ?: "unset (export/build APK disabled)"))
+        println()
+        println("  Ctrl-C to stop.")
+    }
+
+    // ---- plumbing -----------------------------------------------------------
+
+    private fun safe(ex: HttpExchange, body: () -> Unit) {
+        try {
+            body()
+        } catch (t: Throwable) {
+            val msg = (t.message ?: t.toString())
+            send(ex, 500, "application/json", """{"error":${jsonStr(msg)}}""".toByteArray())
+        } finally {
+            ex.close()
+        }
+    }
+
+    private fun query(ex: HttpExchange): Map<String, String> {
+        val q = ex.requestURI.rawQuery ?: return emptyMap()
+        return q.split("&").mapNotNull {
+            val i = it.indexOf('='); if (i <= 0) return@mapNotNull null
+            URLDecoder.decode(it.substring(0, i), StandardCharsets.UTF_8) to
+                URLDecoder.decode(it.substring(i + 1), StandardCharsets.UTF_8)
+        }.toMap()
+    }
+
+    private fun params(ex: HttpExchange): DialParams = ParamCodec.fromQuery(query(ex))
+
+    private fun send(ex: HttpExchange, code: Int, type: String, body: ByteArray) {
+        ex.responseHeaders.add("Content-Type", type)
+        ex.responseHeaders.add("Cache-Control", "no-store")
+        ex.sendResponseHeaders(code, body.size.toLong())
+        ex.responseBody.use { it.write(body) }
+    }
+
+    private fun json(ex: HttpExchange, body: String) =
+        send(ex, 200, "application/json; charset=utf-8", body.toByteArray(Charsets.UTF_8))
+
+    private fun jsonStr(s: String): String {
+        val sb = StringBuilder("\"")
+        for (c in s) when (c) {
+            '"' -> sb.append("\\\""); '\\' -> sb.append("\\\\")
+            '\n' -> sb.append("\\n"); '\r' -> sb.append("\\r"); '\t' -> sb.append("\\t")
+            else -> if (c < ' ') sb.append("\\u%04x".format(c.code)) else sb.append(c)
+        }
+        return sb.append('"').toString()
+    }
+
+    private fun png(img: java.awt.image.BufferedImage): ByteArray {
+        val bos = ByteArrayOutputStream()
+        ImageIO.write(img, "png", bos)
+        return bos.toByteArray()
+    }
+
+    // ---- endpoints ----------------------------------------------------------
+
+    private fun serveIndex(ex: HttpExchange) {
+        val path = ex.requestURI.path
+        if (path != "/" && path != "/index.html") { send(ex, 404, "text/plain", "not found".toByteArray()); return }
+        val html = javaClass.getResourceAsStream("/workbench/index.html")!!.readBytes()
+        send(ex, 200, "text/html; charset=utf-8", html)
+    }
+
+    /** The dial texture alone -- literally the bytes that become dial_bg.png. */
+    private fun serveDial(ex: HttpExchange) {
+        val q = query(ex)
+        val p = params(ex)
+        val size = q["size"]?.toIntOrNull() ?: DIAL_SIZE
+        var img = DialRenderer.render(p, size)
+        if (q["quantize"] == "true") img = Quantizer.quantize(img, q["colors"]?.toIntOrNull() ?: 64).image
+        send(ex, 200, "image/png", png(img))
+    }
+
+    /** The whole face, dial plus text layers, interactive or ambient. */
+    private fun serveFace(ex: HttpExchange) {
+        val q = query(ex)
+        val p = params(ex)
+        val size = q["size"]?.toIntOrNull() ?: DIAL_SIZE
+        send(ex, 200, "image/png", png(FacePreview.render(p, ambient = q["ambient"] == "true", size = size)))
+    }
+
+    private fun serveWff(ex: HttpExchange) =
+        send(ex, 200, "text/plain; charset=utf-8", WffEmitter.emit(params(ex)).toByteArray(Charsets.UTF_8))
+
+    /**
+     * Live XSD 1.1 validation. The single highest-value endpoint here: this is
+     * the failure that is otherwise completely silent all the way to the wrist.
+     */
+    private fun serveValidate(ex: HttpExchange) {
+        val xml = WffEmitter.emit(params(ex))
+        val issues = WffValidator.validate(root, xml)
+        if (issues == null) {
+            json(ex, """{"available":false,"reason":"WFF schema not installed -- run scripts/bootstrap.sh"}""")
+            return
+        }
+        val arr = issues.joinToString(",") {
+            """{"line":${it.line},"fatal":${it.fatal},"message":${jsonStr(it.message)}}"""
+        }
+        json(ex, """{"available":true,"valid":${issues.isEmpty()},"issues":[$arr]}""")
+    }
+
+    /** Numbers that predict behaviour on the watch, shown live while you drag. */
+    private fun serveStats(ex: HttpExchange) {
+        val p = params(ex)
+        val paths = PatternEngines.paths(p)
+        val points = paths.sumOf { it.size }
+        val coverage = PatternEngines.coverage(paths)
+
+        val full = DialRenderer.render(p, DIAL_SIZE)
+        val rawBytes = png(full).size
+        val q = Quantizer.quantize(full, 64)
+        val quantBytes = png(q.image).size
+
+        // 4 bytes/pixel/frame on the watch, independent of PNG size. Quantizing
+        // buys transfer time over Bluetooth, never memory budget.
+        val framebuffer = DIAL_SIZE * DIAL_SIZE * 4
+        json(ex, """{
+  "points": $points, "polylines": ${paths.size}, "coverage": ${"%.4f".format(coverage)},
+  "pngBytes": $rawBytes, "quantizedBytes": $quantBytes,
+  "quantizedColors": ${q.colors}, "meanError": ${"%.3f".format(q.meanError)},
+  "framebufferBytes": $framebuffer
+}""")
+    }
+
+    private fun servePresets(ex: HttpExchange) {
+        val arr = ParamCodec.presets.entries.joinToString(",") { (name, p) ->
+            """{"name":${jsonStr(name)},"query":${jsonStr(ParamCodec.toQuery(p))}}"""
+        }
+        json(ex, """{"presets":[$arr]}""")
+    }
+
+    /**
+     * Write the generated artefacts into watchface-template so build.sh can run.
+     *
+     * This is the seam the repo was missing: dial_bg.png and preview.png are
+     * generated output, correctly gitignored, and until now nothing in the repo
+     * could produce them -- build.sh referred to a "workbench" that did not exist.
+     */
+    private fun serveExport(ex: HttpExchange) {
+        val p = params(ex)
+        val q = query(ex)
+        val colors = q["colors"]?.toIntOrNull() ?: 64
+        val written = exportTo(root, p, colors)
+        json(ex, """{"ok":true,"written":[${written.joinToString(",") { jsonStr(it) }}]}""")
+    }
+
+    fun exportTo(root: File, p: DialParams, colors: Int = 64): List<String> {
+        val tpl = File(root, "watchface-template")
+        val drawable = File(tpl, "res/drawable-nodpi").apply { mkdirs() }
+
+        // Dial: quantized, because it crosses to the watch over Bluetooth.
+        val dial = Quantizer.quantize(DialRenderer.render(p, DIAL_SIZE), colors)
+        val dialFile = File(drawable, "dial_bg.png")
+        ImageIO.write(dial.image, "png", dialFile)
+
+        // Preview: what the carousel shows. res/xml/watch_face_info.xml requires
+        // it, and without it aapt2 link fails on an unresolved @drawable/preview.
+        val preview = Quantizer.quantize(FacePreview.render(p, ambient = false, size = DIAL_SIZE), colors)
+        val previewFile = File(drawable, "preview.png")
+        ImageIO.write(preview.image, "png", previewFile)
+
+        // The WFF definition itself, so the template tracks the params exactly.
+        val xmlFile = File(tpl, "res/raw/watchface.xml")
+        xmlFile.writeText(WffEmitter.emit(p))
+
+        return listOf(
+            "${dialFile.relativeTo(root)} (${dialFile.length()} bytes, ${dial.colors} colours, mean error ${"%.2f".format(dial.meanError)}/255)",
+            "${previewFile.relativeTo(root)} (${previewFile.length()} bytes)",
+            "${xmlFile.relativeTo(root)}"
+        )
+    }
+
+    /** Runs the real build.sh. Same script CI and a human would run -- no shortcut path. */
+    private fun serveBuild(ex: HttpExchange) {
+        if (System.getenv("ANDROID_HOME") == null) {
+            json(ex, """{"ok":false,"output":"ANDROID_HOME is not set, so aapt2/apksigner are unavailable."}""")
+            return
+        }
+        val p = params(ex)
+        val written = exportTo(root, p, query(ex)["colors"]?.toIntOrNull() ?: 64)
+        val pb = ProcessBuilder("./build.sh")
+            .directory(File(root, "watchface-template"))
+            .redirectErrorStream(true)
+        val proc = pb.start()
+        val out = proc.inputStream.bufferedReader().readText()
+        val code = proc.waitFor()
+        val apk = File(root, "watchface-template/build/silver-sand.apk")
+        json(ex, """{"ok":${code == 0},"exit":$code,"apkBytes":${if (apk.isFile) apk.length() else 0},
+"written":[${written.joinToString(",") { jsonStr(it) }}],"output":${jsonStr(out)}}""")
+    }
+}
