@@ -31,15 +31,19 @@ object WffEmitter {
         val ink = argb(p.inkColor)
         val inkDim = argb(p.inkColor, 160)
 
-        val slots = listOf(
-            Triple(0, "STEP_COUNT", "@string/slot_steps"),
-            Triple(1, "HEART_RATE", "@string/slot_heart"),
-            Triple(2, "DAY_AND_DATE", "@string/slot_weather")
-        ).joinToString("\n") { (id, provider, label) ->
+        // Only the slots that are actually switched on, re-centred as a group.
+        // An empty slot is not emitted at all: on the watch it would still cost
+        // a tap target and a frame budget, and it leaves a visible hole.
+        val active = p.complications.filter { it.enabled }
+        val slots = active.mapIndexed { index, source ->
             val w = (l.complicationSize * 4.7).toInt()
             val h = (l.complicationSize * 4.0).toInt()
-            val x = DIAL_SIZE / 2 + (id - 1) * l.complicationSpread - w / 2
+            val offset = (index - (active.size - 1) / 2.0) * l.complicationSpread
+            val x = (DIAL_SIZE / 2 + offset - w / 2).toInt()
             val y = l.complicationY - (l.complicationSize * 1.2).toInt()
+            val id = index
+            val provider = source.wff
+            val label = "@string/slot_${source.name.lowercase()}"
             """
     <ComplicationSlot slotId="$id" x="$x" y="$y" width="$w" height="$h"
                       displayName="$label"
@@ -61,7 +65,7 @@ object WffEmitter {
         </PartImage>
       </Complication>
     </ComplicationSlot>"""
-        }
+        }.joinToString("\n")
 
         // The emitted file is what ships, and since the workbench bakes it into
         // watchface-template it replaces what used to be a hand-annotated

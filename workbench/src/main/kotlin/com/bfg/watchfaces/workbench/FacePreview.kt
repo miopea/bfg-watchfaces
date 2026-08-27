@@ -72,13 +72,19 @@ object FacePreview {
         }
 
         // Complications: alpha 255 interactive, AMBIENT alpha 0.
+        //
+        // Only the slots that are switched on, positioned with the SAME
+        // arithmetic WffEmitter uses -- including the re-centring when a slot is
+        // off. If these two ever disagree the preview stops being evidence about
+        // the layout, which is most of what it is for.
         if (!ambient) {
-            val labels = listOf("8,412", "62", "MAR 10")
-            for (id in 0..2) {
+            val active = p.complications.filter { it.enabled }
+            active.forEachIndexed { index, source ->
                 val w = (l.complicationSize * 4.7).toInt()
-                val x = DIAL_SIZE / 2 + (id - 1) * l.complicationSpread - w / 2
+                val offset = (index - (active.size - 1) / 2.0) * l.complicationSpread
+                val x = (DIAL_SIZE / 2 + offset - w / 2).toInt()
                 val y = l.complicationY - (l.complicationSize * 1.2).toInt()
-                drawCenteredIn(g, labels[id], x, y + (l.complicationSize * 1.4).toInt(), w,
+                drawCenteredIn(g, Complications.sample(source), x, y + (l.complicationSize * 1.4).toInt(), w,
                     (l.complicationSize * 1.8).toInt(), l.complicationSize * 0.92, Font.PLAIN, ink)
             }
             // Battery: alpha 255 interactive, AMBIENT alpha 0.

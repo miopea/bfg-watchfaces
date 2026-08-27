@@ -12,6 +12,36 @@ typealias Polyline = List<Pt>
 enum class Engine { LATTICE, CLOUS, ROSETTE, BARLEYCORN, SUNBURST, BOTANICAL, KNOTWORK, NONE }
 
 /**
+ * What a complication slot shows.
+ *
+ * [wff] is the WFF `defaultSystemProvider` token, and these are EXACTLY the
+ * values the schema's `defaultProviderListType` enumerates -- they are not a
+ * guess and not a superset. An unlisted provider fails schema validation, which
+ * means the face installs and then never appears in the carousel.
+ *
+ * Presentation (labels, sample values for a preview) deliberately lives in the
+ * workbench, not here. :generator defines the stored format; what a slot looks
+ * like on screen is a renderer's problem.
+ */
+enum class ComplicationSource(val wff: String?) {
+    NONE(null),
+    STEP_COUNT("STEP_COUNT"),
+    HEART_RATE("HEART_RATE"),
+    DAY_AND_DATE("DAY_AND_DATE"),
+    DATE("DATE"),
+    DAY_OF_WEEK("DAY_OF_WEEK"),
+    WATCH_BATTERY("WATCH_BATTERY"),
+    WORLD_CLOCK("WORLD_CLOCK"),
+    NEXT_EVENT("NEXT_EVENT"),
+    SUNRISE_SUNSET("SUNRISE_SUNSET"),
+    UNREAD_NOTIFICATION_COUNT("UNREAD_NOTIFICATION_COUNT"),
+    APP_SHORTCUT("APP_SHORTCUT"),
+    FAVORITE_CONTACT("FAVORITE_CONTACT");
+
+    val enabled: Boolean get() = wff != null
+}
+
+/**
  * Everything needed to reproduce a dial.
  *
  * IMPORTANT - [generatorVersion] is load-bearing.
@@ -46,7 +76,20 @@ data class DialParams(
     val lens: Boolean = true,
     val lensAmount: Double = 38.0,
 
-    val layout: Layout = Layout()
+    val layout: Layout = Layout(),
+
+    /**
+     * The complication slots, left to right. Slots set to
+     * [ComplicationSource.NONE] are not emitted at all -- an empty slot still
+     * costs a tap target and a frame budget on the watch, so it is omitted
+     * rather than rendered blank. The enabled ones are re-centred, so turning
+     * one off closes the gap instead of leaving a hole.
+     */
+    val complications: List<ComplicationSource> = listOf(
+        ComplicationSource.STEP_COUNT,
+        ComplicationSource.HEART_RATE,
+        ComplicationSource.DAY_AND_DATE
+    )
 ) {
     init {
         require(generatorVersion in 1..CURRENT_GENERATOR_VERSION) {

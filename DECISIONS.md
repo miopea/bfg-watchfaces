@@ -1,5 +1,61 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-27 — Complications, and two ways to finish a face
+
+### Complications are configurable, and the preview tells the truth about them
+
+`WffEmitter` hardcoded three slots with fixed providers. They are now a stored
+parameter: `DialParams.complications`, a list of `ComplicationSource`.
+
+The provider tokens are **exactly** the schema's `defaultProviderListType`
+enumeration, read out of the XSD rather than remembered — an invented token is
+not a runtime error, it is a face that installs cleanly and never appears. All
+thirteen are covered by a parameterized schema test.
+
+Two behaviours worth stating because they are not obvious from the code:
+
+- **A slot set to Off is not emitted at all**, rather than emitted empty. An
+  empty slot still costs a tap target and frame budget on the watch.
+- **The remaining slots re-centre.** Turning off the left slot must not leave a
+  hole with two slots hanging right. `FacePreview` uses the *same* arithmetic as
+  the emitter, and a test asserts a lone slot lands exactly where the middle of
+  three did — if those two drift, the preview stops being evidence about layout,
+  which is most of what it is for.
+
+The preview draws each slot's selected source with a sample value of
+representative WIDTH. That is the only honest thing a preview can say here: on
+the watch a real provider fills the slot, and the question a designer needs
+answered is whether the layout survives a value about that size.
+
+`strings.xml` is generated with a `slot_<source>` entry for every active slot,
+because the emitter references them by name and aapt2 link fails outright on an
+unresolved `@string`. Presentation (labels, samples) lives in `:workbench`, not
+`:generator`: the generator defines the stored format, and sample strings have
+no business being versioned into it.
+
+### The OS colour picker had to go
+
+`<input type="color">` delegates to the operating system's own dialog — on
+Windows a desktop colour chooser that cannot be styled, does not look like the
+app, and breaks the illusion completely. Replaced with an in-app
+saturation/brightness pad plus hue slider and a hex field.
+
+Drawing gradients for the picker is not a breach of the one-rasterizer rule.
+That rule is about watch-face PIXELS: no dial, no pattern, no preview is drawn
+in the browser. Picker chrome is chrome.
+
+### Save to Gallery, or Save and Update Watch
+
+One button was doing two jobs badly. Saving a design and putting it on a wrist
+are different intentions with very different costs — one writes 700 bytes, the
+other runs aapt2, apksigner and adb.
+
+The install path reports the build and the install **separately**, and an
+`adb install` Success is deliberately NOT reported as "it is on your watch".
+That is the oldest trap in this repo: a schema-invalid face installs cleanly and
+never appears. With no watch attached it says so plainly and prints the command
+to run later, rather than failing as though the face were broken.
+
 ## 2026-08-27 — KNOTWORK engine, and retiring the default face
 
 ### The mockup texture, generated instead of traced

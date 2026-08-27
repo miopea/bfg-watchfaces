@@ -35,6 +35,7 @@ object ParamCodec {
             sheen = q.dbl("sheen", d.sheen),
             lens = q["lens"]?.let { it == "true" || it == "1" } ?: d.lens,
             lensAmount = q.dbl("lensAmount", d.lensAmount),
+            complications = Complications.parse(q["complications"]) ?: d.complications,
             layout = Layout(
                 dateY = q.int("dateY", l.dateY),
                 dateSize = q.int("dateSize", l.dateSize),
@@ -68,7 +69,14 @@ object ParamCodec {
                 else -> flat[k] = v.toString()
             }
         }
-        for ((k, v) in o) if (k != "layout") put(k, v)
+        for ((k, v) in o) when {
+            k == "layout" -> {}
+            // The catalog stores complications as an array; the query form uses
+            // a comma-separated list. Flatten here so there is exactly one
+            // parser, in fromQuery, rather than two that can disagree.
+            k == "complications" && v is List<*> -> flat[k] = v.joinToString(",") { it.toString() }
+            else -> put(k, v)
+        }
         for ((k, v) in Json.obj(o["layout"])) put(k, v)
         return fromQuery(flat)
     }
@@ -93,6 +101,7 @@ object ParamCodec {
   "rotate": ${p.rotate}, "vignette": ${p.vignette}, "sheen": ${p.sheen},
   "dialColor": "${p.dialColor}", "inkColor": "${p.inkColor}",
   "lens": ${p.lens}, "lensAmount": ${p.lensAmount},
+  "complications": [${p.complications.joinToString(", ") { "\"${it.name}\"" }}],
   "layout": {
     "dateY": ${l.dateY}, "dateSize": ${l.dateSize},
     "timeY": ${l.timeY}, "timeSize": ${l.timeSize}, "tracking": ${l.tracking},
@@ -111,6 +120,7 @@ object ParamCodec {
             "rotate" to p.rotate, "vignette" to p.vignette, "sheen" to p.sheen,
             "dialColor" to p.dialColor, "inkColor" to p.inkColor,
             "lens" to p.lens, "lensAmount" to p.lensAmount,
+            "complications" to Complications.format(p.complications),
             "dateY" to l.dateY, "dateSize" to l.dateSize, "timeY" to l.timeY,
             "timeSize" to l.timeSize, "tracking" to l.tracking,
             "complicationY" to l.complicationY, "complicationSpread" to l.complicationSpread,

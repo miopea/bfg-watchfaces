@@ -100,8 +100,9 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 
 Verified — built and run, not assumed:
 
-- `:generator` — 43 tests green, including validation against Google's official
-  XSD and a v1↔v2 guard proving the version bump changed no existing geometry.
+- `:generator` — 59 tests green, including validation against Google's official
+  XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
+  every complication source checked against the schema's own provider list.
 - `:workbench` — 35 tests green. Serves the app at localhost:7777; bakes
   `dial_bg.png`, `preview.png`, `watchface.xml`, `strings.xml` and the manifest
   package from parameters. Quantization measured at 64 colours, mean error
