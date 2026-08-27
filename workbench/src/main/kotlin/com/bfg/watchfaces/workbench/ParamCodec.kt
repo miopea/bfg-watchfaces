@@ -51,6 +51,28 @@ object ParamCodec {
         )
     }
 
+    /**
+     * Reads the `params` object of a stored face.
+     *
+     * Routes through [fromQuery] rather than duplicating the field list, so a
+     * new parameter cannot be supported by the URL and silently dropped by the
+     * catalog reader -- which would corrupt a stored face on load with no error.
+     * The nested `layout` object is flattened first, matching the query shape.
+     */
+    fun fromJson(o: Map<String, Any?>): DialParams {
+        val flat = LinkedHashMap<String, String>()
+        fun put(k: String, v: Any?) {
+            when (v) {
+                null -> {}
+                is Double -> flat[k] = if (v == Math.floor(v) && !v.isInfinite()) v.toLong().toString() else v.toString()
+                else -> flat[k] = v.toString()
+            }
+        }
+        for ((k, v) in o) if (k != "layout") put(k, v)
+        for ((k, v) in Json.obj(o["layout"])) put(k, v)
+        return fromQuery(flat)
+    }
+
     /** `#RGB` and bare `RRGGBB` are accepted here and normalized; DialParams itself is strict. */
     private fun String.normalizeHex(): String {
         val v = trim().removePrefix("#")
@@ -100,9 +122,29 @@ object ParamCodec {
         }
     }
 
-    /** Named starting points. "Silver Sand" is the DEFAULT FACE, not the app. */
+    /**
+     * The starting library.
+     *
+     * No face is "the" face any more. There is no hardcoded default identity in
+     * the product: these are starting points, and a face gets its real name when
+     * someone saves it (see [FaceStore]). That is what retired "Silver Sand" --
+     * naming the shipped face after one colourway was the same category error as
+     * naming the app after it, recorded in DECISIONS.md 2026-08-26.
+     *
+     * Order matters: the first entry is what the app opens on.
+     */
     val presets: LinkedHashMap<String, DialParams> = linkedMapOf(
-        "Silver Sand" to DialParams(),
+        "Knotwork Taupe" to DialParams(
+            engine = Engine.KNOTWORK, scale = 26.0, depth = 3.0, freq = 7, stroke = 1.05,
+            relief = 1.5, contrast = 36.0, rotate = 45.0, vignette = 20.0,
+            dialColor = "#7D7369", inkColor = "#FCF9F1", sheen = 28.0
+        ),
+        "Knotwork Graphite" to DialParams(
+            engine = Engine.KNOTWORK, scale = 22.0, depth = 2.6, freq = 3, stroke = 1.0,
+            relief = 1.4, contrast = 30.0, rotate = 45.0, vignette = 30.0,
+            dialColor = "#2B2E33", inkColor = "#ECEAE5", sheen = 16.0
+        ),
+        "Botanical Sand" to DialParams(engine = Engine.BOTANICAL),
         "Clous de Paris" to DialParams(
             engine = Engine.CLOUS, scale = 22.0, depth = 4.0, contrast = 34.0,
             dialColor = "#6E6A66", inkColor = "#F5F2EC", rotate = 45.0, vignette = 22.0
@@ -119,6 +161,6 @@ object ParamCodec {
             engine = Engine.SUNBURST, scale = 9.0, depth = 6.0, freq = 3, contrast = 22.0,
             dialColor = "#5A6B77", inkColor = "#FFFFFF", sheen = 44.0, vignette = 26.0
         ),
-        "Flat (no pattern)" to DialParams(engine = Engine.NONE, sheen = 22.0, vignette = 20.0)
+        "Flat" to DialParams(engine = Engine.NONE, sheen = 22.0, vignette = 20.0)
     )
 }

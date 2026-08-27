@@ -1,8 +1,9 @@
 # Working in this repo — BFG Watch Faces
 
-The app is **BFG Watch Faces** (`com.bfg.watchfaces`). **Silver Sand** is the
-default face it ships with, not the app. Keep those distinct — the project was
-renamed once already for conflating them.
+The app is **BFG Watch Faces** (`com.bfg.watchfaces`). It has **no default
+face**: it ships a library of styles, and people name the faces they make. The
+project was renamed once for conflating an app with a colourway; the last of
+that naming went away on 2026-08-27.
 
 Read `docs/SPEC.md` for the architecture and `DECISIONS.md` for why things are
 the way they are. Both contain constraints found the expensive way that are not
@@ -39,6 +40,12 @@ definition of the file format.
 second one — in particular, do not "speed up" the preview by redrawing the
 pattern in JavaScript. See `DECISIONS.md` 2026-08-27.
 
+**There is no default face any more.** Presets are starting points; a face gets
+its name when someone saves it, and that name becomes the carousel label, the
+`watchfacepush.<slug>` package and the APK filename. Do not reintroduce a
+hardcoded face identity — that is what "Silver Sand" was, and it went away on
+2026-08-27.
+
 **Never change engine geometry in place.** Community faces are stored as
 parameters, so `PatternEngines` IS the renderer for the stored file format.
 Changing an engine's output silently rewrites every existing face. Add a branch
@@ -70,7 +77,7 @@ rejected — not a changelog.
 
 make docs-check                         # markdownlint + cspell over the docs
 
-cd watchface-template && ./build.sh    # validates + builds build/silver-sand.apk
+cd watchface-template && ./build.sh    # validates + builds build/$FACE_SLUG.apk
 cd watchface-template && ./reskin.sh <template.apk> <bg.png> <wff.xml> <out.apk>
 
 scripts/setup-emulators.sh             # create + pair phone and Wear AVDs
@@ -93,13 +100,16 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 
 Verified — built and run, not assumed:
 
-- `:generator` — 35 tests green, including validation against Google's official XSD.
-- `:workbench` — 23 tests green. Serves the design loop; bakes `dial_bg.png`,
-  `preview.png` and `watchface.xml` from parameters. Quantization measured at
-  64 colours, mean error 0.51/255.
-- `watchface-template` — builds a signed 157KB APK containing exactly the four
-  paths Watch Face Push permits, from artwork baked by `:workbench`. Verified by
-  `unzip -l` and `apksigner verify` on 2026-08-27.
+- `:generator` — 43 tests green, including validation against Google's official
+  XSD and a v1↔v2 guard proving the version bump changed no existing geometry.
+- `:workbench` — 35 tests green. Serves the app at localhost:7777; bakes
+  `dial_bg.png`, `preview.png`, `watchface.xml`, `strings.xml` and the manifest
+  package from parameters. Quantization measured at 64 colours, mean error
+  0.51/255. Saves designs to `faces/<slug>.json`, the catalog format.
+- `watchface-template` — builds a signed APK containing exactly the four paths
+  Watch Face Push permits, named and packaged after the design being built.
+  Verified by `unzip -l`, `apksigner verify` and `aapt2 dump badging` on
+  2026-08-27.
 - `reskin.sh` — swaps resources into a built APK without recompiling.
   (Written and read, but not exercised since the workbench landed.)
 

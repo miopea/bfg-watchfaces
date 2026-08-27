@@ -1,0 +1,145 @@
+package com.bfg.watchfaces.workbench
+
+import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.Engine
+import com.bfg.watchfaces.generator.WffEmitter
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
+
+/**
+ * A saved face IS a catalog entry (docs/SPEC.md). These tests hold that format
+ * to the promises the architecture makes about it: parameters only, reproducible
+ * on someone else's machine, and a slug Watch Face Push will actually accept.
+ */
+class FaceStoreTest {
+
+    companion object {
+        @JvmStatic @BeforeAll fun headless() { System.setProperty("java.awt.headless", "true") }
+    }
+
+    private val sample = DialParams(
+        engine = Engine.KNOTWORK, scale = 26.0, depth = 3.0, freq = 7,
+        dialColor = "#2B2E33", inkColor = "#FCF9F1", lens = false, lensAmount = 12.5
+    )
+
+    @Test
+    fun `a saved face round trips through the catalog format`(@TempDir tmp: File) {
+        val saved = FaceStore.save(tmp, "Midnight Knot", sample)
+        val back = FaceStore.load(tmp, saved.slug)
+        assertNotNull(back)
+        assertEquals("Midnight Knot", back!!.name)
+        // The params are the whole point. If these drift, the author's face
+        // renders differently than they saw it, with no error anywhere.
+        assertEquals(sample, back.params)
+    }
+
+    @Test
+    fun `stored faces contain parameters, never rasters`(@TempDir tmp: File) {
+        val saved = FaceStore.save(tmp, "Midnight Knot", sample)
+        val text = File(FaceStore.dir(tmp), "${saved.slug}.json").readText()
+        assertTrue(text.contains("\"engine\": \"KNOTWORK\""))
+        // Parametric-only is the IP shield AND what keeps the catalog ~5KB/face.
+        assertFalse(text.contains("data:image")) { "a raster leaked into the catalog format" }
+        assertFalse(text.contains("base64")) { "a raster leaked into the catalog format" }
+        assertTrue(text.length < 5000) { "a face should be a few KB, not ${text.length} bytes" }
+    }
+
+    @Test
+    fun `slugs obey the Watch Face Push package rules`() {
+        // Push rejects anything that is not lowercase alphanumeric/underscore,
+        // and the slug becomes <app>.watchfacepush.<slug>. Getting this wrong is
+        // a rejected install, so the rules are Google's, not ours.
+        val cases = mapOf(
+            "Midnight Knot" to "midnight_knot",
+            "  Harbour  Steel  " to "harbour_steel",
+            "Rosette Noir!!" to "rosette_noir",
+            "Café Crème" to "caf_cr_me"
+        )
+        for ((input, expected) in cases) assertEquals(expected, FaceStore.slugify(input)) { "slugify($input)" }
+
+        for (name in cases.keys) {
+            val slug = FaceStore.slugify(name)
+            // The real contract: the emitter must accept it.
+            WffEmitter.pushPackageName("com.bfg.watchfaces", slug)
+        }
+    }
+
+    @Test
+    fun `a slug that would start with a digit is still valid`() {
+        val slug = FaceStore.slugify("1970 Chronograph")
+        WffEmitter.pushPackageName("com.bfg.watchfaces", slug)  // must not throw
+        assertTrue(slug.first().isLetter()) { "package segments cannot start with a digit, got '$slug'" }
+    }
+
+    @Test
+    fun `an unnamed face is refused rather than silently stored`(@TempDir tmp: File) {
+        assertThrows(IllegalArgumentException::class.java) { FaceStore.save(tmp, "   ", sample) }
+    }
+
+    @Test
+    fun `list and delete behave`(@TempDir tmp: File) {
+        FaceStore.save(tmp, "One", sample)
+        FaceStore.save(tmp, "Two", sample.copy(engine = Engine.CLOUS))
+        assertEquals(2, FaceStore.list(tmp).size)
+        assertTrue(FaceStore.delete(tmp, "one"))
+        assertEquals(1, FaceStore.list(tmp).size)
+        assertFalse(FaceStore.delete(tmp, "does_not_exist"))
+    }
+
+    @Test
+    fun `a corrupt face file does not take the whole library down`(@TempDir tmp: File) {
+        FaceStore.save(tmp, "Good", sample)
+        File(FaceStore.dir(tmp), "broken.json").writeText("{ not json at all")
+        // One bad file must not make every other saved face unreachable.
+        assertEquals(1, FaceStore.list(tmp).size)
+    }
+
+    @Test
+    fun `export names the face everywhere the watch will read it`(@TempDir tmp: File) {
+        File(tmp, "watchface-template/res/raw").mkdirs()
+        File(tmp, "watchface-template/AndroidManifest.xml").writeText(
+            """<manifest package="com.bfg.watchfaces.watchfacepush.placeholder"></manifest>"""
+        )
+        Workbench.exportTo(tmp, sample, 64, "Midnight Knot")
+
+        val strings = File(tmp, "watchface-template/res/values/strings.xml").readText()
+        assertTrue(strings.contains("<string name=\"watch_face_name\">Midnight Knot</string>")) {
+            "carousel label not written"
+        }
+        val manifest = File(tmp, "watchface-template/AndroidManifest.xml").readText()
+        assertTrue(manifest.contains("com.bfg.watchfaces.watchfacepush.midnight_knot")) {
+            "package name not rewritten -- Watch Face Push would reject or mislabel this"
+        }
+        assertTrue(File(tmp, "watchface-template/res/raw/watchface.xml").readText().contains("Midnight Knot"))
+    }
+
+    @Test
+    fun `json parser handles the shapes the catalog uses`() {
+        val v = Json.obj(Json.parse("""
+            {"s":"a\"b\n","n":-12.5,"i":7,"t":true,"f":false,"z":null,
+             "nested":{"k":"v"},"arr":[1,2,3]}
+        """.trimIndent()))
+        assertEquals("a\"b\n", Json.str(v, "s"))
+        assertEquals(-12.5, Json.num(v, "n", 0.0))
+        assertEquals(7.0, Json.num(v, "i", 0.0))
+        assertTrue(Json.bool(v, "t", false))
+        assertFalse(Json.bool(v, "f", true))
+        assertEquals("v", Json.str(Json.obj(v["nested"]), "k"))
+        assertEquals(3, (v["arr"] as List<*>).size)
+    }
+
+    @Test
+    fun `json quote and parse are inverses for awkward names`() {
+        for (s in listOf("plain", "with \"quotes\"", "tab\there", "new\nline", "back\\slash", "emoji ✦")) {
+            val parsed = Json.parse(Json.quote(s))
+            assertEquals(s, parsed)
+        }
+    }
+}

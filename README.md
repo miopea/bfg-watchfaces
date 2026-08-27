@@ -5,15 +5,15 @@ to your watch. No server, no account, no ads.
 
 Requires Wear OS 6+ (Pixel Watch 4 / 5, recent Galaxy Watch).
 
-**Silver Sand** is the default face it ships with — a warm-taupe botanical dial.
-The app is the generator; Silver Sand is one preset it can make.
+The app is a generator. It ships a library of styles — knotwork, clous de Paris,
+rosette, barleycorn, sunburst, botanical — and you name the faces you make.
 
 ## Quick start
 
 ```bash
 scripts/bootstrap.sh              # fetch WFF schemas + XSD 1.1 jars + Gradle wrapper
 ./gradlew :generator:test         # 35 tests, no Android SDK or device needed
-./gradlew :workbench:test         # 23 tests, rasterizer + quantizer + ambient budget
+./gradlew :workbench:test         # 35 tests, rasterizer, quantizer, face store
 ./gradlew :workbench:workbench    # design loop at http://localhost:7777
 ```
 
@@ -25,11 +25,14 @@ That is the whole inner loop for pattern and layout work.
 ./gradlew :workbench:workbench    # then open http://localhost:7777
 ```
 
-Drag sliders, watch the dial redraw. It shows the interactive face, the ambient
-face and the raw `dial_bg.png` side by side, and it validates the emitted WFF
-against Google's XSD **on every change** — which matters more than it sounds,
+A three-tab phone app: browse styles, customise one in the Studio against a live
+watch preview, name it, and build an installable APK. It validates the emitted
+WFF against Google's XSD **on every change** — which matters more than it sounds,
 because a schema-invalid face installs perfectly and then silently never appears
 in the carousel.
+
+Saved faces go to `faces/<slug>.json` — parameters only, a few KB each, which is
+exactly the community catalog format.
 
 The browser never draws the pattern itself. It requests PNGs rendered by the
 same code that bakes the shipped file, so the preview cannot drift from the
@@ -37,14 +40,14 @@ artefact. The dial is exact; the text is positioned from `WffEmitter`'s own
 arithmetic but drawn with a local font, so judge composition here and kerning on
 the wrist.
 
-Buttons export the artwork into `watchface-template/` and build the APK. "Copy
-link" encodes the entire design in the URL.
+The name you give a face becomes its carousel label, its
+`com.bfg.watchfaces.watchfacepush.<slug>` package and its APK filename.
 
 Headless, for scripts and CI:
 
 ```bash
-./gradlew :workbench:bake                              # default Silver Sand
-./gradlew :workbench:bake --args="--preset=Rosette Noir"
+./gradlew :workbench:bake                                   # first preset
+./gradlew :workbench:bake --args="--preset=Knotwork Graphite"
 ./gradlew :workbench:bake --args="--engine=CLOUS --scale=22 --dialColor=#6E6A66"
 ```
 
@@ -56,7 +59,7 @@ Headless, for scripts and CI:
 export ANDROID_HOME=~/Android/Sdk    # needs build-tools;34.0.0, platforms;android-34
 ./gradlew :workbench:bake            # generates dial_bg.png + preview.png
 cd watchface-template && ./build.sh
-adb install -r build/silver-sand.apk
+adb install -r build/<your-face>.apk
 ```
 
 On Windows, run the shell scripts from WSL or Git Bash.
@@ -69,7 +72,7 @@ On Windows, run the shell scripts from WSL or Git Bash.
 | `workbench/` | Localhost design loop, rasterizer, quantizer, headless bake |
 | `phone/` | Compose design UI (scaffold) |
 | `wear/` | Watch Face Push host (scaffold) |
-| `watchface-template/` | Verified aapt2 WFF build — the Silver Sand reference face |
+| `watchface-template/` | Verified aapt2 WFF build — packaged per design |
 | `docs/SPEC.md` | Architecture and constraints — read this first |
 | `DECISIONS.md` | Dated record of why things are the way they are |
 | `CLAUDE.md` | Notes for AI-assisted work |

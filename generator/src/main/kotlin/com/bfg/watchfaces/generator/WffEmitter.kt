@@ -23,10 +23,10 @@ object WffEmitter {
     private fun argb(rgb: String, alpha: Int = 255): String =
         "#%02x%s".format(alpha, rgb.removePrefix("#").lowercase())
 
-    fun emit(p: DialParams, faceName: String = "Silver Sand"): String {
-        // "Silver Sand" is the name of the DEFAULT FACE, not the app. The app is
-        // BFG Watch Faces; Silver Sand is the warm-taupe botanical preset it
-        // ships with. Do not conflate the two again.
+    fun emit(p: DialParams, faceName: String = "Untitled"): String {
+        // There is no default face. The name comes from whoever designs it and
+        // becomes the carousel label; "Untitled" is a placeholder for callers
+        // that have not been given one, not a product name.
         val l = p.layout
         val ink = argb(p.inkColor)
         val inkDim = argb(p.inkColor, 160)

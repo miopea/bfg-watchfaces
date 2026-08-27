@@ -1,8 +1,9 @@
 # BFG Watch Faces Documentation
 
-Documentation index for the watch face generator. **Silver Sand** is the default
-face the app ships with, not the app — see [`../DECISIONS.md`](../DECISIONS.md)
-2026-08-26 for why that distinction is load-bearing.
+Documentation index for the watch face generator. The app has no default face:
+it ships styles, and people name what they make. See
+[`../DECISIONS.md`](../DECISIONS.md) 2026-08-26 and 2026-08-27 for why that
+distinction is load-bearing.
 
 ## Reading paths
 
@@ -58,8 +59,8 @@ splitting into ADRs is the right move.
 | --- | --- |
 | `scripts/bootstrap.sh` | Fetch WFF schemas, XSD 1.1 jars, Gradle wrapper |
 | `./gradlew :generator:test` | Engines, params, WFF emission |
-| `./gradlew :workbench:test` | Rasterizer, quantizer, ambient budget |
-| `./gradlew :workbench:workbench` | Design loop at <http://localhost:7777> |
+| `./gradlew :workbench:test` | Rasterizer, quantizer, ambient budget, face store |
+| `./gradlew :workbench:workbench` | The app at <http://localhost:7777> |
 | `./gradlew :workbench:bake` | Generate `dial_bg.png`, `preview.png`, `watchface.xml` |
 | `cd watchface-template && ./build.sh` | Validate, build and sign the APK |
 | `make docs-check` | markdownlint + cspell over the docs |

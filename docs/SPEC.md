@@ -45,7 +45,7 @@ generator/           Pure Kotlin/JVM. No Android. Engines, params, WFF emitter.
                      35 tests, runs in CI without an emulator. Do work here first.
 phone/               Compose app: design UI, pack integration, Data Layer client.
 wear/                Thin Wear app: WatchFacePushManager, Data Layer listener.
-watchface-template/  Standalone aapt2 WFF project. The Silver Sand reference face.
+watchface-template/  Standalone aapt2 WFF project. Packaged per design.
 scripts/             bootstrap, emulator setup, device deploy.
 ```
 

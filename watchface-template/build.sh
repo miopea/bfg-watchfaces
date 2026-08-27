@@ -58,13 +58,16 @@ rm -rf build && mkdir -p build/compiled
   -validity 10000 -dname "CN=BFG Watch Faces, O=BFG, C=US"
 
 "$BT/zipalign" -f -p 4 build/unsigned.apk build/aligned.apk
+# The APK is named after the design being built. FACE_SLUG is set by the
+# workbench; the default keeps a bare ./build.sh working on its own.
+FACE_SLUG="${FACE_SLUG:-watchface}"
 "$BT/apksigner" sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android \
-  --ks-key-alias bfgwatchfaces --out build/silver-sand.apk build/aligned.apk
+  --ks-key-alias bfgwatchfaces --out "build/$FACE_SLUG.apk" build/aligned.apk
 rm -f build/unsigned.apk build/aligned.apk
 
-echo "built: build/silver-sand.apk"
+echo "built: build/$FACE_SLUG.apk"
 
 # Confirm nothing outside the Watch Face Push allowlist crept in.
-BAD=$(unzip -l build/silver-sand.apk | awk 'NR>3 && NF>=4 {print $4}' | grep -v '^$' | grep -v '/$' \
+BAD=$(unzip -l "build/$FACE_SLUG.apk" | awk 'NR>3 && NF>=4 {print $4}' | grep -v '^$' | grep -v '/$' \
       | grep -vE '^(AndroidManifest\.xml|resources\.arsc|res/|META-INF/)' || true)
 [ -z "$BAD" ] && echo "contents ok (Push allowlist)" || { echo "DISALLOWED: $BAD"; exit 1; }

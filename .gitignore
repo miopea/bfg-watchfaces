@@ -19,3 +19,7 @@ watchface-template/res/drawable-nodpi/*.png
 
 # Generated on first build by build.sh. Signs throwaway dev faces only.
 debug.keystore
+
+# Faces you design and save in the app. Personal work, not repo content -- the
+# community catalog is a curated set, not whatever is on someone's laptop.
+faces/

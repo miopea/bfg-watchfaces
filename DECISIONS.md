@@ -1,5 +1,75 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-27 — KNOTWORK engine, and retiring the default face
+
+### The mockup texture, generated instead of traced
+
+The original ChatGPT mockup came back as the texture to use. The 2026-08-26
+analysis still stands — it is an aperiodic tangle, ~6× over the noise floor,
+untraceable and untileable — but it also contained the answer: "closer to Celtic
+knotwork than engine-turning." That is a description of what to build.
+
+`Engine.KNOTWORK` is a **Truchet tiling**: every lattice cell carries one of two
+quarter-arc pairs, so the strapwork wanders and never visibly repeats, while the
+grid keeps it regular enough to read as engine-turning rather than noise. A
+diagonal cross-hatch runs underneath, because without it the tiling reads as
+bubbles. Each arc is a PAIR of concentric edges, so the three-pass relief lifts a
+ribbon with a groove rather than a wire.
+
+The tile choice is a **hash of the cell coordinates, never a Random**: stored
+faces are parameters and must re-render identically on someone else's phone
+years later. `freq` seeds the hash, so it selects between whole arrangements
+instead of counting waves.
+
+Why not just ship the PNG, which is what was asked: baked lighting and paper
+grain that cannot respond to the ambient variant; a colourway frozen forever
+against a `dialColor` parameter that exists precisely to vary it; grain that
+quantizes badly against a Bluetooth budget where the generated dials hit
+0.51/255 at 64 colours; and it could never enter the catalog, where
+parametric-only is the IP shield. Personal raster import stays supported by
+docs/SPEC.md — it just cannot be the shipped default.
+
+### generatorVersion 1 → 2, and how the bump was made safe
+
+Adding an engine is exactly what the version is for. `v2` **delegates** to `v1`
+for every pre-existing engine rather than copying their bodies — copying is how
+geometry drifts, because one copy eventually gets a "small fix" and every face
+pinned to v1 silently re-renders. `GeneratorVersionCompatibilityTest` asserts
+v1 and v2 produce identical output for all seven original engines, and that
+KNOTWORK is *rejected* at v1 rather than silently substituted.
+
+### "Silver Sand" is gone
+
+Retired on the operator's call, and the reasoning finishes what 2026-08-26
+started. That entry kept Silver Sand as the name of the default face, having
+removed it as the name of the app. The remaining half was the same category
+error one level down: **a product like this has no default face.** It has
+starting points, and faces that people name themselves.
+
+So there is no hardcoded face identity anywhere. A saved name becomes the
+carousel label (`strings.xml`), the Watch Face Push package
+(`<app>.watchfacepush.<slug>`, rewritten into the manifest before aapt2 runs
+since only `pack` can vary it afterwards) and the APK filename. `build.sh` takes
+`FACE_SLUG` with a neutral default.
+
+Slugs are ASCII-only on purpose. `Char.isLetterOrDigit()` is true for most of
+Unicode, so "Café Crème" would pass a naive slugify and be rejected by Push at
+install time — far too late. Caught by a test, not on a wrist.
+
+### The workbench became the app
+
+`faces/<slug>.json` is the docs/SPEC.md catalog format, written by the Save
+button. Saving a design in the app and preparing a catalog submission are now
+the same artefact; there is no second format to keep in sync and no export step
+left to build. The JSON reader is hand-rolled for the same reason `:generator`
+has no dependencies — when the catalog becomes real, that parser is what gets
+replaced with a schema-validated reader in `:generator`.
+
+The page is now a three-tab phone app — Designs, Studio, My faces — rather than
+a slider panel. The rule that survived the rewrite: **the browser still never
+draws the pattern.** Every dial on screen, including every gallery thumbnail, is
+a PNG from the same `DialRenderer.render` call that bakes the shipped file.
+
 ## 2026-08-27 — Wear emulator: API 36, and what an install actually proves
 
 `scripts/setup-emulators.sh` pinned `system-images;android-34;android-wear`.
