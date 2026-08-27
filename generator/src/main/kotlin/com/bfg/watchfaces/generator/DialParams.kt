@@ -9,7 +9,7 @@ data class Pt(val x: Double, val y: Double)
 /** An open polyline. Engines emit these; renderers stroke them. */
 typealias Polyline = List<Pt>
 
-enum class Engine { LATTICE, CLOUS, ROSETTE, BARLEYCORN, SUNBURST, BOTANICAL, NONE }
+enum class Engine { LATTICE, CLOUS, ROSETTE, BARLEYCORN, SUNBURST, BOTANICAL, KNOTWORK, NONE }
 
 /**
  * Everything needed to reproduce a dial.
@@ -76,8 +76,15 @@ data class Layout(
     val fontWeight: String = "MEDIUM"
 )
 
-/** Bump ONLY when adding an engine or a parameter. Never when changing geometry. */
-const val CURRENT_GENERATOR_VERSION = 1
+/**
+ * Bump ONLY when adding an engine or a parameter. Never when changing geometry.
+ *
+ * v2 (2026-08-27) added [Engine.KNOTWORK]. Every other engine is UNCHANGED --
+ * PatternEngines.v2 delegates to v1 for them rather than copying the code, so
+ * they cannot drift. A face stored with generatorVersion=1 still renders through
+ * the v1 branch, byte for byte.
+ */
+const val CURRENT_GENERATOR_VERSION = 2
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

@@ -22,7 +22,22 @@ object PatternEngines {
 
     fun paths(p: DialParams): List<Polyline> = when (p.generatorVersion) {
         1 -> v1(p)
+        2 -> v2(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
+    }
+
+    /**
+     * v2 adds KNOTWORK and changes NOTHING else.
+     *
+     * It DELEGATES to [v1] for every pre-existing engine rather than copying
+     * their bodies. Copying would be the obvious way to write this and is
+     * exactly how the geometry drifts: two copies, one gets a "small fix", and
+     * every community face pinned to v1 silently re-renders. Delegation makes
+     * that impossible by construction.
+     */
+    private fun v2(p: DialParams): List<Polyline> = when (p.engine) {
+        Engine.KNOTWORK -> knotwork(p)
+        else -> v1(p)
     }
 
     private fun v1(p: DialParams): List<Polyline> = when (p.engine) {
@@ -32,6 +47,10 @@ object PatternEngines {
         Engine.BARLEYCORN -> barleycorn(p)
         Engine.SUNBURST -> sunburst(p)
         Engine.BOTANICAL -> botanical(p)
+        Engine.KNOTWORK -> error(
+            "KNOTWORK did not exist at generatorVersion=1. It was added in v2; " +
+            "a face that uses it must store generatorVersion>=2."
+        )
         Engine.NONE -> emptyList()
     }
 
@@ -174,6 +193,91 @@ object PatternEngines {
                 gy += step
             }
             gx += step
+        }
+        return out
+    }
+
+    /**
+     * Interlaced strapwork -- the "Celtic knotwork" character of the original
+     * mockup, generated rather than traced.
+     *
+     * DECISIONS.md 2026-08-26 measured that mockup and found an aperiodic tangle
+     * with a different scribble in every lattice cell: it could not be traced,
+     * tiled or cleaned up, which is why the engines are parametric. This engine
+     * reproduces that CHARACTER from the same observation. Each lattice cell
+     * carries one of two quarter-arc pairs (a Truchet tiling), so the strapwork
+     * wanders and never repeats to the eye, while the cell grid keeps it regular
+     * enough to read as engine-turning rather than noise.
+     *
+     * The tile choice comes from a hash of the cell coordinates, NOT from a
+     * Random: community faces are stored as parameters and must re-render byte
+     * for byte on someone else's phone years later. [DialParams.freq] seeds the
+     * hash, so it selects between whole arrangements instead of a wave count.
+     *
+     * Each arc is emitted as a PAIR of concentric edges, so the renderer's
+     * three-pass relief lifts a ribbon with a groove down it, which is what the
+     * reference shows. Straps, not lines.
+     */
+    private fun knotwork(p: DialParams): List<Polyline> {
+        val out = ArrayList<Polyline>()
+        val step = max(10.0, p.scale)
+        val a = p.rotate * PI / 180
+        val m = { x: Double, y: Double -> rot(x, y, a) }
+
+        // Ribbon half-width. Clamped well inside the cell or neighbouring straps
+        // merge into a blob and the interlace stops reading.
+        val w = (step * 0.10 + p.depth * 0.55).coerceIn(1.0, step * 0.30)
+        val r = step / 2
+
+        fun strap(cx: Double, cy: Double, fromDeg: Double) {
+            for (edge in listOf(-w, w)) {
+                val rr = r + edge
+                if (rr <= 0.5) continue
+                val pts = ArrayList<Pt>(13)
+                var t = 0.0
+                while (t <= 90.0001) {
+                    val ang = (fromDeg + t) * PI / 180
+                    pts.add(m(cx + rr * cos(ang), cy + rr * sin(ang)))
+                    t += 7.5
+                }
+                out.add(pts)
+            }
+        }
+
+        val half = SPAN / 2
+
+        // Diamond lattice under the strapwork. The reference dial has a
+        // cross-hatch through the cell corners with the knot motifs riding on
+        // it; without it a Truchet tiling reads as bubbles rather than
+        // engine-turning. Single lines, so the doubled straps still dominate.
+        var g = -half
+        while (g <= half) {
+            out.add(listOf(m(g, -half), m(g, half)))
+            out.add(listOf(m(-half, g), m(half, g)))
+            g += step
+        }
+
+        var gx = -half
+        var i = 0
+        while (gx <= half) {
+            var gy = -half
+            var j = 0
+            while (gy <= half) {
+                // Deterministic tile choice. Integer mixing, no Random anywhere.
+                var h = i * 374761393 + j * 668265263 + p.freq * 1274126177
+                h = (h xor (h shr 13)) * 1274126177
+                h = h xor (h shr 16)
+
+                if (h and 1 == 0) {
+                    strap(gx, gy, 0.0)                       // top-left corner
+                    strap(gx + step, gy + step, 180.0)       // bottom-right corner
+                } else {
+                    strap(gx + step, gy, 90.0)               // top-right corner
+                    strap(gx, gy + step, 270.0)              // bottom-left corner
+                }
+                gy += step; j++
+            }
+            gx += step; i++
         }
         return out
     }
