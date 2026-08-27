@@ -1,0 +1,64 @@
+{
+  "version": "0.2",
+  "language": "en,en-GB",
+  "enableFiletypes": [
+    "markdown"
+  ],
+  "ignorePaths": [
+    "node_modules/**",
+    ".git/**",
+    "**/generated/**",
+    "CHANGELOG.md",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml"
+  ],
+  "dictionaries": [
+    "rcg-terms"
+  ],
+  "dictionaryDefinitions": [
+    {
+      "name": "rcg-terms",
+      "path": "./rcg-terms.txt",
+      "addWords": true
+    }
+  ],
+  "words": [
+    "AARRGGBB",
+    "Androidify",
+    "CLOUS",
+    "JAXP",
+    "OLED",
+    "Quantizer",
+    "RGBA",
+    "RRGGBB",
+    "Xerces",
+    "aapt",
+    "apksigner",
+    "arsc",
+    "avdmanager",
+    "clous",
+    "colourway",
+    "delists",
+    "gradlew",
+    "guilloché",
+    "knotwork",
+    "logcat",
+    "newgrp",
+    "quantizer",
+    "rasterizer",
+    "rasterizers",
+    "reimplementation",
+    "reskin",
+    "sideload",
+    "sideloads",
+    "usermod",
+    "watchface",
+    "watchfacepush",
+    "watchfaces",
+    "xerces",
+    "zygote"
+  ],
+  "flagWords": [],
+  "minWordLength": 4
+}

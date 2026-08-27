@@ -17,7 +17,7 @@ Three pieces landed recently that together remove every reason this needed a bac
 
 So the entire pipeline runs on the phone:
 
-```
+```text
 params -> pack builds APK -> validator issues token -> Data Layer -> addWatchFace()
 ```
 
@@ -40,7 +40,7 @@ A face is ~5KB of JSON. The phone regenerates the artwork locally. Consequences:
 
 ## Modules
 
-```
+```text
 generator/           Pure Kotlin/JVM. No Android. Engines, params, WFF emitter.
                      35 tests, runs in CI without an emulator. Do work here first.
 phone/               Compose app: design UI, pack integration, Data Layer client.
@@ -69,6 +69,7 @@ Stroke each polyline three times for the engraved look: light pass at
 Every one of these was found the expensive way. Do not relax them.
 
 ### WFF
+
 - Canvas is 456x456. Correct for Pixel Watch 4 and 5, both case sizes.
 - Colours are `#AARRGGBB`. Eight digits, **alpha first**. Six-digit values are
   silently wrong, not rejected.
@@ -82,6 +83,7 @@ A schema-invalid face compiles, links, signs, and installs -- then never appears
 in the carousel, with no error anywhere. `WffSchemaTest` is the only defence.
 
 ### Watch Face Push
+
 - Package names must be `<app package>.watchfacepush.<face name>`. Rejected otherwise.
   Here: `com.bfg.watchfaces.watchfacepush.<slug>`. `applicationId` is frozen at
   first Play release and can never be changed afterwards.
@@ -100,6 +102,7 @@ in the carousel, with no error anywhere. `WffSchemaTest` is the only defence.
 - Slots cap how many faces the app may have installed at once.
 
 ### Transfer
+
 The APK crosses to the watch over Bluetooth. Quantize the dial PNG before
 packing: measured 368KB -> 77KB at 64 colours, mean error 0.66/255, visually
 identical on a soft low-contrast dial. Do this always.
@@ -127,6 +130,7 @@ identical on a soft low-contrast dial. Do this always.
 ## Ongoing costs
 
 Zero money. Two recurring time costs, forever:
+
 - Annual target-API bumps, or Play delists the app.
 - `validator-push` is at `1.0.0-alpha10`. The API will move.
 

@@ -12,7 +12,17 @@ SDK="$ANDROID_HOME"
 PATH="$SDK/cmdline-tools/latest/bin:$SDK/platform-tools:$SDK/emulator:$PATH"
 
 PHONE_IMG="system-images;android-34;google_apis_playstore;x86_64"
-WEAR_IMG="system-images;android-34;android-wear;x86_64"
+
+# API 36 is Wear OS 6, and Watch Face Push is Wear OS 6+ ONLY. An android-34
+# image is Wear OS 5: a WFF face still sideloads and appears in the carousel, so
+# it is fine for step one, but WatchFacePushManager does not exist there and the
+# feature this whole project is built on cannot be exercised at all. This used
+# to pin android-34, which quietly capped the emulator below the product.
+#
+# "-signed" is the variant that carries Google Play services. Override to test
+# the sideload path on an older platform:
+#   WEAR_IMG="system-images;android-34;android-wear;x86_64" scripts/setup-emulators.sh
+WEAR_IMG="${WEAR_IMG:-system-images;android-36;android-wear-signed;x86_64}"
 
 echo "==> installing system images (slow the first time)"
 sdkmanager --install "$PHONE_IMG" "$WEAR_IMG" "platform-tools" "emulator"
