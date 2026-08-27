@@ -1,0 +1,21 @@
+build/
+.gradle/
+local.properties
+*.apk
+*.idsig
+.idea/
+*.iml
+.DS_Store
+
+# Fetched by scripts/bootstrap.sh, not ours to redistribute
+generator/libs/
+generator/src/test/resources/wff-schema/
+watchface-template/tools/wff-schema/
+watchface-template/tools/libs/
+watchface-template/tools/*.class
+
+# Generated, not source. The workbench or the generator produces these.
+watchface-template/res/drawable-nodpi/*.png
+
+# Generated on first build by build.sh. Signs throwaway dev faces only.
+debug.keystore

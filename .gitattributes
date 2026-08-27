@@ -1,0 +1,28 @@
+# The repo is authored on Windows (core.autocrlf=true) but everything that
+# actually executes -- CI, the dev box, the shell scripts, the Gradle wrapper --
+# runs on Linux. Normalise to LF in the repository so a Windows checkout can
+# never commit CRLF into a script and break `scripts/bootstrap.sh` on Linux
+# with a "bad interpreter: /bin/bash^M" that reads as a mystery.
+* text=auto eol=lf
+
+*.sh        text eol=lf
+gradlew     text eol=lf
+*.kt        text eol=lf
+*.kts       text eol=lf
+*.java      text eol=lf
+*.xml       text eol=lf
+*.toml      text eol=lf
+*.yml       text eol=lf
+*.md        text eol=lf
+
+# Windows-only launchers genuinely need CRLF.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+gradlew.bat text eol=crlf
+
+*.png       binary
+*.jpg       binary
+*.jar       binary
+*.apk       binary
+*.keystore  binary
+*.idsig     binary

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <uses-feature android:name="android.hardware.type.watch" />
+
+  <!--
+    READ THIS BEFORE WIRING UP THE PROMPT.
+
+    This permission is one-shot and unrecoverable. Once the user denies it, it
+    CANNOT be re-requested, and setWatchFaceAsActive() may only ever be called
+    once regardless. Deny it and that user is permanently stuck setting faces
+    by hand via long-press.
+
+    It is the only irreversible action in the whole system. Design where in the
+    flow you ask before you write the code that asks. See docs/SPEC.md.
+  -->
+  <uses-permission android:name="com.google.wear.permission.SET_PUSHED_WATCH_FACE_AS_ACTIVE" />
+
+  <application android:label="BFG Watch Faces">
+    <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
+
+    <!--
+      TODO: WearableListenerService.
+      Receives the APK over ChannelClient from the phone, then:
+        val mgr = WatchFacePushManagerFactory.createWatchFacePushManager(context)
+        val res = mgr.listWatchFaces()
+        if (res.remainingSlotCount > 0) mgr.addWatchFace(apkFd, token)
+        else mgr.updateWatchFace(res.installedWatchFaceDetails.first().slotId, apkFd, token)
+      Token comes from the Android validator library, generated locally.
+    -->
+  </application>
+</manifest>

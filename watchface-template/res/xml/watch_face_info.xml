@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Required. Without this the face installs cleanly and never shows up. -->
+<WatchFaceInfo>
+  <Preview value="@drawable/preview" />
+</WatchFaceInfo>

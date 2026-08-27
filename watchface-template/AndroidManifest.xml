@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.bfg.watchfaces.watchfacepush.silver_sand">
+
+  <uses-feature android:name="android.hardware.type.watch" />
+
+  <!-- hasCode MUST be false. A Watch Face Format face contains no executable code. -->
+  <application
+      android:label="@string/watch_face_name"
+      android:hasCode="false">
+
+    <meta-data
+        android:name="com.google.android.wearable.standalone"
+        android:value="true" />
+
+    <!-- WFF feature level. 2 is safe on Wear OS 5 and up.
+         Raise to 5 only once both watches are on Wear OS 7. -->
+    <property
+        android:name="com.google.wear.watchface.format.version"
+        android:value="2" />
+  </application>
+</manifest>

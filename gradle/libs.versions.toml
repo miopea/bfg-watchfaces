@@ -1,0 +1,20 @@
+[versions]
+kotlin = "2.0.21"
+agp = "8.7.2"
+wfp-validator = "1.0.0-alpha10"
+playServicesWearable = "18.2.0"
+watchfacePush = "1.0.0-alpha03"
+junit = "5.11.3"
+
+[libraries]
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "1.11.3" }
+play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "playServicesWearable" }
+wear-watchface-push = { module = "androidx.wear.watchfacepush:watchfacepush", version.ref = "watchfacePush" }
+wfp-validator-android = { module = "com.google.android.wearable.watchface.validator:validator-push-android", version.ref = "wfp-validator" }
+wfp-validator-jvm = { module = "com.google.android.wearable.watchface.validator:validator-push", version.ref = "wfp-validator" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

@@ -1,0 +1,26 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  generator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Fetches Google's WFF schemas and the XSD 1.1 jars. Not committed --
+      # they belong to Google and Apache, and pinning a stale schema copy is
+      # how you end up validating against last year's spec.
+      - run: scripts/bootstrap.sh
+
+      # No Android SDK, no emulator. The generator is deliberately pure JVM so
+      # that the piece under most active development is also the fastest to check.
+      - run: ./gradlew :generator:test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-report
+          path: generator/build/reports/tests/test

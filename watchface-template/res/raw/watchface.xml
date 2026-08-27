@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Silver Sand - Watch Face Format definition.
+  The default face shipped with BFG Watch Faces.
+
+  Canvas is 456x456: correct for Pixel Watch 4 and 5, both case sizes.
+  Colours are #AARRGGBB (8 digits, alpha first). This trips people up.
+
+  Ambient is handled by <Variant mode="AMBIENT" .../> on individual elements,
+  NOT by a separate scene. Each element declares its own interactive value as
+  an attribute and its ambient value as a Variant child.
+
+  This file is the hand-verified reference. :generator emits the same shape
+  from parameters; WffSchemaTest keeps the two honest.
+
+  NOTE: the package in AndroidManifest.xml follows the Watch Face Push naming
+  requirement, <app package>.watchfacepush.<face slug>. Push rejects anything
+  else, and it is in the binary manifest, so only pack can vary it at runtime.
+-->
+<WatchFace width="456" height="456">
+  <Metadata key="CLOCK_TYPE" value="DIGITAL"/>
+  <Metadata key="PREVIEW_TIME" value="10:10:00"/>
+
+  <Scene backgroundColor="#ff000000">
+
+    <!-- Dial texture. Fades out entirely in ambient: a full mid-tone dial is
+         the single most expensive thing you can leave lit on an OLED panel. -->
+    <PartImage x="0" y="0" width="456" height="456" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="0"/>
+      <Image resource="dial_bg"/>
+    </PartImage>
+
+    <!-- Date -->
+    <PartText x="0" y="98" width="456" height="40" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="140"/>
+      <Text align="CENTER">
+        <Font family="SYNC_TO_DEVICE" size="21" weight="MEDIUM" color="#fffcf9f1" letterSpacing="0.11">
+          <Template><![CDATA[%s %s]]>
+            <Parameter expression="[DAY_OF_WEEK_S]"/>
+            <Parameter expression="[DAY]"/>
+          </Template>
+        </Font>
+      </Text>
+    </PartText>
+
+    <!-- Time. Two TimeText elements swap by alpha: a heavier cut for
+         interactive, a lighter one for ambient. -->
+    <DigitalClock x="0" y="150" width="456" height="140">
+      <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
+                x="0" y="0" width="456" height="140" alpha="255">
+        <Variant mode="AMBIENT" target="alpha" value="0"/>
+        <Font family="SYNC_TO_DEVICE" size="104" weight="MEDIUM" color="#fffcf9f1"/>
+      </TimeText>
+      <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
+                x="0" y="0" width="456" height="140" alpha="0">
+        <Variant mode="AMBIENT" target="alpha" value="255"/>
+        <Font family="SYNC_TO_DEVICE" size="104" weight="THIN" color="#ffa39c92"/>
+      </TimeText>
+    </DigitalClock>
+
+    <!-- Three live complication slots. Icons and values come from whichever
+         provider fills each slot, so they are NOT baked into dial_bg. -->
+    <ComplicationSlot slotId="0" x="122" y="263" width="90" height="76"
+                      displayName="@string/slot_steps"
+                      supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="0"/>
+      <DefaultProviderPolicy defaultSystemProvider="STEP_COUNT" defaultSystemProviderType="SHORT_TEXT"/>
+      <BoundingBox x="0" y="0" width="90" height="76" outlinePadding="2.0"/>
+      <Complication type="SHORT_TEXT">
+        <PartText x="0" y="26" width="90" height="34">
+          <Text align="CENTER">
+            <Font family="SYNC_TO_DEVICE" size="18" color="#fffcf9f1">
+              <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
+            </Font>
+          </Text>
+        </PartText>
+        <PartImage x="30" y="0" width="30" height="24">
+          <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
+        </PartImage>
+      </Complication>
+    </ComplicationSlot>
+
+    <ComplicationSlot slotId="1" x="183" y="263" width="90" height="76"
+                      displayName="@string/slot_heart"
+                      supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="0"/>
+      <DefaultProviderPolicy defaultSystemProvider="HEART_RATE" defaultSystemProviderType="SHORT_TEXT"/>
+      <BoundingBox x="0" y="0" width="90" height="76" outlinePadding="2.0"/>
+      <Complication type="SHORT_TEXT">
+        <PartText x="0" y="26" width="90" height="34">
+          <Text align="CENTER">
+            <Font family="SYNC_TO_DEVICE" size="18" color="#fffcf9f1">
+              <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
+            </Font>
+          </Text>
+        </PartText>
+        <PartImage x="30" y="0" width="30" height="24">
+          <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
+        </PartImage>
+      </Complication>
+    </ComplicationSlot>
+
+    <ComplicationSlot slotId="2" x="244" y="263" width="90" height="76"
+                      displayName="@string/slot_weather"
+                      supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="0"/>
+      <DefaultProviderPolicy defaultSystemProvider="DAY_AND_DATE" defaultSystemProviderType="SHORT_TEXT"/>
+      <BoundingBox x="0" y="0" width="90" height="76" outlinePadding="2.0"/>
+      <Complication type="SHORT_TEXT">
+        <PartText x="0" y="26" width="90" height="34">
+          <Text align="CENTER">
+            <Font family="SYNC_TO_DEVICE" size="18" color="#fffcf9f1">
+              <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
+            </Font>
+          </Text>
+        </PartText>
+        <PartImage x="30" y="0" width="30" height="24">
+          <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
+        </PartImage>
+      </Complication>
+    </ComplicationSlot>
+
+    <!-- Battery reads a native tag. No slot, no provider, always correct. -->
+    <PartText x="0" y="336" width="456" height="34" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="0"/>
+      <Text align="CENTER">
+        <Font family="SYNC_TO_DEVICE" size="18" color="#fffcf9f1">
+          <Template><![CDATA[%d%%]]><Parameter expression="round([BATTERY_PERCENT])"/></Template>
+        </Font>
+      </Text>
+    </PartText>
+
+  </Scene>
+</WatchFace>

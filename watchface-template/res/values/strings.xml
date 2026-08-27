@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="watch_face_name">Silver Sand</string>
+  <string name="slot_steps">Steps</string>
+  <string name="slot_heart">Heart rate</string>
+  <string name="slot_weather">Weather</string>
+</resources>
