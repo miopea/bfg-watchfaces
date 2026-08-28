@@ -1,0 +1,90 @@
+# RCG-specific terms and technology names
+# Add project-specific words here to suppress false positives
+
+# Organization
+RCG
+rcg
+TeamHUB
+MightyNetworks
+
+# Frameworks & Libraries
+NestJS
+nestjs
+Prisma
+BullMQ
+Vitest
+ESLint
+Prettier
+markdownlint
+CSpell
+cspell
+
+# Infrastructure & Services
+D365
+Dynamics365
+Azure
+PostgreSQL
+Redis
+SendGrid
+Twilio
+Cloudflare
+NGINX
+nginx
+
+# Auth & Security
+OAuth2
+PKCE
+JWT
+SSO
+RBAC
+OIDC
+HMAC
+bcrypt
+
+# API & Protocols
+GraphQL
+REST
+WebSocket
+webhook
+webhooks
+CORS
+CSRF
+
+# DevOps & Tooling
+monorepo
+devcontainer
+dotenv
+husky
+commitlint
+tsx
+tsconfig
+ESM
+CommonJS
+
+# RCG Domain
+subsite
+subsites
+multisite
+multitenant
+
+# Abbreviations & Acronyms
+ADR
+CLI
+API
+CRUD
+UUID
+URI
+DNS
+CDN
+CI
+CD
+
+# Technical Terms
+middleware
+microservice
+microservices
+codebase
+lifecycle
+changelog
+frontmatter
+linter

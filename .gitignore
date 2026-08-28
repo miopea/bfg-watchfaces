@@ -19,3 +19,18 @@ watchface-template/res/drawable-nodpi/*.png
 
 # Generated on first build by build.sh. Signs throwaway dev faces only.
 debug.keystore
+
+# Faces you design and save in the app. Personal work, not repo content -- the
+# community catalog is a separate public repository, and a curated set rather
+# than whatever is on someone's laptop:
+#   https://github.com/miopea/bfg-watchfaces-catalog
+#
+# ANCHORED with a leading slash on purpose. An unanchored `faces/` matches any
+# directory of that name at any depth, which once silently swallowed a
+# catalog/faces/ directory and pushed an index describing faces that were not
+# committed. Anchor these patterns.
+/faces/
+
+# Images imported for the TEXTURE engine. Local content, never part of a face
+# and never publishable -- the catalog is parameters only.
+textures/

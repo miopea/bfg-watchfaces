@@ -23,48 +23,100 @@ object WffEmitter {
     private fun argb(rgb: String, alpha: Int = 255): String =
         "#%02x%s".format(alpha, rgb.removePrefix("#").lowercase())
 
-    fun emit(p: DialParams, faceName: String = "Silver Sand"): String {
-        // "Silver Sand" is the name of the DEFAULT FACE, not the app. The app is
-        // BFG Watch Faces; Silver Sand is the warm-taupe botanical preset it
-        // ships with. Do not conflate the two again.
+    fun emit(p: DialParams, faceName: String = "Untitled"): String {
+        // There is no default face. The name comes from whoever designs it and
+        // becomes the carousel label; "Untitled" is a placeholder for callers
+        // that have not been given one, not a product name.
         val l = p.layout
         val ink = argb(p.inkColor)
-        val inkDim = argb(p.inkColor, 160)
 
-        val slots = listOf(
-            Triple(0, "STEP_COUNT", "@string/slot_steps"),
-            Triple(1, "HEART_RATE", "@string/slot_heart"),
-            Triple(2, "DAY_AND_DATE", "@string/slot_weather")
-        ).joinToString("\n") { (id, provider, label) ->
-            val w = (l.complicationSize * 4.7).toInt()
-            val h = (l.complicationSize * 4.0).toInt()
-            val x = DIAL_SIZE / 2 + (id - 1) * l.complicationSpread - w / 2
-            val y = l.complicationY - (l.complicationSize * 1.2).toInt()
+        // Ambient is a black screen. From v3 the ambient ink is lifted to clear
+        // a contrast floor while keeping its hue, so a dark ink chosen for a
+        // pale dial does not render the time invisible when the watch dims.
+        //
+        // v1 and v2 keep the old behaviour EXACTLY -- the user's ink at alpha
+        // 160, dark or not. A stored face must render as its author saw it, and
+        // that is the whole job of generatorVersion.
+        val inkNeedsLift = AmbientPalette.contrastOnBlack(p.inkColor) < 4.5
+        val inkDim = if (p.generatorVersion >= 3) argb(AmbientPalette.forAmbient(p.inkColor))
+                     else argb(p.inkColor, 160)
+
+        // Slot geometry comes from SlotGeometry, which the preview also uses.
+        // It sizes boxes to their content, widens the spread if they would
+        // touch, pushes the bottom slot clear of the row and keeps everything
+        // inside the rim -- the previous hand-placed numbers overlapped on both
+        // axes and ran into the clock.
+        val boxes = SlotGeometry.boxes(p)
+        val iconH = SlotGeometry.iconHeight(l.complicationSize)
+        val textY = SlotGeometry.textOffset(l.complicationSize)
+        val textH = SlotGeometry.textHeight(l.complicationSize)
+        val fontSize = SlotGeometry.fontSize(l.complicationSize)
+        val iconW = iconH
+
+        // A complication has ONE Font colour for both modes, unlike the clock
+        // which ships two TimeText elements. So the only way its ambient colour
+        // can differ is a colour Variant.
+        //
+        // Schema-valid -- verified against Google's XSD, and asserted by a test.
+        // RUNTIME support is NOT verified: no face from this repo has been
+        // confirmed on a watch yet. If the runtime ignores an unknown Variant
+        // target, this degrades to the previous behaviour rather than to
+        // something worse. Confirm it during the first hardware test.
+        val ambientColorVariant =
+            if (p.generatorVersion >= 3 && inkNeedsLift)
+                "\n          <Variant mode=\"AMBIENT\" target=\"color\" value=\"$inkDim\"/>"
+            else ""
+
+        val slots = boxes.entries.mapIndexed { id, (pos, box) ->
+            val source = p.slot(pos)
+            // TOP keeps a dim ambient variant: it is the always-readable
+            // position, and the ambient design deliberately keeps that one line
+            // visible while everything else goes dark.
+            val ambientAlpha = if (pos == SlotPosition.TOP) 140 else 0
             """
-    <ComplicationSlot slotId="$id" x="$x" y="$y" width="$w" height="$h"
-                      displayName="$label"
+    <ComplicationSlot slotId="$id" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"
+                      displayName="@string/slot_${source.name.lowercase()}"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="0"/>
-      <DefaultProviderPolicy defaultSystemProvider="$provider" defaultSystemProviderType="SHORT_TEXT"/>
-      <BoundingBox x="0" y="0" width="$w" height="$h" outlinePadding="2.0"/>
+      <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
+      <DefaultProviderPolicy defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
+      <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">
-        <PartText x="0" y="${(l.complicationSize * 1.4).toInt()}" width="$w" height="${(l.complicationSize * 1.8).toInt()}">
+        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
+          <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
+        </PartImage>
+        <PartText x="0" y="$textY" width="${box.w}" height="$textH">$ambientColorVariant
           <Text align="CENTER">
-            <Font family="${l.fontFamily}" size="${(l.complicationSize * 0.92).toInt()}" color="$ink">
+            <Font family="${l.fontFamily}" size="$fontSize" color="$ink">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>
         </PartText>
-        <PartImage x="${(w - l.complicationSize * 1.5).toInt() / 2}" y="0"
-                   width="${(l.complicationSize * 1.5).toInt()}" height="${(l.complicationSize * 1.25).toInt()}">
-          <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
-        </PartImage>
       </Complication>
     </ComplicationSlot>"""
-        }
+        }.joinToString("\n")
 
+        // The emitted file is what ships, and since the workbench bakes it into
+        // watchface-template it replaces what used to be a hand-annotated
+        // reference. Carry that file's hard-won notes into the output so the
+        // knowledge lives with the artefact instead of being overwritten by it.
         return """<?xml version="1.0" encoding="utf-8"?>
-<!-- Generated by silversand generator v${p.generatorVersion}. Do not hand-edit. -->
+<!--
+  $faceName - Watch Face Format definition.
+  Generated by the BFG Watch Faces generator, v${p.generatorVersion}. Do not hand-edit:
+  re-bake it instead, with ./gradlew :workbench:bake
+
+  Canvas is 456x456: correct for Pixel Watch 4 and 5, both case sizes.
+  Colours are AARRGGBB (8 digits, alpha FIRST). Six-digit values are silently
+  wrong, not rejected.
+
+  Ambient is handled by per-element Variant mode="AMBIENT", NOT by a second
+  scene. Each element declares its interactive value as an attribute and its
+  ambient value as a child.
+
+  NOTE: the package in AndroidManifest.xml follows the Watch Face Push naming
+  requirement, <app package>.watchfacepush.<face slug>. Push rejects anything
+  else, and it lives in the binary manifest, so only pack can vary it at runtime.
+-->
 <WatchFace width="$DIAL_SIZE" height="$DIAL_SIZE">
   <Metadata key="CLOCK_TYPE" value="DIGITAL"/>
   <Metadata key="PREVIEW_TIME" value="10:10:00"/>
@@ -75,18 +127,6 @@ object WffEmitter {
       <Variant mode="AMBIENT" target="alpha" value="0"/>
       <Image resource="dial_bg"/>
     </PartImage>
-
-    <PartText x="0" y="${l.dateY - l.dateSize}" width="$DIAL_SIZE" height="${(l.dateSize * 1.9).toInt()}" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="140"/>
-      <Text align="CENTER">
-        <Font family="${l.fontFamily}" size="${l.dateSize}" weight="MEDIUM" color="$ink" letterSpacing="0.11">
-          <Template><![CDATA[%s %s]]>
-            <Parameter expression="[DAY_OF_WEEK_S]"/>
-            <Parameter expression="[DAY]"/>
-          </Template>
-        </Font>
-      </Text>
-    </PartText>
 
     <DigitalClock x="0" y="${l.timeY - l.timeSize / 2}" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}">
       <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
@@ -101,16 +141,6 @@ object WffEmitter {
       </TimeText>
     </DigitalClock>
 $slots
-
-    <PartText x="0" y="${l.batteryY - (l.complicationSize * 0.9).toInt()}" width="$DIAL_SIZE"
-              height="${(l.complicationSize * 1.9).toInt()}" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="0"/>
-      <Text align="CENTER">
-        <Font family="${l.fontFamily}" size="${(l.complicationSize * 0.92).toInt()}" color="$ink">
-          <Template><![CDATA[%d%%]]><Parameter expression="round([BATTERY_PERCENT])"/></Template>
-        </Font>
-      </Text>
-    </PartText>
 
   </Scene>
 </WatchFace>

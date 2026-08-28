@@ -1,0 +1,271 @@
+package com.bfg.watchfaces.workbench
+
+import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.Engine
+import com.bfg.watchfaces.generator.WffEmitter
+import java.io.File
+import java.time.Instant
+
+/**
+ * The community catalog: `catalog/faces/<slug>.json` plus a generated
+ * `catalog/index.json`.
+ *
+ * Shape comes straight from docs/SPEC.md. Two things about it are load-bearing
+ * and worth restating where the code is:
+ *
+ * **Parameters only, never rasters.** That is what keeps a face ~5KB, which is
+ * what makes a 10,000-face catalog ~50MB of Git and therefore free to host. It
+ * is also the IP shield: you cannot encode someone's logo as "knotwork, scale
+ * 26, pewter", but you can certainly upload one -- so [Engine.TEXTURE] faces are
+ * rejected here rather than politely accepted and dealt with later.
+ *
+ * **Submissions validate without a human.** A PR that adds a face is checked by
+ * CI: it must parse, render, and emit WFF that passes Google's XSD. An invalid
+ * face is not a review problem, it is a build failure. This matters more than
+ * usual here because a schema-invalid face installs cleanly and then never
+ * appears in the carousel -- there is nothing for a reviewer to notice.
+ *
+ * Served in production from jsDelivr, NOT raw.githubusercontent.com, which is
+ * rate limited and not a CDN. See [CDN_URL].
+ */
+object CatalogStore {
+
+    /** jsDelivr, per docs/SPEC.md. Pinned to a ref so a bad main cannot break clients. */
+    const val CDN_URL = "https://cdn.jsdelivr.net/gh/miopea/bfg-watchfaces-catalog@main/index.json"
+
+    /** Where submissions are opened, and where a face is reported. */
+    const val REPO_URL = "https://github.com/miopea/bfg-watchfaces-catalog"
+
+    /**
+     * The report form for one face.
+     *
+     * Google Play requires a working in-app complaint path for any app showing
+     * user content, so this is not decoration -- without a reachable route to
+     * it, the app cannot ship. The slug and title are prefilled so a reporter
+     * does not have to know what a face is called internally.
+     *
+     * Field ids match .github/ISSUE_TEMPLATE/report-a-face.yml in the catalog.
+     */
+    fun reportUrl(slug: String, name: String): String {
+        fun enc(s: String) = java.net.URLEncoder.encode(s, Charsets.UTF_8)
+        return "$REPO_URL/issues/new?template=report-a-face.yml" +
+               "&slug=${enc(slug)}&title=${enc("report: $name")}"
+    }
+
+    /** A face is parameters. Anything much larger than this is not a face. */
+    const val MAX_FACE_BYTES = 8 * 1024
+
+    data class Entry(
+        val slug: String,
+        val name: String,
+        val author: String,
+        val created: String,
+        val params: DialParams
+    )
+
+    data class Problem(val file: String, val message: String)
+
+    /**
+     * Resolve the catalog root.
+     *
+     * The catalog is its own public repository now -- strangers opening pull
+     * requests against a folder of JSON is a very different risk profile from
+     * strangers opening them against the app's source. Order of preference:
+     *
+     *   1. BFG_CATALOG_DIR, for anyone working on a checkout somewhere else
+     *   2. a sibling clone, which is what a contributor working on both has
+     *   3. catalog/ inside this repo, which is the legacy in-tree location
+     *
+     * Returns null when none exists; the caller falls back to the CDN.
+     */
+    fun resolveRoot(repoRoot: File): File? {
+        System.getenv("BFG_CATALOG_DIR")?.takeIf { it.isNotBlank() }?.let {
+            val f = File(it)
+            if (File(f, "faces").isDirectory) return f
+        }
+        val sibling = File(repoRoot.parentFile, "bfg-watchfaces-catalog")
+        if (File(sibling, "faces").isDirectory) return sibling
+        val inTree = File(repoRoot, "catalog")
+        if (File(inTree, "faces").isDirectory) return inTree
+        return null
+    }
+
+    fun dir(root: File): File = File(root, "faces")
+    fun indexFile(root: File): File = File(root, "index.json")
+
+    // ---- reading ------------------------------------------------------------
+
+    fun list(root: File): List<Entry> =
+        (dir(root).listFiles { f -> f.extension == "json" } ?: emptyArray())
+            .sortedBy { it.name }
+            .mapNotNull { f -> runCatching { parse(f.readText()) }.getOrNull() }
+
+    fun parse(text: String): Entry {
+        val o = Json.obj(Json.parse(text))
+        val name = Json.str(o, "name", "")
+        return Entry(
+            slug = Json.str(o, "slug", FaceStore.slugify(name)),
+            name = name,
+            author = Json.str(o, "author", ""),
+            created = Json.str(o, "created", ""),
+            params = ParamCodec.fromJson(Json.obj(o["params"]))
+        )
+    }
+
+    fun toJson(e: Entry): String = """{
+  "name": ${Json.quote(e.name)},
+  "slug": ${Json.quote(e.slug)},
+  "author": ${Json.quote(e.author)},
+  "created": ${Json.quote(e.created)},
+  "params": ${ParamCodec.toJson(e.params).prependIndent("  ").trimStart()}
+}
+"""
+
+    // ---- validation ---------------------------------------------------------
+
+    /**
+     * Every reason a submission can be refused, checked in one pass so a PR
+     * author sees all of them at once rather than one per CI run.
+     */
+    fun validate(root: File, file: File): List<Problem> {
+        val problems = mutableListOf<Problem>()
+        fun bad(msg: String) = problems.add(Problem(file.name, msg))
+
+        val text = runCatching { file.readText() }.getOrElse {
+            bad("cannot be read: ${it.message}"); return problems
+        }
+        if (text.toByteArray().size > MAX_FACE_BYTES) {
+            bad("is ${text.toByteArray().size} bytes; a face is parameters and must stay under $MAX_FACE_BYTES")
+        }
+
+        val entry = runCatching { parse(text) }.getOrElse {
+            bad("is not valid catalog JSON: ${it.message}"); return problems
+        }
+
+        if (entry.name.isBlank()) bad("has no name")
+        if (entry.slug != FaceStore.slugify(entry.name)) {
+            bad("slug '${entry.slug}' does not match its name '${entry.name}' (expected '${FaceStore.slugify(entry.name)}')")
+        }
+        if (file.nameWithoutExtension != entry.slug) {
+            bad("filename does not match slug '${entry.slug}'")
+        }
+        runCatching { WffEmitter.pushPackageName("com.bfg.watchfaces", entry.slug) }
+            .onFailure { bad("slug is not a legal Watch Face Push package segment: ${it.message}") }
+
+        // Parametric only. This is the IP shield and the size guarantee, not a
+        // style preference -- an imported image cannot be re-derived from
+        // parameters and cannot be licensed by us.
+        if (entry.params.engine == Engine.TEXTURE) {
+            bad("uses the TEXTURE engine. The catalog is parameters only: a face built on an imported image stays on the machine that made it")
+        }
+        if (entry.params.texture.isNotBlank()) bad("references an imported image, which cannot be published")
+
+        // No generatorVersion check here on purpose: DialParams' own constructor
+        // already refuses a version this build does not implement, so parse()
+        // above throws first and reports it. A second check would be
+        // unreachable code that looks like protection.
+
+        // The one that actually bites: a schema-invalid face installs, reports
+        // success, and never appears. CI is the only place this gets caught.
+        val xml = runCatching { WffEmitter.emit(entry.params, entry.name) }.getOrElse {
+            bad("does not render: ${it.message}"); return problems
+        }
+        when (val issues = WffValidator.validate(root, xml)) {
+            null -> bad("could not be schema-checked: the WFF schema is not installed (run scripts/bootstrap.sh)")
+            else -> issues.take(3).forEach { bad("emits schema-invalid WFF at line ${it.line}: ${it.message}") }
+        }
+        return problems
+    }
+
+    /**
+     * Validates every face and reports duplicates.
+     *
+     * [schemaRoot] is where the WFF schema lives (the app repo); [catalogRoot]
+     * is the catalog checkout. They are different repositories now.
+     */
+    fun validateAll(schemaRoot: File, catalogRoot: File = schemaRoot): List<Problem> {
+        val files = (dir(catalogRoot).listFiles { f -> f.extension == "json" } ?: emptyArray()).sortedBy { it.name }
+        val problems = files.flatMap { validate(schemaRoot, it) }.toMutableList()
+
+        val bySlug = files.groupBy { it.nameWithoutExtension }
+        bySlug.filterValues { it.size > 1 }.forEach { (slug, dupes) ->
+            problems += Problem(dupes.first().name, "duplicate slug '$slug' (${dupes.size} files)")
+        }
+        return problems
+    }
+
+    // ---- index --------------------------------------------------------------
+
+    /**
+     * The generated index the gallery reads.
+     *
+     * It carries enough to render a browsable list -- name, author, engine and
+     * the two colours -- so a gallery of a thousand faces is ONE request, not a
+     * thousand. Full parameters still live in the per-face files, fetched only
+     * when someone opens one.
+     */
+    fun buildIndex(root: File): String {
+        val entries = list(root)
+        val rows = entries.joinToString(",\n") { e ->
+            """    {"slug": ${Json.quote(e.slug)}, "name": ${Json.quote(e.name)}, """ +
+            """"author": ${Json.quote(e.author)}, "engine": ${Json.quote(e.params.engine.name)}, """ +
+            """"dialColor": ${Json.quote(e.params.dialColor)}, "inkColor": ${Json.quote(e.params.inkColor)}, """ +
+            """"generatorVersion": ${e.params.generatorVersion}, "created": ${Json.quote(e.created)}}"""
+        }
+        // The HIGHEST version among the faces, not the version of whatever built
+        // the index. Recording the builder's version made every committed index
+        // go stale the moment the generator was bumped, which is churn that says
+        // nothing. What a client actually needs to know is whether it is new
+        // enough to render everything in here.
+        val maxVersion = entries.maxOfOrNull { it.params.generatorVersion } ?: 0
+        return """{
+  "generated": ${Json.quote(Instant.now().toString())},
+  "maxGeneratorVersion": $maxVersion,
+  "count": ${entries.size},
+  "faces": [
+$rows
+  ]
+}
+"""
+    }
+
+    fun writeIndex(root: File): Int {
+        val f = indexFile(root)
+        f.parentFile.mkdirs()
+        f.writeText(buildIndex(root))
+        return list(root).size
+    }
+
+    // ---- submitting ---------------------------------------------------------
+
+    /**
+     * Stage a saved face as a catalog submission.
+     *
+     * It does NOT open a pull request. Publishing is the author's action, not
+     * the tool's: this writes the file and validates it, and the human commits
+     * and opens the PR. A design tool that pushes to a public repo on a button
+     * press is a mistake waiting to happen.
+     */
+    fun submit(
+        schemaRoot: File,
+        catalogRoot: File,
+        face: FaceStore.StoredFace,
+        author: String
+    ): Pair<File, List<Problem>> {
+        val entry = Entry(
+            slug = face.slug,
+            name = face.name,
+            author = author.trim(),
+            created = face.created.ifBlank { Instant.now().toString() },
+            params = face.params
+        )
+        // Two different roots, deliberately named: the face is written to the
+        // CATALOG, but the WFF schema that judges it lives in the app repo.
+        // Conflating them is what listed private faces as community content.
+        val f = File(dir(catalogRoot).apply { mkdirs() }, "${entry.slug}.json")
+        f.writeText(toJson(entry))
+        val problems = validate(schemaRoot, f)
+        if (problems.isNotEmpty()) f.delete()   // never leave an invalid submission staged
+        return f to problems
+    }
+}

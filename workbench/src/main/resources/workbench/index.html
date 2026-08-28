@@ -1,0 +1,1357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101215">
+<title>BFG Watch Faces</title>
+<style>
+  :root{
+    --bg:#0d0f12; --surface:#16191e; --surface2:#1e222a; --line:#2a2f39;
+    --ink:#eceae5; --dim:#98a0ad; --faint:#69707c;
+    --accent:#c9a227; --accent-ink:#1b1500;
+    --ok:#4ea96b; --bad:#e0655a;
+    --r:16px;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,"DejaVu Sans Mono",monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    margin:0;background:#07080a;color:var(--ink);font:15px/1.45 var(--sans);
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ---- phone shell -------------------------------------------------- */
+  .phone{
+    width:400px;height:860px;max-height:100vh;position:relative;
+    background:var(--bg);border-radius:38px;overflow:hidden;
+    box-shadow:0 0 0 10px #16181c, 0 0 0 12px #2a2e35, 0 30px 80px rgba(0,0,0,.7);
+    display:flex;flex-direction:column;
+  }
+  @media (max-width:520px), (max-height:900px){
+    body{align-items:stretch;justify-content:stretch}
+    .phone{width:100%;height:100%;max-height:none;border-radius:0;box-shadow:none}
+  }
+
+  .appbar{
+    flex:none;padding:14px 18px 10px;display:flex;align-items:center;gap:10px;
+    border-bottom:1px solid var(--line);background:var(--surface);
+  }
+  .appbar h1{margin:0;font-size:16px;font-weight:650;letter-spacing:.01em}
+  .appbar .spacer{flex:1}
+  .chipbtn{
+    font:inherit;font-size:12.5px;color:var(--dim);background:var(--surface2);
+    border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer;
+  }
+  .chipbtn:active{transform:scale(.97)}
+
+  .screen{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  .screen[hidden]{display:none}
+  .pad{padding:16px 18px 24px}
+
+  /* ---- bottom nav ---------------------------------------------------- */
+  nav{
+    flex:none;display:grid;grid-template-columns:repeat(4,1fr);
+    border-top:1px solid var(--line);background:var(--surface);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav button{
+    background:none;border:none;color:var(--faint);font:inherit;font-size:11px;
+    padding:9px 0 11px;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:3px;transition:color .15s;
+  }
+  nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7}
+  nav button[aria-selected="true"]{color:var(--accent)}
+
+  /* ---- watch preview -------------------------------------------------- */
+  .watch{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .case{
+    padding:10px;border-radius:50%;
+    background:linear-gradient(150deg,#454b55,#191b1f 65%);
+    box-shadow:0 14px 34px rgba(0,0,0,.6);position:relative;
+  }
+  .case::after{
+    content:"";position:absolute;right:-4px;top:42%;width:5px;height:46px;
+    border-radius:3px;background:linear-gradient(180deg,#4a505a,#23262b);
+  }
+  .case img{display:block;border-radius:50%;background:#000}
+  .seg{
+    display:inline-flex;background:var(--surface2);border:1px solid var(--line);
+    border-radius:999px;padding:3px;gap:2px;
+  }
+  .seg button{
+    font:inherit;font-size:12.5px;color:var(--dim);background:none;border:none;
+    padding:6px 15px;border-radius:999px;cursor:pointer;
+  }
+  .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+
+  /* ---- generic bits ---------------------------------------------------- */
+  h2.sec{
+    font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);
+    margin:22px 0 10px;font-weight:650;
+  }
+  h2.sec:first-child{margin-top:6px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    padding:12px;cursor:pointer;transition:border-color .15s,transform .1s;text-align:center;
+  }
+  .card:active{transform:scale(.98)}
+  .card:hover{border-color:#3a414d}
+  .card img{width:100%;aspect-ratio:1;border-radius:50%;background:#000;display:block}
+  .card .nm{margin-top:9px;font-size:13px;font-weight:550}
+  .card .sub{font-size:11.5px;color:var(--faint);margin-top:2px}
+
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chips button{
+    flex:none;font:inherit;font-size:13px;color:var(--dim);background:var(--surface);
+    border:1px solid var(--line);border-radius:999px;padding:8px 14px;cursor:pointer;white-space:nowrap;
+  }
+  .chips button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+
+  .swatches{display:flex;gap:9px;flex-wrap:wrap}
+  .sw{
+    width:36px;height:36px;border-radius:50%;border:2px solid transparent;
+    cursor:pointer;padding:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
+  }
+  .sw[aria-pressed="true"]{border-color:var(--accent)}
+  .sw.custom{display:grid;place-items:center;background:var(--surface2);color:var(--dim);font-size:16px}
+
+  details.tune{border-top:1px solid var(--line);margin-top:20px;padding-top:6px}
+  details.tune summary{
+    cursor:pointer;list-style:none;padding:10px 0;font-size:13px;color:var(--dim);
+    display:flex;align-items:center;gap:7px;
+  }
+  details.tune summary::-webkit-details-marker{display:none}
+  details.tune summary::before{content:"▸";transition:transform .15s;display:inline-block}
+  details.tune[open] summary::before{transform:rotate(90deg)}
+
+  .row{display:grid;grid-template-columns:92px 1fr 42px;gap:10px;align-items:center;margin-bottom:11px}
+  .row label{font-size:12.5px;color:var(--dim)}
+  .row output{font:12px var(--mono);text-align:right;color:var(--faint)}
+  input[type=range]{width:100%;accent-color:var(--accent);height:22px}
+
+  .btn{
+    font:inherit;font-size:14.5px;font-weight:600;border-radius:12px;padding:13px 16px;
+    border:1px solid var(--line);background:var(--surface2);color:var(--ink);
+    cursor:pointer;width:100%;transition:transform .1s;
+  }
+  .btn:active{transform:scale(.985)}
+  .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .btn.ghost{background:none}
+  .btn[disabled]{opacity:.5;cursor:default}
+  .btnrow{display:flex;gap:10px;margin-top:14px}
+
+  .pill{
+    display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);
+    background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;
+  }
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+  .pill.ok .dot{background:var(--ok)} .pill.bad .dot{background:var(--bad)}
+  .pill.bad{color:#f0a49c;border-color:#5c2f2a}
+
+  .empty{text-align:center;color:var(--faint);font-size:13.5px;padding:44px 20px;line-height:1.6}
+
+  .item{
+    display:flex;gap:13px;align-items:center;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--r);padding:11px;margin-bottom:11px;
+  }
+  .item img{width:62px;height:62px;border-radius:50%;background:#000;flex:none}
+  .item .meta{flex:1;min-width:0}
+  .item .meta .nm{font-size:14px;font-weight:600}
+  .item .meta .sub{font-size:11.5px;color:var(--faint);margin-top:2px;
+                   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .acts{display:flex;flex-direction:column;gap:6px}
+  .mini{
+    font:inherit;font-size:11.5px;padding:5px 10px;border-radius:8px;cursor:pointer;
+    border:1px solid var(--line);background:var(--surface2);color:var(--dim);
+  }
+  .mini.danger:hover{color:#f0a49c;border-color:#5c2f2a}
+
+  /* ---- sheet ----------------------------------------------------------- */
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:none;z-index:20}
+  .scrim.open{display:block}
+  /* The fine-tune drawer is the one sheet you open in order to LOOK at the
+     dial. Dimming it behind a 60% scrim makes colour and contrast impossible
+     to judge, which is the whole reason the drawer exists. Still catches the
+     tap-outside-to-close, just without the tint. */
+  .scrim.clear{background:transparent}
+  .sheet{
+    position:absolute;left:0;right:0;bottom:0;background:var(--surface);
+    border-radius:22px 22px 0 0;border-top:1px solid var(--line);
+    padding:10px 18px calc(20px + env(safe-area-inset-bottom));z-index:21;
+    transform:translateY(100%);transition:transform .22s cubic-bezier(.3,.9,.3,1);
+    max-height:80%;overflow-y:auto;
+  }
+  .sheet.open{transform:translateY(0)}
+  .sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 14px}
+  .sheet h3{margin:0 0 4px;font-size:17px}
+  .sheet p.hint{margin:0 0 16px;font-size:12.5px;color:var(--faint);line-height:1.5}
+  input[type=text]{
+    width:100%;font:inherit;font-size:15px;padding:12px 14px;border-radius:12px;
+    background:var(--bg);border:1px solid var(--line);color:var(--ink);margin-bottom:6px;
+  }
+  input[type=text]:focus{outline:none;border-color:var(--accent)}
+  pre.out{
+    font:11.5px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line);
+    border-radius:10px;padding:11px;max-height:190px;overflow:auto;white-space:pre-wrap;
+    color:var(--dim);margin:12px 0 0;word-break:break-word;
+  }
+  .reasons{margin:0 0 14px;padding-left:20px;color:var(--dim);font-size:13px;line-height:1.7}
+  .microhint{font-size:11.5px;color:var(--faint);line-height:1.5;margin:8px 0 0}
+  .btnrow.stack{flex-direction:column}
+
+  /* Android-style colour picker: saturation/brightness pad + hue slider.
+     Native <input type=color> opens the OS picker, which on Windows is a
+     desktop dialog that has nothing to do with this app. */
+  .sv{
+    position:relative;width:100%;height:150px;border-radius:12px;overflow:hidden;
+    border:1px solid var(--line);margin-bottom:14px;touch-action:none;cursor:crosshair;
+    background:hsl(30,100%,50%);
+  }
+  .sv-white,.sv-black{position:absolute;inset:0}
+  .sv-white{background:linear-gradient(to right,#fff,rgba(255,255,255,0))}
+  .sv-black{background:linear-gradient(to top,#000,rgba(0,0,0,0))}
+  .sv-thumb{
+    position:absolute;width:20px;height:20px;border-radius:50%;border:2px solid #fff;
+    box-shadow:0 0 0 1px rgba(0,0,0,.5),0 2px 6px rgba(0,0,0,.5);
+    transform:translate(-50%,-50%);pointer-events:none;
+  }
+  input[type=range].hue{
+    -webkit-appearance:none;appearance:none;width:100%;height:14px;border-radius:7px;
+    background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);
+    margin:0 0 14px;border:1px solid var(--line);
+  }
+  input[type=range].hue::-webkit-slider-thumb{
+    -webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;
+    border:2px solid #22262e;box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:pointer;
+  }
+  input[type=range].hue::-moz-range-thumb{
+    width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid #22262e;cursor:pointer;
+  }
+  .colorfoot{display:flex;gap:11px;align-items:center;margin-bottom:4px}
+  .preview-sw{
+    width:44px;height:44px;border-radius:12px;flex:none;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);
+  }
+  .colorfoot input[type=text]{margin:0;font-family:var(--mono);text-transform:uppercase}
+
+  .tunebtn{
+    display:flex;align-items:center;justify-content:space-between;width:100%;
+    font:inherit;font-size:14px;color:var(--ink);background:var(--surface);
+    border:1px solid var(--line);border-radius:12px;padding:13px 15px;cursor:pointer;
+    margin-top:18px;
+  }
+  .tunebtn:hover{border-color:#3a414d}
+  .tunebtn .chev{color:var(--faint);font-size:18px;line-height:1}
+
+  /* A SHORT sheet. The point of the drawer is that the dial stays on screen
+     while you drag, so it must not grow to the usual 80%. */
+  .sheet.short{max-height:56%}
+  .sheethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .sheethead h3{margin:0}
+  .tunescroll{overflow-y:auto;max-height:calc(56vh - 96px);padding-top:6px}
+
+  /* ---- About ---- */
+  .brand{display:flex;gap:13px;align-items:center;margin:4px 0 18px}
+  .brandmark{
+    width:52px;height:52px;border-radius:14px;flex:none;display:grid;place-items:center;
+    background:linear-gradient(145deg,var(--accent),#8a6f18);color:#1b1500;
+    font-weight:800;font-size:15px;letter-spacing:.02em;
+  }
+  .brandname{font-size:17px;font-weight:650}
+  .brandsub{font-size:12.5px;color:var(--faint);margin-top:2px}
+  .tier{margin-top:20px}
+  .tier h4{
+    margin:0 0 3px;font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--faint);font-weight:650;
+  }
+  .tier .tblurb{font-size:12px;color:var(--faint);margin:0 0 11px}
+  .prod{
+    display:flex;gap:12px;align-items:flex-start;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:10px;
+    text-decoration:none;color:inherit;
+  }
+  .prod:hover{border-color:#3a414d}
+  .prodicon{
+    width:40px;height:40px;border-radius:11px;flex:none;display:grid;place-items:center;
+    font-weight:700;font-size:15px;color:#0d0f12;
+  }
+  .prodbody{flex:1;min-width:0}
+  .prodname{font-size:14px;font-weight:650;display:flex;align-items:center;gap:7px}
+  .prodtag{font-size:12px;color:var(--dim);margin-top:3px;line-height:1.45}
+  .prodavail{font-size:11px;color:var(--faint);margin-top:5px}
+  .badge{
+    font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;padding:2px 6px;
+    border-radius:999px;border:1px solid var(--line);color:var(--faint);font-weight:600;
+  }
+  .badge.live{color:#7fd39b;border-color:#2c5c3e}
+  .badge.beta{color:#e8c46a;border-color:#5c4a1f}
+  .badge.oss{color:#8fb8e0;border-color:#2c455c}
+
+  .uploader{
+    display:block;text-align:center;padding:16px;border:1.5px dashed var(--line);
+    border-radius:12px;color:var(--dim);font-size:13.5px;cursor:pointer;margin-bottom:12px;
+  }
+  .uploader:hover{border-color:var(--accent);color:var(--ink)}
+  .texgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+  .texgrid .tex{
+    position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;cursor:pointer;
+    border:2px solid transparent;background:#000;
+  }
+  .texgrid .tex img{width:100%;height:100%;object-fit:cover;display:block}
+  .texgrid .tex[aria-pressed="true"]{border-color:var(--accent)}
+  /* Reporting has to be reachable wherever community content is shown -- that
+     is what Play's UGC policy asks for -- but it should not compete with the
+     face itself. Quiet until hovered or focused, and always reachable by
+     keyboard. */
+  .card{position:relative}
+  .card .report{
+    position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;
+    border:1px solid var(--line);background:rgba(13,15,18,.72);color:var(--faint);
+    font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;
+    opacity:0;transition:opacity .15s,color .15s;
+  }
+  .card:hover .report, .card .report:focus-visible{opacity:1}
+  .card .report:hover{color:#f0a49c;border-color:#5c2f2a}
+  @media (hover:none){ .card .report{opacity:1} }   /* touch has no hover */
+
+  .texgrid .tex .del{
+    position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;
+    background:rgba(0,0,0,.65);color:#fff;border:none;font-size:11px;line-height:1;
+    cursor:pointer;display:grid;place-items:center;
+  }
+
+  .comprow{display:grid;grid-template-columns:58px 1fr;gap:10px;align-items:center;margin-bottom:9px}
+  .comprow label{font-size:12.5px;color:var(--dim)}
+  .seg.segfull{display:flex;width:100%}
+  .seg.segfull button{flex:1;padding:8px 0}
+  .comprow select{
+    font:inherit;font-size:13.5px;padding:10px 12px;border-radius:11px;
+    background:var(--surface);border:1px solid var(--line);color:var(--ink);width:100%;
+  }
+
+  .toast{
+    position:absolute;left:50%;bottom:78px;transform:translateX(-50%) translateY(14px);
+    background:#2c313a;border:1px solid var(--line);color:var(--ink);font-size:13px;
+    padding:10px 16px;border-radius:999px;opacity:0;transition:.22s;z-index:30;pointer-events:none;
+    white-space:nowrap;max-width:88%;overflow:hidden;text-overflow:ellipsis;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <div class="appbar">
+    <h1 id="title">Designs</h1>
+    <span class="spacer"></span>
+    <span class="pill" id="valid"><span class="dot"></span><span id="validText">checking…</span></span>
+  </div>
+
+  <!-- ============ DESIGNS ============ -->
+  <section class="screen" id="scr-designs">
+    <div class="pad">
+      <div class="seg segfull" id="galleryTabs" style="margin-bottom:4px">
+        <button data-src="styles" aria-pressed="true">Styles</button>
+        <button data-src="community">Community</button>
+      </div>
+      <div id="stylesPane">
+        <h2 class="sec">Start from a style</h2>
+        <div class="grid" id="presetGrid"></div>
+      </div>
+      <div id="communityPane" hidden>
+        <h2 class="sec">Community catalog</h2>
+        <p class="microhint" id="catalogNote" style="margin:0 0 12px"></p>
+        <div class="grid" id="catalogGrid"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STUDIO ============ -->
+  <section class="screen" id="scr-studio" hidden>
+    <div class="pad">
+      <div class="watch">
+        <div class="case"><img id="preview" alt="watch face preview" width="300" height="300"></div>
+        <div class="seg" role="group">
+          <button id="modeI" aria-pressed="true">Interactive</button>
+          <button id="modeA" aria-pressed="false">Always-on</button>
+        </div>
+      </div>
+
+      <h2 class="sec">Pattern</h2>
+      <div class="chips" id="engineChips"></div>
+
+      <div id="textureBlock" hidden>
+        <h2 class="sec">Your image</h2>
+        <label class="uploader" id="uploader">
+          <input type="file" id="fileInput" accept="image/*" hidden>
+          <span id="uploadLabel">Choose an image…</span>
+        </label>
+        <div class="texgrid" id="texGrid"></div>
+        <p class="microhint">Imported images stay on this machine. A face that uses
+          one can be installed on your watch, but cannot be shared to the community
+          catalog — that is parameters only.</p>
+      </div>
+
+      <h2 class="sec">Dial colour</h2>
+      <div class="swatches" id="dialSw"></div>
+
+      <h2 class="sec">Hands &amp; text</h2>
+      <div class="swatches" id="inkSw"></div>
+
+      <button class="tunebtn" id="btnTune">
+        <span>Fine tune</span><span class="chev">›</span>
+      </button>
+
+      <h2 class="sec">Complications</h2>
+      <div class="comprow">
+        <label>Size</label>
+        <div class="seg segfull" id="compSize">
+          <button data-size="16">Small</button>
+          <button data-size="19">Medium</button>
+          <button data-size="23">Large</button>
+        </div>
+      </div>
+      <div class="comprow">
+        <label>Spacing</label>
+        <div class="seg segfull" id="compSpread">
+          <button data-spread="84">Tight</button>
+          <button data-spread="92">Normal</button>
+          <button data-spread="110">Wide</button>
+        </div>
+      </div>
+      <p class="microhint" id="layoutNote" style="margin:0 0 14px"></p>
+      <div id="compRows"></div>
+      <p class="microhint">Slots set to Off are removed from the face entirely — the
+        remaining ones re-centre rather than leaving a gap.</p>
+
+      <div class="btnrow stack">
+        <button class="btn primary" id="btnSave">Save to Gallery</button>
+        <button class="btn" id="btnSaveInstall">Save and Update Watch</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MY FACES ============ -->
+  <section class="screen" id="scr-mine" hidden>
+    <div class="pad">
+      <h2 class="sec">Saved on this machine</h2>
+      <div id="mineList"></div>
+    </div>
+  </section>
+
+  <section class="screen" id="scr-about" hidden>
+    <div class="pad">
+      <div class="brand">
+        <div class="brandmark">BFG</div>
+        <div>
+          <div class="brandname">BFG Solutions</div>
+          <div class="brandsub">Independent software, built small and shipped.</div>
+        </div>
+      </div>
+      <p class="microhint" style="margin-bottom:6px">
+        BFG Watch Faces is one of ours. Here is the rest.</p>
+      <div id="productTiers"></div>
+      <a class="btn ghost" id="siteLink" href="https://bfgsolutions.net" target="_blank"
+         rel="noopener noreferrer" style="display:block;text-align:center;text-decoration:none;margin-top:18px">
+        bfgsolutions.net
+      </a>
+    </div>
+  </section>
+
+  <nav>
+    <button id="tab-designs" aria-selected="true">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>
+      Designs
+    </button>
+    <button id="tab-studio" aria-selected="false">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="7" cy="17" r="2"/></svg>
+      Studio
+    </button>
+    <button id="tab-mine" aria-selected="false">
+      <svg viewBox="0 0 24 24"><path d="M5 4h14v16l-7-4-7 4z"/></svg>
+      My faces
+    </button>
+    <button id="tab-about" aria-selected="false">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.6"/></svg>
+      About
+    </button>
+  </nav>
+
+  <div class="scrim" id="scrim"></div>
+
+  <div class="sheet" id="sheetSave">
+    <div class="grab"></div>
+    <h3>Name this face</h3>
+    <p class="hint">The name shows in the watch's face carousel, and becomes the package
+      the watch installs — so it has to be yours, not a preset's.</p>
+    <input type="text" id="faceName" placeholder="Midnight Knot" maxlength="40" autocomplete="off">
+    <p class="hint" id="slugHint"></p>
+    <div class="btnrow">
+      <button class="btn ghost" id="saveCancel">Cancel</button>
+      <button class="btn primary" id="saveConfirm">Save</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="sheetInstall">
+    <div class="grab"></div>
+    <h3 id="installTitle">Install to watch</h3>
+    <p class="hint">Builds a signed Watch Face Format APK from your parameters and
+      checks it against Google's schema first — a face that fails validation installs
+      fine and then never appears in the carousel.</p>
+    <div class="btnrow">
+      <button class="btn ghost" id="installClose">Close</button>
+      <button class="btn primary" id="installGo">Build APK</button>
+    </div>
+    <pre class="out" id="installOut" hidden></pre>
+  </div>
+
+  <!-- Fine tune lives in a SHORT sheet: tall enough to scroll eleven sliders,
+       short enough that the watch stays visible above it while you drag. -->
+  <div class="sheet short" id="sheetTune">
+    <div class="grab"></div>
+    <div class="sheethead">
+      <h3>Fine tune</h3>
+      <button class="chipbtn" id="tuneDone">Done</button>
+    </div>
+    <div class="tunescroll" id="tuneRows"></div>
+  </div>
+
+  <div class="sheet" id="sheetReport">
+    <div class="grab"></div>
+    <h3>Report this face</h3>
+    <p class="hint" id="reportWhat"></p>
+    <ul class="reasons">
+      <li>It copies someone's artwork, logo or brand</li>
+      <li>It pretends to be official, or from a company it is not from</li>
+      <li>It is offensive, or aimed at a particular person</li>
+    </ul>
+    <p class="hint">Every report is read. Copied artwork is taken down within three
+      days; anything abusive goes immediately.</p>
+    <p class="microhint">Opens a short form in your browser. You will need a GitHub
+      account to send it.</p>
+    <div class="btnrow">
+      <button class="btn ghost" id="reportCancel">Cancel</button>
+      <button class="btn primary" id="reportGo">Continue</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="sheetShare">
+    <div class="grab"></div>
+    <h3>Share to the catalog</h3>
+    <p class="hint">Writes <code>catalog/faces/&lt;slug&gt;.json</code> and validates it.
+      It does not open a pull request — publishing is your call. Commit the file and
+      open a PR when you are ready.</p>
+    <input type="text" id="shareAuthor" placeholder="Your name or handle" maxlength="60" autocomplete="off">
+    <div class="btnrow">
+      <button class="btn ghost" id="shareCancel">Cancel</button>
+      <button class="btn primary" id="shareConfirm">Stage submission</button>
+    </div>
+    <pre class="out" id="shareOut" hidden></pre>
+  </div>
+
+  <div class="sheet" id="sheetColor">
+    <div class="grab"></div>
+    <h3 id="colorTitle">Dial colour</h3>
+    <div class="sv" id="svPad"><div class="sv-white"></div><div class="sv-black"></div>
+      <div class="sv-thumb" id="svThumb"></div></div>
+    <input type="range" id="hue" class="hue" min="0" max="360" step="1" value="30">
+    <div class="colorfoot">
+      <span class="preview-sw" id="colorPreview"></span>
+      <input type="text" id="hexField" spellcheck="false" maxlength="7" autocomplete="off">
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" id="colorCancel">Cancel</button>
+      <button class="btn primary" id="colorDone">Use colour</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ * The browser NEVER draws the pattern. Every dial you see here is a
+ * PNG rendered by DialRenderer on the server -- the same call that
+ * bakes the file shipped inside the APK. A canvas reimplementation
+ * would be a second renderer and would drift. See DECISIONS.md.
+ * ------------------------------------------------------------------ */
+
+const ENGINES = [
+  ["KNOTWORK","Knotwork"], ["BOTANICAL","Botanical"], ["CLOUS","Clous de Paris"],
+  ["ROSETTE","Rosette"], ["BARLEYCORN","Barleycorn"], ["SUNBURST","Sunburst"],
+  ["LATTICE","Lattice"], ["TEXTURE","Your image"], ["NONE","Plain"],
+];
+
+// Mirrors ComplicationSource in :generator. Those tokens are exactly the
+// schema's defaultProviderListType -- an unlisted one fails validation, which
+// means the face installs and then never appears in the carousel.
+const COMP_SOURCES = [
+  ["NONE","Off"], ["STEP_COUNT","Steps"], ["HEART_RATE","Heart rate"],
+  ["DAY_AND_DATE","Day and date"], ["DATE","Date"], ["DAY_OF_WEEK","Day of week"],
+  ["WATCH_BATTERY","Battery"], ["WORLD_CLOCK","World clock"], ["NEXT_EVENT","Next event"],
+  ["SUNRISE_SUNSET","Sunrise and sunset"], ["UNREAD_NOTIFICATION_COUNT","Notifications"],
+  ["APP_SHORTCUT","App shortcut"], ["FAVORITE_CONTACT","Favourite contact"],
+];
+const COMP_SLOTS = ["Top","Left","Middle","Right","Bottom"];  // order matches SlotPosition
+
+const DIALS = ["#7D7369","#2B2E33","#23262B","#6E6A66","#8A7343","#5A6B77","#3E4A3F","#7A4A3C","#C9C3B6"];
+const INKS  = ["#FCF9F1","#FFFFFF","#E8E6E1","#C9A227","#1A1A1A"];
+
+const TUNE = [
+  ["scale","Size",4,80,0.5], ["depth","Depth",0,20,0.1], ["freq","Variation",1,24,1],
+  ["stroke","Line",0.2,4,0.05], ["relief","Relief",0,6,0.1], ["rotate","Angle",0,360,1],
+  ["contrast","Contrast",0,100,1], ["sheen","Sheen",0,100,1], ["vignette","Vignette",0,100,1],
+  ["timeSize","Time size",40,170,1], ["timeY","Time position",80,380,1],
+  ["complicationSpread","Slot spacing",60,150,1],
+  ["complicationY","Row position",200,360,1],
+  ["dateY","Top slot",40,160,1], ["batteryY","Bottom slot",250,430,1],
+];
+
+const state = {
+  engine:"KNOTWORK", scale:26, depth:3, freq:7, stroke:1.05, relief:1.5, contrast:36,
+  rotate:45, vignette:20, dialColor:"#7D7369", inkColor:"#FCF9F1", sheen:28,
+  lens:true, lensAmount:38, texture:"",
+  complications:"DAY_AND_DATE,STEP_COUNT,HEART_RATE,UNREAD_NOTIFICATION_COUNT,WATCH_BATTERY",
+  dateY:99, dateSize:21, timeY:196, timeSize:104,
+  complicationY:273, complicationSpread:92, complicationSize:19, batteryY:344,
+  fontFamily:"SYNC_TO_DEVICE", fontWeight:"MEDIUM"
+};
+let ambient = false;
+let currentName = "";           // set once a face has been saved/opened
+let installTarget = null;       // {name, query}
+
+const $ = s => document.querySelector(s);
+const qs = () => new URLSearchParams(state).toString();
+
+/* ---------------- navigation ---------------- */
+const SCREENS = { designs:"Designs", studio:"Studio", mine:"My faces", about:"About" };
+function show(which){
+  for (const k of Object.keys(SCREENS)){
+    $("#scr-"+k).hidden = (k !== which);
+    $("#tab-"+k).setAttribute("aria-selected", String(k === which));
+  }
+  $("#title").textContent = which === "studio" && currentName ? currentName : SCREENS[which];
+  if (which === "mine") loadMine();
+  if (which === "about") renderAbout();
+  $(".screen:not([hidden])").scrollTop = 0;
+}
+for (const k of Object.keys(SCREENS)) $("#tab-"+k).addEventListener("click", () => show(k));
+
+/* ---------------- toast ---------------- */
+let toastT;
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+/* ---------------- sheets ---------------- */
+function openSheet(id, clearScrim = false){
+  const scrim = $("#scrim");
+  scrim.classList.add("open");
+  scrim.classList.toggle("clear", clearScrim);
+  $(id).classList.add("open");
+}
+function closeSheets(){
+  const scrim = $("#scrim");
+  scrim.classList.remove("open");
+  scrim.classList.remove("clear");
+  document.querySelectorAll(".sheet").forEach(s => s.classList.remove("open"));
+}
+$("#scrim").addEventListener("click", closeSheets);
+
+/* ---------------- build the controls ---------------- */
+const chips = $("#engineChips");
+for (const [val,label] of ENGINES){
+  const b = document.createElement("button");
+  b.textContent = label; b.dataset.engine = val;
+  b.setAttribute("aria-pressed", String(state.engine === val));
+  b.addEventListener("click", () => {
+    state.engine = val;
+    chips.querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-pressed", String(x.dataset.engine === val)));
+    if (textureVisible()) loadTextures();
+    refresh();
+  });
+  chips.appendChild(b);
+}
+
+function compList(){ return state.complications.split(",").filter(Boolean); }
+
+const compHost = $("#compRows");
+COMP_SLOTS.forEach((slotName, idx) => {
+  const row = document.createElement("div");
+  row.className = "comprow";
+  const sel = document.createElement("select");
+  sel.id = "comp" + idx;
+  for (const [val,label] of COMP_SOURCES){
+    const o = document.createElement("option"); o.value = val; o.textContent = label; sel.appendChild(o);
+  }
+  sel.addEventListener("change", () => {
+    const list = compList(); list[idx] = sel.value;
+    state.complications = list.join(",");
+    refresh();
+  });
+  const lab = document.createElement("label");
+  lab.setAttribute("for", sel.id); lab.textContent = slotName;
+  row.appendChild(lab); row.appendChild(sel);
+  compHost.appendChild(row);
+});
+function syncComps(){
+  const list = compList();
+  COMP_SLOTS.forEach((_, idx) => {
+    const sel = $("#comp" + idx);
+    if (sel) sel.value = list[idx] || "NONE";
+  });
+}
+
+const sizeSeg = $("#compSize");
+sizeSeg.querySelectorAll("button").forEach(b => {
+  b.addEventListener("click", () => {
+    state.complicationSize = parseInt(b.dataset.size, 10);
+    syncSize();
+    refresh();
+  });
+});
+const spreadSeg = $("#compSpread");
+spreadSeg.querySelectorAll("button").forEach(b => {
+  b.addEventListener("click", () => {
+    state.complicationSpread = parseInt(b.dataset.spread, 10);
+    syncSize();
+    refresh();
+  });
+});
+
+function syncSize(){
+  sizeSeg.querySelectorAll("button").forEach(b =>
+    b.setAttribute("aria-pressed", String(parseInt(b.dataset.size,10) === state.complicationSize)));
+  // Nearest preset wins the highlight: the Fine tune slider can land between
+  // them, and leaving every button unlit reads as broken.
+  const opts = [...spreadSeg.querySelectorAll("button")];
+  const near = opts.reduce((a,b) =>
+    Math.abs(b.dataset.spread - state.complicationSpread) < Math.abs(a.dataset.spread - state.complicationSpread) ? b : a);
+  opts.forEach(b => b.setAttribute("aria-pressed", String(b === near)));
+}
+
+/* The geometry clamps size and spacing against the rim, the clock and each
+ * other. Saying so beats a control that silently does nothing. */
+async function refreshLayoutNote(){
+  try{
+    const e = await fetch(`/api/layout?${qs()}`).then(r=>r.json());
+    const bits = [];
+    if (e.sizeClamped) bits.push(`size reduced to ${e.size} to fit`);
+    if (e.spreadClamped) bits.push(`spacing adjusted to ${e.spread}`);
+    $("#layoutNote").textContent = bits.length
+      ? bits.join(" · ") + " — the dial ran out of room."
+      : "";
+  }catch(e){ /* transient while dragging */ }
+}
+
+function swatchRow(host, colors, key){
+  const el = $(host);
+  for (const c of colors){
+    const b = document.createElement("button");
+    b.className = "sw"; b.style.background = c; b.dataset.color = c;
+    b.title = c;
+    b.setAttribute("aria-pressed", String(state[key].toUpperCase() === c));
+    b.addEventListener("click", () => { state[key] = c; markSw(host, key); refresh(); });
+    el.appendChild(b);
+  }
+  // Custom opens OUR picker. A native <input type=color> hands off to the OS
+  // dialog -- on Windows a desktop colour chooser that looks nothing like the
+  // app and cannot be styled.
+  const custom = document.createElement("button");
+  custom.className = "sw custom"; custom.textContent = "+"; custom.title = "Custom colour";
+  custom.addEventListener("click", () => openColorPicker(key, host));
+  el.appendChild(custom);
+}
+function markSw(host, key){
+  document.querySelectorAll(host+" .sw[data-color]").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.color === state[key].toUpperCase())));
+}
+swatchRow("#dialSw", DIALS, "dialColor");
+swatchRow("#inkSw", INKS, "inkColor");
+
+const tuneHost = $("#tuneRows");
+for (const [key,label,min,max,step] of TUNE){
+  const row = document.createElement("div"); row.className = "row";
+  row.innerHTML = `<label for="t_${key}">${label}</label>
+    <input type="range" id="t_${key}" min="${min}" max="${max}" step="${step}">
+    <output id="o_${key}"></output>`;
+  tuneHost.appendChild(row);
+  const inp = row.querySelector("input");
+  inp.addEventListener("input", e => {
+    state[key] = parseFloat(e.target.value);
+    $("#o_"+key).textContent = e.target.value;
+    refresh();
+  });
+}
+function syncTune(){
+  for (const [key] of TUNE){
+    const el = $("#t_"+key); if(!el) continue;
+    el.value = state[key]; $("#o_"+key).textContent = state[key];
+  }
+  chips.querySelectorAll("button").forEach(x =>
+    x.setAttribute("aria-pressed", String(x.dataset.engine === state.engine)));
+  markSw("#dialSw","dialColor"); markSw("#inkSw","inkColor");
+  syncComps();
+  syncSize();
+  textureVisible();
+}
+
+/* ---------------- mode toggle ---------------- */
+$("#modeI").addEventListener("click", () => setMode(false));
+$("#modeA").addEventListener("click", () => setMode(true));
+function setMode(a){
+  ambient = a;
+  $("#modeI").setAttribute("aria-pressed", String(!a));
+  $("#modeA").setAttribute("aria-pressed", String(a));
+  refresh();
+}
+
+/* ---------------- refresh ---------------- */
+function swap(img, url){ const pre = new Image(); pre.onload = () => img.src = url; pre.src = url; }
+
+let timer = null, seq = 0;
+function refresh(){ clearTimeout(timer); timer = setTimeout(doRefresh, 110); }
+
+async function doRefresh(){
+  const mine = ++seq;
+  const q = qs();
+  swap($("#preview"), `/api/face.png?${q}&size=600${ambient ? "&ambient=true" : ""}`);
+  try{
+    const v = await fetch(`/api/validate?${q}`).then(r => r.json());
+    if (mine !== seq) return;
+    refreshLayoutNote();
+    const pill = $("#valid");
+    if (!v.available){ pill.className = "pill"; $("#validText").textContent = "no schema"; return; }
+    pill.className = "pill " + (v.valid ? "ok" : "bad");
+    $("#validText").textContent = v.valid ? "Valid" : `${v.issues.length} error${v.issues.length>1?"s":""}`;
+    if (!v.valid) console.warn("WFF schema errors:", v.issues);
+  }catch(e){ /* transient while dragging */ }
+}
+
+/* ---------------- presets ---------------- */
+function applyQuery(str){
+  const p = new URLSearchParams(str);
+  for (const [k,v] of p){
+    if (!(k in state)) continue;
+    state[k] = (v === "true") ? true : (v === "false") ? false : (isNaN(v) ? v : parseFloat(v));
+  }
+}
+
+async function loadPresets(){
+  const {presets} = await fetch("/api/presets").then(r => r.json());
+  const grid = $("#presetGrid");
+  grid.innerHTML = "";
+  for (const p of presets){
+    const card = document.createElement("div");
+    card.className = "card";
+    const eng = new URLSearchParams(p.query).get("engine") || "";
+    const pretty = (ENGINES.find(e => e[0] === eng) || [,eng])[1];
+    card.innerHTML = `<img loading="lazy" alt="${p.name}" src="/api/face.png?${p.query}&size=340">
+      <div class="nm">${p.name}</div><div class="sub">${pretty}</div>`;
+    card.addEventListener("click", () => {
+      applyQuery(p.query);
+      currentName = "";
+      syncTune(); show("studio"); refresh();
+    });
+    grid.appendChild(card);
+  }
+}
+
+/* ---------------- community catalog ----------------
+ * The gallery reads the LOCAL catalog through the workbench. In production the
+ * same index is served from jsDelivr (not raw.githubusercontent.com, which is
+ * rate limited and not a CDN) -- the server reports that URL so the app never
+ * has it hardcoded in two places.
+ *
+ * Thumbnails are rendered from parameters by the same renderer as everything
+ * else. A catalog face is ~1KB of JSON; there are no images to ship.
+ */
+let catalogLoaded = false;
+$("#galleryTabs").querySelectorAll("button").forEach(b => {
+  b.addEventListener("click", () => {
+    const src = b.dataset.src;
+    $("#galleryTabs").querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-pressed", String(x === b)));
+    $("#stylesPane").hidden = src !== "styles";
+    $("#communityPane").hidden = src !== "community";
+    if (src === "community" && !catalogLoaded) loadCatalog();
+  });
+});
+
+async function loadCatalog(){
+  const grid = $("#catalogGrid");
+  grid.innerHTML = `<p class="microhint" style="grid-column:1/-1">Loading…</p>`;
+  const data = await fetch("/api/catalog").then(r=>r.json());
+  catalogLoaded = true;
+  $("#catalogNote").textContent =
+    `${data.faces.length} face${data.faces.length===1?"":"s"} · parameters only, a few KB each · published via jsDelivr`;
+  grid.innerHTML = "";
+  if (!data.faces.length){
+    grid.innerHTML = `<p class="microhint" style="grid-column:1/-1">
+      Nothing published yet. Save a face, then Share it from My faces.</p>`;
+    return;
+  }
+  for (const f of data.faces){
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<img loading="lazy" alt="" src="/api/face.png?${f.query}&size=340">
+      <button class="report" title="Report this face" aria-label="Report this face">\u2691</button>
+      <div class="nm"></div><div class="sub"></div>`;
+    card.querySelector(".nm").textContent = f.name;
+    card.querySelector(".sub").textContent = f.author ? `by ${f.author}` : "unattributed";
+
+    card.querySelector(".report").addEventListener("click", e => {
+      e.stopPropagation();          // reporting must not also open the face
+      openReport(f);
+    });
+    card.addEventListener("click", () => {
+      applyQuery(f.query);
+      currentName = f.name;
+      syncTune(); show("studio"); refresh();
+    });
+    grid.appendChild(card);
+  }
+}
+
+/* ---------------- reporting ----------------
+ * Play's UGC policy requires a working in-app complaint path for any app that
+ * shows user content, so this is store-blocking rather than optional. The form
+ * itself lives with the catalog, where the moderation policy and the response
+ * times are; the app's job is to get someone there with the face already
+ * identified, so a reporter never has to know its internal name.
+ */
+let reportTarget = null;
+
+function openReport(face){
+  reportTarget = face;
+  $("#reportWhat").textContent =
+    `Tell us what is wrong with “${face.name}”` +
+    (face.author ? `, shared by ${face.author}.` : ".");
+  openSheet("#sheetReport");
+}
+
+$("#reportCancel").addEventListener("click", closeSheets);
+$("#reportGo").addEventListener("click", () => {
+  if (!reportTarget) return;
+  // The server builds this so the URL and its field names live next to the
+  // issue template they have to match.
+  window.open(reportTarget.reportUrl, "_blank", "noopener");
+  closeSheets();
+  toast("Opening the report form");
+});
+
+/* ---------------- share to catalog ---------------- */
+let shareSlug = null;
+$("#shareCancel").addEventListener("click", closeSheets);
+$("#shareConfirm").addEventListener("click", async () => {
+  if (!shareSlug) return;
+  const out = $("#shareOut");
+  out.hidden = false;
+  out.textContent = "validating…";
+  const author = encodeURIComponent($("#shareAuthor").value.trim());
+  const r = await fetch(`/api/catalog?slug=${encodeURIComponent(shareSlug)}&author=${author}`,
+                        { method:"POST" }).then(r=>r.json());
+  if (r.ok){
+    out.textContent =
+      `Staged ${r.path}
+
+It validated: parses, renders, and emits schema-valid WFF.
+
+` +
+      `Next:
+  git add ${r.path} catalog/index.json
+  git commit -m "catalog: add ${r.slug}"
+` +
+      `  then open a pull request`;
+    catalogLoaded = false;             // the gallery is stale now
+    toast("Submission staged");
+  } else {
+    out.textContent = "Refused:\n" + (r.error || "unknown");
+  }
+});
+
+/* ---------------- my faces ---------------- */
+async function loadMine(){
+  const host = $("#mineList");
+  host.innerHTML = `<div class="empty">Loading…</div>`;
+  const {faces} = await fetch("/api/faces").then(r => r.json());
+  if (!faces.length){
+    host.innerHTML = `<div class="empty">No saved faces yet.<br>
+      Open <b>Designs</b>, pick a style, make it yours, then tap <b>Save face</b>.</div>`;
+    return;
+  }
+  host.innerHTML = "";
+  for (const f of faces){
+    const row = document.createElement("div");
+    row.className = "item";
+    const when = (f.created || "").slice(0,10);
+    row.innerHTML = `
+      <img loading="lazy" alt="${f.name}" src="/api/face.png?${f.query}&size=150">
+      <div class="meta">
+        <div class="nm"></div>
+        <div class="sub">${when} · faces/${f.slug}.json</div>
+      </div>
+      <div class="acts">
+        <button class="mini" data-act="open">Open</button>
+        <button class="mini" data-act="install">Install</button>
+        <button class="mini" data-act="share">Share</button>
+        <button class="mini danger" data-act="del">Delete</button>
+      </div>`;
+    row.querySelector(".nm").textContent = f.name;
+    row.querySelector('[data-act="open"]').addEventListener("click", () => {
+      applyQuery(f.query); currentName = f.name; syncTune(); show("studio"); refresh();
+    });
+    row.querySelector('[data-act="install"]').addEventListener("click", () => {
+      installTarget = { name: f.name, query: f.query };
+      $("#installTitle").textContent = "Install " + f.name;
+      $("#installOut").hidden = true; $("#installGo").disabled = false;
+      $("#installGo").textContent = "Build APK";
+      openSheet("#sheetInstall");
+    });
+    row.querySelector('[data-act="share"]').addEventListener("click", () => {
+      shareSlug = f.slug;
+      $("#shareAuthor").value = "";
+      $("#shareOut").hidden = true;
+      openSheet("#sheetShare");
+      setTimeout(() => $("#shareAuthor").focus(), 260);
+    });
+    row.querySelector('[data-act="del"]').addEventListener("click", async () => {
+      await fetch(`/api/faces?slug=${encodeURIComponent(f.slug)}`, { method:"DELETE" });
+      toast("Deleted " + f.name);
+      loadMine();
+    });
+    host.appendChild(row);
+  }
+}
+
+/* ---------------- fine tune drawer ----------------
+ * A short bottom sheet rather than an inline accordion. The whole point of
+ * fine-tuning is watching the dial change while you drag, and an accordion
+ * pushed the watch off the top of the screen exactly when you needed it.
+ * Opening it scrolls the studio back to the dial first.
+ */
+$("#btnTune").addEventListener("click", () => {
+  $(".screen:not([hidden])").scrollTop = 0;   // put the watch back in view
+  openSheet("#sheetTune", true);              // and do not tint it
+
+});
+$("#tuneDone").addEventListener("click", closeSheets);
+
+/* ---------------- about / BFG Solutions ----------------
+ * Product copy mirrors bfgsolutions.net's ProductShelf, which is the single
+ * source of truth for status and tagline on the marketing site. If a product
+ * ships or changes tier there, it changes here too -- this is a copy, and the
+ * site is the original.
+ */
+const TIERS = [
+  { title:"Available now", blurb:"Shipping products you can download and use today.", products:[
+    { name:"BudgetBug", status:"live", color:"#4ea96b", avail:"Web · iOS · Android",
+      href:"https://budgetbug.live",
+      tag:"A personal budget tracker that syncs with your bank, tracks recurring bills, and shows you exactly where your money is going." },
+    { name:"Sculpt Studio", status:"live", color:"#e0655a", avail:"Web · iOS · Android",
+      href:"https://bfgsolutions.net/products/sculptstudio",
+      tag:"Goal-driven strength training — a guided session runner, honest progression, a fitness-age dashboard, and an AI coach that can read your data and program your week." },
+    { name:"VoiceBridge", status:"live", color:"#5a9bd8", avail:"Web",
+      href:"https://bfgsolutions.net/products/voicebridge",
+      tag:"Real-time speech translation. Speak once, reach everyone in the room — in their own language." },
+  ]},
+  { title:"In beta", blurb:"Working products still finding their edges. Testers welcome.", products:[
+    { name:"Aria", status:"beta", color:"#c9a227", avail:"Web beta",
+      href:"https://bfgsolutions.net/products/aria",
+      tag:"A voice-training PWA with a singing studio — live pitch dial, range finder, melody trainer, and karaoke-style song mode, all in the browser." },
+  ]},
+  { title:"Open source", blurb:"Developer tools we built for ourselves and published.", products:[
+    { name:"Shotcraft", status:"open-source", color:"#9b8ec4", avail:"CLI · GitHub",
+      href:"https://bfgsolutions.net/products/shotcraft",
+      tag:"Capture your live app and ship App Store-ready screenshots, README hero images, and social cards in one command." },
+    { name:"Swarm", status:"open-source", color:"#7fb3a3", avail:"Linux · macOS · WSL",
+      href:"https://bfgsolutions.net/products/swarm",
+      tag:"A web-based control center for AI coding agents. Manage one agent or ten from a single browser tab — with autopilot, a task board, and email integration." },
+  ]},
+];
+const BADGE = { live:["live","Live"], beta:["beta","Beta"], "open-source":["oss","Open source"] };
+
+let aboutRendered = false;
+function renderAbout(){
+  if (aboutRendered) return;
+  const host = $("#productTiers");
+  host.innerHTML = "";
+  for (const tier of TIERS){
+    const sec = document.createElement("div");
+    sec.className = "tier";
+    const h = document.createElement("h4"); h.textContent = tier.title;
+    const bl = document.createElement("p"); bl.className = "tblurb"; bl.textContent = tier.blurb;
+    sec.appendChild(h); sec.appendChild(bl);
+    for (const pr of tier.products){
+      const [cls,label] = BADGE[pr.status];
+      const a = document.createElement("a");
+      a.className = "prod"; a.href = pr.href; a.target = "_blank"; a.rel = "noopener noreferrer";
+      a.innerHTML = `
+        <div class="prodicon" style="background:${pr.color}"></div>
+        <div class="prodbody">
+          <div class="prodname"><span class="pn"></span><span class="badge ${cls}">${label}</span></div>
+          <div class="prodtag"></div>
+          <div class="prodavail"></div>
+        </div>`;
+      // textContent, not innerHTML: this copy is data, and a stray < in a
+      // tagline should render as a character, not as markup.
+      a.querySelector(".prodicon").textContent = pr.name[0];
+      a.querySelector(".pn").textContent = pr.name;
+      a.querySelector(".prodtag").textContent = pr.tag;
+      a.querySelector(".prodavail").textContent = pr.avail;
+      sec.appendChild(a);
+    }
+    host.appendChild(sec);
+  }
+  aboutRendered = true;
+}
+
+/* ---------------- textures (Engine.TEXTURE) ----------------
+ * Imported images live server-side, content-addressed. The face stores only
+ * the hash: the bytes are never part of the face, which is what keeps the
+ * catalog format parametric.
+ */
+function textureVisible(){
+  const on = state.engine === "TEXTURE";
+  $("#textureBlock").hidden = !on;
+  return on;
+}
+
+async function loadTextures(){
+  const {textures} = await fetch("/api/textures").then(r=>r.json());
+  const grid = $("#texGrid");
+  grid.innerHTML = "";
+  if (!textures.length){
+    grid.innerHTML = `<p class="microhint" style="grid-column:1/-1;margin:0">
+      Nothing imported yet.</p>`;
+    return;
+  }
+  for (const t of textures){
+    const cell = document.createElement("div");
+    cell.className = "tex";
+    cell.title = t.note;
+    cell.setAttribute("aria-pressed", String(state.texture === t.id));
+    cell.innerHTML = `<img loading="lazy" alt="" src="/api/dial.png?engine=TEXTURE&texture=${t.id}&contrast=100&vignette=0&sheen=0&size=120">
+                      <button class="del" title="Remove">×</button>`;
+    cell.addEventListener("click", e => {
+      if (e.target.classList.contains("del")) return;
+      state.texture = t.id;
+      grid.querySelectorAll(".tex").forEach(c => c.setAttribute("aria-pressed","false"));
+      cell.setAttribute("aria-pressed","true");
+      toast(t.note);
+      refresh();
+    });
+    cell.querySelector(".del").addEventListener("click", async ev => {
+      ev.stopPropagation();
+      await fetch(`/api/textures?id=${t.id}`, {method:"DELETE"});
+      if (state.texture === t.id){ state.texture = ""; refresh(); }
+      loadTextures();
+    });
+    grid.appendChild(cell);
+  }
+}
+
+$("#uploader").addEventListener("click", () => $("#fileInput").click());
+$("#fileInput").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  $("#uploadLabel").textContent = "Importing…";
+  // Raw body, not multipart: the server just needs the bytes, and a hand-rolled
+  // multipart parser would be the only reason this tool needed one.
+  const r = await fetch("/api/textures", { method:"POST", body: f }).then(r=>r.json());
+  $("#uploadLabel").textContent = "Choose an image…";
+  e.target.value = "";
+  if (!r.ok){ toast(r.error || "Could not read that image"); return; }
+  state.texture = r.texture.id;
+  state.engine = "TEXTURE";
+  syncTune();
+  await loadTextures();
+  toast(r.texture.note);
+  refresh();
+});
+
+/* ---------------- colour picker ----------------
+ * Saturation/brightness pad + hue slider, in-app. Replaces
+ * <input type="color">, which delegates to the operating system's own dialog
+ * -- a desktop chooser on Windows that cannot be styled and does not belong in
+ * a phone UI. Drawing gradients here is fine: this is chrome, not the dial.
+ * The one rule that still holds is that no watch-face PIXEL is drawn here.
+ */
+let pickKey = null, pickHost = null, pickH = 30, pickS = 1, pickV = 1;
+
+function hsv2rgb(h, sv, v){
+  const c = v * sv, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
+  let r=0,g=0,b=0;
+  if (h < 60){ r=c; g=x; } else if (h < 120){ r=x; g=c; }
+  else if (h < 180){ g=c; b=x; } else if (h < 240){ g=x; b=c; }
+  else if (h < 300){ r=x; b=c; } else { r=c; b=x; }
+  return [r+m, g+m, b+m].map(u => Math.round(u * 255));
+}
+function rgb2hex(r,g,b){ return "#" + [r,g,b].map(u => u.toString(16).padStart(2,"0")).join("").toUpperCase(); }
+function hex2hsv(hex){
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1],16);
+  const r=(n>>16&255)/255, g=(n>>8&255)/255, b=(n&255)/255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn;
+  let h=0;
+  if (d){ if (mx===r) h=60*(((g-b)/d)%6); else if (mx===g) h=60*((b-r)/d+2); else h=60*((r-g)/d+4); }
+  if (h<0) h+=360;
+  return [h, mx ? d/mx : 0, mx];
+}
+function currentPickHex(){ const [r,g,b] = hsv2rgb(pickH, pickS, pickV); return rgb2hex(r,g,b); }
+
+function paintPicker(){
+  const hex = currentPickHex();
+  $("#svPad").style.background = `hsl(${pickH},100%,50%)`;
+  $("#svThumb").style.left = (pickS * 100) + "%";
+  $("#svThumb").style.top = ((1 - pickV) * 100) + "%";
+  $("#svThumb").style.background = hex;
+  $("#colorPreview").style.background = hex;
+  $("#hue").value = Math.round(pickH);
+  if (document.activeElement !== $("#hexField")) $("#hexField").value = hex;
+}
+
+function openColorPicker(key, host){
+  pickKey = key; pickHost = host;
+  const hsv = hex2hsv(state[key]) || [30,1,1];
+  pickH = hsv[0]; pickS = hsv[1]; pickV = hsv[2];
+  $("#colorTitle").textContent = key === "dialColor" ? "Dial colour" : "Hands & text colour";
+  paintPicker();
+  openSheet("#sheetColor");
+}
+
+(function wirePad(){
+  const pad = $("#svPad");
+  let dragging = false;
+  const set = e => {
+    const r = pad.getBoundingClientRect();
+    const cx = (e.touches ? e.touches[0].clientX : e.clientX);
+    const cy = (e.touches ? e.touches[0].clientY : e.clientY);
+    pickS = Math.min(1, Math.max(0, (cx - r.left) / r.width));
+    pickV = 1 - Math.min(1, Math.max(0, (cy - r.top) / r.height));
+    paintPicker();
+  };
+  pad.addEventListener("pointerdown", e => { dragging = true; pad.setPointerCapture(e.pointerId); set(e); });
+  pad.addEventListener("pointermove", e => { if (dragging) set(e); });
+  pad.addEventListener("pointerup", () => { dragging = false; });
+  pad.addEventListener("pointercancel", () => { dragging = false; });
+})();
+
+$("#hue").addEventListener("input", e => { pickH = parseFloat(e.target.value); paintPicker(); });
+$("#hexField").addEventListener("input", e => {
+  const hsv = hex2hsv(e.target.value);
+  if (hsv){ pickH = hsv[0]; pickS = hsv[1]; pickV = hsv[2];
+            $("#svPad").style.background = `hsl(${pickH},100%,50%)`;
+            $("#svThumb").style.left = (pickS*100)+"%"; $("#svThumb").style.top = ((1-pickV)*100)+"%";
+            $("#colorPreview").style.background = currentPickHex(); $("#hue").value = Math.round(pickH); }
+});
+$("#colorCancel").addEventListener("click", closeSheets);
+$("#colorDone").addEventListener("click", () => {
+  if (pickKey){ state[pickKey] = currentPickHex(); markSw(pickHost, pickKey); refresh(); }
+  closeSheets();
+});
+
+/* ---------------- save ---------------- */
+let saveThenInstall = false;
+
+$("#btnSaveInstall").addEventListener("click", () => {
+  saveThenInstall = true;
+  $("#faceName").value = currentName || "";
+  $("#slugHint").textContent = "";
+  openSheet("#sheetSave");
+  setTimeout(() => $("#faceName").focus(), 260);
+});
+
+$("#btnSave").addEventListener("click", () => {
+  saveThenInstall = false;
+  $("#faceName").value = currentName || "";
+  $("#slugHint").textContent = "";
+  openSheet("#sheetSave");
+  setTimeout(() => $("#faceName").focus(), 260);
+});
+$("#saveCancel").addEventListener("click", closeSheets);
+$("#faceName").addEventListener("input", e => {
+  const s = e.target.value.trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
+  $("#slugHint").textContent = s ? `Installs as com.bfg.watchfaces.watchfacepush.${s}` : "";
+});
+$("#saveConfirm").addEventListener("click", async () => {
+  const name = $("#faceName").value.trim();
+  if (!name){ toast("Give it a name first"); return; }
+  const r = await fetch(`/api/faces?${qs()}&name=${encodeURIComponent(name)}`, { method:"POST" })
+              .then(r => r.json());
+  if (!r.ok){ toast(r.error || "Could not save"); return; }
+  currentName = r.face.name;
+  $("#title").textContent = currentName;
+  closeSheets();
+  toast(`Saved to faces/${r.face.slug}.json`);
+
+  if (saveThenInstall){
+    // Straight into the build+install flow, no second trip through My faces.
+    installTarget = { name: r.face.name, query: r.face.query };
+    $("#installTitle").textContent = "Update watch with " + r.face.name;
+    $("#installOut").hidden = true;
+    $("#installGo").disabled = false;
+    $("#installGo").textContent = "Build and install";
+    setTimeout(() => openSheet("#sheetInstall"), 280);
+  } else {
+    show("mine");
+  }
+});
+
+/* ---------------- install ---------------- */
+$("#installClose").addEventListener("click", closeSheets);
+$("#installGo").addEventListener("click", async () => {
+  if (!installTarget) return;
+  const btn = $("#installGo"), out = $("#installOut");
+  btn.disabled = true; btn.textContent = "Building…";
+  out.hidden = false; out.textContent = "Validating, baking artwork, running aapt2 + apksigner…";
+  const url = `/api/build?${installTarget.query}&name=${encodeURIComponent(installTarget.name)}&install=true`;
+  try{
+    const r = await fetch(url).then(r => r.json());
+    if (r.ok){
+      const inst = r.installed || "not attempted";
+      out.textContent =
+        `Built ${r.apk}  (${(r.apkBytes/1024).toFixed(0)} KB)\n` +
+        `Install: ${inst}\n\n` +
+        r.written.join("\n") +
+        (inst.startsWith("installed")
+          ? `\n\nOn the watch: long-press the current face and scroll to "${installTarget.name}".`
+          : `\n\nNo watch attached, so it was only built. Install it later with:\n  adb install -r ${r.apk}`);
+      btn.textContent = "Done";
+      toast(inst.startsWith("installed") ? "Sent to watch" : "APK built");
+    } else {
+      out.textContent = (r.output || r.error || "build failed").slice(-1400);
+      btn.textContent = "Retry"; btn.disabled = false;
+    }
+  }catch(e){
+    out.textContent = "Request failed: " + e.message;
+    btn.textContent = "Retry"; btn.disabled = false;
+  }
+});
+
+/* ---------------- boot ---------------- */
+(async function boot(){
+  // A shared link restores a full design.
+  const incoming = new URLSearchParams(location.search);
+  let deep = false;
+  for (const [k,v] of incoming) if (k in state){
+    state[k] = (v==="true") ? true : (v==="false") ? false : (isNaN(v) ? v : parseFloat(v));
+    deep = true;
+  }
+  syncTune();
+  if (textureVisible()) await loadTextures();
+  await loadPresets();
+  refresh();
+  show(deep ? "studio" : "designs");
+})();
+</script>
+</body>
+</html>

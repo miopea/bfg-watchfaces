@@ -1,0 +1,198 @@
+package com.bfg.watchfaces.workbench
+
+import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.Engine
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
+import java.awt.image.BufferedImage
+import java.io.File
+import javax.imageio.ImageIO
+
+/**
+ * The bake path is now load-bearing: it produces the artwork that ships inside
+ * the APK. These tests cover the properties that would otherwise only be
+ * discovered on a wrist.
+ */
+class RenderPipelineTest {
+
+    companion object {
+        @JvmStatic @BeforeAll fun headless() { System.setProperty("java.awt.headless", "true") }
+    }
+
+    private fun pixels(img: BufferedImage): IntArray =
+        img.getRGB(0, 0, img.width, img.height, null, 0, img.width)
+
+    @ParameterizedTest
+    @EnumSource(Engine::class)
+    fun `every engine rasterizes to a full dial`(engine: Engine) {
+        val img = DialRenderer.render(DialParams(engine = engine))
+        assertEquals(DIAL_SIZE, img.width)
+        assertEquals(DIAL_SIZE, img.height)
+        // Centre is inside the dial and must be opaque; corners are outside the
+        // circle and must be transparent, or we are shipping wasted bytes.
+        assertTrue((img.getRGB(DIAL_SIZE / 2, DIAL_SIZE / 2) ushr 24) == 255) { "$engine centre not opaque" }
+        assertTrue((img.getRGB(2, 2) ushr 24) == 0) { "$engine corner not transparent" }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Engine::class)
+    fun `rendering is deterministic`(engine: Engine) {
+        // Community faces are parameters. If the same params rasterize to
+        // different bytes, an author's face is not reproducible.
+        val p = DialParams(engine = engine)
+        assertArrayEqualsInt(pixels(DialRenderer.render(p)), pixels(DialRenderer.render(p)))
+    }
+
+    private fun assertArrayEqualsInt(a: IntArray, b: IntArray) {
+        assertEquals(a.size, b.size)
+        for (i in a.indices) if (a[i] != b[i]) {
+            throw AssertionError("pixel $i differs: ${a[i].toUInt().toString(16)} vs ${b[i].toUInt().toString(16)}")
+        }
+    }
+
+    @Test
+    fun `render scales without changing the design`() {
+        // Geometry is authored in 456 space. A 2x render must be the same image
+        // at higher resolution, not a differently-composed one.
+        val small = DialRenderer.render(DialParams(), DIAL_SIZE)
+        val big = DialRenderer.render(DialParams(), DIAL_SIZE * 2)
+        assertEquals(DIAL_SIZE * 2, big.width)
+        // Centre pixel colour should agree closely across scales.
+        val a = small.getRGB(DIAL_SIZE / 2, DIAL_SIZE / 2)
+        val b = big.getRGB(DIAL_SIZE, DIAL_SIZE)
+        for (shift in listOf(16, 8, 0)) {
+            val d = Math.abs(((a shr shift) and 0xFF) - ((b shr shift) and 0xFF))
+            assertTrue(d <= 24) { "channel at shift $shift differs by $d across scales" }
+        }
+    }
+
+    @Test
+    fun `quantization stays inside the budget the spec measured`() {
+        val src = DialRenderer.render(DialParams())
+        val q = Quantizer.quantize(src, 64)
+        assertTrue(q.colors <= 64) { "palette grew to ${q.colors}" }
+        // docs/SPEC.md measured mean error 0.66/255 on the reference dial and
+        // calls it visually identical. Guard the property, with headroom.
+        assertTrue(q.meanError < 2.0) { "quantization error ${q.meanError}/255 is too high" }
+    }
+
+    @Test
+    fun `quantization actually shrinks the transferred file`() {
+        // The APK crosses to the watch over Bluetooth; this is the whole reason
+        // quantization is mandatory rather than optional.
+        val src = DialRenderer.render(DialParams())
+        fun bytes(img: BufferedImage): Int {
+            val bos = java.io.ByteArrayOutputStream(); ImageIO.write(img, "png", bos); return bos.size()
+        }
+        val raw = bytes(src)
+        val quant = bytes(Quantizer.quantize(src, 64).image)
+        assertTrue(quant < raw) { "quantized ($quant) is not smaller than raw ($raw)" }
+    }
+
+    @Test
+    fun `ambient stays far under the lit-pixel ceiling`() {
+        // DECISIONS.md: the dial fades to alpha 0 in ambient because a lit
+        // mid-tone dial is the most expensive thing on an OLED panel. Wear OS
+        // budgets roughly 15% lit pixels. This test is what keeps that true if
+        // someone "improves" ambient by leaving the texture visible.
+        fun litFraction(img: BufferedImage): Double {
+            val px = pixels(img)
+            var lit = 0
+            for (p in px) {
+                if ((p ushr 24) < 128) continue
+                val r = (p shr 16) and 0xFF; val g = (p shr 8) and 0xFF; val b = p and 0xFF
+                if ((r * 299 + g * 587 + b * 114) / 1000 > 24) lit++
+            }
+            return lit.toDouble() / px.size
+        }
+        val ambient = litFraction(FacePreview.render(DialParams(), ambient = true))
+        val interactive = litFraction(FacePreview.render(DialParams(), ambient = false))
+        assertTrue(ambient < 0.15) { "ambient lights ${"%.1f".format(ambient * 100)}% of pixels, over the ~15% ceiling" }
+        assertTrue(interactive > ambient * 4) { "ambient is not meaningfully darker than interactive" }
+    }
+
+    @Test
+    fun `ambient and interactive are genuinely different renders`() {
+        assertNotEquals(
+            pixels(FacePreview.render(DialParams(), ambient = true)).toList(),
+            pixels(FacePreview.render(DialParams(), ambient = false)).toList()
+        )
+    }
+
+    @Test
+    fun `export writes exactly what build_sh needs`(@TempDir tmp: File) {
+        // build.sh fails on a missing dial_bg.png, and aapt2 link fails on the
+        // unresolved @drawable/preview that watch_face_info.xml requires.
+        File(tmp, "watchface-template/res/raw").mkdirs()
+        Workbench.exportTo(tmp, DialParams(), 64)
+
+        val dial = File(tmp, "watchface-template/res/drawable-nodpi/dial_bg.png")
+        val preview = File(tmp, "watchface-template/res/drawable-nodpi/preview.png")
+        val xml = File(tmp, "watchface-template/res/raw/watchface.xml")
+        assertTrue(dial.isFile && dial.length() > 0) { "dial_bg.png not written" }
+        assertTrue(preview.isFile && preview.length() > 0) { "preview.png not written" }
+        assertTrue(xml.isFile && xml.readText().contains("<WatchFace")) { "watchface.xml not written" }
+    }
+
+    @Test
+    fun `params survive a query string round trip`() {
+        val p = DialParams(
+            engine = Engine.ROSETTE, scale = 17.5, depth = 6.25, freq = 11,
+            dialColor = "#23262B", inkColor = "#E8E6E1", lens = false, lensAmount = 12.0
+        )
+        val back = ParamCodec.fromQuery(
+            ParamCodec.toQuery(p).split("&").associate {
+                val i = it.indexOf('=')
+                java.net.URLDecoder.decode(it.substring(0, i), Charsets.UTF_8) to
+                    java.net.URLDecoder.decode(it.substring(i + 1), Charsets.UTF_8)
+            }
+        )
+        assertEquals(p, back)
+    }
+
+    private fun repoRoot(): File = File(System.getProperty("user.dir")).let {
+        generateSequence(it) { d -> d.parentFile }.first { d -> File(d, "settings.gradle.kts").isFile }
+    }
+
+    /**
+     * Guards the no-op: if the schema is not installed, [WffValidator.validate]
+     * returns null and EVERY schema assertion in this suite passes without
+     * validating anything. Passing-because-unmeasured is indistinguishable from
+     * passing-because-correct, which is the whole defect class.
+     *
+     * Locally that is a skip with a message telling you to run bootstrap.sh.
+     * In CI, where bootstrap.sh is a build step, its absence is a hard failure.
+     */
+    @Test
+    fun `schema validation is wired up, not silently skipped`() {
+        val issues = WffValidator.validate(repoRoot(), com.bfg.watchfaces.generator.WffEmitter.emit(DialParams()))
+        if (issues == null && System.getenv("CI") != null) {
+            org.junit.jupiter.api.Assertions.fail<Unit>(
+                "WFF schema is not installed but CI=true. scripts/bootstrap.sh did not deliver it, " +
+                "and every schema assertion in this suite would have passed without validating anything."
+            )
+        }
+        org.junit.jupiter.api.Assumptions.assumeTrue(issues != null) {
+            "WFF schema not installed -- run scripts/bootstrap.sh. Schema assertions are NOT being checked."
+        }
+        assertTrue(issues!!.isEmpty()) { "default params emit invalid WFF: $issues" }
+    }
+
+    @Test
+    fun `every preset is renderable and schema valid`() {
+        val root = repoRoot()
+        for ((name, p) in ParamCodec.presets) {
+            val img = DialRenderer.render(p)
+            assertTrue(img.width == DIAL_SIZE) { "$name did not render" }
+            val issues = WffValidator.validate(root, com.bfg.watchfaces.generator.WffEmitter.emit(p))
+            if (issues != null) assertTrue(issues.isEmpty()) { "$name emits invalid WFF: $issues" }
+        }
+    }
+}

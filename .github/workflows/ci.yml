@@ -19,8 +19,47 @@ jobs:
       # that the piece under most active development is also the fastest to check.
       - run: ./gradlew :generator:test
 
+      # The workbench owns the rasterizer, so it now owns artwork that ships
+      # inside the APK. Determinism, quantization budget and the ambient
+      # lit-pixel ceiling are all covered here.
+      - run: ./gradlew :workbench:test
+
+      # Smoke the headless bake. This is the path build.sh depends on, and it
+      # refuses to write a schema-invalid face, so a green bake is also a
+      # statement that the emitted WFF validates.
+      - run: ./gradlew :workbench:bake
+      - name: bake produced the artwork build.sh requires
+        run: |
+          # set -e explicitly. GitHub's default shell supplies it, but a bare
+          # list of `test` calls reports the exit of the LAST one, so without it
+          # a missing dial_bg.png passes silently -- a check measuring nothing.
+          set -euo pipefail
+          test -s watchface-template/res/drawable-nodpi/dial_bg.png
+          test -s watchface-template/res/drawable-nodpi/preview.png
+          test -s watchface-template/res/raw/watchface.xml
+
+      # No catalog step here. The catalog moved to its own public repository and
+      # is validated by ITS CI, using this validator. Running --check here would
+      # find no checkout, print "nothing to validate" and pass -- a step that
+      # measures nothing, which is the defect this file exists to avoid.
+      #   https://github.com/miopea/bfg-watchfaces-catalog
+
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-report
-          path: generator/build/reports/tests/test
+          path: |
+            generator/build/reports/tests/test
+            workbench/build/reports/tests/test
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+
+      # markdownlint + cspell over every tracked and untracked-but-not-ignored
+      # markdown file. Configs are the shared fleet ones from claude-team-config;
+      # project vocabulary lives in this repo's cspell.json, not in rcg-terms.txt.
+      - run: make docs-check

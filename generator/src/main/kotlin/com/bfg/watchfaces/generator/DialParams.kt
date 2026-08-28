@@ -9,7 +9,62 @@ data class Pt(val x: Double, val y: Double)
 /** An open polyline. Engines emit these; renderers stroke them. */
 typealias Polyline = List<Pt>
 
-enum class Engine { LATTICE, CLOUS, ROSETTE, BARLEYCORN, SUNBURST, BOTANICAL, NONE }
+/**
+ * TEXTURE is the odd one out and deliberately so: it emits NO geometry. The
+ * dial comes from an image the user supplied, composited by the renderer.
+ *
+ * That makes a TEXTURE face un-shareable. docs/SPEC.md's catalog is
+ * parametric-only -- both because a face has to stay ~5KB of JSON and because
+ * parameters are the IP shield: you cannot encode someone's logo as "knotwork,
+ * scale 26, pewter", but you certainly can upload it. The SPEC already carves
+ * out exactly this case: "Users import their own photos locally; those never
+ * enter the shared catalog."
+ */
+enum class Engine { LATTICE, CLOUS, ROSETTE, BARLEYCORN, SUNBURST, BOTANICAL, KNOTWORK, TEXTURE, NONE }
+
+/**
+ * What a complication slot shows.
+ *
+ * [wff] is the WFF `defaultSystemProvider` token, and these are EXACTLY the
+ * values the schema's `defaultProviderListType` enumerates -- they are not a
+ * guess and not a superset. An unlisted provider fails schema validation, which
+ * means the face installs and then never appears in the carousel.
+ *
+ * Presentation (labels, sample values for a preview) deliberately lives in the
+ * workbench, not here. :generator defines the stored format; what a slot looks
+ * like on screen is a renderer's problem.
+ */
+enum class ComplicationSource(val wff: String?) {
+    NONE(null),
+    STEP_COUNT("STEP_COUNT"),
+    HEART_RATE("HEART_RATE"),
+    DAY_AND_DATE("DAY_AND_DATE"),
+    DATE("DATE"),
+    DAY_OF_WEEK("DAY_OF_WEEK"),
+    WATCH_BATTERY("WATCH_BATTERY"),
+    WORLD_CLOCK("WORLD_CLOCK"),
+    NEXT_EVENT("NEXT_EVENT"),
+    SUNRISE_SUNSET("SUNRISE_SUNSET"),
+    UNREAD_NOTIFICATION_COUNT("UNREAD_NOTIFICATION_COUNT"),
+    APP_SHORTCUT("APP_SHORTCUT"),
+    FAVORITE_CONTACT("FAVORITE_CONTACT");
+
+    val enabled: Boolean get() = wff != null
+}
+
+/**
+ * Where a complication sits on the dial.
+ *
+ * Five positions, and the ORDER of this enum is the order
+ * [DialParams.complications] is stored in -- adding one in the middle would
+ * re-map every stored face, so append only.
+ *
+ * TOP and BOTTOM used to be hardcoded PartText elements: the date and the
+ * battery percentage. They were not configurable and could not be turned off,
+ * which meant the face had five information areas but only advertised three.
+ * They are ordinary slots now.
+ */
+enum class SlotPosition { TOP, LEFT, MIDDLE, RIGHT, BOTTOM }
 
 /**
  * Everything needed to reproduce a dial.
@@ -42,11 +97,35 @@ data class DialParams(
     val inkColor: String = "#FCF9F1",
     val sheen: Double = 30.0,
 
+    /**
+     * Id of an imported image, used only by [Engine.TEXTURE]. Empty means none,
+     * and TEXTURE with no image falls back to a plain dial rather than failing.
+     *
+     * This is a LOCAL reference, not content: the bytes live outside the face.
+     * A face carrying one cannot be shared, which [Engine.TEXTURE] documents.
+     */
+    val texture: String = "",
+
     /** Draw the pattern OVER the numerals rather than behind them. */
     val lens: Boolean = true,
     val lensAmount: Double = 38.0,
 
-    val layout: Layout = Layout()
+    val layout: Layout = Layout(),
+
+    /**
+     * The complication slots, left to right. Slots set to
+     * [ComplicationSource.NONE] are not emitted at all -- an empty slot still
+     * costs a tap target and a frame budget on the watch, so it is omitted
+     * rather than rendered blank. The enabled ones are re-centred, so turning
+     * one off closes the gap instead of leaving a hole.
+     */
+    val complications: List<ComplicationSource> = listOf(
+        ComplicationSource.DAY_AND_DATE,               // TOP
+        ComplicationSource.STEP_COUNT,                 // LEFT
+        ComplicationSource.HEART_RATE,                 // MIDDLE
+        ComplicationSource.UNREAD_NOTIFICATION_COUNT,  // RIGHT
+        ComplicationSource.WATCH_BATTERY               // BOTTOM
+    )
 ) {
     init {
         require(generatorVersion in 1..CURRENT_GENERATOR_VERSION) {
@@ -57,27 +136,48 @@ data class DialParams(
         require(HEX.matches(inkColor)) { "inkColor must be #RRGGBB, got $inkColor" }
     }
 
+    /** True when this face depends on a local image and cannot enter the catalog. */
+    val isLocalOnly: Boolean get() = engine == Engine.TEXTURE && texture.isNotBlank()
+
+    /** The source at [pos], or NONE when the stored list is short/absent. */
+    fun slot(pos: SlotPosition): ComplicationSource =
+        complications.getOrElse(pos.ordinal) { ComplicationSource.NONE }
+
     companion object {
         private val HEX = Regex("^#[0-9A-Fa-f]{6}$")
     }
 }
 
 data class Layout(
-    val dateY: Int = 118,
+    /** Y of the TOP complication slot. Was the fixed date line. */
+    val dateY: Int = 99,
     val dateSize: Int = 21,
     val timeY: Int = 196,
     val timeSize: Int = 104,
     val tracking: Double = 0.0,
-    val complicationY: Int = 286,
-    val complicationSpread: Int = 86,
+    val complicationY: Int = 273,
+    val complicationSpread: Int = 92,
     val complicationSize: Int = 19,
-    val batteryY: Int = 348,
+    /** Y of the BOTTOM complication slot. Was the fixed battery line. */
+    val batteryY: Int = 344,
     val fontFamily: String = "SYNC_TO_DEVICE",
     val fontWeight: String = "MEDIUM"
 )
 
-/** Bump ONLY when adding an engine or a parameter. Never when changing geometry. */
-const val CURRENT_GENERATOR_VERSION = 1
+/**
+ * Bump ONLY when adding an engine or a parameter. Never when changing geometry.
+ *
+ * v3 (2026-08-28) makes the AMBIENT ink colour readable on a black screen (see
+ * [AmbientPalette]). No geometry changed: PatternEngines.v3 delegates to v2
+ * wholesale. It is a version bump because it changes what a STORED face renders
+ * as in ambient, which is exactly what this number protects against.
+ *
+ * v2 (2026-08-27) added [Engine.KNOTWORK]. Every other engine is UNCHANGED --
+ * PatternEngines.v2 delegates to v1 for them rather than copying the code, so
+ * they cannot drift. A face stored with generatorVersion=1 still renders through
+ * the v1 branch, byte for byte.
+ */
+const val CURRENT_GENERATOR_VERSION = 3
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

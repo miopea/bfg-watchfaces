@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.generator
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -76,5 +77,116 @@ class WffSchemaTest {
         val xml = WffEmitter.emit(DialParams())
         assertTrue(xml.contains("<Variant mode=\"AMBIENT\""))
         assertTrue(xml.split("<Scene").size == 2) { "there must be exactly one Scene" }
+    }
+}
+
+/**
+ * Complication slots are user-configurable, so every combination a user can
+ * reach has to be schema-valid. The provider tokens come from the schema's own
+ * enumeration; an invented one installs cleanly and never appears.
+ */
+class ComplicationSchemaTest {
+
+    private fun validate(xml: String): List<String> {
+        val errors = mutableListOf<String>()
+        val factory = javax.xml.validation.SchemaFactory.newInstance(
+            "http://www.w3.org/XML/XMLSchema/v1.1",
+            "org.apache.xerces.jaxp.validation.XMLSchema11Factory",
+            null
+        )
+        val schema = File(
+            WffSchemaTest::class.java.classLoader.getResource("wff-schema/watchface.xsd")!!.toURI()
+        )
+        val validator = factory.newSchema(schema).newValidator()
+        validator.errorHandler = object : org.xml.sax.ErrorHandler {
+            override fun warning(e: org.xml.sax.SAXParseException) {}
+            override fun error(e: org.xml.sax.SAXParseException) { errors += "line ${e.lineNumber}: ${e.message}" }
+            override fun fatalError(e: org.xml.sax.SAXParseException) { errors += "FATAL: ${e.message}" }
+        }
+        validator.validate(javax.xml.transform.stream.StreamSource(xml.reader()))
+        return errors
+    }
+
+    @ParameterizedTest
+    @EnumSource(ComplicationSource::class)
+    fun `every complication source emits schema-valid WFF`(source: ComplicationSource) {
+        val errors = validate(WffEmitter.emit(DialParams(complications = listOf(source))))
+        assertTrue(errors.isEmpty()) { "$source: ${errors.joinToString("\n")}" }
+    }
+
+    @Test
+    fun `slots set to NONE are not emitted at all`() {
+        val xml = WffEmitter.emit(
+            DialParams(complications = listOf(
+                ComplicationSource.STEP_COUNT, ComplicationSource.NONE, ComplicationSource.WATCH_BATTERY
+            ))
+        )
+        // An empty slot would still cost a tap target and a frame budget.
+        assertTrue(xml.split("<ComplicationSlot").size - 1 == 2) { "expected exactly 2 slots" }
+        assertTrue(!xml.contains("defaultSystemProvider=\"null\"")) { "a disabled slot leaked into the output" }
+        assertTrue(validate(xml).isEmpty())
+    }
+
+    @Test
+    fun `a face with no complications at all is still valid`() {
+        val xml = WffEmitter.emit(DialParams(complications = emptyList()))
+        assertTrue(!xml.contains("<ComplicationSlot"))
+        assertTrue(validate(xml).isEmpty())
+    }
+
+    @Test
+    fun `row slots re-centre rather than leaving a hole`() {
+        fun xs(vararg c: ComplicationSource): List<Int> =
+            Regex("""<ComplicationSlot slotId="\d+" x="(-?\d+)"""")
+                .findAll(WffEmitter.emit(DialParams(complications = c.toList())))
+                .map { it.groupValues[1].toInt() }.toList()
+
+        val N = ComplicationSource.NONE
+        val S = ComplicationSource.STEP_COUNT
+        val H = ComplicationSource.HEART_RATE
+        val D = ComplicationSource.DATE
+
+        // TOP, LEFT, MIDDLE, RIGHT, BOTTOM
+        val fullRow = xs(N, S, H, D, N)
+        val loneRow = xs(N, N, H, N, N)
+        assertEquals(3, fullRow.size)
+        assertEquals(1, loneRow.size)
+        assertEquals(fullRow[1], loneRow[0]) {
+            "a lone row slot did not re-centre: $loneRow vs middle-of-three ${fullRow[1]}"
+        }
+    }
+
+    @Test
+    fun `top and bottom are centred singles`() {
+        val N = ComplicationSource.NONE
+        val B = ComplicationSource.WATCH_BATTERY
+        fun xs(vararg c: ComplicationSource): List<Int> =
+            Regex("""<ComplicationSlot slotId="\d+" x="(-?\d+)"""")
+                .findAll(WffEmitter.emit(DialParams(complications = c.toList())))
+                .map { it.groupValues[1].toInt() }.toList()
+        assertEquals(xs(B, N, N, N, N), xs(N, N, N, N, B)) {
+            "TOP and BOTTOM should share the same centred x"
+        }
+    }
+
+    @Test
+    fun `all five positions can be filled and stay schema valid`() {
+        val xml = WffEmitter.emit(DialParams(complications = listOf(
+            ComplicationSource.DAY_AND_DATE, ComplicationSource.STEP_COUNT,
+            ComplicationSource.HEART_RATE, ComplicationSource.UNREAD_NOTIFICATION_COUNT,
+            ComplicationSource.WATCH_BATTERY)))
+        assertEquals(5, xml.split("<ComplicationSlot").size - 1)
+        assertTrue(validate(xml).isEmpty())
+    }
+
+    @Test
+    fun `slot ids are unique and contiguous`() {
+        // Duplicate slotIds are accepted by the schema and then behave
+        // unpredictably on the watch, so this is checked here rather than there.
+        val ids = Regex("""slotId="(\d+)"""")
+            .findAll(WffEmitter.emit(DialParams()))
+            .map { it.groupValues[1].toInt() }.toList()
+        assertEquals(ids.size, ids.toSet().size) { "duplicate slotId: $ids" }
+        assertEquals((0 until ids.size).toList(), ids) { "slot ids not contiguous from 0: $ids" }
     }
 }

@@ -17,7 +17,7 @@ Three pieces landed recently that together remove every reason this needed a bac
 
 So the entire pipeline runs on the phone:
 
-```
+```text
 params -> pack builds APK -> validator issues token -> Data Layer -> addWatchFace()
 ```
 
@@ -40,12 +40,12 @@ A face is ~5KB of JSON. The phone regenerates the artwork locally. Consequences:
 
 ## Modules
 
-```
+```text
 generator/           Pure Kotlin/JVM. No Android. Engines, params, WFF emitter.
                      35 tests, runs in CI without an emulator. Do work here first.
 phone/               Compose app: design UI, pack integration, Data Layer client.
 wear/                Thin Wear app: WatchFacePushManager, Data Layer listener.
-watchface-template/  Standalone aapt2 WFF project. The Silver Sand reference face.
+watchface-template/  Standalone aapt2 WFF project. Packaged per design.
 scripts/             bootstrap, emulator setup, device deploy.
 ```
 
@@ -69,6 +69,7 @@ Stroke each polyline three times for the engraved look: light pass at
 Every one of these was found the expensive way. Do not relax them.
 
 ### WFF
+
 - Canvas is 456x456. Correct for Pixel Watch 4 and 5, both case sizes.
 - Colours are `#AARRGGBB`. Eight digits, **alpha first**. Six-digit values are
   silently wrong, not rejected.
@@ -82,6 +83,7 @@ A schema-invalid face compiles, links, signs, and installs -- then never appears
 in the carousel, with no error anywhere. `WffSchemaTest` is the only defence.
 
 ### Watch Face Push
+
 - Package names must be `<app package>.watchfacepush.<face name>`. Rejected otherwise.
   Here: `com.bfg.watchfaces.watchfacepush.<slug>`. `applicationId` is frozen at
   first Play release and can never be changed afterwards.
@@ -100,6 +102,7 @@ in the carousel, with no error anywhere. `WffSchemaTest` is the only defence.
 - Slots cap how many faces the app may have installed at once.
 
 ### Transfer
+
 The APK crosses to the watch over Bluetooth. Quantize the dial PNG before
 packing: measured 368KB -> 77KB at 64 colours, mean error 0.66/255, visually
 identical on a soft low-contrast dial. Do this always.
@@ -114,19 +117,46 @@ identical on a soft low-contrast dial. Do this always.
 5. **Compose design UI.** Ten sliders next to a 456px preview on a phone screen
    is a genuinely harder design problem than a desktop tool was.
 
-## Community catalog (later)
+## Community catalog
 
-- Repo of `faces/*.json`, one per face, plus a generated `index.json`.
+Built, and it lives in its own public repository:
+<https://github.com/miopea/bfg-watchfaces-catalog>. `faces/<slug>.json`, one per
+face, plus a generated `index.json`.
+
+It is separate on purpose: strangers opening pull requests against a folder of
+JSON is a very different risk profile from strangers opening them against the
+app's source.
+
+- The index carries name, author, engine and colours only, so a gallery of a
+  thousand faces is ONE request. Full parameters stay in the per-face files and
+  are fetched when someone opens one.
 - Served via jsDelivr -- free, no bandwidth limits, GitHub-integrated.
   Not `raw.githubusercontent.com`, which is not a CDN and is rate limited.
-- Submissions are PRs. GitHub Actions runs the schema validator automatically,
-  so invalid faces are rejected before human review.
-- **Parametric submissions only.** No uploaded rasters.
-- Play's UGC policy requires in-app reporting and moderation. Budget for it.
+- Submissions are PRs. `./gradlew :workbench:catalog --args="--check"` runs in
+  CI and fails on a face that does not parse, does not render, emits
+  schema-invalid WFF, has a slug disagreeing with its name or filename, exceeds
+  8KB, or leaves `index.json` stale. Invalid faces are rejected before human
+  review because a reviewer cannot see schema-invalidity in a diff.
+- **Parametric submissions only.** `TEXTURE` faces are refused automatically.
+- The app stages a submission; it does not open the PR. Publishing is the
+  author's action, not a button press in a design tool.
+
+Moderation and reporting are documented in the catalog repo's `MODERATION.md`:
+what is disallowed, how to report it, and how fast a report is acted on. Play's
+UGC policy requires a working complaint path for any app surfacing user content.
+
+Still open:
+
+- **The in-app Report action.** The catalog has an issue template and a stated
+  policy; the app does not yet link to it. That is the remaining store-blocking
+  gap.
+- **The catalog repo's CI cannot reach this validator while this repo is
+  private.** See DECISIONS.md 2026-08-28.
 
 ## Ongoing costs
 
 Zero money. Two recurring time costs, forever:
+
 - Annual target-API bumps, or Play delists the app.
 - `validator-push` is at `1.0.0-alpha10`. The API will move.
 
