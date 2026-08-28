@@ -1,5 +1,97 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — The activation prompt: asked once, explained properly, and never again
+
+Settled by operator decision `01a0495b-dc98-76d2-9e80-92aff51cdec6`, which
+closes the question the 2026-08-26 entry left open. Their words, both parts:
+
+> When to ask: "Should this be when they first open the app. Explained carefully
+> and why it is important they approve it and what the approval limits the app
+> to."
+>
+> After a denial: "Show a persistent short note on how to activate from the
+> watch instead"
+
+Four options were offered and they took none of them, so this is their placement
+rather than the nearest button: ask EARLY, not gated behind a first push that
+may never happen.
+
+### What verifying it first turned up, and why it matters
+
+The task required confirming the permission can actually be requested before
+building around it. It cannot, where the answer assumes.
+
+`androidx.wear.watchfacepush:watchfacepush:1.0.0` declares `<uses-library
+android:name="wear-sdk" android:required="true" />`. That is a Wear OS system
+library, so an app linking this cannot install on a phone or tablet at all. The
+permission is checked with `checkSelfPermission` inside `setWatchFaceAsActive`,
+on the watch. And `setWatchFaceAsActive` takes a slot ID which the library's own
+error text says comes only from `listWatchFaces` or `addWatchFace`.
+
+So the app the user opens to design a face can never hold this permission. There
+are two different "first opens" — the design app, where the attention is, and
+the watch app, where the permission lives — and choosing between them changes
+what the operator's answer means. That went back to them as
+`01a04987-6498-7820-b7c6-271471f39fb5` rather than being quietly resolved by
+moving the prompt, which is what the task told us not to do.
+
+**Everything below is independent of that answer** and is built now.
+
+### The rules, in `ActivationConsent`
+
+A three-state machine — `UNASKED`, `GRANTED`, `DENIED` — with `DENIED`
+deliberately terminal, because Android offers no transition out of it.
+
+`canAsk` is true only from `UNASKED`. It is pointedly NOT "is the permission
+missing": a denial also leaves it missing, and that reading is exactly how the
+one shot gets spent on somebody who already said no. `record` throws rather than
+quietly doing nothing when called from a settled state, because a silent second request is a
+call that looks like it worked and reached nobody.
+
+Same shape as `WatchDevices`: the judgement is here and tested, the Android call
+is a thin thing at the edge that does not exist yet. When `:wear` is built this
+class does not change, it gains a caller.
+
+### The explanation is the deliverable, not the wrapper
+
+The operator named two things and the second is the one usually omitted: why it
+matters, AND what the approval limits the app to. A permission screen that only
+sells the upside is the shape people have learned to distrust, so the boundary
+gets equal room — it only ever switches to a face you made here, it cannot see
+the face you are wearing, and it cannot change anything else.
+
+Three specific choices, each pinned by a test:
+
+- **It says a no still leaves a working app.** "Without it the face still
+  arrives — you just switch to it yourself." Overstating the cost of declining
+  is the cheapest way to get a yes and the fastest way to deserve distrust.
+- **It admits there is only one chance, before they choose.** Someone making a
+  permanent decision should learn that while they are making it.
+- **The decline button is "No thanks", not "Not now".** "Not now" promises
+  another ask that cannot happen. A button that lies about being reversible is
+  worse here than anywhere else in the app.
+
+### After a no: instructions, not a second pitch
+
+Persistent, as asked — the note has to still be there next week when they have
+sent a face and are wondering why nothing happened, which a toast would not be.
+
+It carries the actual gesture (press and hold, then scroll) and a test forbids
+the words "allow", "permission", "grant", "enable" and "settings" in it. Nothing
+can reopen the choice, so anything persuasive there is nagging someone about a
+locked door.
+
+### Found on the way: two dependency versions that were never published
+
+`gradle/libs.versions.toml` pins `watchfacePush = "1.0.0-alpha03"`, which does
+not exist — that library has shipped `1.0.0` — and `wfp-validator =
+"1.0.0-alpha10"`, which does not exist for either validator artifact. Nothing
+has caught it because `:mobile` and `:wear` are commented out of
+`settings.gradle.kts`; they would fail to resolve the first time anyone
+uncomments them. Raised with the operator in the same decision; not changed
+unilaterally, because choosing between `1.0.0-alpha09` and `1.1.0-alpha01` for
+the validator is a real choice and not a typo fix.
+
 ## 2026-08-28 — The app you can open is the app that ships, and it is Compose
 
 The localhost app is the SPECIFICATION for the shipped one, not a design toy
@@ -204,6 +296,9 @@ and never claiming success.
   The 2026-08-26 entry says the prompt placement must be settled on paper BEFORE
   the code around it exists, and that is still unresolved. Writing it now would
   be deciding it by accident.
+
+  **Superseded 2026-08-28** — decided, and the rules built. See the entry at the
+  top of this file.
 - **Remaining slot count.** `WatchFacePushManager.listWatchFaces()` is a Wear
   API; adb cannot see it. It arrives with the real Data Layer implementation.
 
@@ -997,6 +1092,9 @@ replaced them set the shape of everything else.
   once regardless. It is the only irreversible action in the system. The prompt
   placement is a design problem and should be settled on paper before the code
   around it exists. Nothing has been decided here yet.
+
+  **Superseded 2026-08-28** — settled by operator decision
+  `01a0495b-dc98-76d2-9e80-92aff51cdec6`. See the entry at the top of this file.
 
 - **Market is Wear OS 6+ only** — Pixel Watch 4 and 5, recent Galaxy Watch.
   Pixel Watch 1–3 cannot run this at all. Small today, growing. Accepted.
