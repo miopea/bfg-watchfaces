@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.workbench
 
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.AmbientPalette
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.SlotGeometry
@@ -66,11 +67,19 @@ object FacePreview {
         val textH = SlotGeometry.textHeight(l.complicationSize)
         val fontSize = SlotGeometry.fontSize(l.complicationSize).toDouble()
 
+        // From v3 a complication carries an ambient colour Variant when the ink
+        // would be unreadable on black. Mirror it, or the preview would show a
+        // legible top slot that the watch renders as an invisible smudge.
+        val liftAmbientInk = p.generatorVersion >= 3 &&
+            AmbientPalette.contrastOnBlack(p.inkColor) < 4.5
+        val ambientSlotInk =
+            if (liftAmbientInk) DialRenderer.hex(AmbientPalette.forAmbient(p.inkColor)) else ink
+
         for ((pos, box) in SlotGeometry.boxes(p)) {
             val source = p.slot(pos)
             val a = if (ambient) (if (pos == SlotPosition.TOP) 140 else 0) else 255
             if (a <= 0) continue
-            val c = withAlpha(ink, a)
+            val c = withAlpha(if (ambient) ambientSlotInk else ink, a)
             ComplicationIcons.draw(g, source, box.x + (box.w - iconSize) / 2.0, box.y.toDouble(), iconSize, c)
             drawCenteredIn(g, Complications.sample(source), box.x, box.y + textY, box.w, textH,
                 fontSize, Font.PLAIN, c)
@@ -82,8 +91,14 @@ object FacePreview {
         val hh = now.hour % 12
         val timeText = "%02d:%02d".format(if (hh == 0) 12 else hh, now.minute)
         if (ambient) {
+            // Mirror the emitter's version branch exactly. From v3 the ambient
+            // ink clears a contrast floor against black; before that it is the
+            // raw ink at alpha 160, dark or not.
+            val ambientInk =
+                if (p.generatorVersion >= 3) DialRenderer.hex(AmbientPalette.forAmbient(p.inkColor))
+                else withAlpha(ink, 160)
             drawCentered(g, timeText, l.timeY - l.timeSize / 2, (l.timeSize * 1.4).toInt(),
-                l.timeSize.toDouble(), Font.PLAIN, withAlpha(ink, 160), thin = true)
+                l.timeSize.toDouble(), Font.PLAIN, ambientInk, thin = true)
         } else {
             drawCentered(g, timeText, l.timeY - l.timeSize / 2, (l.timeSize * 1.4).toInt(),
                 l.timeSize.toDouble(), awtStyle(l.fontWeight), ink)

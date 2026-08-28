@@ -97,7 +97,7 @@ class CatalogStoreTest {
         // unknown version, so this shape cannot be built in Kotlin at all -- but
         // it can certainly arrive in a pull request from a newer client.
         val json = CatalogStore.toJson(entry("Future Face", DialParams()))
-            .replace("\"generatorVersion\": 2", "\"generatorVersion\": 99")
+            .replace(Regex("\"generatorVersion\": \\d+"), "\"generatorVersion\": 99")
         val f = write(root, "future_face", json)
         val problems = CatalogStore.validate(root, f)
         assertTrue(problems.any { it.message.contains("generatorVersion") }) {
@@ -135,6 +135,7 @@ class CatalogStoreTest {
         val index = CatalogStore.buildIndex(root)
 
         assertTrue(index.contains("\"count\": 1"))
+        assertTrue(index.contains("\"maxGeneratorVersion\":")) { "the index must say how new a client needs to be" }
         assertTrue(index.contains("\"name\": \"Knot Test\""))
         assertTrue(index.contains("\"author\": \"Tester\""))
         assertTrue(index.contains("\"engine\": \"KNOTWORK\""))

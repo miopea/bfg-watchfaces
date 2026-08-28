@@ -23,6 +23,9 @@ object PatternEngines {
     fun paths(p: DialParams): List<Polyline> = when (p.generatorVersion) {
         1 -> v1(p)
         2 -> v2(p)
+        // v3 changed the ambient ink colour, not geometry. Delegating rather
+        // than adding a branch keeps that true and provable.
+        3 -> v2(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

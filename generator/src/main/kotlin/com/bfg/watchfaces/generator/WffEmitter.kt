@@ -29,7 +29,17 @@ object WffEmitter {
         // that have not been given one, not a product name.
         val l = p.layout
         val ink = argb(p.inkColor)
-        val inkDim = argb(p.inkColor, 160)
+
+        // Ambient is a black screen. From v3 the ambient ink is lifted to clear
+        // a contrast floor while keeping its hue, so a dark ink chosen for a
+        // pale dial does not render the time invisible when the watch dims.
+        //
+        // v1 and v2 keep the old behaviour EXACTLY -- the user's ink at alpha
+        // 160, dark or not. A stored face must render as its author saw it, and
+        // that is the whole job of generatorVersion.
+        val inkNeedsLift = AmbientPalette.contrastOnBlack(p.inkColor) < 4.5
+        val inkDim = if (p.generatorVersion >= 3) argb(AmbientPalette.forAmbient(p.inkColor))
+                     else argb(p.inkColor, 160)
 
         // Slot geometry comes from SlotGeometry, which the preview also uses.
         // It sizes boxes to their content, widens the spread if they would
@@ -42,6 +52,20 @@ object WffEmitter {
         val textH = SlotGeometry.textHeight(l.complicationSize)
         val fontSize = SlotGeometry.fontSize(l.complicationSize)
         val iconW = iconH
+
+        // A complication has ONE Font colour for both modes, unlike the clock
+        // which ships two TimeText elements. So the only way its ambient colour
+        // can differ is a colour Variant.
+        //
+        // Schema-valid -- verified against Google's XSD, and asserted by a test.
+        // RUNTIME support is NOT verified: no face from this repo has been
+        // confirmed on a watch yet. If the runtime ignores an unknown Variant
+        // target, this degrades to the previous behaviour rather than to
+        // something worse. Confirm it during the first hardware test.
+        val ambientColorVariant =
+            if (p.generatorVersion >= 3 && inkNeedsLift)
+                "\n          <Variant mode=\"AMBIENT\" target=\"color\" value=\"$inkDim\"/>"
+            else ""
 
         val slots = boxes.entries.mapIndexed { id, (pos, box) ->
             val source = p.slot(pos)
@@ -60,7 +84,7 @@ object WffEmitter {
         <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>
-        <PartText x="0" y="$textY" width="${box.w}" height="$textH">
+        <PartText x="0" y="$textY" width="${box.w}" height="$textH">$ambientColorVariant
           <Text align="CENTER">
             <Font family="${l.fontFamily}" size="$fontSize" color="$ink">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>

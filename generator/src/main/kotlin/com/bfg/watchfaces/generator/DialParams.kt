@@ -167,12 +167,17 @@ data class Layout(
 /**
  * Bump ONLY when adding an engine or a parameter. Never when changing geometry.
  *
+ * v3 (2026-08-28) makes the AMBIENT ink colour readable on a black screen (see
+ * [AmbientPalette]). No geometry changed: PatternEngines.v3 delegates to v2
+ * wholesale. It is a version bump because it changes what a STORED face renders
+ * as in ambient, which is exactly what this number protects against.
+ *
  * v2 (2026-08-27) added [Engine.KNOTWORK]. Every other engine is UNCHANGED --
  * PatternEngines.v2 delegates to v1 for them rather than copying the code, so
  * they cannot drift. A face stored with generatorVersion=1 still renders through
  * the v1 branch, byte for byte.
  */
-const val CURRENT_GENERATOR_VERSION = 2
+const val CURRENT_GENERATOR_VERSION = 3
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

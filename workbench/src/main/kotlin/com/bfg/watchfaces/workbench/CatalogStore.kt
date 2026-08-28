@@ -196,9 +196,15 @@ object CatalogStore {
             """"dialColor": ${Json.quote(e.params.dialColor)}, "inkColor": ${Json.quote(e.params.inkColor)}, """ +
             """"generatorVersion": ${e.params.generatorVersion}, "created": ${Json.quote(e.created)}}"""
         }
+        // The HIGHEST version among the faces, not the version of whatever built
+        // the index. Recording the builder's version made every committed index
+        // go stale the moment the generator was bumped, which is churn that says
+        // nothing. What a client actually needs to know is whether it is new
+        // enough to render everything in here.
+        val maxVersion = entries.maxOfOrNull { it.params.generatorVersion } ?: 0
         return """{
   "generated": ${Json.quote(Instant.now().toString())},
-  "generatorVersion": ${com.bfg.watchfaces.generator.CURRENT_GENERATOR_VERSION},
+  "maxGeneratorVersion": $maxVersion,
   "count": ${entries.size},
   "faces": [
 $rows

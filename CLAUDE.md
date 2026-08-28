@@ -106,7 +106,7 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 
 Verified — built and run, not assumed:
 
-- `:generator` — 91 tests green, including validation against Google's official
+- `:generator` — 109 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
 - `:workbench` — 53 tests green. Serves the app at localhost:7777; bakes

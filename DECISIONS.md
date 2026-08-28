@@ -1,5 +1,58 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — generatorVersion 3: ambient ink is lifted, not reused
+
+Ambient is a black screen — the dial fades to alpha 0 and only text remains.
+Nothing stopped someone choosing near-black ink (the palette offers `#1A1A1A`),
+which looks deliberate on a pale dial and renders the time **invisible** the
+moment the watch dims. Schema-valid, installs fine, unusable on the wrist. No
+test or validator in the build could see it.
+
+`AmbientPalette` keeps hue and saturation and raises only HSL lightness until
+the colour clears **4.5:1 against black**. WCAG's large-text bar is 3:1, but
+ambient is read at a glance, at an angle, often outdoors, on a panel the watch
+has already dimmed, so the stricter floor is the honest one. Measured:
+`#1A1A1A` becomes `#757575`, `#23306B` becomes `#5A6EC9` and is still navy,
+`#FCF9F1` is returned unchanged.
+
+Rejected: forcing white would work and would flatten a design dimension across
+the whole catalog; warning the user would be honest and would still ship faces
+whose time cannot be read.
+
+### Why it is a version bump
+
+The change alters what a STORED face renders as in ambient, which is precisely
+what `generatorVersion` protects. v1 and v2 keep the old behaviour exactly — raw
+ink at alpha 160, dark or not — and a test asserts a v2 face gains none of this.
+`PatternEngines` v3 delegates wholesale to v2, with a test asserting every
+engine's geometry is identical across the two, so the bump provably carries a
+colour change and nothing else.
+
+### The complication needed a mechanism the clock did not
+
+The clock ships TWO `TimeText` elements, so its ambient colour can simply differ.
+A complication has ONE `Font` colour for both modes, so the only way to vary it
+is a colour `Variant`.
+
+That this validates is not obvious — `Variant`'s value is
+`arithmeticExpressionType`, which sounds numeric — so it was **tested against
+Google's XSD rather than assumed**, and a test now asserts it. The variant is
+emitted only when the ink actually needs lifting; emitting a no-op on every face
+would be noise implying a change that is not happening.
+
+**Runtime support is UNVERIFIED.** Schema-valid is not the same as honoured, and
+no face from this repo has been confirmed on a watch yet. If the runtime ignores
+an unknown Variant target this degrades to the previous behaviour rather than to
+something worse — but it belongs on the list for the first hardware test,
+alongside the carousel check that still gates everything.
+
+### A side effect worth keeping
+
+The catalog index recorded the generator version that BUILT it, so bumping the
+app made every committed index stale — churn that says nothing. It now records
+the highest version among the faces, which is what a client actually needs:
+whether it is new enough to render everything in there.
+
 ## 2026-08-28 — An unanchored gitignore line published an index with no faces
 
 Immediately after the catalog landed, CI went green having validated **nothing**.

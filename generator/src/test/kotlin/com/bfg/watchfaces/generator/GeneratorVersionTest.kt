@@ -11,7 +11,7 @@ class GeneratorVersionTest {
 
     @Test
     fun `bumping CURRENT_GENERATOR_VERSION is deliberate`() {
-        assertEquals(2, CURRENT_GENERATOR_VERSION,
+        assertEquals(3, CURRENT_GENERATOR_VERSION,
             "You changed CURRENT_GENERATOR_VERSION. That is fine ONLY if you added a new " +
             "branch in PatternEngines.paths() and left every older branch untouched. " +
             "Existing community faces must keep rendering exactly as their authors saw them. " +
