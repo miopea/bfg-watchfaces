@@ -83,6 +83,9 @@ rejected — not a changelog.
 
 make docs-check                         # markdownlint + cspell over the docs
 
+./gradlew :wear:assembleDebug          # needs ANDROID_HOME + platform 36
+./gradlew :mobile:assembleDebug
+
 cd watchface-template && ./build.sh    # validates + builds build/$FACE_SLUG.apk
 cd watchface-template && ./reskin.sh <template.apk> <bg.png> <wff.xml> <out.apk>
 
@@ -120,10 +123,14 @@ Verified — built and run, not assumed:
 - `reskin.sh` — swaps resources into a built APK without recompiling.
   (Written and read, but not exercised since the workbench landed.)
 
-Scaffolded, never built or run:
+Builds, but has never run:
 
-- `:mobile`, `:wear` — build files and a manifest only. Commented out of
-  `settings.gradle.kts`. Uncomment as you implement them.
+- `:mobile`, `:wear` — both assemble a real APK and are in `settings.gradle.kts`
+  and CI. `:wear` declares the activation permission; `:mobile` carries the
+  generator. Neither has been installed or launched: there is no emulator here
+  (`/dev/kvm` is unreachable) and Watch Face Push needs Wear OS 6 hardware.
+  Compiling is a much smaller claim than working, and it is the only one made.
+  Both are empty of UI — no Compose screens yet.
 
 Never tested on hardware:
 

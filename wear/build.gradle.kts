@@ -7,11 +7,11 @@ plugins {
 
 android {
     namespace = "com.bfg.watchfaces.wear"
-    compileSdk = 35
+    compileSdk = 36  // Watch Face Push 1.0.0 requires 36 or later
     defaultConfig {
         applicationId = "com.bfg.watchfaces"  // MUST match the phone app
-        minSdk = 34                           // Watch Face Push is Wear OS 6+
-        targetSdk = 35
+        minSdk = 36                           // Wear OS 6 = API 36. Push exists nowhere below it.
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }

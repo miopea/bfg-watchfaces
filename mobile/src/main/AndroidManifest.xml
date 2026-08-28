@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!--
+    The DESIGN app. It explains the activation handoff and sends faces; it never
+    asks for the activation permission, because it cannot hold it.
+
+    androidx.wear.watchfacepush declares <uses-library wear-sdk required="true">,
+    so any app linking it will not install on a phone or tablet at all. The
+    permission is checked inside setWatchFaceAsActive on the WATCH. Google's own
+    guidance gives the watch app the job of "requesting necessary permissions and
+    prompting the user".
+
+    See DECISIONS.md 2026-08-28 and docs/SPEC.md, "Why there are two apps".
+  -->
+
+  <uses-permission android:name="android.permission.INTERNET" />
+
+  <application android:label="BFG Watch Faces" />
+</manifest>

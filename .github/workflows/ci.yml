@@ -15,8 +15,10 @@ jobs:
       # how you end up validating against last year's spec.
       - run: scripts/bootstrap.sh
 
-      # No Android SDK, no emulator. The generator is deliberately pure JVM so
-      # that the piece under most active development is also the fastest to check.
+      # The generator is deliberately pure JVM so the piece under most active
+      # development is also the fastest to check. The Android modules are in the
+      # build now, so Gradle configures them here, but nothing Android is
+      # compiled or run by this job.
       - run: ./gradlew :generator:test
 
       # The workbench owns the rasterizer, so it now owns artwork that ships
@@ -51,6 +53,62 @@ jobs:
           path: |
             generator/build/reports/tests/test
             workbench/build/reports/tests/test
+
+  # The Android modules were scaffolds nobody had ever built, which is how both
+  # of them ended up pinned to versions that could not resolve and to a
+  # compileSdk the Watch Face Push library rejects. Building them here is what
+  # stops that happening again.
+  #
+  # Nothing is RUN: there is no emulator and Watch Face Push needs Wear OS 6
+  # hardware. This proves the APKs assemble and contain what they must, which is
+  # a smaller claim than "it works" and is stated as such.
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: gradle/actions/setup-gradle@v4
+
+      # compileSdk 36 explicitly: androidx.wear.watchfacepush:1.0.0 refuses to
+      # be compiled against anything lower, and the runner image is not
+      # guaranteed to carry it.
+      - name: Android SDK 36
+        run: |
+          set -euo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0"
+
+      - run: ./gradlew :wear:assembleDebug :mobile:assembleDebug
+
+      - name: the APKs contain what they must, and nothing they must not
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          WEAR=wear/build/outputs/apk/debug/wear-debug.apk
+          MOBILE=mobile/build/outputs/apk/debug/mobile-debug.apk
+          test -s "$WEAR" && test -s "$MOBILE"
+
+          # The watch app is the only one that can hold this, and the whole
+          # activation design depends on it being declared.
+          "$BT/aapt2" dump badging "$WEAR" \
+            | grep -q "com.google.wear.permission.SET_PUSHED_WATCH_FACE_AS_ACTIVE"
+
+          # Both must ship under the frozen applicationId. Watch Face Push
+          # derives every face package from it and it can never change after
+          # the first Play release.
+          for apk in "$WEAR" "$MOBILE"; do
+            "$BT/aapt2" dump badging "$apk" | grep -q "package: name='com.bfg.watchfaces'"
+          done
+
+          # :workbench is dev tooling and is NOT shipped. If it ever leaks into
+          # an APK, the localhost server and the catalog writer go with it.
+          for apk in "$WEAR" "$MOBILE"; do
+            if unzip -p "$apk" 'classes*.dex' | strings | grep -q "com/bfg/watchfaces/workbench"; then
+              echo "FAIL: $apk contains :workbench code" >&2; exit 1
+            fi
+          done
 
   docs:
     runs-on: ubuntu-latest

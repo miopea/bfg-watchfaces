@@ -7,19 +7,22 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "com.bfg.watchfaces.mobile"
-    compileSdk = 35
+    compileSdk = 36  // Watch Face Push 1.0.0 requires 36 or later
     defaultConfig {
         // FROZEN AT FIRST PLAY RELEASE. applicationId can never be changed
         // afterwards -- a new one is a new app with zero installs and zero
         // reviews. Watch Face Push also derives every pushed face's package
         // from it: <applicationId>.watchfacepush.<slug>.
         applicationId = "com.bfg.watchfaces"
-        minSdk = 26
-        targetSdk = 35
+        // 28, not 26: the Watch Face Push validator library declares minSdk 28,
+        // so anything lower fails the manifest merge. Android 9 and up.
+        minSdk = 28
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
         // pack ships as native libs; limit ABIs to what you actually ship
