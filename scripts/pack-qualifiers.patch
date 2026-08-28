@@ -1,0 +1,142 @@
+diff --git a/pack-asset-compiler/src/resource_internal_types.rs b/pack-asset-compiler/src/resource_internal_types.rs
+index 057d6ff..7bb3231 100644
+--- a/pack-asset-compiler/src/resource_internal_types.rs
++++ b/pack-asset-compiler/src/resource_internal_types.rs
+@@ -96,6 +96,45 @@ pub struct StringResource {
+ 
+ impl Resource {
+     /// Returns the directory after `res/` in which this resource resides, eg. `drawable`.
++    /// The resource TYPE, with any configuration qualifiers stripped.
++    ///
++    /// `drawable-nodpi` is the type `drawable` in the configuration `nodpi`.
++    /// The directory name is both, so the type is everything before the first
++    /// `-`. Without this, `res/drawable-nodpi/preview.png` registers a type
++    /// literally called `drawable-nodpi` and `@drawable/preview` cannot be
++    /// resolved.
++    pub fn get_res_type(&self) -> &str {
++        let subdir = self.get_subdirectory();
++        match subdir.find('-') {
++            Some(i) => &subdir[..i],
++            None => subdir
++        }
++    }
++
++    /// The density this resource is declared for, as a `ResTable_config` value.
++    ///
++    /// Only the density qualifier is understood, because it is the one that
++    /// changes behaviour for a watch face: `nodpi` tells the platform not to
++    /// scale the bitmap, and a 456x456 dial scaled up is several times the
++    /// per-frame memory. Anything unrecognised is left as the default.
++    pub fn get_density(&self) -> u16 {
++        for part in self.get_subdirectory().split('-').skip(1) {
++            match part {
++                "nodpi" => return 0xFFFF,   // DENSITY_NONE: never scale
++                "anydpi" => return 0xFFFE,  // DENSITY_ANY
++                "ldpi" => return 120,
++                "mdpi" => return 160,
++                "tvdpi" => return 213,
++                "hdpi" => return 240,
++                "xhdpi" => return 320,
++                "xxhdpi" => return 480,
++                "xxxhdpi" => return 640,
++                _ => continue
++            }
++        }
++        0
++    }
++
+     pub fn get_subdirectory(&self) -> &str {
+         match self {
+             Resource::File(file) => &file.subdirectory[..],
+diff --git a/pack-asset-compiler/src/resource_table.rs b/pack-asset-compiler/src/resource_table.rs
+index caa772f..f44de9e 100644
+--- a/pack-asset-compiler/src/resource_table.rs
++++ b/pack-asset-compiler/src/resource_table.rs
+@@ -101,9 +101,16 @@ pub fn construct_resource_table(
+             reserved: 0,
+             entry_count,
+             entries_start: 0x54 + offsets.len() as u32 * 4,
+-            config: TableConfigChunk {
+-                size: 64,
+-                data: [0; 60]
++            config: {
++                // ResTable_config, after the leading size: mcc(2) mnc(2)
++                // language(2) country(2) orientation(1) touchscreen(1) then
++                // density(2, little-endian) at offset 10. Everything else stays
++                // zero, which means "any".
++                let mut data = [0u8; 60];
++                let density = density_for_type(resources, res_type);
++                data[10] = (density & 0xFF) as u8;
++                data[11] = (density >> 8) as u8;
++                TableConfigChunk { size: 64, data }
+             },
+             offsets
+         };
+@@ -159,18 +166,34 @@ fn get_padded_package_name(package_name: &str) -> Result<Vec<u16>> {
+ pub fn get_unique_res_types(resources: &[Resource]) -> Vec<String> {
+     let mut unique_vec = vec![];
+     for res in resources {
+-        let subdir = res.get_subdirectory().to_string();
+-        if !unique_vec.contains(&subdir) {
+-            unique_vec.push(subdir);
++        // The TYPE, not the directory name: `drawable-nodpi` is a `drawable`.
++        let res_type = res.get_res_type().to_string();
++        if !unique_vec.contains(&res_type) {
++            unique_vec.push(res_type);
+         }
+     }
+     unique_vec
+ }
+ 
++/// The density to record for a type, taken from the resources in it.
++///
++/// One `TableType` chunk is emitted per type, so a type whose files disagree
++/// about density cannot be represented and the first non-default wins. That is
++/// enough for a watch face, which has one dial at one density, and it is why
++/// this is not general qualifier support.
++fn density_for_type(resources: &[Resource], res_type: &str) -> u16 {
++    resources
++        .iter()
++        .filter(|r| r.get_res_type() == res_type)
++        .map(|r| r.get_density())
++        .find(|d| *d != 0)
++        .unwrap_or(0)
++}
++
+ fn get_res_type_buckets(resources: &[Resource]) -> HashMap<String, Vec<String>> {
+     let mut map = HashMap::new();
+     for res in resources {
+-        let subdir = res.get_subdirectory().to_string();
++        let subdir = res.get_res_type().to_string();
+         if !map.contains_key(&subdir) {
+             map.insert(subdir.clone(), vec![]);
+         }
+diff --git a/pack-asset-compiler/src/xml_file.rs b/pack-asset-compiler/src/xml_file.rs
+index a3eed38..00d9176 100644
+--- a/pack-asset-compiler/src/xml_file.rs
++++ b/pack-asset-compiler/src/xml_file.rs
+@@ -369,8 +369,13 @@ pub fn lookup_resource_id(reference: &str, resources: &[Resource]) -> Result<u32
+     let mut res_id = 0;
+     let mut subdir = String::new();
+     for res in resources {
+-        if res.get_subdirectory() != subdir {
+-            subdir = res.get_subdirectory().into();
++        // Compare the resource TYPE, not the directory name. A reference is
++        // written "@drawable/preview" whichever configuration the file sits in,
++        // so `res/drawable-nodpi/preview.png` must still match `drawable`.
++        // This has to walk types the same way construct_resource_table does, or
++        // the predicted id below points at the wrong entry.
++        if res.get_res_type() != subdir {
++            subdir = res.get_res_type().into();
+             res_type += 1;
+             res_id = 0;
+         }
+@@ -381,7 +386,7 @@ pub fn lookup_resource_id(reference: &str, resources: &[Resource]) -> Result<u32
+             res_id += 1;
+             continue;
+         }
+-        if res.get_subdirectory() == subdir_and_name[0] && res_stem.unwrap() == subdir_and_name[1] {
++        if res.get_res_type() == subdir_and_name[0] && res_stem.unwrap() == subdir_and_name[1] {
+             // At this stage, we may be parsing an AndroidManifest.xml, in which case
+             // we may not have built the resource table yet and we hit a chicken-and-egg
+             // problem.

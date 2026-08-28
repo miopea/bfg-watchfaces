@@ -51,11 +51,14 @@ fi
 # the same library that will build faces on the device. Running it here is how
 # that path gets exercised before any of it ships.
 #
-# It is opt-in because of one real difference: pack has no resource-qualifier
-# support, so `res/drawable-nodpi/` has to become `res/drawable/`. That drops
-# the instruction not to density-scale the dial, and a 456x456 dial scaled 2x on
-# a high-density watch is 3.3MB a frame instead of 831KB. Nobody here can
-# measure that without a watch, so aapt2 stays in charge of what ships.
+# Still opt-in, but no longer because anything is WRONG with it: pack's missing
+# resource-qualifier support is fixed by scripts/pack-qualifiers.patch, which
+# build-pack.sh applies. `res/drawable-nodpi/` now survives intact and aapt2
+# reads (nodpi) back out of the result, so the two builders agree on the
+# resource table -- same type ids, same entry ids, same density.
+#
+# It stays opt-in only because it has never been installed on a watch, which is
+# true of everything here. aapt2 remains the default until something has.
 #
 #   scripts/build-pack.sh && USE_PACK=1 ./build.sh
 if [ "${USE_PACK:-}" = "1" ]; then
@@ -63,15 +66,8 @@ if [ "${USE_PACK:-}" = "1" ]; then
   [ -x "$PACK" ] || { echo "ERROR: $PACK not found. Run scripts/build-pack.sh first." >&2; exit 1; }
 
   FACE_SLUG="${FACE_SLUG:-watchface}"
-  rm -rf build/pack && mkdir -p build/pack/res
-  cp AndroidManifest.xml build/pack/
-  # Flatten the density qualifier, which is exactly the caveat above.
-  for d in res/*/; do
-    name=$(basename "$d")
-    cp -r "$d" "build/pack/res/${name%%-*}"
-  done
-
-  "$PACK" build/pack "build/$FACE_SLUG"
+  # No copying and no flattening any more -- res/ goes in as it stands.
+  "$PACK" . "build/$FACE_SLUG"
   rm -f "build/$FACE_SLUG.aab"        # Push takes an APK; the bundle is for Play
   echo "built with pack: build/$FACE_SLUG.apk"
 

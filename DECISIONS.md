@@ -73,20 +73,47 @@ even though only the APK is wanted).
 "currently being developed for compiling Wear OS Watch Face Format packages",
 which is exactly this.
 
-### Why it is opt-in and aapt2 still ships what matters
+### The qualifier gap, and the patch that closes it
 
-One real difference, found by building both and comparing:
+**pack had no resource-qualifier support.** `read_res_dir` used the directory
+name verbatim as the resource type, so `res/drawable-nodpi/` became a type
+called `drawable-nodpi` and `@drawable/preview` failed to resolve. Flattening
+the directory made it build, and dropped the instruction not to density-scale
+the dial — 831KB a frame becomes 3.3MB at 2x, a 4x regression against a figure
+this repo measured deliberately.
 
-**pack has no resource-qualifier support.** `read_res_dir` uses the directory
-name verbatim as the resource type, so `res/drawable-nodpi/` becomes a type
-called `drawable-nodpi` and `@drawable/preview` fails to resolve. The build.sh
-path flattens the qualifier to make it work.
+`scripts/pack-qualifiers.patch` closes it properly. Three changes: a resource
+knows its TYPE (everything before the first `-`) separately from its directory;
+the buckets and the `@type/name` resolver group by type rather than by
+directory; and the density qualifier is written into `ResTable_config` instead
+of the 60 zero bytes that were there.
 
-That flattening drops the instruction not to density-scale the dial. A 456×456
-RGBA dial is 831KB a frame; scaled 2× on a high-density watch it is 3.3MB. The
-memory budget is roughly 10MB ambient, so it is survivable and it is still a 4×
-regression against a figure this repo measured deliberately. **Nobody here can
-measure it without a watch**, so aapt2 stays responsible for what ships.
+Those zeroes were not an oversight. pack's own comment says "Luckily, we don't
+care about any of the data for watch faces" — but an all-zero config means
+density 0, which is *mdpi*, not "unspecified". The file that says "do not scale
+me" was being recorded as "I am mdpi, scale me".
+
+Verified rather than assumed: `aapt2 dump resources` reads `(nodpi)` back out of
+pack's APK, and the resource table matches aapt2's own — same type ids, same
+entry ids, same entry counts, same configuration. The only remaining difference
+is that aapt2 annotates the path `-v4`.
+
+`build-pack.sh` pins pack at `7b60931e4058` and applies the patch, so the build
+is reproducible and a pack that has moved fails loudly rather than quietly
+building something else.
+
+**Not sent upstream.** google/pack is Apache-2.0 and actively developed for exactly
+this use case, and `res_dir.rs` carries a "TODO: Use a better pattern here" at
+the spot, so it would likely be welcome. Sending it is outward-facing and is the
+operator's call, not this session's.
+
+### Still opt-in, for a different reason now
+
+aapt2 remains the default. Not because anything is wrong with pack any more, but
+because **no APK from this repo, from either builder, has ever been installed on
+a watch.** Switching what builds the shipped artefact on the strength of a
+comparison that has never touched hardware would trade a known-untested path for
+a differently-untested one.
 
 ### Found on the way: the manifest was not self-describing
 
