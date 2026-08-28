@@ -1,5 +1,47 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — One engraved look, described in `:generator`
+
+`DECISIONS.md` 2026-08-27 left this open: the workbench's AWT renderer would
+become a second rasterizer once `:mobile` existed, and the fix was "extracting a
+small drawing interface into `:generator` that AWT and Android `Canvas` both
+implement, leaving stroke order and compositing defined once." It said not to
+guess that shape before the Android side existed.
+
+`:mobile` exists now, so `EngravedStroke` is that extraction. Operator chose it
+over porting `DialRenderer` and living with two.
+
+### What is shared is a description, not a canvas
+
+The tempting move is a lowest-common-denominator canvas interface that both AWT
+and Android `Canvas` implement. That is a large surface — transforms, clips,
+paints, gradients, image drawing — maintained forever, and most of it is
+platform detail that could differ without anyone noticing or caring.
+
+What actually matters is the part `CLAUDE.md` states as a rule: three passes per
+polyline, light offset up-left by relief, dark down-right, thin mid pass last.
+That is where a second renderer drifts into looking almost-right. So
+`EngravedStroke.passes()` returns the passes AS DATA — offset, colour, width, in
+order — and each platform executes them with its own API. Small, pure, and
+tested on the JVM.
+
+### It changed no pixels, and that was checked rather than assumed
+
+All twelve engines were rendered to PNG before the change and after, and the
+SHA-256 of every one is identical. That mattered because `DialRenderer`'s output
+IS the shipped artwork: any drift would have restyled every face already saved,
+which is what `generatorVersion` exists to prevent.
+
+The check earned its keep immediately. The first draft of `mix` ROUNDED, which
+is arguably better arithmetic — truncation biases every channel down. The
+workbench has always truncated. Rounding would have shifted the colour of every
+dial in the catalog as a side effect of a refactor advertised as a no-op, so the
+truncation is preserved and pinned by a test that says why.
+
+A second guard pins the exact ARGB of the default face's three passes. It exists
+so the promise survives a year: someone improving this arithmetic gets a failing
+test that names `generatorVersion` rather than a silent restyle.
+
 ## 2026-08-28 — The community catalog leaves GitHub
 
 Operator decision `01a049a3-0a0c-7521-a6f3-f40510b81cf7`, in their own words:

@@ -4,6 +4,7 @@ import com.bfg.watchfaces.generator.DIAL_CENTER
 import com.bfg.watchfaces.generator.DIAL_RADIUS
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.EngravedStroke
 import com.bfg.watchfaces.generator.PatternEngines
 import com.bfg.watchfaces.generator.TextureField
 import com.bfg.watchfaces.generator.Polyline
@@ -225,29 +226,26 @@ object DialRenderer {
         val paths = PatternEngines.paths(p).map { path(it) }
         if (paths.isEmpty()) return
 
-        val k = (p.contrast / 100.0).coerceIn(0.0, 1.0)
-        val light = alpha(mix(dial, Color.WHITE, 0.80), (k * 205).toInt())
-        val dark = alpha(mix(dial, Color.BLACK, 0.62), (k * 185).toInt())
-        val mid = alpha(ink, (k * 42).toInt())
-
-        val d = p.relief * 0.7071  // diagonal component, so relief reads as a distance
+        // The passes themselves come from :generator, so the Android renderer
+        // gets the identical description rather than a second copy of this
+        // arithmetic. This class now only knows how to EXECUTE a pass in AWT.
         val cap = BasicStroke.CAP_ROUND
         val join = BasicStroke.JOIN_ROUND
-
-        fun pass(dx: Double, dy: Double, color: Color, width: Double) {
+        for (pass in EngravedStroke.passes(p)) {
             val old = g.transform
-            g.translate(dx, dy)
-            g.color = color
-            g.stroke = BasicStroke(width.toFloat(), cap, join)
+            g.translate(pass.dx, pass.dy)
+            g.color = Color(pass.argb, true)
+            g.stroke = BasicStroke(pass.width.toFloat(), cap, join)
             for (pa in paths) g.draw(pa)
             g.transform = old
         }
 
-        pass(-d, -d, light, p.stroke)          // highlight, up-left
-        pass(d, d, dark, p.stroke)             // shadow, down-right
-        pass(0.0, 0.0, mid, p.stroke * 0.5)    // thin mid pass holds the line together
-
-        if (p.lens) drawLens(g, p, paths, light, dark)
+        if (p.lens) {
+            // The lens reuses the highlight and shadow colours, so it reads the
+            // same passes rather than recomputing them.
+            val passes = EngravedStroke.passes(p)
+            drawLens(g, p, paths, Color(passes[0].argb, true), Color(passes[1].argb, true))
+        }
     }
 
     /**

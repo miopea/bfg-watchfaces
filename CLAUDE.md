@@ -35,6 +35,11 @@ ambient needs a device to judge. `:workbench` is also pure JVM and depends on
 `:generator`, never the reverse — the generator stays the dependency-free
 definition of the file format.
 
+**The engraved look lives in `EngravedStroke`, in `:generator`.** Three passes
+per polyline, described once as data and executed by each platform. Do not
+recompute those colours or offsets in a renderer — `EngravedStrokeTest` pins the
+exact ARGB, because changing them restyles every face already saved.
+
 **There is one rasterizer, and it is `DialRenderer`.** The browser preview, the
 `bake` task and the shipped `dial_bg.png` are all the same call. Do not add a
 second one — in particular, do not "speed up" the preview by redrawing the
@@ -110,7 +115,7 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 
 Verified — built and run, not assumed:
 
-- `:generator` — 177 tests green, including validation against Google's official
+- `:generator` — 190 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
 - `:appcore` — 30 tests green. Rules and words the shipped apps share, pure
