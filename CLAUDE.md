@@ -101,6 +101,7 @@ cd watchface-template && ./build.sh    # validates + builds build/$FACE_SLUG.apk
 cd watchface-template && ./reskin.sh <template.apk> <bg.png> <wff.xml> <out.apk>
 
 scripts/setup-emulators.sh             # create + pair phone and Wear AVDs
+scripts/remote-adb.sh                  # check the bridge to a watch on ANOTHER machine
 scripts/deploy.sh                      # build and install to whatever adb sees
 ```
 
