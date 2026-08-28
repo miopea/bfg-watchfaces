@@ -1,5 +1,50 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — Spacing is one control, and it works on both axes (v5)
+
+"Spacing" moved the middle row and nothing else. Set it to Wide and three slots
+spread sideways while the date and the battery stayed exactly where they were —
+the dial got wider and no airier, which is not what the word means to anyone
+using it.
+
+From `generatorVersion` 5, `complicationSpread` also pushes the top slot up and
+the bottom slot down, and widens the gap between the row and the bottom slot.
+The clock does not move: it is the fixed thing everything else spaces away from.
+
+### Why a version bump for a layout tweak
+
+Complication placement IS the stored file format. A face in the catalog is
+parameters, so changing what a given `complicationSpread` means silently
+rewrites every face already saved with it. `PatternEngines.v5` delegates
+straight to `v4` because no engine changed — the bump exists purely so
+`SlotGeometry.verticalAir` returns 0 for anything saved before today, and
+`VerticalSpacingTest` asserts a v4 face's top and bottom slots do not move at
+any spacing.
+
+### Vertical travel is 0.45 of horizontal, and nothing is clamped in the formula
+
+A 456px dial holding five slots and a 104px clock has far less vertical slack
+than horizontal. Matching the horizontal travel one-for-one spends the whole
+slider against a limit, so the factor is under 1.
+
+The first version also clamped the derived air to a fixed range inside
+`verticalAir`. That was wrong for the reason this file keeps re-learning: a
+clamp there is invisible, so the control stops responding at the ends of the
+slider with nothing to explain it. Every limit now comes from the layout itself,
+which is the only code that knows about the clock and the rim, and `effective()`
+reports what was refused.
+
+**Rejected: detecting refusal by comparing against the ideal arithmetic.** It
+reports "adjusted" whenever a slot is clamped at all, which is most of the time
+and true regardless of the spacing setting. The honest question is not "did it
+land where the formula said" but "did moving this control move anything", so
+`effective()` lays the face out twice — once with the air and once without — and
+compares the travel. A slot that moved the full amount is not a refusal.
+
+Tightening below Normal is genuinely refused for the bottom slot: at the default
+layout it already sits at the minimum readable gap below the row, so there is
+nothing to give. The readout says so rather than pretending.
+
 ## 2026-08-28 — Watch detection: the judgement is ours, the mechanism is not
 
 The app could send a face to a watch without ever saying which watch, or whether

@@ -381,8 +381,9 @@ object Workbench {
     /** What SlotGeometry actually used, so a clamped control can say so. */
     private fun serveLayout(ex: HttpExchange) {
         val e = com.bfg.watchfaces.generator.SlotGeometry.effective(params(ex))
-        json(ex, """{"size":${e.size},"spread":${e.spread},""" +
-                 """"sizeClamped":${e.sizeClamped},"spreadClamped":${e.spreadClamped}}""")
+        json(ex, """{"size":${e.size},"spread":${e.spread},"verticalAir":${e.verticalAir},""" +
+                 """"sizeClamped":${e.sizeClamped},"spreadClamped":${e.spreadClamped},""" +
+                 """"verticalClamped":${e.verticalClamped}}""")
     }
 
     private fun serveTextures(ex: HttpExchange) {

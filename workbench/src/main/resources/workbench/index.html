@@ -807,17 +807,20 @@ function syncSize(){
   opts.forEach(b => b.setAttribute("aria-pressed", String(b === near)));
 }
 
-/* The geometry clamps size and spacing against the rim, the clock and each
- * other. Saying so beats a control that silently does nothing. */
+/* Spacing and size get limited by the edge of the dial, the clock and each
+ * other. A control that quietly ignores you feels broken, so when the dial
+ * refuses something we say it — in plain words, not pixel counts. */
 async function refreshLayoutNote(){
   try{
     const e = await fetch(`/api/layout?${qs()}`).then(r=>r.json());
     const bits = [];
-    if (e.sizeClamped) bits.push(`size reduced to ${e.size} to fit`);
-    if (e.spreadClamped) bits.push(`spacing adjusted to ${e.spread}`);
-    $("#layoutNote").textContent = bits.length
-      ? bits.join(" · ") + " — the dial ran out of room."
-      : "";
+    if (e.sizeClamped) bits.push("made them a little smaller so they all fit");
+    if (e.spreadClamped) bits.push("they're as far apart side to side as the dial allows");
+    if (e.verticalClamped) bits.push(e.verticalAir > 0
+      ? "they're as far apart top to bottom as the dial allows"
+      : "they're already as close together top to bottom as they get");
+    const note = bits.join(", and ");
+    $("#layoutNote").textContent = note ? note[0].toUpperCase() + note.slice(1) + "." : "";
   }catch(e){ /* transient while dragging */ }
 }
 

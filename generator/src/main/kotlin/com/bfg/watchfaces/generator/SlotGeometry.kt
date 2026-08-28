@@ -41,6 +41,37 @@ object SlotGeometry {
     /** Keep everything this far inside the rim; the dial curves away fast. */
     private const val RIM = 14
 
+    /**
+     * The spread at which spacing is "normal" — no extra vertical air either
+     * way. Matches Layout.complicationSpread's default.
+     */
+    const val NEUTRAL_SPREAD = 92
+
+    /**
+     * Extra vertical air, derived from the SAME control as horizontal spread.
+     *
+     * From v5 spacing is one concept: Tight and Wide loosen or tighten the whole
+     * layout rather than only the middle row. The top slot moves up and the
+     * bottom slot moves down — away from the clock, which is the fixed thing —
+     * and the gap between the row and the bottom grows with them.
+     *
+     * v1..v4 get zero, so a stored face from before this renders exactly as its
+     * author saw it. That is the whole job of generatorVersion.
+     *
+     * The factor is under 1: a 456px dial holding five slots and a 104px clock
+     * has far less vertical slack than horizontal, so matching the horizontal
+     * travel one-for-one would spend the whole range against a clamp.
+     *
+     * Deliberately NOT clamped here. Every limit is applied by the layout
+     * itself, which is the only place that knows about the clock and the rim,
+     * and [effective] reports what it refused. A clamp hidden in this function
+     * would be a silent override with nothing to surface it.
+     */
+    fun verticalAir(p: DialParams): Int =
+        if (p.generatorVersion >= 5)
+            ((p.layout.complicationSpread - NEUTRAL_SPREAD) * 0.45).roundToInt()
+        else 0
+
     fun boxWidth(size: Int): Int = (size * 3.9).roundToInt()
 
     /**
@@ -118,18 +149,48 @@ object SlotGeometry {
      * clock. A control whose value is silently overridden feels broken, so the
      * UI can show the effective numbers instead of pretending the request won.
      */
-    data class Effective(val size: Int, val spread: Int, val sizeClamped: Boolean, val spreadClamped: Boolean)
+    data class Effective(
+        val size: Int,
+        val spread: Int,
+        val verticalAir: Int,
+        val sizeClamped: Boolean,
+        val spreadClamped: Boolean,
+        val verticalClamped: Boolean
+    )
 
     fun effective(p: DialParams): Effective {
+        val l = p.layout
         val size = fittedSize(p)
         val boxes = layoutAt(p, size)
+        val air = verticalAir(p)
+
         val row = listOf(SlotPosition.LEFT, SlotPosition.MIDDLE, SlotPosition.RIGHT).mapNotNull { boxes[it] }
-        val spread = if (row.size > 1) row[1].x - row[0].x else p.layout.complicationSpread
+        val spread = if (row.size > 1) row[1].x - row[0].x else l.complicationSpread
+
+        // Vertical room on a 456px dial is genuinely tight, so a wide setting is
+        // often refused and the honest question is not "did it land where the
+        // arithmetic said" -- clamps are normal and fine -- but "did moving this
+        // control actually move anything". Compare against the same layout with
+        // no air at all: if an end slot did not shift by the full amount, the
+        // request was not honoured and the readout has to say so.
+        val baseline = layoutAt(p, size, airOverride = 0)
+        val ends = listOf(
+            SlotPosition.TOP to -1,        // air pushes the top UP
+            SlotPosition.BOTTOM to 1       // and the bottom DOWN
+        ).mapNotNull { (pos, dir) ->
+            val now = boxes[pos] ?: return@mapNotNull null
+            val was = baseline[pos] ?: return@mapNotNull null
+            (now.y - was.y) * dir          // how far it actually travelled
+        }
+
         return Effective(
             size = size,
             spread = spread,
-            sizeClamped = size != p.layout.complicationSize,
-            spreadClamped = row.size > 1 && spread != p.layout.complicationSpread
+            verticalAir = air,
+            sizeClamped = size != l.complicationSize,
+            spreadClamped = row.size > 1 && spread != l.complicationSpread,
+            // Nothing to move is also a control that did nothing.
+            verticalClamped = air != 0 && (ends.isEmpty() || ends.any { it != air })
         )
     }
 
@@ -161,12 +222,14 @@ object SlotGeometry {
         return true
     }
 
-    private fun layoutAt(p: DialParams, size: Int): LinkedHashMap<SlotPosition, Box> {
+    /** [airOverride] exists so [effective] can compare against the no-air layout. */
+    private fun layoutAt(p: DialParams, size: Int, airOverride: Int? = null): LinkedHashMap<SlotPosition, Box> {
         val l = p.layout
         val w = boxWidth(size)
         val h = boxHeight(size)
         val anchor = (size * 1.2).roundToInt()
         val (timeTop, timeBottom) = timeBand(l)
+        val air = airOverride ?: verticalAir(p)
         val out = LinkedHashMap<SlotPosition, Box>()
 
         val limit = maxCentreOffset(w)
@@ -177,7 +240,7 @@ object SlotGeometry {
         val top = p.slot(SlotPosition.TOP)
         var topBottom = 0
         if (top.enabled) {
-            var y = l.dateY - anchor
+            var y = l.dateY - anchor - air         // spacing pushes it away from the clock
             y = min(y, timeTop - GAP - h)          // never run into the clock
             y = max(y, highestY)                   // and never leave the circle
             out[SlotPosition.TOP] = Box(DIAL_SIZE / 2 - w / 2, y, w, h)
@@ -220,7 +283,7 @@ object SlotGeometry {
             // both hold at this size, the layout is rejected by fits() and the
             // caller retries a size down -- rather than shipping a slot that
             // hangs into the bezel, which is what the clamp used to do.
-            var y = max(l.batteryY - anchor, rowBottom + GAP)
+            var y = max(l.batteryY - anchor + air, rowBottom + GAP + max(0, air))
             y = min(y, lowestBottom - h)
             out[SlotPosition.BOTTOM] = Box(DIAL_SIZE / 2 - w / 2, y, w, h)
         }

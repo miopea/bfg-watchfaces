@@ -27,6 +27,8 @@ object PatternEngines {
         // than adding a branch keeps that true and provable.
         3 -> v2(p)
         4 -> v4(p)
+        // v5 changed complication SPACING, not engine geometry.
+        5 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

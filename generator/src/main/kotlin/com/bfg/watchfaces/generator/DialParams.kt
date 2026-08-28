@@ -174,6 +174,10 @@ data class Layout(
 /**
  * Bump ONLY when adding an engine or a parameter. Never when changing geometry.
  *
+ * v5 (2026-08-28) makes complicationSpread drive VERTICAL spacing as well as
+ * horizontal, so one control loosens the whole layout. No engine changed:
+ * PatternEngines.v5 delegates to v4.
+ *
  * v4 (2026-08-28) added the generated-surface engines GRAIN, BRUSHED, CARBON and
  * LINEN. No existing engine changed: PatternEngines.v4 delegates to v3.
  *
@@ -187,7 +191,7 @@ data class Layout(
  * they cannot drift. A face stored with generatorVersion=1 still renders through
  * the v1 branch, byte for byte.
  */
-const val CURRENT_GENERATOR_VERSION = 4
+const val CURRENT_GENERATOR_VERSION = 5
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456
