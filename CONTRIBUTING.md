@@ -8,7 +8,7 @@ valuable contribution right now is anything that moves that forward.
 
 ```bash
 scripts/bootstrap.sh          # WFF schemas, XSD 1.1 jars, Gradle wrapper
-./gradlew :generator:test     # 35 tests, ~15s, no Android SDK or device
+./gradlew :generator:test     # 91 tests, no Android SDK or device
 ```
 
 `generator/libs/` and the schema directories are fetched, not committed — they
@@ -56,13 +56,44 @@ rather than rejected. Do not store 8-digit colours in `DialParams`.
 
 ## Face submissions
 
-The community catalog is not built yet. When it lands, submissions will be
-parametric only — a few KB of JSON, no uploaded rasters.
+The catalog lives in `catalog/faces/<slug>.json`, with a generated
+`catalog/index.json`. In production it is served from jsDelivr — not
+`raw.githubusercontent.com`, which is rate limited and is not a CDN.
+
+To submit a face:
+
+1. Design it in the workbench and **Save to Gallery**.
+2. In **My faces**, tap **Share**, give an attribution, and stage it.
+3. Commit both files and open a pull request:
+
+   ```bash
+   ./gradlew :workbench:catalog          # revalidate + rewrite the index
+   git add catalog/faces/<slug>.json catalog/index.json
+   git commit -m "catalog: add <slug>"
+   ```
+
+CI runs `./gradlew :workbench:catalog --args="--check"` on every PR. It fails if
+a face does not parse, does not render, emits schema-invalid WFF, has a slug that
+disagrees with its name or filename, exceeds 8KB, or if `index.json` is stale.
+
+**This is a build gate, not review advice.** A reviewer cannot see that a face is
+schema-invalid by reading the diff, and on a watch the failure is silence: it
+installs, reports success, and never appears in the carousel.
+
+### Parametric only
+
+Submissions are parameters — a few KB of JSON, no uploaded rasters. Faces using
+the `TEXTURE` engine are refused automatically.
 
 That is not a size optimisation. You cannot encode a copyrighted logo as
 "clous engine, scale 34, pewter", so the parametric constraint is what keeps the
-shared catalog clear of other people's IP. Users import their own photos locally;
-those never enter the catalog.
+shared catalog clear of other people's IP. Import your own photos locally; those
+never enter the catalog, and the app tells you so where you pick the image.
+
+### Attribution
+
+The `author` field is whatever you want to be credited as, and it shows in the
+gallery. Leave it blank and the face reads as unattributed.
 
 ## Scope
 

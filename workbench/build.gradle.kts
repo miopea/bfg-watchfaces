@@ -32,6 +32,15 @@ tasks.register<JavaExec>("workbench") {
     standardInput = System.`in`
 }
 
+/** Validate the community catalog and regenerate its index. */
+tasks.register<JavaExec>("catalog") {
+    group = "bfg"
+    description = "Validate catalog/faces/*.json and rewrite catalog/index.json"
+    mainClass.set("com.bfg.watchfaces.workbench.Catalog")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
 /** Headless bake, for build.sh and CI. */
 tasks.register<JavaExec>("bake") {
     group = "bfg"

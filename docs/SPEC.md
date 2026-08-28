@@ -117,14 +117,30 @@ identical on a soft low-contrast dial. Do this always.
 5. **Compose design UI.** Ten sliders next to a 456px preview on a phone screen
    is a genuinely harder design problem than a desktop tool was.
 
-## Community catalog (later)
+## Community catalog
 
-- Repo of `faces/*.json`, one per face, plus a generated `index.json`.
+Built. `catalog/faces/<slug>.json`, one per face, plus a generated
+`catalog/index.json`.
+
+- The index carries name, author, engine and colours only, so a gallery of a
+  thousand faces is ONE request. Full parameters stay in the per-face files and
+  are fetched when someone opens one.
 - Served via jsDelivr -- free, no bandwidth limits, GitHub-integrated.
   Not `raw.githubusercontent.com`, which is not a CDN and is rate limited.
-- Submissions are PRs. GitHub Actions runs the schema validator automatically,
-  so invalid faces are rejected before human review.
-- **Parametric submissions only.** No uploaded rasters.
+- Submissions are PRs. `./gradlew :workbench:catalog --args="--check"` runs in
+  CI and fails on a face that does not parse, does not render, emits
+  schema-invalid WFF, has a slug disagreeing with its name or filename, exceeds
+  8KB, or leaves `index.json` stale. Invalid faces are rejected before human
+  review because a reviewer cannot see schema-invalidity in a diff.
+- **Parametric submissions only.** `TEXTURE` faces are refused automatically.
+- The app stages a submission; it does not open the PR. Publishing is the
+  author's action, not a button press in a design tool.
+
+Still open:
+
+- **Where it lives.** It is in this repo today. Before a public launch it should
+  move to its own repository: strangers opening PRs against the app's source is
+  a different risk profile from strangers opening PRs against a folder of JSON.
 - Play's UGC policy requires in-app reporting and moderation. Budget for it.
 
 ## Ongoing costs

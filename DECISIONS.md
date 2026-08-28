@@ -1,5 +1,82 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — The catalog is real, and the gallery reads it
+
+docs/SPEC.md described the community catalog as "later". It is built.
+
+`catalog/faces/<slug>.json` plus a generated `catalog/index.json`, served in
+production from jsDelivr. The index carries name, author, engine and the two
+colours and nothing else, so **a gallery of a thousand faces is one request**.
+Full parameters stay in the per-face files and are fetched only when someone
+opens one — inlining them would make the index grow with the size of the
+catalog rather than with its length.
+
+### Validation is a build gate, because review cannot do this job
+
+`./gradlew :workbench:catalog --args="--check"` runs in CI on every PR and fails
+on a face that does not parse, does not render, emits schema-invalid WFF, has a
+slug disagreeing with its name or filename, exceeds 8KB, or leaves `index.json`
+stale.
+
+That last one matters: a generated file that can drift from its source is a
+generated file nobody trusts. `--check` rebuilds the index in memory and
+compares, ignoring only the timestamp.
+
+The reason this is a gate rather than a reviewer's checklist is the same reason
+`WffSchemaTest` exists — **a schema-invalid face is invisible in a diff and
+silent on the wrist.** It installs, reports success, and never appears in the
+carousel. There is nothing for a human to notice.
+
+Verified by injection rather than assertion: a TEXTURE face, a slug/name
+mismatch, and a hand-staled index each fail the task, and it passes again once
+reverted.
+
+### Refusals are structural
+
+TEXTURE faces are rejected automatically. Parametric-only is what keeps a face
+~5KB (so 10,000 of them are ~50MB of Git and free to host) and it is the IP
+shield: you cannot encode a copyrighted logo as "knotwork, scale 26, pewter",
+but you can certainly upload one. The app says so where the image is chosen, and
+the submit path refuses again and deletes the staged file rather than leaving an
+invalid submission for someone to commit.
+
+### The app stages; the human publishes
+
+**Share** writes the file and validates it, then stops and prints the git
+commands. It does not open a pull request. A design tool that pushes to a public
+repo on a button press is a mistake waiting to happen, and the failure mode —
+publishing something you did not mean to — is not one an undo button fixes.
+
+### Removed a check that could never fire
+
+The first version of the validator checked `generatorVersion` against what this
+build supports. It was unreachable: `DialParams`' own constructor already
+refuses an unknown version, so parsing throws first. Unreachable code that looks
+like protection is worse than none, so it is gone and a comment says where the
+guard actually lives. The test now writes raw JSON, which is the only way such a
+face can reach us — from a newer client, in a pull request.
+
+### Still open: where the catalog lives
+
+It is in this repo. Before a public launch it should move to its own repository.
+Strangers opening PRs against the app's source is a different risk profile from
+strangers opening PRs against a folder of JSON, and the split is much cheaper
+now than after the first outside contribution.
+
+## 2026-08-28 — Complication spacing is a control, and clamping is visible
+
+Size was selectable; spacing was buried in Fine tune. Both are now
+Small/Medium/Large-style controls, with the slider still there for precise work.
+
+The interesting part is what happens when the request cannot be honoured.
+`SlotGeometry` clamps size and spacing against the rim, the clock and each
+other, and a control whose value is silently overridden feels broken. So
+`SlotGeometry.effective()` reports what was actually used, and the app says
+"spacing adjusted to 100 — the dial ran out of room" instead of appearing inert.
+
+The nearest preset keeps the highlight when the Fine tune slider lands between
+two of them; leaving every button unlit reads as a bug.
+
 ## 2026-08-28 — SlotGeometry: one calculation, and the collisions it found
 
 The five slots were cramped and overlapping. Measuring the defaults rather than

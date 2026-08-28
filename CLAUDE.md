@@ -79,6 +79,7 @@ rejected — not a changelog.
 ./gradlew :workbench:workbench          # design loop at http://localhost:7777
 ./gradlew :workbench:bake               # dial_bg.png + preview.png + watchface.xml
 ./gradlew :workbench:bake --args="--preset=Rosette Noir"
+./gradlew :workbench:catalog            # validate catalog + rewrite index.json
 
 make docs-check                         # markdownlint + cspell over the docs
 
@@ -108,7 +109,7 @@ Verified — built and run, not assumed:
 - `:generator` — 91 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
-- `:workbench` — 43 tests green. Serves the app at localhost:7777; bakes
+- `:workbench` — 53 tests green. Serves the app at localhost:7777; bakes
   `dial_bg.png`, `preview.png`, `watchface.xml`, `strings.xml` and the manifest
   package from parameters. Quantization measured at 64 colours, mean error
   0.51/255. Saves designs to `faces/<slug>.json`, the catalog format.
