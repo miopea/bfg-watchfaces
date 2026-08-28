@@ -200,6 +200,7 @@
     border-radius:10px;padding:11px;max-height:190px;overflow:auto;white-space:pre-wrap;
     color:var(--dim);margin:12px 0 0;word-break:break-word;
   }
+  .reasons{margin:0 0 14px;padding-left:20px;color:var(--dim);font-size:13px;line-height:1.7}
   .microhint{font-size:11.5px;color:var(--faint);line-height:1.5;margin:8px 0 0}
   .btnrow.stack{flex-direction:column}
 
@@ -303,6 +304,21 @@
   }
   .texgrid .tex img{width:100%;height:100%;object-fit:cover;display:block}
   .texgrid .tex[aria-pressed="true"]{border-color:var(--accent)}
+  /* Reporting has to be reachable wherever community content is shown -- that
+     is what Play's UGC policy asks for -- but it should not compete with the
+     face itself. Quiet until hovered or focused, and always reachable by
+     keyboard. */
+  .card{position:relative}
+  .card .report{
+    position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;
+    border:1px solid var(--line);background:rgba(13,15,18,.72);color:var(--faint);
+    font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;
+    opacity:0;transition:opacity .15s,color .15s;
+  }
+  .card:hover .report, .card .report:focus-visible{opacity:1}
+  .card .report:hover{color:#f0a49c;border-color:#5c2f2a}
+  @media (hover:none){ .card .report{opacity:1} }   /* touch has no hover */
+
   .texgrid .tex .del{
     position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;
     background:rgba(0,0,0,.65);color:#fff;border:none;font-size:11px;line-height:1;
@@ -503,6 +519,25 @@
       <button class="chipbtn" id="tuneDone">Done</button>
     </div>
     <div class="tunescroll" id="tuneRows"></div>
+  </div>
+
+  <div class="sheet" id="sheetReport">
+    <div class="grab"></div>
+    <h3>Report this face</h3>
+    <p class="hint" id="reportWhat"></p>
+    <ul class="reasons">
+      <li>It copies someone's artwork, logo or brand</li>
+      <li>It pretends to be official, or from a company it is not from</li>
+      <li>It is offensive, or aimed at a particular person</li>
+    </ul>
+    <p class="hint">Every report is read. Copied artwork is taken down within three
+      days; anything abusive goes immediately.</p>
+    <p class="microhint">Opens a short form in your browser. You will need a GitHub
+      account to send it.</p>
+    <div class="btnrow">
+      <button class="btn ghost" id="reportCancel">Cancel</button>
+      <button class="btn primary" id="reportGo">Continue</button>
+    </div>
   </div>
 
   <div class="sheet" id="sheetShare">
@@ -867,9 +902,15 @@ async function loadCatalog(){
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `<img loading="lazy" alt="" src="/api/face.png?${f.query}&size=340">
+      <button class="report" title="Report this face" aria-label="Report this face">\u2691</button>
       <div class="nm"></div><div class="sub"></div>`;
     card.querySelector(".nm").textContent = f.name;
     card.querySelector(".sub").textContent = f.author ? `by ${f.author}` : "unattributed";
+
+    card.querySelector(".report").addEventListener("click", e => {
+      e.stopPropagation();          // reporting must not also open the face
+      openReport(f);
+    });
     card.addEventListener("click", () => {
       applyQuery(f.query);
       currentName = f.name;
@@ -878,6 +919,33 @@ async function loadCatalog(){
     grid.appendChild(card);
   }
 }
+
+/* ---------------- reporting ----------------
+ * Play's UGC policy requires a working in-app complaint path for any app that
+ * shows user content, so this is store-blocking rather than optional. The form
+ * itself lives with the catalog, where the moderation policy and the response
+ * times are; the app's job is to get someone there with the face already
+ * identified, so a reporter never has to know its internal name.
+ */
+let reportTarget = null;
+
+function openReport(face){
+  reportTarget = face;
+  $("#reportWhat").textContent =
+    `Tell us what is wrong with “${face.name}”` +
+    (face.author ? `, shared by ${face.author}.` : ".");
+  openSheet("#sheetReport");
+}
+
+$("#reportCancel").addEventListener("click", closeSheets);
+$("#reportGo").addEventListener("click", () => {
+  if (!reportTarget) return;
+  // The server builds this so the URL and its field names live next to the
+  // issue template they have to match.
+  window.open(reportTarget.reportUrl, "_blank", "noopener");
+  closeSheets();
+  toast("Opening the report form");
+});
 
 /* ---------------- share to catalog ---------------- */
 let shareSlug = null;

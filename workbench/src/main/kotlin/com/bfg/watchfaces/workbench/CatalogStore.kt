@@ -36,6 +36,22 @@ object CatalogStore {
     /** Where submissions are opened, and where a face is reported. */
     const val REPO_URL = "https://github.com/miopea/bfg-watchfaces-catalog"
 
+    /**
+     * The report form for one face.
+     *
+     * Google Play requires a working in-app complaint path for any app showing
+     * user content, so this is not decoration -- without a reachable route to
+     * it, the app cannot ship. The slug and title are prefilled so a reporter
+     * does not have to know what a face is called internally.
+     *
+     * Field ids match .github/ISSUE_TEMPLATE/report-a-face.yml in the catalog.
+     */
+    fun reportUrl(slug: String, name: String): String {
+        fun enc(s: String) = java.net.URLEncoder.encode(s, Charsets.UTF_8)
+        return "$REPO_URL/issues/new?template=report-a-face.yml" +
+               "&slug=${enc(slug)}&title=${enc("report: $name")}"
+    }
+
     /** A face is parameters. Anything much larger than this is not a face. */
     const val MAX_FACE_BYTES = 8 * 1024
 
@@ -230,7 +246,12 @@ $rows
      * and opens the PR. A design tool that pushes to a public repo on a button
      * press is a mistake waiting to happen.
      */
-    fun submit(root: File, face: FaceStore.StoredFace, author: String): Pair<File, List<Problem>> {
+    fun submit(
+        schemaRoot: File,
+        catalogRoot: File,
+        face: FaceStore.StoredFace,
+        author: String
+    ): Pair<File, List<Problem>> {
         val entry = Entry(
             slug = face.slug,
             name = face.name,
@@ -238,9 +259,12 @@ $rows
             created = face.created.ifBlank { Instant.now().toString() },
             params = face.params
         )
-        val f = File(dir(root).apply { mkdirs() }, "${entry.slug}.json")
+        // Two different roots, deliberately named: the face is written to the
+        // CATALOG, but the WFF schema that judges it lives in the app repo.
+        // Conflating them is what listed private faces as community content.
+        val f = File(dir(catalogRoot).apply { mkdirs() }, "${entry.slug}.json")
         f.writeText(toJson(entry))
-        val problems = validate(root, f)
+        val problems = validate(schemaRoot, f)
         if (problems.isNotEmpty()) f.delete()   // never leave an invalid submission staged
         return f to problems
     }

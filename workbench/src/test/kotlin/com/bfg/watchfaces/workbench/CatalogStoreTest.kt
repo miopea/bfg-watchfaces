@@ -4,6 +4,7 @@ import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -121,7 +122,7 @@ class CatalogStoreTest {
             "photo_dial", "Photo Dial", "2026-08-28T00:00:00Z",
             DialParams(engine = Engine.TEXTURE, texture = "b".repeat(40))
         )
-        val (file, problems) = CatalogStore.submit(root, face, "Tester")
+        val (file, problems) = CatalogStore.submit(root, root, face, "Tester")
         assertTrue(problems.isNotEmpty())
         // An invalid submission must not be left behind for someone to commit.
         assertFalse(file.exists()) { "a refused submission was left staged at $file" }
@@ -175,5 +176,73 @@ class CatalogStoreTest {
         assertEquals(strip(CatalogStore.buildIndex(catalog)), strip(onDisk)) {
             "index.json is stale -- run ./gradlew :workbench:catalog"
         }
+    }
+}
+
+/**
+ * The catalog is a DIFFERENT repository from the app, and CatalogStore.dir()
+ * appends "faces" to whatever root it is given. Hand it the app's repo root and
+ * it reads <repo>/faces -- the user's own private designs.
+ *
+ * That is not hypothetical. When the catalog moved to its own repo the endpoints
+ * kept passing the app root, and a face the operator had saved privately
+ * appeared in the Community gallery. These tests pin the distinction.
+ */
+class CatalogRootTest {
+
+    companion object {
+        @JvmStatic @BeforeAll fun headless() { System.setProperty("java.awt.headless", "true") }
+    }
+
+    @Test
+    fun `the app root is not a catalog root`(@TempDir tmp: File) {
+        // A private save, in the app repo, exactly where FaceStore puts it.
+        FaceStore.save(tmp, "Private Design", DialParams(engine = Engine.KNOTWORK))
+        assertEquals(1, FaceStore.list(tmp).size)
+
+        // With no catalog checkout anywhere near it, resolution must fail rather
+        // than quietly landing on the personal directory.
+        assertNull(CatalogStore.resolveRoot(tmp)) {
+            "resolveRoot returned a root with no catalog in it; the personal " +
+            "faces directory would be served as the community catalog"
+        }
+    }
+
+    @Test
+    fun `a private face never appears in a catalog listing`(@TempDir tmp: File) {
+        val app = File(tmp, "app").apply { mkdirs() }
+        val catalog = File(tmp, "bfg-watchfaces-catalog").apply { mkdirs() }
+        File(catalog, "faces").mkdirs()
+
+        FaceStore.save(app, "Private Design", DialParams(engine = Engine.KNOTWORK))
+        val resolved = CatalogStore.resolveRoot(app)
+        assertEquals(catalog.canonicalFile, resolved?.canonicalFile) { "sibling clone should win" }
+
+        val listed = CatalogStore.list(resolved!!).map { it.name }
+        assertTrue(listed.isEmpty()) { "the catalog is empty but listed $listed" }
+        assertTrue("Private Design" !in listed) { "a private face leaked into the catalog listing" }
+    }
+
+    @Test
+    fun `submitting writes to the catalog, never to the personal directory`(@TempDir tmp: File) {
+        val app = File(tmp, "app").apply { mkdirs() }
+        val catalog = File(tmp, "bfg-watchfaces-catalog").apply { mkdirs() }
+        File(catalog, "faces").mkdirs()
+        // The schema has to be reachable or validate() cannot judge the face.
+        val real = File(System.getProperty("user.dir")).let {
+            generateSequence(it) { d -> d.parentFile }.first { d -> File(d, "settings.gradle.kts").isFile }
+        }
+        File(real, "generator/src/test/resources/wff-schema").takeIf { it.isDirectory }
+            ?.copyRecursively(File(app, "generator/src/test/resources/wff-schema"), overwrite = true)
+
+        val face = FaceStore.save(app, "Shared Design", DialParams(engine = Engine.KNOTWORK))
+        val (file, problems) = CatalogStore.submit(app, catalog, face, "Tester")
+        assertTrue(problems.isEmpty()) { problems.toString() }
+
+        assertTrue(file.canonicalPath.startsWith(catalog.canonicalPath)) {
+            "submission landed outside the catalog at ${file.canonicalPath}"
+        }
+        // And the private copy is untouched, still one face.
+        assertEquals(1, FaceStore.list(app).size)
     }
 }

@@ -106,6 +106,18 @@ object Workbench {
 
     private fun params(ex: HttpExchange): DialParams = ParamCodec.fromQuery(query(ex))
 
+    /**
+     * The catalog checkout, which is a DIFFERENT repository from this one.
+     *
+     * Resolving this correctly matters more than it looks: CatalogStore.dir()
+     * appends "faces", so passing the app's repo root here reads
+     * <repo>/faces -- the user's OWN saved designs. That is exactly what
+     * happened when the catalog moved out and the endpoints kept passing
+     * `root`: private faces were listed as community content, and a submission
+     * would have been written into the personal directory.
+     */
+    private fun catalogRoot(): File? = CatalogStore.resolveRoot(root)
+
     /** The imported image a TEXTURE face refers to, or null for every other engine. */
     private fun textureFor(p: DialParams): java.awt.image.BufferedImage? =
         if (p.engine == com.bfg.watchfaces.generator.Engine.TEXTURE && p.texture.isNotBlank())
@@ -275,6 +287,8 @@ object Workbench {
         val q = query(ex)
         when (ex.requestMethod.uppercase()) {
             "POST" -> {
+                val catalog = catalogRoot()
+                if (catalog == null) { json(ex, noCatalogJson()); return }
                 val slug = q["slug"].orEmpty()
                 val face = FaceStore.load(root, slug)
                 if (face == null) { json(ex, """{"ok":false,"error":"no saved face '$slug'"}"""); return }
@@ -283,26 +297,31 @@ object Workbench {
                         "This face uses an imported image. The catalog is parameters only, so it stays on this machine."
                     )}}"""); return
                 }
-                val (file, problems) = CatalogStore.submit(root, face, q["author"].orEmpty())
+                val (file, problems) = CatalogStore.submit(root, catalog, face, q["author"].orEmpty())
                 if (problems.isNotEmpty()) {
                     json(ex, """{"ok":false,"error":${jsonStr(problems.joinToString("; ") { it.message })}}""")
                     return
                 }
-                CatalogStore.writeIndex(root)
-                json(ex, """{"ok":true,"path":${jsonStr(file.relativeTo(root).path)},"slug":${jsonStr(face.slug)}}""")
+                CatalogStore.writeIndex(catalog)
+                json(ex, """{"ok":true,"path":${jsonStr(file.absolutePath)},"slug":${jsonStr(face.slug)}}""")
             }
             "DELETE" -> {
+                val catalog = catalogRoot()
+                if (catalog == null) { json(ex, noCatalogJson()); return }
                 val slug = q["slug"].orEmpty()
-                val f = File(CatalogStore.dir(root), "${FaceStore.slugify(slug)}.json")
+                val f = File(CatalogStore.dir(catalog), "${FaceStore.slugify(slug)}.json")
                 val gone = f.isFile && f.delete()
-                if (gone) CatalogStore.writeIndex(root)
+                if (gone) CatalogStore.writeIndex(catalog)
                 json(ex, """{"ok":$gone}""")
             }
             else -> {
-                val entries = CatalogStore.list(root).joinToString(",") { e ->
+                val catalog = catalogRoot()
+                if (catalog == null) { json(ex, noCatalogJson()); return }
+                val entries = CatalogStore.list(catalog).joinToString(",") { e ->
                     """{"slug":${jsonStr(e.slug)},"name":${jsonStr(e.name)},"author":${jsonStr(e.author)},""" +
                     """"engine":${jsonStr(e.params.engine.name)},"created":${jsonStr(e.created)},""" +
-                    """"query":${jsonStr(ParamCodec.toQuery(e.params))}}"""
+                    """"query":${jsonStr(ParamCodec.toQuery(e.params))},""" +
+                    """"reportUrl":${jsonStr(CatalogStore.reportUrl(e.slug, e.name))}}"""
                 }
                 json(ex, """{"cdn":${jsonStr(CatalogStore.CDN_URL)},"faces":[$entries]}""")
             }
@@ -331,6 +350,15 @@ object Workbench {
             else -> json(ex, """{"textures":[${TextureStore.list(root).joinToString(",") { textureJson(it) }}]}""")
         }
     }
+
+    /**
+     * No catalog checkout. Returns an EMPTY catalog rather than falling back to
+     * any local directory -- showing the user's private designs under
+     * "Community" would be a privacy bug, not a graceful degradation.
+     */
+    private fun noCatalogJson(): String =
+        """{"cdn":${jsonStr(CatalogStore.CDN_URL)},"repo":${jsonStr(CatalogStore.REPO_URL)},""" +
+        """"available":false,"faces":[]}"""
 
     private fun textureJson(t: TextureStore.Texture): String =
         """{"id":${jsonStr(t.id)},"width":${t.width},"height":${t.height},""" +
