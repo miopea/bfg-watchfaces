@@ -1,5 +1,65 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — google/pack builds our watch face, and is not the default yet
+
+Operator: "try pack-cli in build.sh I don't see a reason we don't just do this
+ourselves from source". Tried, from source, and it works — `USE_PACK=1
+./build.sh` produces a signed, Push-allowlist-clean APK with **no Android SDK,
+no aapt2, no apksigner, no zipalign and no Java**.
+
+That matters beyond the desktop. `pack` is the same library that will build faces
+ON THE DEVICE, so exercising it here is how that path gets de-risked before any
+of it ships. `scripts/build-pack.sh` builds it reproducibly.
+
+### Correcting what this repo assumed about pack
+
+`docs/SPEC.md` said to "use Androidify's prebuilt `jniLibs` if the ABIs cover
+you". That reads as though an official binary exists. **It does not** — `pack`
+publishes no releases and no artifacts at all, so that route means scavenging
+unversioned `.so` files out of a sample app nobody here can audit. Building from
+source is the ordinary path, and it needs `cargo` plus `protoc` (the App Bundle
+crate generates code from `.proto`, and the workspace will not build without it
+even though only the APK is wanted).
+
+`pack` is also more relevant than "an APK packer": its README says it is
+"currently being developed for compiling Wear OS Watch Face Format packages",
+which is exactly this.
+
+### Why it is opt-in and aapt2 still ships what matters
+
+One real difference, found by building both and comparing:
+
+**pack has no resource-qualifier support.** `read_res_dir` uses the directory
+name verbatim as the resource type, so `res/drawable-nodpi/` becomes a type
+called `drawable-nodpi` and `@drawable/preview` fails to resolve. The build.sh
+path flattens the qualifier to make it work.
+
+That flattening drops the instruction not to density-scale the dial. A 456×456
+RGBA dial is 831KB a frame; scaled 2× on a high-density watch it is 3.3MB. The
+memory budget is roughly 10MB ambient, so it is survivable and it is still a 4×
+regression against a figure this repo measured deliberately. **Nobody here can
+measure it without a watch**, so aapt2 stays responsible for what ships.
+
+### Found on the way: the manifest was not self-describing
+
+`minSdkVersion`, `targetSdkVersion`, `versionCode` and `versionName` existed only
+as `aapt2 link` flags. `pack` reads the manifest and takes no flags — and neither
+will the on-device build — so an APK came out with no version and an implied
+`targetSdk` below 4, which made `apksigner` demand a v1 JAR signature that a
+v3-only signer never produces. The APK looked unsigned and was not: with a real
+`minSdk` supplied, the v3 signature verified.
+
+They are declared in the manifest now, which Push permits (`uses-sdk` is on its
+tag list). Both build paths then produce identical package metadata, and the
+pack APK verifies with no flags at all.
+
+### What is not yet known
+
+Whether Watch Face Push accepts a v3-only signature with no `META-INF`. The
+allowlist permits `META-INF/**` rather than requiring it, and minSdk 33 is far
+above the API 24 where v1 stopped mattering, so there is no reason to expect a
+problem — but it is untested, like everything else that needs a watch.
+
 ## 2026-08-28 — One engraved look, described in `:generator`
 
 `DECISIONS.md` 2026-08-27 left this open: the workbench's AWT renderer would

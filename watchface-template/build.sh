@@ -43,6 +43,44 @@ if [ -n "$MISSING" ]; then
   exit 1
 fi
 
+# ---- optional: build with google/pack instead of the Android SDK -------------
+#
+# PROVEN TO WORK, and deliberately NOT the default. See DECISIONS.md 2026-08-28.
+#
+# pack compiles and signs the APK with no SDK, no aapt2 and no Java, and it is
+# the same library that will build faces on the device. Running it here is how
+# that path gets exercised before any of it ships.
+#
+# It is opt-in because of one real difference: pack has no resource-qualifier
+# support, so `res/drawable-nodpi/` has to become `res/drawable/`. That drops
+# the instruction not to density-scale the dial, and a 456x456 dial scaled 2x on
+# a high-density watch is 3.3MB a frame instead of 831KB. Nobody here can
+# measure that without a watch, so aapt2 stays in charge of what ships.
+#
+#   scripts/build-pack.sh && USE_PACK=1 ./build.sh
+if [ "${USE_PACK:-}" = "1" ]; then
+  PACK="${PACK_BIN:-../build/pack-cli}"
+  [ -x "$PACK" ] || { echo "ERROR: $PACK not found. Run scripts/build-pack.sh first." >&2; exit 1; }
+
+  FACE_SLUG="${FACE_SLUG:-watchface}"
+  rm -rf build/pack && mkdir -p build/pack/res
+  cp AndroidManifest.xml build/pack/
+  # Flatten the density qualifier, which is exactly the caveat above.
+  for d in res/*/; do
+    name=$(basename "$d")
+    cp -r "$d" "build/pack/res/${name%%-*}"
+  done
+
+  "$PACK" build/pack "build/$FACE_SLUG"
+  rm -f "build/$FACE_SLUG.aab"        # Push takes an APK; the bundle is for Play
+  echo "built with pack: build/$FACE_SLUG.apk"
+
+  BAD=$(unzip -l "build/$FACE_SLUG.apk" | awk 'NR>3 && NF>=4 {print $4}' | grep -v '^$' | grep -v '/$' \
+        | grep -vE '^(AndroidManifest\.xml|resources\.arsc|res/|META-INF/)' || true)
+  [ -z "$BAD" ] && echo "contents ok (Push allowlist)" || { echo "DISALLOWED: $BAD"; exit 1; }
+  exit 0
+fi
+
 rm -rf build && mkdir -p build/compiled
 "$BT/aapt2" compile --dir res -o build/compiled/res.zip
 "$BT/aapt2" link -o build/unsigned.apk -I "$PLATFORM" \

@@ -61,6 +61,8 @@
     "knotwork",
     "letterboxing",
     "logcat",
+    "nodpi",
+    "protoc",
     "miopea",
     "luminance",
     "newgrp",
@@ -80,6 +82,7 @@
     "watchfaces",
     "webapps",
     "xerces",
+    "zipalign",
     "zygote"
   ],
   "flagWords": [],

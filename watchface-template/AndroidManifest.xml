@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    android:versionCode="1"
+    android:versionName="1.0"
     package="com.bfg.watchfaces.watchfacepush.brushed_steel">
+
+  <!--
+    Declared HERE rather than only as aapt2 link flags, so the manifest fully
+    describes the package. google/pack reads the manifest and takes no SDK
+    flags, and neither will the on-device build; without these an APK comes out
+    with no versionCode and an implied targetSdk below 4, which makes apksigner
+    demand a v1 JAR signature that a v3-only signer does not produce.
+
+    uses-sdk is on Watch Face Push's permitted-tag list. See docs/SPEC.md.
+  -->
+  <uses-sdk android:minSdkVersion="33" android:targetSdkVersion="34" />
 
   <uses-feature android:name="android.hardware.type.watch" />
 
