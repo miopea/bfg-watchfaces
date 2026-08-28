@@ -9,13 +9,23 @@
 # So the split is: BUILD HERE, RUN THERE. adb is already a client/server
 # protocol over TCP, so one SSH reverse forward is the entire bridge.
 #
-# ON YOUR MACHINE — add one flag to the ssh command you already use:
+# IN YOUR ~/.ssh/config, on the machine with the watch:
 #
-#     ssh -R 5037:localhost:5037 you@this-box
+#     RemoteForward 5038 localhost:5037
 #
-# That exposes your adb server here. Then:
+# RemoteForward, not LocalForward. LocalForward would listen on YOUR machine and
+# reach this one — the wrong way round. RemoteForward listens HERE and reaches
+# your adb server.
 #
-#     export ADB_SERVER_SOCKET=tcp:localhost:5037
+# And 5038 here rather than 5037, on purpose. Any bare `adb` command run on this
+# box starts a daemon on 5037; with ExitOnForwardFailure yes, a RemoteForward
+# onto an occupied port does not merely fail that forward, it drops the WHOLE
+# session — every app port with it. 5038 is nothing else's default, so the
+# bridge cannot be knocked over by an unrelated adb command.
+#
+# Then here:
+#
+#     export ADB_SERVER_SOCKET=tcp:localhost:5038
 #     scripts/remote-adb.sh
 #
 # Everything after that — install, shell, screencap — targets whatever is
@@ -23,7 +33,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-SOCKET="${ADB_SERVER_SOCKET:-tcp:localhost:5037}"
+SOCKET="${ADB_SERVER_SOCKET:-tcp:localhost:5038}"
 PORT="${SOCKET##*:}"
 ADB="${ANDROID_HOME:-$HOME/Android/Sdk}/platform-tools/adb"
 [ -x "$ADB" ] || { echo "ERROR: adb not found at $ADB" >&2; exit 1; }
@@ -42,8 +52,8 @@ else
   echo "The reverse forward is not up, so adb would start an empty local" >&2
   echo "daemon and report 'no devices' — which is not the same thing." >&2
   echo >&2
-  echo "From your machine:" >&2
-  echo "    ssh -R $PORT:localhost:5037 $USER@$(hostname)" >&2
+  echo "Add to ~/.ssh/config on the machine with the watch, then reconnect:" >&2
+  echo "    RemoteForward $PORT localhost:5037" >&2
   exit 1
 fi
 echo "bridge            : $BRIDGE"
