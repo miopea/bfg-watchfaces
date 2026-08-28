@@ -46,6 +46,28 @@
 #     export ADB_SERVER_SOCKET=tcp:localhost:5038
 #     scripts/remote-adb.sh
 #
+# OPTIONAL — a shell on the watch machine, over the same connection.
+#
+# adb alone cannot START anything on your side: it can drive a device that
+# already exists, but not launch an emulator or install platform-tools. A second
+# RemoteForward fixes that, using Windows' own OpenSSH Server:
+#
+#     RemoteForward 2222 localhost:22
+#
+# On Windows, once:
+#     Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+#     Start-Service sshd; Set-Service -Name sshd -StartupType Automatic
+#     # then append this box's ~/.ssh/bfg_win_bridge.pub to
+#     #   C:\Users\<you>\.ssh\authorized_keys
+#
+# Then from here:
+#     ssh -i ~/.ssh/bfg_win_bridge -p 2222 <you>@localhost
+#
+# Understand what this grants: a shell as your Windows user, for as long as the
+# tunnel is up. It is revoked by deleting that one line from authorized_keys, or
+# by `Stop-Service sshd`. It is a separate key from the one you connect with, so
+# revoking it costs you nothing else.
+#
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
