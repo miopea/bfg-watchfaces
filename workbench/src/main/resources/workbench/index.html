@@ -201,6 +201,19 @@
     color:var(--dim);margin:12px 0 0;word-break:break-word;
   }
   .reasons{margin:0 0 14px;padding-left:20px;color:var(--dim);font-size:13px;line-height:1.7}
+  /* The build log still matters when something fails -- to us, not to the person
+     wearing the watch. It stays one tap away rather than being deleted. */
+  details.tech{margin:12px 0 0}
+  details.tech>summary{
+    font-size:12.5px;color:var(--faint);cursor:pointer;list-style:none;
+    padding:4px 0;user-select:none;
+  }
+  details.tech>summary::-webkit-details-marker{display:none}
+  details.tech>summary::before{content:"\25B8 ";display:inline-block;transition:transform .15s}
+  details.tech[open]>summary::before{transform:rotate(90deg)}
+  details.tech>summary:hover{color:var(--dim)}
+  details.tech pre.out{margin-top:8px}
+  .sheetmsg{font-size:14px;line-height:1.55;color:var(--ink);margin:12px 0 0;white-space:pre-wrap}
   .watchstate{
     display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--faint);
     margin:12px 0 0;line-height:1.5;
@@ -419,7 +432,7 @@
         <div class="grid" id="presetGrid"></div>
       </div>
       <div id="communityPane" hidden>
-        <h2 class="sec">Community catalog</h2>
+        <h2 class="sec">Made by the community</h2>
         <p class="microhint" id="catalogNote" style="margin:0 0 12px"></p>
         <div class="grid" id="catalogGrid"></div>
       </div>
@@ -432,7 +445,7 @@
       <div class="watch">
         <div class="case"><img id="preview" alt="watch face preview" width="300" height="300"></div>
         <div class="seg" role="group">
-          <button id="modeI" aria-pressed="true">Interactive</button>
+          <button id="modeI" aria-pressed="true">Normal</button>
           <button id="modeA" aria-pressed="false">Always-on</button>
         </div>
       </div>
@@ -447,9 +460,9 @@
           <span id="uploadLabel">Choose an image…</span>
         </label>
         <div class="texgrid" id="texGrid"></div>
-        <p class="microhint">Imported images stay on this machine. A face that uses
-          one can be installed on your watch, but cannot be shared to the community
-          catalog — that is parameters only.</p>
+        <p class="microhint">Pictures you add stay on this device. You can wear a face
+          made with one, but you cannot share it with the community — those are
+          built from patterns, not photos.</p>
       </div>
 
       <h2 class="sec">Dial colour</h2>
@@ -481,8 +494,7 @@
       </div>
       <p class="microhint" id="layoutNote" style="margin:0 0 14px"></p>
       <div id="compRows"></div>
-      <p class="microhint">Slots set to Off are removed from the face entirely — the
-        remaining ones re-centre rather than leaving a gap.</p>
+      <p class="microhint">Turn one off and the others move over to fill the space.</p>
 
       <div class="btnrow stack">
         <button class="btn primary" id="btnSave">Save to Gallery</button>
@@ -544,10 +556,10 @@
   <div class="sheet" id="sheetSave">
     <div class="grab"></div>
     <h3>Name this face</h3>
-    <p class="hint">The name shows in the watch's face carousel, and becomes the package
-      the watch installs — so it has to be yours, not a preset's.</p>
+    <p class="hint">This is what you will look for on your watch, so give it a name
+      of your own rather than the style you started from.</p>
     <input type="text" id="faceName" placeholder="Midnight Knot" maxlength="40" autocomplete="off">
-    <p class="hint" id="slugHint"></p>
+    <p class="hint" id="nameHint"></p>
     <div class="btnrow">
       <button class="btn ghost" id="saveCancel">Cancel</button>
       <button class="btn primary" id="saveConfirm">Save</button>
@@ -556,19 +568,22 @@
 
   <div class="sheet" id="sheetInstall">
     <div class="grab"></div>
-    <h3 id="installTitle">Install to watch</h3>
+    <h3 id="installTitle">Send to your watch</h3>
     <div id="devicePick" hidden>
       <p class="hint" style="margin-bottom:8px">Which watch?</p>
       <div id="deviceList"></div>
     </div>
-    <p class="hint">Builds a signed Watch Face Format APK from your parameters and
-      checks it against Google's schema first — a face that fails validation installs
-      fine and then never appears in the carousel.</p>
+    <p class="hint">We check the face works before sending it. A face that has not been
+      checked can install and then simply never turn up on your watch.</p>
     <div class="btnrow">
       <button class="btn ghost" id="installClose">Close</button>
-      <button class="btn primary" id="installGo">Build APK</button>
+      <button class="btn primary" id="installGo">Send to watch</button>
     </div>
-    <pre class="out" id="installOut" hidden></pre>
+    <p class="sheetmsg" id="installMsg" hidden></p>
+    <details class="tech" id="installTech" hidden>
+      <summary>Technical details</summary>
+      <pre class="out" id="installOut"></pre>
+    </details>
   </div>
 
   <!-- Fine tune lives in a SHORT sheet: tall enough to scroll eleven sliders,
@@ -603,16 +618,20 @@
 
   <div class="sheet" id="sheetShare">
     <div class="grab"></div>
-    <h3>Share to the catalog</h3>
-    <p class="hint">Writes <code>catalog/faces/&lt;slug&gt;.json</code> and validates it.
-      It does not open a pull request — publishing is your call. Commit the file and
-      open a PR when you are ready.</p>
-    <input type="text" id="shareAuthor" placeholder="Your name or handle" maxlength="60" autocomplete="off">
+    <h3>Share with the community</h3>
+    <p class="hint">Other people will be able to find this face and make it their own.
+      Add your name if you would like the credit, or leave it blank to stay anonymous.
+      You can ask for it to be taken down at any time.</p>
+    <input type="text" id="shareAuthor" placeholder="Your name (optional)" maxlength="60" autocomplete="off">
     <div class="btnrow">
       <button class="btn ghost" id="shareCancel">Cancel</button>
-      <button class="btn primary" id="shareConfirm">Stage submission</button>
+      <button class="btn primary" id="shareConfirm">Share</button>
     </div>
-    <pre class="out" id="shareOut" hidden></pre>
+    <p class="sheetmsg" id="shareMsg" hidden></p>
+    <details class="tech" id="shareTech" hidden>
+      <summary>Technical details</summary>
+      <pre class="out" id="shareOut"></pre>
+    </details>
   </div>
 
   <div class="sheet" id="sheetColor">
@@ -667,13 +686,18 @@ const COMP_SLOTS = ["Top","Left","Middle","Right","Bottom"];  // order matches S
 const DIALS = ["#7D7369","#2B2E33","#23262B","#6E6A66","#8A7343","#5A6B77","#3E4A3F","#7A4A3C","#C9C3B6"];
 const INKS  = ["#FCF9F1","#FFFFFF","#E8E6E1","#C9A227","#1A1A1A"];
 
+/* Slider names are what someone SEES change, not what the parameter is called.
+   "Vignette" and "Relief" are the engraver's words for it; nobody wearing the
+   watch has to learn them to darken an edge or deepen a cut. */
 const TUNE = [
-  ["scale","Size",4,80,0.5], ["depth","Depth",0,20,0.1], ["freq","Variation",1,24,1],
-  ["stroke","Line",0.2,4,0.05], ["relief","Relief",0,6,0.1], ["rotate","Angle",0,360,1],
-  ["contrast","Contrast",0,100,1], ["sheen","Sheen",0,100,1], ["vignette","Vignette",0,100,1],
-  ["timeSize","Time size",40,170,1], ["timeY","Time position",80,380,1],
-  ["complicationSpread","Slot spacing",60,150,1],
-  ["complicationY","Row position",200,360,1],
+  ["scale","Pattern size",4,80,0.5], ["depth","Depth",0,20,0.1],
+  ["freq","Variation",1,24,1], ["stroke","Line width",0.2,4,0.05],
+  ["relief","Engraving",0,6,0.1], ["rotate","Angle",0,360,1],
+  ["contrast","Contrast",0,100,1], ["sheen","Sheen",0,100,1],
+  ["vignette","Edge shading",0,100,1],
+  ["timeSize","Clock size",40,170,1], ["timeY","Clock position",80,380,1],
+  ["complicationSpread","Spacing",60,150,1],
+  ["complicationY","Middle row",200,360,1],
   ["dateY","Top slot",40,160,1], ["batteryY","Bottom slot",250,430,1],
 ];
 
@@ -901,9 +925,20 @@ async function doRefresh(){
     if (mine !== seq) return;
     refreshLayoutNote();
     const pill = $("#valid");
-    if (!v.available){ pill.className = "pill"; $("#validText").textContent = "no schema"; return; }
+    if (!v.available){
+      // The checker itself is missing -- a setup problem, not the face's fault.
+      pill.className = "pill";
+      pill.removeAttribute("title");
+      $("#validText").textContent = "Not checked";
+      return;
+    }
     pill.className = "pill " + (v.valid ? "ok" : "bad");
-    $("#validText").textContent = v.valid ? "Valid" : `${v.issues.length} error${v.issues.length>1?"s":""}`;
+    // A user cannot act on "cvc-complex-type.2.4.a". What they need to know is
+    // that this face would install and then never show up.
+    $("#validText").textContent = v.valid ? "Ready to wear" : "Won't work yet";
+    pill.title = v.valid
+      ? "This face will work on your watch."
+      : "Something about this face would stop it appearing on your watch. Try a different pattern or colour.";
     if (!v.valid) console.warn("WFF schema errors:", v.issues);
   }catch(e){ /* transient while dragging */ }
 }
@@ -963,12 +998,14 @@ async function loadCatalog(){
   grid.innerHTML = `<p class="microhint" style="grid-column:1/-1">Loading…</p>`;
   const data = await fetch("/api/catalog").then(r=>r.json());
   catalogLoaded = true;
-  $("#catalogNote").textContent =
-    `${data.faces.length} face${data.faces.length===1?"":"s"} · parameters only, a few KB each · published via jsDelivr`;
+  $("#catalogNote").textContent = data.faces.length === 1
+    ? "1 face shared by the community"
+    : `${data.faces.length} faces shared by the community`;
   grid.innerHTML = "";
   if (!data.faces.length){
     grid.innerHTML = `<p class="microhint" style="grid-column:1/-1">
-      Nothing published yet. Save a face, then Share it from My faces.</p>`;
+      Nothing here yet. Make a face you like, save it, then share it from My faces —
+      yours could be the first.</p>`;
     return;
   }
   for (const f of data.faces){
@@ -1091,55 +1128,60 @@ $("#reportGo").addEventListener("click", () => {
 });
 
 /* ---------------- share to catalog ---------------- */
-let shareSlug = null;
+let shareSlug = null, shareName = "";
 $("#shareCancel").addEventListener("click", closeSheets);
 $("#shareConfirm").addEventListener("click", async () => {
   if (!shareSlug) return;
-  const out = $("#shareOut");
-  out.hidden = false;
-  out.textContent = "validating…";
+  const msg = $("#shareMsg"), tech = $("#shareTech"), out = $("#shareOut");
+  msg.hidden = false; tech.hidden = true;
+  msg.textContent = "Checking your face…";
   const author = encodeURIComponent($("#shareAuthor").value.trim());
   const r = await fetch(`/api/catalog?slug=${encodeURIComponent(shareSlug)}&author=${author}`,
                         { method:"POST" }).then(r=>r.json());
   if (r.ok){
-    out.textContent =
-      `Staged ${r.path}
-
-It validated: parses, renders, and emits schema-valid WFF.
-
-` +
-      `Next:
-  git add ${r.path} catalog/index.json
-  git commit -m "catalog: add ${r.slug}"
-` +
-      `  then open a pull request`;
+    // Careful with the tense here: the face is checked and queued, not live.
+    // Claiming it is already in the gallery would be a promise the app cannot
+    // keep, and the person would go looking for it and not find it.
+    msg.textContent = `"${r.name || shareName || "Your face"}" is ready to share.\n\n` +
+      `Every face is checked before it joins the community gallery. Yours has passed, ` +
+      `and it will show up there once it has been published.`;
+    tech.hidden = false;
+    out.textContent = `${r.path}\nvalidated: parses, renders, and emits schema-valid WFF`;
     catalogLoaded = false;             // the gallery is stale now
-    toast("Submission staged");
+    toast("Ready to share");
   } else {
-    out.textContent = "Refused:\n" + (r.error || "unknown");
+    msg.textContent = "This face could not be shared. The details below say why.";
+    tech.hidden = false; tech.open = true;
+    out.textContent = r.error || "unknown error";
   }
 });
 
 /* ---------------- my faces ---------------- */
+/* "2026-08-28" is a timestamp; "28 August 2026" is a date someone can read. */
+function niceDate(iso){
+  const d = new Date((iso || "").slice(0,10));
+  if (isNaN(d)) return "Saved";
+  return "Saved " + d.toLocaleDateString(undefined, { day:"numeric", month:"long", year:"numeric" });
+}
 async function loadMine(){
   const host = $("#mineList");
   host.innerHTML = `<div class="empty">Loading…</div>`;
   const {faces} = await fetch("/api/faces").then(r => r.json());
   if (!faces.length){
     host.innerHTML = `<div class="empty">No saved faces yet.<br>
-      Open <b>Designs</b>, pick a style, make it yours, then tap <b>Save face</b>.</div>`;
+      Open <b>Designs</b>, pick a style, make it yours, then tap <b>Save to Gallery</b>.</div>`;
     return;
   }
   host.innerHTML = "";
   for (const f of faces){
     const row = document.createElement("div");
     row.className = "item";
-    const when = (f.created || "").slice(0,10);
+    const when = niceDate(f.created);
     row.innerHTML = `
       <img loading="lazy" alt="${f.name}" src="/api/face.png?${f.query}&size=150">
       <div class="meta">
         <div class="nm"></div>
-        <div class="sub">${when} · faces/${f.slug}.json</div>
+        <div class="sub">${when}</div>
       </div>
       <div class="acts">
         <button class="mini" data-act="open">Open</button>
@@ -1154,15 +1196,18 @@ async function loadMine(){
     row.querySelector('[data-act="install"]').addEventListener("click", () => {
       installTarget = { name: f.name, query: f.query };
       $("#installTitle").textContent = "Send " + f.name + " to your watch";
-      $("#installOut").hidden = true; $("#installGo").disabled = false;
+      $("#installMsg").hidden = true; $("#installTech").hidden = true;
+      $("#installGo").disabled = false;
       $("#installGo").textContent = "Send to watch";
       refreshDevices().then(renderDevicePicker);
       openSheet("#sheetInstall");
     });
     row.querySelector('[data-act="share"]').addEventListener("click", () => {
       shareSlug = f.slug;
+      shareName = f.name;
       $("#shareAuthor").value = "";
-      $("#shareOut").hidden = true;
+      $("#shareMsg").hidden = true;
+      $("#shareTech").hidden = true;
       openSheet("#sheetShare");
       setTimeout(() => $("#shareAuthor").focus(), 260);
     });
@@ -1404,7 +1449,7 @@ let saveThenInstall = false;
 $("#btnSaveInstall").addEventListener("click", () => {
   saveThenInstall = true;
   $("#faceName").value = currentName || "";
-  $("#slugHint").textContent = "";
+  $("#nameHint").textContent = "";
   openSheet("#sheetSave");
   setTimeout(() => $("#faceName").focus(), 260);
 });
@@ -1412,14 +1457,21 @@ $("#btnSaveInstall").addEventListener("click", () => {
 $("#btnSave").addEventListener("click", () => {
   saveThenInstall = false;
   $("#faceName").value = currentName || "";
-  $("#slugHint").textContent = "";
+  $("#nameHint").textContent = "";
   openSheet("#sheetSave");
   setTimeout(() => $("#faceName").focus(), 260);
 });
 $("#saveCancel").addEventListener("click", closeSheets);
 $("#faceName").addEventListener("input", e => {
-  const s = e.target.value.trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
-  $("#slugHint").textContent = s ? `Installs as com.bfg.watchfaces.watchfacepush.${s}` : "";
+  // The only thing worth saying here is when the name will not work. A watch
+  // needs plain letters or numbers somewhere in it; a name of only punctuation
+  // or emoji has nothing to install under, and finding that out at save time is
+  // better than at install time.
+  const typed = e.target.value.trim();
+  const usable = typed.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
+  $("#nameHint").textContent = (typed && !usable)
+    ? "Please use some plain letters or numbers in the name."
+    : "";
 });
 $("#saveConfirm").addEventListener("click", async () => {
   const name = $("#faceName").value.trim();
@@ -1430,13 +1482,14 @@ $("#saveConfirm").addEventListener("click", async () => {
   currentName = r.face.name;
   $("#title").textContent = currentName;
   closeSheets();
-  toast(`Saved to faces/${r.face.slug}.json`);
+  toast(`Saved "${r.face.name}"`);
 
   if (saveThenInstall){
     // Straight into the build+install flow, no second trip through My faces.
     installTarget = { name: r.face.name, query: r.face.query };
     $("#installTitle").textContent = "Send " + r.face.name + " to your watch";
-    $("#installOut").hidden = true;
+    $("#installMsg").hidden = true;
+    $("#installTech").hidden = true;
     $("#installGo").disabled = false;
     $("#installGo").textContent = "Send to watch";
     refreshDevices().then(renderDevicePicker);
@@ -1451,29 +1504,43 @@ $("#installClose").addEventListener("click", closeSheets);
 $("#installGo").addEventListener("click", async () => {
   if (!installTarget) return;
   const btn = $("#installGo"), out = $("#installOut");
-  btn.disabled = true; btn.textContent = "Building…";
-  out.hidden = false; out.textContent = "Validating, baking artwork, running aapt2 + apksigner…";
+  const msg = $("#installMsg"), tech = $("#installTech");
+  btn.disabled = true; btn.textContent = "Sending…";
+  msg.hidden = false; tech.hidden = true; tech.open = false;
+  msg.textContent = "Checking your face and getting it ready…";
   const url = `/api/build?${installTarget.query}&name=${encodeURIComponent(installTarget.name)}&install=true`
             + (chosenSerial ? `&serial=${encodeURIComponent(chosenSerial)}` : "");
   try{
     const r = await fetch(url).then(r => r.json());
     if (r.ok){
       const inst = r.installed || "not attempted";
+      const sent = inst.startsWith("installed");
+      msg.textContent = sent
+        ? `"${installTarget.name}" is on your watch.\n\n` +
+          `To wear it: press and hold your current watch face, then scroll along to it.`
+        : `"${installTarget.name}" is ready, but no watch is connected.\n\n` +
+          `Connect your watch and tap Send to watch again.`;
+      // Kept, not deleted: when a face does not appear on the watch, this is
+      // the only thing that says what was actually built and installed.
+      tech.hidden = false;
       out.textContent =
-        `Built ${r.apk}  (${(r.apkBytes/1024).toFixed(0)} KB)\n` +
-        `Install: ${inst}\n\n` +
-        r.written.join("\n") +
-        (inst.startsWith("installed")
-          ? `\n\nOn the watch: long-press the current face and scroll to "${installTarget.name}".`
-          : `\n\nNo watch attached, so it was only built. Install it later with:\n  adb install -r ${r.apk}`);
-      btn.textContent = "Done";
-      toast(inst.startsWith("installed") ? "Sent to watch" : "APK built");
+        `${r.apk}  (${(r.apkBytes/1024).toFixed(0)} KB)\ninstall: ${inst}\n\n` + r.written.join("\n");
+      btn.textContent = sent ? "Done" : "Send to watch";
+      btn.disabled = sent;
+      toast(sent ? "Sent to watch" : "Ready — no watch connected");
     } else {
-      out.textContent = (r.output || r.error || "build failed").slice(-1400);
+      // Vague reassurance would be worse than the log. Say it plainly, keep
+      // the next action obvious, and open the details rather than hiding them.
+      msg.textContent = "We could not get this face ready.\n\n" +
+        "Tap Retry. If it keeps happening, the details below say what went wrong.";
+      tech.hidden = false; tech.open = true;
+      out.textContent = (r.output || r.error || "the build failed").slice(-1400);
       btn.textContent = "Retry"; btn.disabled = false;
     }
   }catch(e){
-    out.textContent = "Request failed: " + e.message;
+    msg.textContent = "The app lost contact with itself part way through.\n\nTap Retry.";
+    tech.hidden = false; tech.open = true;
+    out.textContent = String(e && e.message || e);
     btn.textContent = "Retry"; btn.disabled = false;
   }
 });

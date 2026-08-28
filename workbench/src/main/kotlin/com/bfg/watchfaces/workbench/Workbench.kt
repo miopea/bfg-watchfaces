@@ -316,10 +316,15 @@ object Workbench {
                 if (catalog == null) { json(ex, noCatalogJson()); return }
                 val slug = q["slug"].orEmpty()
                 val face = FaceStore.load(root, slug)
-                if (face == null) { json(ex, """{"ok":false,"error":"no saved face '$slug'"}"""); return }
+                if (face == null) {
+                    json(ex, """{"ok":false,"error":${jsonStr(
+                        "That face is no longer saved on this device."
+                    )}}"""); return
+                }
                 if (face.params.isLocalOnly) {
                     json(ex, """{"ok":false,"error":${jsonStr(
-                        "This face uses an imported image. The catalog is parameters only, so it stays on this machine."
+                        "This face uses a picture you added. Community faces are built from " +
+                        "patterns rather than photos, so this one stays on your device."
                     )}}"""); return
                 }
                 val (file, problems) = CatalogStore.submit(root, catalog, face, q["author"].orEmpty())
@@ -328,7 +333,8 @@ object Workbench {
                     return
                 }
                 CatalogStore.writeIndex(catalog)
-                json(ex, """{"ok":true,"path":${jsonStr(file.absolutePath)},"slug":${jsonStr(face.slug)}}""")
+                json(ex, """{"ok":true,"path":${jsonStr(file.absolutePath)},""" +
+                         """"slug":${jsonStr(face.slug)},"name":${jsonStr(face.name)}}""")
             }
             "DELETE" -> {
                 val catalog = catalogRoot()
