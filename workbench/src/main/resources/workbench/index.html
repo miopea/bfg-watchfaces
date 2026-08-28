@@ -311,6 +311,8 @@
 
   .comprow{display:grid;grid-template-columns:58px 1fr;gap:10px;align-items:center;margin-bottom:9px}
   .comprow label{font-size:12.5px;color:var(--dim)}
+  .seg.segfull{display:flex;width:100%}
+  .seg.segfull button{flex:1;padding:8px 0}
   .comprow select{
     font:inherit;font-size:13.5px;padding:10px 12px;border-radius:11px;
     background:var(--surface);border:1px solid var(--line);color:var(--ink);width:100%;
@@ -379,6 +381,14 @@
       </button>
 
       <h2 class="sec">Complications</h2>
+      <div class="comprow" style="margin-bottom:14px">
+        <label>Size</label>
+        <div class="seg segfull" id="compSize">
+          <button data-size="16">Small</button>
+          <button data-size="19">Medium</button>
+          <button data-size="23">Large</button>
+        </div>
+      </div>
       <div id="compRows"></div>
       <p class="microhint">Slots set to Off are removed from the face entirely — the
         remaining ones re-centre rather than leaving a gap.</p>
@@ -528,6 +538,9 @@ const TUNE = [
   ["stroke","Line",0.2,4,0.05], ["relief","Relief",0,6,0.1], ["rotate","Angle",0,360,1],
   ["contrast","Contrast",0,100,1], ["sheen","Sheen",0,100,1], ["vignette","Vignette",0,100,1],
   ["timeSize","Time size",40,170,1], ["timeY","Time position",80,380,1],
+  ["complicationSpread","Slot spacing",60,150,1],
+  ["complicationY","Row position",200,360,1],
+  ["dateY","Top slot",40,160,1], ["batteryY","Bottom slot",250,430,1],
 ];
 
 const state = {
@@ -535,8 +548,8 @@ const state = {
   rotate:45, vignette:20, dialColor:"#7D7369", inkColor:"#FCF9F1", sheen:28,
   lens:true, lensAmount:38, texture:"",
   complications:"DAY_AND_DATE,STEP_COUNT,HEART_RATE,UNREAD_NOTIFICATION_COUNT,WATCH_BATTERY",
-  dateY:118, dateSize:21, timeY:196, timeSize:104,
-  complicationY:286, complicationSpread:86, complicationSize:19, batteryY:348,
+  dateY:99, dateSize:21, timeY:196, timeSize:104,
+  complicationY:273, complicationSpread:92, complicationSize:19, batteryY:344,
   fontFamily:"SYNC_TO_DEVICE", fontWeight:"MEDIUM"
 };
 let ambient = false;
@@ -627,6 +640,19 @@ function syncComps(){
   });
 }
 
+const sizeSeg = $("#compSize");
+sizeSeg.querySelectorAll("button").forEach(b => {
+  b.addEventListener("click", () => {
+    state.complicationSize = parseInt(b.dataset.size, 10);
+    syncSize();
+    refresh();
+  });
+});
+function syncSize(){
+  sizeSeg.querySelectorAll("button").forEach(b =>
+    b.setAttribute("aria-pressed", String(parseInt(b.dataset.size,10) === state.complicationSize)));
+}
+
 function swatchRow(host, colors, key){
   const el = $(host);
   for (const c of colors){
@@ -675,6 +701,7 @@ function syncTune(){
     x.setAttribute("aria-pressed", String(x.dataset.engine === state.engine)));
   markSw("#dialSw","dialColor"); markSw("#inkSw","inkColor");
   syncComps();
+  syncSize();
   textureVisible();
 }
 

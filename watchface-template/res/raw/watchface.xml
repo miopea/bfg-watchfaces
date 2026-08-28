@@ -40,17 +40,17 @@
       </TimeText>
     </DigitalClock>
 
-    <ComplicationSlot slotId="0" x="184" y="96" width="89" height="76"
+    <ComplicationSlot slotId="0" x="191" y="76" width="74" height="63"
                       displayName="@string/slot_day_and_date"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="140"/>
       <DefaultProviderPolicy defaultSystemProvider="DAY_AND_DATE" defaultSystemProviderType="SHORT_TEXT"/>
-      <BoundingBox x="0" y="0" width="89" height="76" outlinePadding="2.0"/>
+      <BoundingBox x="0" y="0" width="74" height="63" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">
-        <PartImage x="30" y="0" width="28" height="23">
+        <PartImage x="25" y="0" width="24" height="24">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>
-        <PartText x="0" y="26" width="89" height="34">
+        <PartText x="0" y="28" width="74" height="32">
           <Text align="CENTER">
             <Font family="SYNC_TO_DEVICE" size="17" color="#fffcf9f1">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
@@ -60,17 +60,17 @@
       </Complication>
     </ComplicationSlot>
 
-    <ComplicationSlot slotId="1" x="98" y="264" width="89" height="76"
+    <ComplicationSlot slotId="1" x="99" y="268" width="74" height="63"
                       displayName="@string/slot_step_count"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="0"/>
       <DefaultProviderPolicy defaultSystemProvider="STEP_COUNT" defaultSystemProviderType="SHORT_TEXT"/>
-      <BoundingBox x="0" y="0" width="89" height="76" outlinePadding="2.0"/>
+      <BoundingBox x="0" y="0" width="74" height="63" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">
-        <PartImage x="30" y="0" width="28" height="23">
+        <PartImage x="25" y="0" width="24" height="24">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>
-        <PartText x="0" y="26" width="89" height="34">
+        <PartText x="0" y="28" width="74" height="32">
           <Text align="CENTER">
             <Font family="SYNC_TO_DEVICE" size="17" color="#fffcf9f1">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
@@ -80,17 +80,17 @@
       </Complication>
     </ComplicationSlot>
 
-    <ComplicationSlot slotId="2" x="184" y="264" width="89" height="76"
+    <ComplicationSlot slotId="2" x="191" y="268" width="74" height="63"
                       displayName="@string/slot_heart_rate"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="0"/>
       <DefaultProviderPolicy defaultSystemProvider="HEART_RATE" defaultSystemProviderType="SHORT_TEXT"/>
-      <BoundingBox x="0" y="0" width="89" height="76" outlinePadding="2.0"/>
+      <BoundingBox x="0" y="0" width="74" height="63" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">
-        <PartImage x="30" y="0" width="28" height="23">
+        <PartImage x="25" y="0" width="24" height="24">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>
-        <PartText x="0" y="26" width="89" height="34">
+        <PartText x="0" y="28" width="74" height="32">
           <Text align="CENTER">
             <Font family="SYNC_TO_DEVICE" size="17" color="#fffcf9f1">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
@@ -100,17 +100,17 @@
       </Complication>
     </ComplicationSlot>
 
-    <ComplicationSlot slotId="3" x="270" y="264" width="89" height="76"
+    <ComplicationSlot slotId="3" x="283" y="268" width="74" height="63"
                       displayName="@string/slot_unread_notification_count"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="0"/>
       <DefaultProviderPolicy defaultSystemProvider="UNREAD_NOTIFICATION_COUNT" defaultSystemProviderType="SHORT_TEXT"/>
-      <BoundingBox x="0" y="0" width="89" height="76" outlinePadding="2.0"/>
+      <BoundingBox x="0" y="0" width="74" height="63" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">
-        <PartImage x="30" y="0" width="28" height="23">
+        <PartImage x="25" y="0" width="24" height="24">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>
-        <PartText x="0" y="26" width="89" height="34">
+        <PartText x="0" y="28" width="74" height="32">
           <Text align="CENTER">
             <Font family="SYNC_TO_DEVICE" size="17" color="#fffcf9f1">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
@@ -120,17 +120,17 @@
       </Complication>
     </ComplicationSlot>
 
-    <ComplicationSlot slotId="4" x="184" y="326" width="89" height="76"
+    <ComplicationSlot slotId="4" x="191" y="339" width="74" height="63"
                       displayName="@string/slot_watch_battery"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="0"/>
       <DefaultProviderPolicy defaultSystemProvider="WATCH_BATTERY" defaultSystemProviderType="SHORT_TEXT"/>
-      <BoundingBox x="0" y="0" width="89" height="76" outlinePadding="2.0"/>
+      <BoundingBox x="0" y="0" width="74" height="63" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">
-        <PartImage x="30" y="0" width="28" height="23">
+        <PartImage x="25" y="0" width="24" height="24">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>
-        <PartText x="0" y="26" width="89" height="34">
+        <PartText x="0" y="28" width="74" height="32">
           <Text align="CENTER">
             <Font family="SYNC_TO_DEVICE" size="17" color="#fffcf9f1">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>

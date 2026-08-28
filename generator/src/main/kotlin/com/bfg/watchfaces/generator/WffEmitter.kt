@@ -31,64 +31,45 @@ object WffEmitter {
         val ink = argb(p.inkColor)
         val inkDim = argb(p.inkColor, 160)
 
-        // Five positioned slots. TOP and BOTTOM are centred singles; LEFT,
-        // MIDDLE and RIGHT share a row and re-centre among themselves, so
-        // turning one off closes the gap instead of leaving a hole.
-        //
-        // A slot set to NONE is not emitted at all. An empty slot still costs a
-        // tap target and a frame budget on the watch.
-        fun slotXml(source: ComplicationSource, id: Int, x: Int, y: Int, ambientAlpha: Int): String {
-            val w = (l.complicationSize * 4.7).toInt()
-            val h = (l.complicationSize * 4.0).toInt()
-            val iconW = (l.complicationSize * 1.5).toInt()
-            return """
-    <ComplicationSlot slotId="$id" x="$x" y="$y" width="$w" height="$h"
+        // Slot geometry comes from SlotGeometry, which the preview also uses.
+        // It sizes boxes to their content, widens the spread if they would
+        // touch, pushes the bottom slot clear of the row and keeps everything
+        // inside the rim -- the previous hand-placed numbers overlapped on both
+        // axes and ran into the clock.
+        val boxes = SlotGeometry.boxes(p)
+        val iconH = SlotGeometry.iconHeight(l.complicationSize)
+        val textY = SlotGeometry.textOffset(l.complicationSize)
+        val textH = SlotGeometry.textHeight(l.complicationSize)
+        val fontSize = SlotGeometry.fontSize(l.complicationSize)
+        val iconW = iconH
+
+        val slots = boxes.entries.mapIndexed { id, (pos, box) ->
+            val source = p.slot(pos)
+            // TOP keeps a dim ambient variant: it is the always-readable
+            // position, and the ambient design deliberately keeps that one line
+            // visible while everything else goes dark.
+            val ambientAlpha = if (pos == SlotPosition.TOP) 140 else 0
+            """
+    <ComplicationSlot slotId="$id" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"
                       displayName="@string/slot_${source.name.lowercase()}"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <DefaultProviderPolicy defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
-      <BoundingBox x="0" y="0" width="$w" height="$h" outlinePadding="2.0"/>
+      <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">
-        <PartImage x="${(w - iconW) / 2}" y="0" width="$iconW" height="${(l.complicationSize * 1.25).toInt()}">
+        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>
-        <PartText x="0" y="${(l.complicationSize * 1.4).toInt()}" width="$w" height="${(l.complicationSize * 1.8).toInt()}">
+        <PartText x="0" y="$textY" width="${box.w}" height="$textH">
           <Text align="CENTER">
-            <Font family="${l.fontFamily}" size="${(l.complicationSize * 0.92).toInt()}" color="$ink">
+            <Font family="${l.fontFamily}" size="$fontSize" color="$ink">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>
         </PartText>
       </Complication>
     </ComplicationSlot>"""
-        }
-
-        val w = (l.complicationSize * 4.7).toInt()
-        val slotList = ArrayList<String>()
-        var nextId = 0
-
-        // TOP keeps a dim ambient variant. It is the always-readable position --
-        // it held the date before it became a slot, and DECISIONS.md records the
-        // ambient design as deliberately keeping that line visible at alpha 140.
-        p.slot(SlotPosition.TOP).let { src ->
-            if (src.enabled) slotList += slotXml(src, nextId++, DIAL_SIZE / 2 - w / 2,
-                l.dateY - (l.complicationSize * 1.2).toInt(), 140)
-        }
-
-        val row = listOf(SlotPosition.LEFT, SlotPosition.MIDDLE, SlotPosition.RIGHT)
-            .map { p.slot(it) }.filter { it.enabled }
-        row.forEachIndexed { index, src ->
-            val offset = (index - (row.size - 1) / 2.0) * l.complicationSpread
-            slotList += slotXml(src, nextId++, (DIAL_SIZE / 2 + offset - w / 2).toInt(),
-                l.complicationY - (l.complicationSize * 1.2).toInt(), 0)
-        }
-
-        p.slot(SlotPosition.BOTTOM).let { src ->
-            if (src.enabled) slotList += slotXml(src, nextId++, DIAL_SIZE / 2 - w / 2,
-                l.batteryY - (l.complicationSize * 1.2).toInt(), 0)
-        }
-
-        val slots = slotList.joinToString("\n")
+        }.joinToString("\n")
 
         // The emitted file is what ships, and since the workbench bakes it into
         // watchface-template it replaces what used to be a hand-annotated

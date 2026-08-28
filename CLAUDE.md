@@ -46,6 +46,11 @@ its name when someone saves it, and that name becomes the carousel label, the
 hardcoded face identity — that is what "Silver Sand" was, and it went away on
 2026-08-27.
 
+**Slot positions come from `SlotGeometry`, not from arithmetic you write.** The
+emitter and the preview both call it. They used to compute boxes independently
+with a test asserting they matched, and they matched while overlapping on both
+axes and colliding with the clock. Do not reintroduce a second copy.
+
 **Never change engine geometry in place.** Community faces are stored as
 parameters, so `PatternEngines` IS the renderer for the stored file format.
 Changing an engine's output silently rewrites every existing face. Add a branch
@@ -100,7 +105,7 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 
 Verified — built and run, not assumed:
 
-- `:generator` — 65 tests green, including validation against Google's official
+- `:generator` — 91 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
 - `:workbench` — 43 tests green. Serves the app at localhost:7777; bakes

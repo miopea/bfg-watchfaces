@@ -3,6 +3,7 @@ package com.bfg.watchfaces.workbench
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.SlotGeometry
 import com.bfg.watchfaces.generator.SlotPosition
 import java.awt.Color
 import java.awt.Font
@@ -57,39 +58,22 @@ object FacePreview {
 
         g.scale(s, s)
 
-        // Five complication slots, positioned with the SAME arithmetic
-        // WffEmitter uses -- including the row re-centring. If those two ever
-        // drift the preview stops being evidence about layout, which is most of
-        // what it is for.
-        //
-        // The date and battery lines are gone: they are ordinary slots now.
-        val w = (l.complicationSize * 4.7).toInt()
-        val iconSize = l.complicationSize * 1.25
-        val textY = (l.complicationSize * 1.4).toInt()
-        val textH = (l.complicationSize * 1.8).toInt()
+        // Slot boxes come from SlotGeometry -- the same call WffEmitter makes.
+        // Previously both computed this independently and a test asserted they
+        // matched, which guarded a copy rather than removing it.
+        val iconSize = SlotGeometry.iconHeight(l.complicationSize).toDouble()
+        val textY = SlotGeometry.textOffset(l.complicationSize)
+        val textH = SlotGeometry.textHeight(l.complicationSize)
+        val fontSize = SlotGeometry.fontSize(l.complicationSize).toDouble()
 
-        fun slot(source: ComplicationSource, x: Int, y: Int, alpha: Int) {
-            if (!source.enabled || alpha <= 0) return
-            val c = withAlpha(ink, alpha)
-            ComplicationIcons.draw(g, source, x + (w - iconSize) / 2.0, y.toDouble(), iconSize, c)
-            drawCenteredIn(g, Complications.sample(source), x, y + textY, w, textH,
-                l.complicationSize * 0.92, Font.PLAIN, c)
-        }
-
-        // TOP keeps a dim ambient variant -- the always-readable position.
-        slot(p.slot(SlotPosition.TOP), DIAL_SIZE / 2 - w / 2,
-             l.dateY - (l.complicationSize * 1.2).toInt(), if (ambient) 140 else 255)
-
-        if (!ambient) {
-            val row = listOf(SlotPosition.LEFT, SlotPosition.MIDDLE, SlotPosition.RIGHT)
-                .map { p.slot(it) }.filter { it.enabled }
-            row.forEachIndexed { index, source ->
-                val offset = (index - (row.size - 1) / 2.0) * l.complicationSpread
-                slot(source, (DIAL_SIZE / 2 + offset - w / 2).toInt(),
-                     l.complicationY - (l.complicationSize * 1.2).toInt(), 255)
-            }
-            slot(p.slot(SlotPosition.BOTTOM), DIAL_SIZE / 2 - w / 2,
-                 l.batteryY - (l.complicationSize * 1.2).toInt(), 255)
+        for ((pos, box) in SlotGeometry.boxes(p)) {
+            val source = p.slot(pos)
+            val a = if (ambient) (if (pos == SlotPosition.TOP) 140 else 0) else 255
+            if (a <= 0) continue
+            val c = withAlpha(ink, a)
+            ComplicationIcons.draw(g, source, box.x + (box.w - iconSize) / 2.0, box.y.toDouble(), iconSize, c)
+            drawCenteredIn(g, Complications.sample(source), box.x, box.y + textY, box.w, textH,
+                fontSize, Font.PLAIN, c)
         }
 
         // Time: the emitter ships TWO TimeText elements, one interactive

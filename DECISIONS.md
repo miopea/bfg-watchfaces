@@ -1,5 +1,60 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — SlotGeometry: one calculation, and the collisions it found
+
+The five slots were cramped and overlapping. Measuring the defaults rather than
+squinting at them found four separate faults:
+
+- the three row boxes were 89 wide on an 86 spread — **overlapping by 3px**
+- the bottom slot **overlapped the row by 14px**
+- the top slot ran **28px into the clock**, and the row **25px** into it
+- boxes were `size * 4.0` tall for `size * 3.15` of content — ~15px of dead
+  space in every slot, which is what made five of them look crowded when they
+  were merely mis-measured
+
+None of it was caught because nothing asserted it. The tests checked that the
+emitter and the preview AGREED on slot positions — and they agreed, on being
+wrong. **A test that guards a copy-paste is the wrong shape.** The fix was to
+delete the second copy.
+
+`SlotGeometry` in `:generator` now computes every box once, and both the emitter
+and the preview ask it. It sizes boxes to their content, widens the spread if
+boxes would touch, narrows it if the outer ones would leave the circle, pushes
+the bottom slot clear of the row, and keeps every CORNER inside the dial —
+checked against the circle, not the bounding square, because the dial curves
+away and a corner can escape while x and y both look fine.
+
+### When it does not fit, it shrinks
+
+Five slots plus a 104px clock genuinely runs out of room on a 456px dial above
+size ~24. The first attempt clamped the bottom slot and pushed it off the edge
+of the circle: a face that would have shipped with a complication in the bezel.
+
+`boxes()` now steps the size down until the layout actually fits. Shrinking is
+the only option that stays correct while keeping every slot the user switched
+on — dropping one silently loses data they asked for, and overlapping is not a
+layout. `fittedSize()` reports what was actually used.
+
+### The clock band was measured from the wrong point
+
+Even after all that, the row still touched the digits. The band was computed
+around `timeY`, but the digits are centred inside the `DigitalClock` ELEMENT
+BOX, which runs from `timeY - timeSize/2` for `timeSize * 1.4` — so its centre
+sits `timeSize * 0.2` LOWER, 20px at the default size. Every slot was being
+kept clear of a band 20px above where the numerals actually are.
+
+This is the class of bug that only appears on the dial: schema-valid, no
+overlap by the old measure, and completely wrong. `ClockBandTest` now derives
+the band from the same box arithmetic the emitter uses and asserts the row
+clears it at four clock sizes.
+
+### Sizes are user-facing
+
+Small / Medium / Large (16 / 19 / 23) in the Complications section, with slot
+spacing, row position and the top and bottom anchors exposed in Fine tune for
+precise work. Defaults retuned to the corrected geometry: `dateY` 118→99,
+`complicationY` 286→273, `batteryY` 348→344, `complicationSpread` 86→92.
+
 ## 2026-08-28 — Five slots, provider icons, and an image engine
 
 ### Five positions, and the date and battery stop being special

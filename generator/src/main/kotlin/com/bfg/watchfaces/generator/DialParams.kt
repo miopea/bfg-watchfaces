@@ -150,16 +150,16 @@ data class DialParams(
 
 data class Layout(
     /** Y of the TOP complication slot. Was the fixed date line. */
-    val dateY: Int = 118,
+    val dateY: Int = 99,
     val dateSize: Int = 21,
     val timeY: Int = 196,
     val timeSize: Int = 104,
     val tracking: Double = 0.0,
-    val complicationY: Int = 286,
-    val complicationSpread: Int = 86,
+    val complicationY: Int = 273,
+    val complicationSpread: Int = 92,
     val complicationSize: Int = 19,
     /** Y of the BOTTOM complication slot. Was the fixed battery line. */
-    val batteryY: Int = 348,
+    val batteryY: Int = 344,
     val fontFamily: String = "SYNC_TO_DEVICE",
     val fontWeight: String = "MEDIUM"
 )
