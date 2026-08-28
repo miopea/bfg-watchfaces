@@ -9,43 +9,43 @@
 # So the split is: BUILD HERE, RUN THERE. adb is already a client/server
 # protocol over TCP, so one SSH reverse forward is the entire bridge.
 #
-# SETUP — a SEPARATE ssh host, used only while a watch is plugged in.
+# SETUP — ONE line in the host you already use. No second connection.
 #
-# Everything else in a normal config is LocalForward: you reaching services that
-# run HERE. This is the one that goes the other way, and it is only live while
-# there is a watch on your machine. Keeping it apart means a dead adb forward
-# cannot take your app ports down with it.
-#
-#     Host bgsdev-watch
-#         HostName 10.2.0.4
-#         User bschleifer
+#     Host bgsdev
+#         ... everything you already have ...
 #         RemoteForward 5038 localhost:5037
-#         # deliberately NO ExitOnForwardFailure: if adb is not running on your
-#         # side, the session should still come up rather than refusing to
-#         # connect at all.
 #
-# Then, on the machine with the watch:
+# Your existing command is unchanged:
 #
-#     adb devices            # starts the local adb server; do this FIRST
-#     ssh -N bgsdev-watch -i C:\temp\swarm_key.pem
+#     ssh -N bgsdev -i C:\temp\swarm_key.pem
 #
-# And here:
+# This is safe to sit alongside ExitOnForwardFailure yes. That option fires when
+# a forward cannot be ESTABLISHED, which for RemoteForward means binding 5038
+# here. The far end — your adb server — is contacted lazily, per connection, so
+# the forward comes up whether or not adb is running on your machine, and you
+# can plug a watch in later without reconnecting.
+#
+# (Reasoned from ssh's semantics, not observed: this box has no key to ssh to
+# itself with, so the case could not be run here.)
+#
+# Two details that are not arbitrary:
+#
+#   RemoteForward, not LocalForward. Every other line in that config is you
+#   reaching a service that runs HERE. This one goes the other way.
+#
+#   5038, not 5037. Any bare `adb` command on this box starts a daemon on 5037,
+#   and a RemoteForward onto an occupied port under ExitOnForwardFailure drops
+#   the WHOLE session — every app port with it. Nothing here binds 5038, and
+#   this script deliberately never starts a daemon on it either: it checks
+#   whether the bridge is up BEFORE invoking adb, precisely so a stray command
+#   cannot squat the port and lock you out on the next reconnect.
+#
+# On the watch machine, nothing to run by hand — plugging in a watch, opening
+# Android Studio or starting an emulator all start adb for you. Then here:
 #
 #     export ADB_SERVER_SOCKET=tcp:localhost:5038
 #     scripts/remote-adb.sh
 #
-# Two details that are not arbitrary:
-#
-#   RemoteForward, not LocalForward. LocalForward listens on YOUR machine and
-#   reaches this one — the wrong way round. RemoteForward listens HERE.
-#
-#   5038, not 5037. Any bare `adb` command on this box grabs 5037. If that
-#   collides while ExitOnForwardFailure is set, ssh drops the WHOLE session
-#   rather than just the one forward — which is why this lives on its own host
-#   and its own port.
-#
-# Everything after that — install, shell, screencap — targets whatever is
-# plugged into or emulated on your machine.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
