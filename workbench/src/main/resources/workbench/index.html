@@ -204,6 +204,17 @@
     color:var(--dim);margin:12px 0 0;word-break:break-word;
   }
   .reasons{margin:0 0 14px;padding-left:20px;color:var(--dim);font-size:13px;line-height:1.7}
+  .steps{margin:14px 0 4px;padding:0;list-style:none;counter-reset:step}
+  .steps li{
+    counter-increment:step;position:relative;padding:0 0 14px 34px;
+    font-size:13.5px;line-height:1.55;color:var(--dim);
+  }
+  .steps li::before{
+    content:counter(step);position:absolute;left:0;top:0;
+    width:22px;height:22px;border-radius:50%;background:var(--line);color:var(--ink);
+    font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;
+  }
+  .steps li b{display:block;color:var(--ink);font-weight:600;margin-bottom:2px}
   /* The build log still matters when something fails -- to us, not to the person
      wearing the watch. It stays one tap away rather than being deleted. */
   details.tech{margin:12px 0 0}
@@ -578,6 +589,11 @@
     </div>
     <p class="hint">We check the face works before sending it. A face that has not been
       checked can install and then simply never turn up on your watch.</p>
+    <!-- Shown once, before the first face is sent. The watch is where the
+         approval dialog has to appear, and a small round screen is a poor place
+         to read anything careful -- so the explaining happens here. -->
+    <ol class="steps" id="handoff" hidden></ol>
+    <p class="sheetmsg" id="activationNote" hidden></p>
     <div class="btnrow">
       <button class="btn ghost" id="installClose">Close</button>
       <button class="btn primary" id="installGo">Send to watch</button>
@@ -1203,6 +1219,7 @@ async function loadMine(){
       $("#installGo").disabled = false;
       $("#installGo").textContent = "Send to watch";
       refreshDevices().then(renderDevicePicker);
+      refreshActivation();
       openSheet("#sheetInstall");
     });
     row.querySelector('[data-act="share"]').addEventListener("click", () => {
@@ -1496,11 +1513,47 @@ $("#saveConfirm").addEventListener("click", async () => {
     $("#installGo").disabled = false;
     $("#installGo").textContent = "Send to watch";
     refreshDevices().then(renderDevicePicker);
+    refreshActivation();
     setTimeout(() => openSheet("#sheetInstall"), 280);
   } else {
     show("mine");
   }
 });
+
+/* ---------------- activation handoff ----------------
+ * The device explains; the WATCH asks. Operator decision
+ * 01a049a1-390b-7b50-a5d3-cc082037bb55.
+ *
+ * This deliberately does not mime a permission dialog. The permission does not
+ * exist on this side -- it belongs to the app on the watch -- and a demo that
+ * faked it would teach the wrong thing about how the app behaves.
+ */
+async function refreshActivation(){
+  try{
+    const a = await fetch("/api/activation").then(r=>r.json());
+    const ol = $("#handoff"), note = $("#activationNote");
+
+    // Steps show until they have been asked. After that the watch has already
+    // put its dialog up and repeating them is noise.
+    ol.innerHTML = "";
+    ol.hidden = !a.needsHandoff;
+    if (a.needsHandoff){
+      for (const st of a.steps){
+        const li = document.createElement("li");
+        const b = document.createElement("b");
+        b.textContent = st.title;
+        li.appendChild(b);
+        li.appendChild(document.createTextNode(st.detail));
+        ol.appendChild(li);
+      }
+    }
+
+    // Persistent, not a toast: this has to still be here next week, when they
+    // have sent a face and are wondering why nothing happened.
+    note.hidden = !a.note;
+    note.textContent = a.note || "";
+  }catch(e){ /* the sheet still works without it */ }
+}
 
 /* ---------------- install ---------------- */
 $("#installClose").addEventListener("click", closeSheets);

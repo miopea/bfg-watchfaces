@@ -31,6 +31,10 @@ debug.keystore
 # committed. Anchor these patterns.
 /faces/
 
+# Whether this install has been asked about activation. Per-install state, like
+# /faces/, not source -- and anchored for the same reason.
+/activation.txt
+
 # Images imported for the TEXTURE engine. Local content, never part of a face
 # and never publishable -- the catalog is parameters only.
 textures/

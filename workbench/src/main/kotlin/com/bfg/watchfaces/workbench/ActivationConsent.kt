@@ -200,4 +200,35 @@ object ActivationConsent {
 
     /** One step of [HANDOFF]: a short heading and a sentence or two under it. */
     data class Step(val title: String, val detail: String)
+
+    // ---- remembering, which is the whole reason this is not a boolean ---------
+    //
+    // The state has to outlive the process: "have we asked yet" is meaningless
+    // if it resets when the app restarts, and re-asking is the one thing that
+    // cannot be undone. On Android this is DataStore; here it is a file, and
+    // the judgement above does not care which.
+
+    private const val FILE = "activation.txt"
+
+    /** Read the stored state. Anything unreadable is [State.UNASKED]. */
+    fun load(root: java.io.File): State {
+        val f = java.io.File(root, FILE)
+        if (!f.isFile) return State.UNASKED
+        // An unrecognised value must NOT become DENIED -- that would silently
+        // consume the one ask on a corrupt file. UNASKED is the safe reading:
+        // worst case the person is asked when they could have been spared it.
+        return runCatching { State.valueOf(f.readText().trim()) }.getOrDefault(State.UNASKED)
+    }
+
+    fun save(root: java.io.File, state: State) {
+        java.io.File(root, FILE).writeText(state.name)
+    }
+
+    /**
+     * Whether the device still owes the person the explanation.
+     *
+     * True until they have been asked. After that the watch has already put its
+     * dialog up, so repeating the steps is just noise.
+     */
+    fun needsHandoff(state: State): Boolean = state == State.UNASKED
 }

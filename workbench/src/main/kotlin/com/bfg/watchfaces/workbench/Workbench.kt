@@ -70,6 +70,7 @@ object Workbench {
         server.createContext("/api/catalog") { ex -> safe(ex) { serveCatalog(ex) } }
         server.createContext("/logos/") { ex -> safe(ex) { serveLogo(ex) } }
         server.createContext("/api/devices") { ex -> safe(ex) { serveDevices(ex) } }
+        server.createContext("/api/activation") { ex -> safe(ex) { serveActivation(ex) } }
         server.start()
 
         println()
@@ -382,6 +383,42 @@ object Workbench {
             """"blocked":${d.blockedReason?.let { jsonStr(it) } ?: "null"}}"""
         }
         json(ex, """{"available":true,"devices":[$rows]}""")
+    }
+
+    /**
+     * The device's half of the activation flow.
+     *
+     * Operator decision 01a049a1-390b-7b50-a5d3-cc082037bb55 splits it: the
+     * device explains what is coming, the WATCH puts the actual dialog up the
+     * first time a face lands. So this serves the explanation and the remembered
+     * state, and never pretends to request anything -- the permission does not
+     * exist on this side and a demo that mimed it would be teaching the wrong
+     * thing about the app.
+     *
+     * POST records what the watch came back with, which is what the Data Layer
+     * will report once :wear exists.
+     */
+    private fun serveActivation(ex: HttpExchange) {
+        if (ex.requestMethod.equals("POST", ignoreCase = true)) {
+            val answer = query(ex)["granted"]
+            val state = ActivationConsent.load(root)
+            if (!ActivationConsent.canAsk(state)) {
+                // Not an error to report loudly -- it is the rule working.
+                json(ex, """{"ok":false,"state":"$state","error":${jsonStr(
+                    "This was already answered. It can only be asked once."
+                )}}"""); return
+            }
+            val next = ActivationConsent.record(state, granted = answer == "true")
+            ActivationConsent.save(root, next)
+            json(ex, """{"ok":true,"state":"$next"}"""); return
+        }
+
+        val state = ActivationConsent.load(root)
+        val steps = ActivationConsent.HANDOFF.joinToString(",") { st ->
+            """{"title":${jsonStr(st.title)},"detail":${jsonStr(st.detail)}}"""
+        }
+        json(ex, """{"state":"$state","needsHandoff":${ActivationConsent.needsHandoff(state)},""" +
+                 """"steps":[$steps],"note":${ActivationConsent.persistentNote(state)?.let { jsonStr(it) } ?: "null"}}""")
     }
 
     /** What SlotGeometry actually used, so a clamped control can say so. */
