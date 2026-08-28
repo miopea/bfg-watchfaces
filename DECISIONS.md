@@ -91,6 +91,64 @@ Four options were offered and they took none of them, so this is their placement
 rather than the nearest button: ask EARLY, not gated behind a first push that
 may never happen.
 
+### Where it happens, settled
+
+Operator decision `01a049a1-390b-7b50-a5d3-cc082037bb55`: **the watch puts the
+dialog up the first time a face lands on it**, and the device app explains what
+is coming beforehand, in clear steps. Their words: "It should be a clear
+multi-step instruction on the device app, saying it is pushing to the watch,
+needs approval."
+
+The operator's original intent survives inside that. The explaining happens
+where they wanted it — on the device, while someone is looking at it, with room
+to say it properly — and only the system dialog happens on the watch, because
+that is the only place it can. `ActivationConsent.HANDOFF` is those steps.
+
+The watch app's own first open was rejected as the moment: a companion app
+installed alongside a handheld app is often never deliberately opened, so the one
+irreversible ask could sit unused for weeks or fire cold on a wrist.
+
+### "I've never seen another app install anything on a watch. Like Facer."
+
+A fair challenge, and worth answering in the record because it will be asked
+again. Checked against Google's own documentation rather than argued.
+
+`developer.android.com/training/wearables/watch-face-push` gives a table of use
+cases, and ours is in it verbatim:
+
+> "I want to create a phone app that allows users to select watch faces from a
+> curated collection, or design and customize watch faces for installation
+> directly on their Wear OS watch." → "**Create an app, for both watch and
+> phone**, using the Watch Face Push API on the watch." Complexity: **High**.
+
+And on what the watch half is for:
+
+> "**Watch app**: The watch app may typically not have a significant user
+> interface. It is primarily a bridge between the phone app and the Watch Face
+> Push APIs... Using the Watch Face Push API to install/update or replace watch
+> faces. **Requesting necessary permissions and prompting the user.** Providing a
+> default watch face. Providing a minimal cache of watch faces."
+
+So Google independently assigns the permission prompt to the watch app, which is
+what reading the library had already shown. Two apps is the documented design,
+not a workaround.
+
+The reason it has never *looked* like an install is that it did not used to be
+one. The older generation of design apps shipped a single native watch face that
+re-rendered whatever design you picked, so switching "faces" sent data rather
+than a package — nothing was installed per design, so nothing appeared to be.
+That route is closed: **"As of January 2026, the Watch Face Format is required
+for installing watch faces on all Wear OS devices."** Watch Face Push is the
+sanctioned replacement for exactly what those apps were doing.
+
+### A detail worth having found
+
+The same page notes the phone app can detect the absence of the watch app
+through `CapabilityClient` and "launch an intent to the Play store to install the
+missing form factor". That is why the first handoff step is about the companion
+app rather than about the face: without it nothing can be sent at all, and
+"nothing happened" is the worst failure available here.
+
 ### What verifying it first turned up, and why it matters
 
 The task required confirming the permission can actually be requested before
@@ -108,9 +166,8 @@ are two different "first opens" — the design app, where the attention is, and
 the watch app, where the permission lives — and choosing between them changes
 what the operator's answer means. That went back to them as
 `01a04987-6498-7820-b7c6-271471f39fb5` rather than being quietly resolved by
-moving the prompt, which is what the task told us not to do.
-
-**Everything below is independent of that answer** and is built now.
+moving the prompt, which is what the task told us not to do. It was answered by
+`01a049a1`, above.
 
 ### The rules, in `ActivationConsent`
 

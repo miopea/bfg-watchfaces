@@ -18,20 +18,21 @@ package com.bfg.watchfaces.workbench
  * than as a boolean somebody remembers to check, and [ActivationConsentTest]
  * asserts the terminal state is genuinely terminal.
  *
- * ## Which app asks is NOT settled here
+ * ## Where the ask happens, now settled
  *
- * Operator decision 01a0495b-dc98-76d2-9e80-92aff51cdec6 says ask at first app
- * open. Verifying that before building it turned up a problem with it: the
- * permission can only be held by the app running ON THE WATCH.
- * `androidx.wear.watchfacepush` declares `<uses-library android:name="wear-sdk"
- * android:required="true" />`, so an app that links it cannot install on a
- * phone or tablet at all, and the permission is checked with
- * `checkSelfPermission` inside `setWatchFaceAsActive` on the watch side.
+ * Operator decision 01a049a1-390b-7b50-a5d3-cc082037bb55: **the watch puts the
+ * dialog up the first time a face lands on it**, and the DEVICE app explains
+ * what is about to happen beforehand, in clear steps. See [HANDOFF].
  *
- * That is with the operator as 01a04987-6498-7820-b7c6-271471f39fb5. Everything
- * in this file is the same whichever way they answer — what the person is told,
- * that they are asked at most once, and what they see after a no. The moment of
- * the ask is the only open part, and it belongs to the caller.
+ * The permission can only be held by the app on the watch — Google's own
+ * guidance gives the watch app the job of "requesting necessary permissions and
+ * prompting the user", and `androidx.wear.watchfacepush` declares
+ * `<uses-library android:name="wear-sdk" android:required="true" />`, so an app
+ * linking it cannot install on a phone at all. The device app therefore does
+ * the explaining and the watch does the asking.
+ *
+ * The moment is the caller's business; everything in this file is the same
+ * either way.
  *
  * ## Pure, so the words are testable
  *
@@ -159,4 +160,44 @@ object ActivationConsent {
      */
     fun persistentNote(state: State): String? =
         if (state == State.DENIED) DENIED_NOTE else null
+
+    // ---- what the DEVICE says before the watch asks --------------------------
+
+    /**
+     * The steps shown on the device before the first face is sent.
+     *
+     * Operator: "It should be a clear multi-step instruction on the device app,
+     * saying it is pushing to the watch, needs approval."
+     *
+     * This exists because the explaining and the asking happen on different
+     * screens. The watch is where the system dialog has to appear, and a small
+     * round screen is a poor place to read anything careful — so the device does
+     * the explaining while the person is looking at it, and the watch dialog
+     * lands on someone who already knows what it is for.
+     *
+     * The first step is not padding. Google's guidance is explicit that a phone
+     * app should detect the absence of the watch app through `CapabilityClient`
+     * and offer to install it; without it nothing can be sent at all, and
+     * "nothing happened" is the worst possible failure here.
+     */
+    val HANDOFF: List<Step> = listOf(
+        Step(
+            "Your watch needs the app too",
+            "A small companion app receives faces on the watch. If it is not there yet, " +
+            "we will take you to install it."
+        ),
+        Step(
+            "We send the face over",
+            "It goes straight from here to your watch over Bluetooth. Nothing is uploaded " +
+            "anywhere and no account is needed."
+        ),
+        Step(
+            "Your watch asks once",
+            "The first time, your watch asks whether this app may change your watch face. " +
+            "Say yes and it can put faces on for you; say no and you switch to them yourself."
+        )
+    )
+
+    /** One step of [HANDOFF]: a short heading and a sentence or two under it. */
+    data class Step(val title: String, val detail: String)
 }

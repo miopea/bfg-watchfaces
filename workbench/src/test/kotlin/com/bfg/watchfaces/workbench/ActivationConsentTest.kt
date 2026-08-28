@@ -143,13 +143,70 @@ class ActivationConsentTest {
         }
     }
 
+    // ---- the steps the device shows before the watch asks --------------------
+
+    @Test
+    fun `the device explains the handoff in steps, before anything is sent`() {
+        val steps = ActivationConsent.HANDOFF
+        assertTrue(steps.size >= 3) { "the operator asked for a multi-step instruction, got ${steps.size}" }
+        for (s in steps) {
+            assertTrue(s.title.isNotBlank() && s.detail.isNotBlank()) { "empty step: $s" }
+        }
+    }
+
+    @Test
+    fun `the steps say a companion app is needed on the watch`() {
+        // Without it nothing can be sent at all, and "nothing happened" is the
+        // worst failure available here. Google's own guidance is that the phone
+        // app detects the watch app's absence and offers to install it.
+        val all = ActivationConsent.HANDOFF.joinToString(" ") { it.title + " " + it.detail }.lowercase()
+        assertTrue(all.contains("watch") && (all.contains("install") || all.contains("companion"))) {
+            "the steps never mention the watch needing the app: $all"
+        }
+    }
+
+    @Test
+    fun `the steps say the face is being sent to the watch`() {
+        // The operator's words: "saying it is pushing to the watch, needs approval".
+        val all = ActivationConsent.HANDOFF.joinToString(" ") { it.detail }.lowercase()
+        assertTrue(all.contains("send") || all.contains("sent") || all.contains("goes")) {
+            "nothing in the steps says the face is sent anywhere: $all"
+        }
+    }
+
+    @Test
+    fun `the steps warn that the watch will ask, and that it asks once`() {
+        val all = ActivationConsent.HANDOFF.joinToString(" ") { it.title + " " + it.detail }.lowercase()
+        assertTrue(all.contains("ask")) { "the steps never warn an approval is coming: $all" }
+        assertTrue(all.contains("once")) {
+            "the steps must say the watch asks ONCE -- it is the irreversible part: $all"
+        }
+    }
+
+    @Test
+    fun `the steps say what a no means, not just what a yes means`() {
+        // Same rule as the permission screen itself. Selling only the upside is
+        // the shape people have learned to distrust.
+        val all = ActivationConsent.HANDOFF.joinToString(" ") { it.detail }.lowercase()
+        assertTrue(all.contains("no")) { "the steps never say what declining does: $all" }
+    }
+
+    @Test
+    fun `the steps do not promise an upload or an account`() {
+        // The whole design is on-device. Copy that implies otherwise is wrong
+        // about the product, not just badly worded.
+        val all = ActivationConsent.HANDOFF.joinToString(" ") { it.detail }.lowercase()
+        assertFalse(Regex("""\bsign (in|up)\b""").containsMatchIn(all)) { "the steps imply an account: $all" }
+        assertFalse(all.contains("our server")) { "the steps imply a server: $all" }
+    }
+
     @Test
     fun `every string a person reads is free of developer vocabulary`() {
         val shown = listOf(
             ActivationConsent.TITLE, ActivationConsent.WHY, ActivationConsent.LIMITS,
             ActivationConsent.ONE_SHOT, ActivationConsent.ACCEPT, ActivationConsent.DECLINE,
             ActivationConsent.DENIED_NOTE
-        )
+        ) + ActivationConsent.HANDOFF.flatMap { listOf(it.title, it.detail) }
         // Same rule as the rest of the app: a person naming a watch face should
         // never meet an API name. "Android" survives -- it is the name of the
         // thing making the rule, and hiding it would be vaguer, not kinder.
