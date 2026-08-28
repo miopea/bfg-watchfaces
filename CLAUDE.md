@@ -143,7 +143,8 @@ Builds, but has never run:
 - `:mobile`, `:wear` — both assemble a real APK, in `settings.gradle.kts` and
   CI. `:mobile` has a Compose activation handoff screen behind a launcher
   activity; `:wear` has the `WearableListenerService` that receives a face and
-  the no-UI activity that makes the one permission request, plus 5 unit tests.
+  the no-UI activity that makes the one permission request. Their shared rules
+  and the device/watch contract are tested in `:appcore`, not here.
   **Neither has ever been installed or launched**: no emulator here
   (`/dev/kvm` is unreachable) and Watch Face Push needs Wear OS 6 hardware.
   "It assembles" is a much smaller claim than "it works", and it is the only one

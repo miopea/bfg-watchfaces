@@ -31,6 +31,4 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.play.services.wearable)
     implementation(libs.wear.watchface.push)
-
-    testImplementation("junit:junit:4.13.2")
 }
