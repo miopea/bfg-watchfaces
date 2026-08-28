@@ -69,6 +69,7 @@ object Workbench {
         server.createContext("/api/layout") { ex -> safe(ex) { serveLayout(ex) } }
         server.createContext("/api/catalog") { ex -> safe(ex) { serveCatalog(ex) } }
         server.createContext("/logos/") { ex -> safe(ex) { serveLogo(ex) } }
+        server.createContext("/api/devices") { ex -> safe(ex) { serveDevices(ex) } }
         server.start()
 
         println()
@@ -352,6 +353,31 @@ object Workbench {
         }
     }
 
+    /**
+     * Watches this machine can see.
+     *
+     * Exposed as its own endpoint so the app can show the connection state
+     * BEFORE someone commits to a build -- previously "Save and Update Watch"
+     * was the first place anyone learned nothing was attached, which is a slow
+     * way to find out.
+     */
+    private fun serveDevices(ex: HttpExchange) {
+        val devices = WatchDevices.list()
+        if (devices == null) {
+            json(ex, """{"available":false,"reason":${jsonStr(
+                "This computer cannot see any watches. Set ANDROID_HOME so the app can talk to a connected watch."
+            )},"devices":[]}""")
+            return
+        }
+        val rows = devices.joinToString(",") { d ->
+            """{"serial":${jsonStr(d.serial)},"label":${jsonStr(d.label)},""" +
+            """"state":${jsonStr(d.state)},"wearOs":${jsonStr(if (d.isWatch) WatchDevices.wearOsName(d.sdk) else "")},""" +
+            """"isWatch":${d.isWatch},"ready":${d.supportsPush},""" +
+            """"blocked":${d.blockedReason?.let { jsonStr(it) } ?: "null"}}"""
+        }
+        json(ex, """{"available":true,"devices":[$rows]}""")
+    }
+
     /** What SlotGeometry actually used, so a clamped control can say so. */
     private fun serveLayout(ex: HttpExchange) {
         val e = com.bfg.watchfaces.generator.SlotGeometry.effective(params(ex))
@@ -486,26 +512,26 @@ $slotStrings
         // build so a missing watch never reads as a broken face -- and an
         // `adb install` Success is NOT reported as "it's on your watch",
         // because a schema-invalid face installs cleanly and never appears.
+        // Sending to a CHOSEN watch, rather than to whatever adb happened to
+        // see first. Reported separately from the build so a missing watch
+        // never reads as a broken face.
         var installed = "not attempted"
         if (code == 0 && q["install"] == "true" && apk.isFile) {
             installed = runCatching {
-                val adb = File(System.getenv("ANDROID_HOME") ?: "", "platform-tools/adb")
-                if (!adb.isFile) "adb not found under ANDROID_HOME"
-                else {
-                    val devices = ProcessBuilder(adb.path, "devices").redirectErrorStream(true).start()
-                    val list = devices.inputStream.bufferedReader().readText()
-                    devices.waitFor()
-                    val online = list.lines().drop(1).filter { it.trim().endsWith("\tdevice") }
-                    if (online.isEmpty()) "no watch connected (adb sees no device)"
-                    else {
-                        val inst = ProcessBuilder(adb.path, "install", "-r", apk.absolutePath)
-                            .redirectErrorStream(true).start()
-                        val out2 = inst.inputStream.bufferedReader().readText()
-                        val rc = inst.waitFor()
-                        if (rc == 0) "installed on ${online.size} device(s)" else "adb install failed: ${out2.take(300)}"
+                val devices = WatchDevices.list()
+                val eligible = devices?.filter { it.supportsPush }.orEmpty()
+                val chosen = q["serial"]?.let { s -> eligible.firstOrNull { it.serial == s } }
+                    ?: eligible.singleOrNull()
+                when {
+                    devices == null -> "adb is not available, so nothing could be sent"
+                    eligible.isEmpty() -> "no watch connected"
+                    chosen == null -> "more than one watch is connected -- choose which one"
+                    else -> {
+                        val (ok, out2) = WatchDevices.install(chosen.serial, apk)
+                        if (ok) "sent to ${chosen.label}" else "could not send to ${chosen.label}: $out2"
                     }
                 }
-            }.getOrElse { "install error: ${it.message}" }
+            }.getOrElse { "could not send it: ${it.message}" }
         }
 
         json(ex, """{"ok":${code == 0},"exit":$code,"apkBytes":${if (apk.isFile) apk.length() else 0},

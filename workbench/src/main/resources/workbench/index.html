@@ -201,6 +201,22 @@
     color:var(--dim);margin:12px 0 0;word-break:break-word;
   }
   .reasons{margin:0 0 14px;padding-left:20px;color:var(--dim);font-size:13px;line-height:1.7}
+  .watchstate{
+    display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--faint);
+    margin:12px 0 0;line-height:1.5;
+  }
+  .watchstate .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
+  .watchstate.ready{color:var(--dim)} .watchstate.ready .dot{background:var(--ok)}
+  .watchstate.warn .dot{background:#e8c46a}
+  .devopt{
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    font:inherit;font-size:13.5px;color:var(--ink);background:var(--surface);
+    border:1px solid var(--line);border-radius:11px;padding:11px 12px;margin-bottom:8px;cursor:pointer;
+  }
+  .devopt[aria-pressed="true"]{border-color:var(--accent)}
+  .devopt[disabled]{opacity:.55;cursor:default}
+  .devopt .sub{display:block;font-size:11.5px;color:var(--faint);margin-top:2px}
+
   .microhint{font-size:11.5px;color:var(--faint);line-height:1.5;margin:8px 0 0}
   .btnrow.stack{flex-direction:column}
 
@@ -472,13 +488,16 @@
         <button class="btn primary" id="btnSave">Save to Gallery</button>
         <button class="btn" id="btnSaveInstall">Save and Update Watch</button>
       </div>
+      <p class="watchstate" id="watchState"></p>
     </div>
   </section>
 
   <!-- ============ MY FACES ============ -->
   <section class="screen" id="scr-mine" hidden>
     <div class="pad">
-      <h2 class="sec">Saved on this machine</h2>
+      <h2 class="sec">Your faces</h2>
+      <p class="microhint" style="margin:0 0 14px">Saved on this device, and only
+        visible to you until you share one.</p>
       <div id="mineList"></div>
     </div>
   </section>
@@ -538,6 +557,10 @@
   <div class="sheet" id="sheetInstall">
     <div class="grab"></div>
     <h3 id="installTitle">Install to watch</h3>
+    <div id="devicePick" hidden>
+      <p class="hint" style="margin-bottom:8px">Which watch?</p>
+      <div id="deviceList"></div>
+    </div>
     <p class="hint">Builds a signed Watch Face Format APK from your parameters and
       checks it against Google's schema first — a face that fails validation installs
       fine and then never appears in the carousel.</p>
@@ -683,6 +706,7 @@ function show(which){
   // "Valid" over a page of promotional copy.
   $("#valid").style.display = (which === "studio") ? "" : "none";
   if (which === "mine") loadMine();
+  if (which === "studio") refreshDevices();
   if (which === "about") renderAbout();
   $(".screen:not([hidden])").scrollTop = 0;
 }
@@ -966,6 +990,76 @@ async function loadCatalog(){
   }
 }
 
+/* ---------------- connected watches ----------------
+ * Shown in Studio, before anyone commits to a build. Previously "Save and
+ * Update Watch" was the first place you learned nothing was attached, which is
+ * an expensive way to find out -- it runs a full aapt2 + apksigner build first.
+ *
+ * On a real device this is the Wear Data Layer over Bluetooth. Here it is adb,
+ * which is a dev stand-in; the SHAPE of what the UI does with the answer is the
+ * part that carries over.
+ */
+let devices = [];
+let chosenSerial = null;
+
+async function refreshDevices(){
+  let d;
+  try { d = await fetch("/api/devices").then(r=>r.json()); }
+  catch(e){ return; }
+  devices = d.devices || [];
+  const ready = devices.filter(x => x.ready);
+  const el = $("#watchState");
+
+  // Keep an explicit choice only while that watch is still there.
+  if (chosenSerial && !ready.some(x => x.serial === chosenSerial)) chosenSerial = null;
+  if (!chosenSerial && ready.length === 1) chosenSerial = ready[0].serial;
+
+  if (!d.available){
+    el.className = "watchstate";
+    el.innerHTML = `<span class="dot"></span><span></span>`;
+    el.querySelector("span:last-child").textContent = d.reason || "No watch connection available";
+  } else if (ready.length === 0){
+    // Say WHY when we can see something that cannot take a face -- "no watch"
+    // is misleading when a watch is sitting right there unauthorised.
+    const blocked = devices.find(x => x.blocked && x.isWatch);
+    el.className = "watchstate warn";
+    el.innerHTML = `<span class="dot"></span><span></span>`;
+    el.querySelector("span:last-child").textContent =
+      blocked ? `${blocked.label}: ${blocked.blocked}`
+              : "No watch connected. You can still save faces and send them later.";
+  } else if (ready.length === 1){
+    el.className = "watchstate ready";
+    el.innerHTML = `<span class="dot"></span><span></span>`;
+    el.querySelector("span:last-child").textContent =
+      `Ready to send to ${ready[0].label} · Wear OS ${ready[0].wearOs}`;
+  } else {
+    el.className = "watchstate ready";
+    el.innerHTML = `<span class="dot"></span><span></span>`;
+    el.querySelector("span:last-child").textContent =
+      `${ready.length} watches connected — you will choose when you send`;
+  }
+}
+
+/** The picker inside the install sheet, shown only when there is a choice. */
+function renderDevicePicker(){
+  const ready = devices.filter(x => x.ready);
+  const pick = $("#devicePick");
+  if (ready.length < 2){ pick.hidden = true; return; }
+  pick.hidden = false;
+  const host = $("#deviceList");
+  host.innerHTML = "";
+  for (const d of ready){
+    const b = document.createElement("button");
+    b.className = "devopt";
+    b.setAttribute("aria-pressed", String(d.serial === chosenSerial));
+    b.innerHTML = `<span><span class="nm"></span><span class="sub"></span></span>`;
+    b.querySelector(".nm").textContent = d.label;
+    b.querySelector(".sub").textContent = `Wear OS ${d.wearOs}`;
+    b.addEventListener("click", () => { chosenSerial = d.serial; renderDevicePicker(); });
+    host.appendChild(b);
+  }
+}
+
 /* ---------------- reporting ----------------
  * Play's UGC policy requires a working in-app complaint path for any app that
  * shows user content, so this is store-blocking rather than optional. The form
@@ -1056,9 +1150,10 @@ async function loadMine(){
     });
     row.querySelector('[data-act="install"]').addEventListener("click", () => {
       installTarget = { name: f.name, query: f.query };
-      $("#installTitle").textContent = "Install " + f.name;
+      $("#installTitle").textContent = "Send " + f.name + " to your watch";
       $("#installOut").hidden = true; $("#installGo").disabled = false;
-      $("#installGo").textContent = "Build APK";
+      $("#installGo").textContent = "Send to watch";
+      refreshDevices().then(renderDevicePicker);
       openSheet("#sheetInstall");
     });
     row.querySelector('[data-act="share"]').addEventListener("click", () => {
@@ -1337,10 +1432,11 @@ $("#saveConfirm").addEventListener("click", async () => {
   if (saveThenInstall){
     // Straight into the build+install flow, no second trip through My faces.
     installTarget = { name: r.face.name, query: r.face.query };
-    $("#installTitle").textContent = "Update watch with " + r.face.name;
+    $("#installTitle").textContent = "Send " + r.face.name + " to your watch";
     $("#installOut").hidden = true;
     $("#installGo").disabled = false;
-    $("#installGo").textContent = "Build and install";
+    $("#installGo").textContent = "Send to watch";
+    refreshDevices().then(renderDevicePicker);
     setTimeout(() => openSheet("#sheetInstall"), 280);
   } else {
     show("mine");
@@ -1354,7 +1450,8 @@ $("#installGo").addEventListener("click", async () => {
   const btn = $("#installGo"), out = $("#installOut");
   btn.disabled = true; btn.textContent = "Building…";
   out.hidden = false; out.textContent = "Validating, baking artwork, running aapt2 + apksigner…";
-  const url = `/api/build?${installTarget.query}&name=${encodeURIComponent(installTarget.name)}&install=true`;
+  const url = `/api/build?${installTarget.query}&name=${encodeURIComponent(installTarget.name)}&install=true`
+            + (chosenSerial ? `&serial=${encodeURIComponent(chosenSerial)}` : "");
   try{
     const r = await fetch(url).then(r => r.json());
     if (r.ok){
@@ -1388,6 +1485,7 @@ $("#installGo").addEventListener("click", async () => {
     deep = true;
   }
   syncTune();
+  refreshDevices();
   if (textureVisible()) await loadTextures();
   await loadPresets();
   refresh();

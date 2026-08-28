@@ -31,12 +31,12 @@
       <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
                 x="0" y="0" width="456" height="145" alpha="255">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
-        <Font family="SYNC_TO_DEVICE" size="104" weight="MEDIUM" color="#fffcfcfa"/>
+        <Font family="SYNC_TO_DEVICE" size="104" weight="MEDIUM" color="#fffcf9f1"/>
       </TimeText>
       <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
                 x="0" y="0" width="456" height="145" alpha="0">
         <Variant mode="AMBIENT" target="alpha" value="255"/>
-        <Font family="SYNC_TO_DEVICE" size="104" weight="THIN" color="#fffcfcfa"/>
+        <Font family="SYNC_TO_DEVICE" size="104" weight="THIN" color="#fffcf9f1"/>
       </TimeText>
     </DigitalClock>
 
@@ -52,7 +52,7 @@
         </PartImage>
         <PartText x="0" y="28" width="74" height="32">
           <Text align="CENTER">
-            <Font family="SYNC_TO_DEVICE" size="17" color="#fffcfcfa">
+            <Font family="SYNC_TO_DEVICE" size="17" color="#fffcf9f1">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>
@@ -72,7 +72,7 @@
         </PartImage>
         <PartText x="0" y="28" width="74" height="32">
           <Text align="CENTER">
-            <Font family="SYNC_TO_DEVICE" size="17" color="#fffcfcfa">
+            <Font family="SYNC_TO_DEVICE" size="17" color="#fffcf9f1">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>
@@ -92,7 +92,7 @@
         </PartImage>
         <PartText x="0" y="28" width="74" height="32">
           <Text align="CENTER">
-            <Font family="SYNC_TO_DEVICE" size="17" color="#fffcfcfa">
+            <Font family="SYNC_TO_DEVICE" size="17" color="#fffcf9f1">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>
@@ -112,7 +112,7 @@
         </PartImage>
         <PartText x="0" y="28" width="74" height="32">
           <Text align="CENTER">
-            <Font family="SYNC_TO_DEVICE" size="17" color="#fffcfcfa">
+            <Font family="SYNC_TO_DEVICE" size="17" color="#fffcf9f1">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>
@@ -132,7 +132,7 @@
         </PartImage>
         <PartText x="0" y="28" width="74" height="32">
           <Text align="CENTER">
-            <Font family="SYNC_TO_DEVICE" size="17" color="#fffcfcfa">
+            <Font family="SYNC_TO_DEVICE" size="17" color="#fffcf9f1">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>

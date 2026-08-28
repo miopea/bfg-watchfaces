@@ -1,5 +1,64 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — Watch detection: the judgement is ours, the mechanism is not
+
+The app could send a face to a watch without ever saying which watch, or whether
+one was attached. "Save and Update Watch" was the first place anyone learned
+nothing was connected — after a full aapt2 and apksigner build.
+
+`WatchDevices` now reports what is attached, whether each thing can actually
+take a pushed face, and why not when it cannot. Studio shows that BEFORE the
+build, the install sheet offers a picker when more than one watch is eligible,
+and the install targets the chosen serial rather than whatever adb saw first.
+
+### The mechanism is a stand-in and is written to be replaced
+
+On a real device this is the Wear Data Layer — `CapabilityClient` discovery over
+Bluetooth. The workbench has no Bluetooth and no paired phone, so it asks `adb`.
+
+Everything except the two `ProcessBuilder` calls is therefore pure and tested:
+parsing the device list, reading properties into a `Device`, and judging
+eligibility. When this is rebuilt on the Data Layer the discovery changes and the
+JUDGEMENT does not — so the part carrying the rules survives the swap, and the
+part that gets thrown away is the part with no tests.
+
+### Wear OS 6 is stated as a floor, early
+
+docs/SPEC.md has always said Watch Face Push is Wear OS 6+. Nothing enforced it.
+An older watch now reports "Runs Wear OS 5. Sending faces needs Wear OS 6 or
+newer" instead of failing at install, and a phone is never offered as a target.
+
+### A parsing bug the test found
+
+The first parser did `.drop(1)` to skip the `adb devices` banner. That looks
+equivalent to skipping the header and is not: adb prints `* daemon not running`
+and `* daemon started successfully` BEFORE the banner on a cold start, so
+positional dropping leaves "List of devices attached" to be parsed as a device
+named "List" in state "of". Rows are now recognised by their STATE.
+
+### Verified against real hardware, unusually
+
+Detection, the UI state, a targeted send and the resulting install were all
+checked against a booting Wear OS 6 emulator rather than fixtures: it was seen
+as `offline` while booting, then `device` with `isWatch=true`, `wearOs=6`,
+`ready=true`; Studio read "Ready to send to sdk_gwear_x86_64 · Wear OS 6"; and a
+Brushed Steel face built and installed, confirmed by `pm list packages` showing
+`com.bfg.watchfaces.watchfacepush.brushed_steel`.
+
+The failure paths were exercised on the way there and reported honestly — "could
+not send to sdk_gwear_x86_64: ... device is still booting" — naming the device
+and never claiming success.
+
+### Deliberately NOT built
+
+- **The activation prompt.** `SET_PUSHED_WATCH_FACE_AS_ACTIVE` cannot be
+  re-requested after denial and `setWatchFaceAsActive()` may be called only once.
+  The 2026-08-26 entry says the prompt placement must be settled on paper BEFORE
+  the code around it exists, and that is still unresolved. Writing it now would
+  be deciding it by accident.
+- **Remaining slot count.** `WatchFacePushManager.listWatchFaces()` is a Wear
+  API; adb cannot see it. It arrives with the real Data Layer implementation.
+
 ## 2026-08-28 — generatorVersion 4: generated surfaces, as a field not polylines
 
 `GRAIN`, `BRUSHED`, `CARBON` and `LINEN`. They exist because of a gap with real
