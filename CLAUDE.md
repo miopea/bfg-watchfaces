@@ -113,7 +113,7 @@ Verified — built and run, not assumed:
 - `:generator` — 177 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
-- `:appcore` — 25 tests green. Rules and words the shipped apps share, pure
+- `:appcore` — 30 tests green. Rules and words the shipped apps share, pure
   JVM. Not `:generator` (that is the file format) and not `:workbench` (never
   shipped). Holds `ActivationConsent`, whose one-shot rule guards the only
   unrecoverable action in the system.

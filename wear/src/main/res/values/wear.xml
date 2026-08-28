@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Advertised to the paired device so it can tell "no watch" apart from "watch
+  without our app". Those two need different words in front of a person, and the
+  first step of the device's handoff explanation exists because of the second.
+
+  The name must match WatchLink.CAPABILITY exactly. WatchLinkTest reads this
+  file and asserts it, because a mismatch is silent: the device would look for a
+  capability nobody advertises, find no watch, and say so wrongly.
+-->
+<resources>
+  <string-array name="android_wear_capabilities">
+    <item>bfg_watchfaces_receiver</item>
+  </string-array>
+</resources>

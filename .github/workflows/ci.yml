@@ -92,9 +92,6 @@ jobs:
 
       - run: ./gradlew :wear:assembleDebug :mobile:assembleDebug
 
-      # The only watch-side logic testable without a watch.
-      - run: ./gradlew :wear:testDebugUnitTest
-
       - name: the APKs contain what they must, and nothing they must not
         run: |
           set -euo pipefail

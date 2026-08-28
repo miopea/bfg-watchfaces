@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.wear.watchfacepush.WatchFacePushManager
 import androidx.wear.watchfacepush.WatchFacePushManagerFactory
 import com.bfg.watchfaces.appcore.ActivationConsent
+import com.bfg.watchfaces.appcore.WatchLink
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.Wearable
@@ -44,8 +45,8 @@ class FaceReceiverService : WearableListenerService() {
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
         // The token rides on the path, issued by the device next to `pack`.
-        // No token, no install: see ValidationToken.
-        val token = ValidationToken.fromChannelPath(channel.path) ?: return
+        // No token, no install: see WatchLink.
+        val token = WatchLink.tokenFromChannelPath(channel.path) ?: return
         val client = Wearable.getChannelClient(this)
         scope.launch {
             // Staged to a private file first. addWatchFace needs a descriptor it
