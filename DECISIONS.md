@@ -1,5 +1,80 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — The community catalog leaves GitHub
+
+Operator decision `01a049a3-0a0c-7521-a6f3-f40510b81cf7`, in their own words:
+
+> Submission path: "Move the catalog off GitHub entirely"
+>
+> Reporting: "We need another solution"
+
+The contract the replacement has to meet is `docs/specs/catalog-service.md`,
+written before the code because the thing being replaced is a Play-required
+complaint path.
+
+### The fact that forced it
+
+GitHub has no anonymous write path. Commits, pull requests, issues, discussions,
+comments and gists all require an authenticated account; reading is anonymous,
+writing never is, and no repository setting changes that.
+
+So "anyone can share a face without an account" and "the catalog lives on
+GitHub" cannot both be true. The catalog repo was created five hours earlier on
+the assumption that submissions arrive as pull requests, which is the assumption
+this removes.
+
+### Recommended against, and chosen anyway
+
+Recorded plainly because the next reader will otherwise wonder. Three options
+went up — keep GitHub and make the user sign in; keep GitHub as the store with a
+small relay holding the token; leave GitHub entirely. The recommendation was the
+middle one, and the argument against the third was that it throws away
+properties that are currently free:
+
+- removals stop being an auditable public commit
+- anyone can clone a git repo of JSON, so the catalog is portable by
+  construction; that stops being true
+- free hosting stops being automatic, because jsDelivr over a public repo is
+  free in a way a service is not
+
+The operator read that and chose to leave anyway. Their call, and the
+requirements now carry mitigations for each loss: an export endpoint that dumps
+every published face as the same files the git catalog uses, a moderation log,
+and a hard rule that everything in the store can be exported as files.
+
+### The part that is not about storage
+
+Anonymous submission removes the only handle moderation normally has. There is
+no identity to ban, and a public endpoint writing to a public catalog will be
+found. `MODERATION.md` also already promises Play a working complaint path, and
+that path currently requires a GitHub account — an asymmetry that was tolerable
+while submitting needed one too, and stops being tolerable the moment submitting
+does not. Anyone could publish; only developers could complain.
+
+Both are answered by the same requirement: **nothing is public until it is
+approved.** Pre-moderation is what makes anonymous submission safe, because
+flooding a queue that nobody sees costs the attacker effort and gains them
+nothing. Rate limiting only slows a flood that still lands.
+
+### Nothing is ripped out yet, deliberately
+
+The GitHub report route works today, and it is what makes the app shippable
+under Play's UGC rules. Removing it before a replacement is deployed would leave
+the app with no complaint path at all — strictly worse than one that needs an
+account.
+
+So the order is: build the service, verify it, point the app at it behind one
+seam, and only then remove the GitHub route and rewrite `MODERATION.md`. The
+spec says so in as many words so that a later reader does not mistake the
+surviving GitHub code for someone ignoring this decision.
+
+### Cheaper than it looks: the read path was never built
+
+Worth knowing before anyone budgets for this. `CDN_URL` is only ever *reported*
+in JSON and printed by the catalog task — nothing fetches it. The Community tab
+reads the local catalog directory. So there is no network read path to migrate;
+the work is submit, report, and moderation.
+
 ## 2026-08-28 — The activation prompt: asked once, explained properly, and never again
 
 Settled by operator decision `01a0495b-dc98-76d2-9e80-92aff51cdec6`, which

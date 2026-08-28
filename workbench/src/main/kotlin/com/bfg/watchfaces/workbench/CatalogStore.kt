@@ -27,13 +27,34 @@ import java.time.Instant
  *
  * Served in production from jsDelivr, NOT raw.githubusercontent.com, which is
  * rate limited and not a CDN. See [CDN_URL].
+ *
+ * ## This whole file is on its way out
+ *
+ * Operator decision `01a049a3-0a0c-7521-a6f3-f40510b81cf7` moves the catalog off
+ * GitHub entirely, because GitHub has no anonymous write path of any kind and
+ * the aim is that anyone can share a face and anyone can report one without an
+ * account. `docs/specs/catalog-service.md` is the contract for the replacement.
+ *
+ * The GitHub-shaped parts below are still here ON PURPOSE, not by oversight.
+ * [reportUrl] is the app's Play-required complaint path, and deleting it before
+ * the replacement is deployed would leave the app with none at all — strictly
+ * worse than one that needs an account. The spec's sequencing section says the
+ * same thing in as many words.
  */
 object CatalogStore {
 
-    /** jsDelivr, per docs/SPEC.md. Pinned to a ref so a bad main cannot break clients. */
+    /**
+     * jsDelivr, per docs/SPEC.md. Pinned to a ref so a bad main cannot break
+     * clients.
+     *
+     * INTERIM — becomes the service's index endpoint. Nothing fetches this
+     * today: it is reported in JSON and printed by the catalog task, and the
+     * Community tab reads the local catalog directory. The network read path
+     * was never built, which is why moving off GitHub costs less than it looks.
+     */
     const val CDN_URL = "https://cdn.jsdelivr.net/gh/miopea/bfg-watchfaces-catalog@main/index.json"
 
-    /** Where submissions are opened, and where a face is reported. */
+    /** Where submissions are opened, and where a face is reported. INTERIM. */
     const val REPO_URL = "https://github.com/miopea/bfg-watchfaces-catalog"
 
     /**
@@ -45,6 +66,12 @@ object CatalogStore {
      * does not have to know what a face is called internally.
      *
      * Field ids match .github/ISSUE_TEMPLATE/report-a-face.yml in the catalog.
+     *
+     * INTERIM, and the highest-risk thing to replace. It requires a GitHub
+     * account, which was tolerable while submitting needed one too and stops
+     * being tolerable the moment submitting does not: anyone could publish and
+     * only developers could complain. Replaced by the service's report endpoint
+     * once that exists — and not one moment before, per the note on this object.
      */
     fun reportUrl(slug: String, name: String): String {
         fun enc(s: String) = java.net.URLEncoder.encode(s, Charsets.UTF_8)
