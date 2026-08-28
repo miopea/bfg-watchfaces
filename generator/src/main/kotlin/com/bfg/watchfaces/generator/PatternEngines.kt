@@ -26,6 +26,7 @@ object PatternEngines {
         // v3 changed the ambient ink colour, not geometry. Delegating rather
         // than adding a branch keeps that true and provable.
         3 -> v2(p)
+        4 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 
@@ -38,6 +39,16 @@ object PatternEngines {
      * every community face pinned to v1 silently re-renders. Delegation makes
      * that impossible by construction.
      */
+    /**
+     * v4 adds the generated-surface engines and changes nothing else.
+     *
+     * They emit NO geometry, exactly like TEXTURE: their dial is a height field
+     * from [TextureField] that the renderer shades. Delegating everything else
+     * to v3 keeps the guarantee that a stored v1/v2/v3 face is untouched.
+     */
+    private fun v4(p: DialParams): List<Polyline> =
+        if (TextureField.isProcedural(p.engine)) emptyList() else v2(p)
+
     private fun v2(p: DialParams): List<Polyline> = when (p.engine) {
         Engine.KNOTWORK -> knotwork(p)
         // TEXTURE has no geometry at all -- the dial is an imported image the
@@ -60,6 +71,11 @@ object PatternEngines {
         Engine.TEXTURE -> error(
             "TEXTURE did not exist at generatorVersion=1. It was added in v2; " +
             "a face that uses it must store generatorVersion>=2."
+        )
+        Engine.GRAIN, Engine.BRUSHED, Engine.CARBON, Engine.LINEN -> error(
+            "${p.engine} did not exist at generatorVersion=${p.generatorVersion}. " +
+            "The generated-surface engines were added in v4; a face that uses one " +
+            "must store generatorVersion>=4."
         )
         Engine.NONE -> emptyList()
     }

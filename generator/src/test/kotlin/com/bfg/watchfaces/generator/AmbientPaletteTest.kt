@@ -91,8 +91,13 @@ class AmbientPaletteTest {
     fun `v3 changes no geometry`() {
         // The bump is about colour. If geometry moved too, the version would be
         // hiding a second change and the guarantee would be worthless.
-        for (e in Engine.entries) {
-            if (e == Engine.NONE || e == Engine.TEXTURE) continue
+        // Only engines that existed at v2 can be compared across v2 and v3.
+        // TEXTURE and the generated surfaces have no geometry, and the surfaces
+        // did not exist until v4.
+        val comparable = Engine.entries.filter {
+            it != Engine.NONE && it != Engine.TEXTURE && !TextureField.isProcedural(it)
+        }
+        for (e in comparable) {
             val v2 = PatternEngines.paths(DialParams(generatorVersion = 2, engine = e))
             val v3 = PatternEngines.paths(DialParams(generatorVersion = 3, engine = e))
             assertEquals(v2, v3) { "$e geometry differs between v2 and v3" }

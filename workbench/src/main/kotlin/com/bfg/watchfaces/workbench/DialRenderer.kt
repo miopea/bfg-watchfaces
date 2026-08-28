@@ -5,6 +5,7 @@ import com.bfg.watchfaces.generator.DIAL_RADIUS
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.PatternEngines
+import com.bfg.watchfaces.generator.TextureField
 import com.bfg.watchfaces.generator.Polyline
 import java.awt.BasicStroke
 import java.awt.Color
@@ -92,10 +93,12 @@ object DialRenderer {
         // An imported image replaces the generated pattern entirely. Sheen and
         // vignette still apply on top, so a photo sits on the same dial as the
         // engines rather than looking pasted on.
+        val procedural = TextureField.kindFor(p.engine)
         if (texture != null) drawTexture(g, texture, p)
+        else if (procedural != null) drawProcedural(g, procedural, p, dial, size)
         else drawSheen(g, dial, p.sheen)
 
-        if (texture == null) drawPattern(g, p, dial, ink)
+        if (texture == null && procedural == null) drawPattern(g, p, dial, ink)
         drawVignette(g, p.vignette)
 
         g.dispose()
@@ -126,6 +129,76 @@ object DialRenderer {
             g.fillRect(0, 0, DIAL_SIZE, DIAL_SIZE)
         }
         drawSheen(g, hex(p.dialColor), p.sheen * 0.5)
+    }
+
+    /**
+     * Shade a generated height field into the dial.
+     *
+     * The field is built into an array ONCE and the surface normal comes from
+     * neighbouring cells. Re-sampling the field for each gradient would be four
+     * extra fBm evaluations per pixel -- roughly five times the work for the
+     * same picture, and a preview that stutters while a slider moves.
+     *
+     * Lighting is a cheap directional bump: the field's slope brightens or
+     * darkens the dial colour. That is what makes brushed metal look brushed
+     * rather than merely noisy, and it is the same top-left key light the
+     * stroked engines emboss against, so the two families sit together.
+     */
+    private fun drawProcedural(
+        g: java.awt.Graphics2D,
+        kind: TextureField.Kind,
+        p: DialParams,
+        dial: Color,
+        size: Int
+    ) {
+        val s = size.toDouble() / DIAL_SIZE
+        val w = size
+        val field = DoubleArray(w * w)
+        for (y in 0 until w) {
+            val dy = y / s
+            for (x in 0 until w) {
+                field[y * w + x] = TextureField.sample(kind, x / s, dy, p)
+            }
+        }
+
+        val amp = (p.contrast / 100.0).coerceIn(0.0, 1.0)
+        val relief = (p.relief / 6.0).coerceIn(0.0, 1.0)
+        val img = BufferedImage(w, w, BufferedImage.TYPE_INT_ARGB)
+        val px = IntArray(w * w)
+
+        for (y in 0 until w) {
+            for (x in 0 until w) {
+                val i = y * w + x
+                val h = field[i]
+                // Central differences, clamped at the edges.
+                val l = field[i - if (x > 0) 1 else 0]
+                val r = field[i + if (x < w - 1) 1 else 0]
+                val u = field[i - if (y > 0) w else 0]
+                val d = field[i + if (y < w - 1) w else 0]
+                val slope = ((l - r) + (u - d)) * 0.5
+
+                // Height gives the base tone, slope gives the lit edge.
+                val t = (h - 0.5) * amp * 0.55 + slope * relief * 6.0
+                px[i] = 0xFF shl 24 or
+                    (shift(dial.red, t) shl 16) or (shift(dial.green, t) shl 8) or shift(dial.blue, t)
+            }
+        }
+        img.setRGB(0, 0, w, w, px, 0, w)
+
+        val old = g.transform
+        g.transform = AffineTransform()   // px are already at render scale
+        g.clip(Ellipse2D.Double(0.0, 0.0, size.toDouble(), size.toDouble()))
+        g.drawImage(img, 0, 0, null)
+        g.transform = old
+        drawSheen(g, dial, p.sheen)
+    }
+
+    /** Lighten or darken a channel by t in roughly [-1, 1]. */
+    private fun shift(c: Int, t: Double): Int {
+        // Toward white when lifting, toward black when darkening, so the same t
+        // reads as the same amount of light on any dial colour.
+        val room = if (t >= 0) (255 - c).toDouble() else c.toDouble()
+        return (c + t * room).toInt().coerceIn(0, 255)
     }
 
     /** Soft directional lustre, as if light falls across brushed metal. */

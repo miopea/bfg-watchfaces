@@ -1,5 +1,72 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — generatorVersion 4: generated surfaces, as a field not polylines
+
+`GRAIN`, `BRUSHED`, `CARBON` and `LINEN`. They exist because of a gap with real
+consequences: an IMPORTED image makes a face **local-only**, since the catalog is
+parameters and a picture is not. Anyone wanting a textured dial had to give up
+sharing it. A generated surface is parameters, so it can be published like any
+other face.
+
+### Why a scalar field rather than polylines
+
+Every other engine emits `List<Polyline>` and the renderer strokes it. Grain
+cannot be expressed that way honestly:
+
+- it would take on the order of 100k strokes to read as grain at 456px, each
+  stroked three times for the emboss — blowing the 400k point budget the other
+  engines are held to, and making the preview crawl
+- stroked lines produce **hatching, not isotropic noise**; the difference is
+  visible immediately
+- the three-pass emboss is meaningful for a cut line and meaningless for a field
+
+So a surface engine emits no geometry — exactly as `TEXTURE` already did — and
+`TextureField` supplies a height field the renderer shades. That precedent
+existed, which is what made this the smaller change rather than a new concept.
+
+### Why a field rather than a BufferedImage
+
+`:generator` is deliberately free of Canvas, Graphics2D and Android; that is what
+lets it be tested in CI without rendering anything. Returning an image would have
+broken that for one caller's convenience. A pure `(x, y) -> Double` keeps
+determinism directly testable and leaves `DialRenderer` the only rasterizer.
+
+The renderer builds the field into an array ONCE and takes the surface normal
+from neighbouring cells. Re-sampling for each gradient would be four extra fBm
+evaluations per pixel — about five times the work for the same picture, and a
+preview that stutters under a moving slider.
+
+### Determinism, and why not a seeded Random
+
+Integer hashing throughout. A seeded RNG is reproducible only as long as nobody
+changes the call order; a hash of the coordinates is reproducible because it does
+not depend on being called in any particular sequence. A stored face must
+re-render identically on someone else's device years later.
+
+### The quantization warning was right to make and did not bite
+
+The task said noise quantizes badly and to measure rather than assume. Measured
+at 64 colours: **GRAIN 0.28, BRUSHED 0.22, CARBON 0.86, LINEN 0.54** per 255 —
+all far inside budget.
+
+The reason is worth recording so nobody re-derives the fear: these are
+low-contrast variations around a SINGLE dial colour, so the palette only has to
+cover a narrow band rather than a full gamut. Noise over a photographic gamut
+would have banded; noise over one hue does not.
+
+They are heavier on the wire though — **112–132KB quantized against ~77KB for the
+stroked engines** — because there are more distinct tones per pixel. Still an
+acceptable Bluetooth transfer, and now pinned by a test at 200KB so a change that
+doubles it fails rather than surprising someone on a slow link.
+
+### Carbon needed a second pass
+
+The first attempt read as **diamond plate**: the tows were too coarse and too
+high-contrast, and the hard block boundary drew a grid the eye locked onto.
+Finer tows, a softened seam and roughly half the amplitude turned it into
+something recognisable as twill. Recorded because the fix was aesthetic
+judgement, not a bug, and the numbers alone would not have found it.
+
 ## 2026-08-28 — The About screen is a promotion, and diverges from the site
 
 The About tab is the only promotion in an app with no ads, no account and no

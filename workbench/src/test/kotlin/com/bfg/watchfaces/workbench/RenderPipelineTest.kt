@@ -196,3 +196,68 @@ class RenderPipelineTest {
         }
     }
 }
+
+/**
+ * Generated surfaces cross to the watch as a quantized PNG like every other
+ * dial. The task that asked for them warned that noise quantizes badly and said
+ * to MEASURE rather than assume, so this measures.
+ */
+class ProceduralSurfaceTest {
+
+    companion object {
+        @JvmStatic @BeforeAll fun headless() { System.setProperty("java.awt.headless", "true") }
+    }
+
+    private fun params(e: Engine) = DialParams(
+        generatorVersion = 4, engine = e, scale = 18.0, contrast = 40.0, relief = 2.0
+    )
+
+    @ParameterizedTest
+    @EnumSource(value = Engine::class, names = ["GRAIN", "BRUSHED", "CARBON", "LINEN"])
+    fun `a generated surface survives the 64-colour budget`(e: Engine) {
+        val q = Quantizer.quantize(DialRenderer.render(params(e)), 64)
+        assertTrue(q.colors <= 64) { "$e used ${q.colors} colours" }
+        // The warning was reasonable and turned out not to bite: these are
+        // low-contrast variations around ONE dial colour, so the palette only
+        // has to cover a narrow band rather than a full gamut. Measured well
+        // under 1/255 for all four; 2.0 leaves headroom without hiding a
+        // regression that would show as visible banding.
+        assertTrue(q.meanError < 2.0) { "$e quantized at ${"%.2f".format(q.meanError)}/255" }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Engine::class, names = ["GRAIN", "BRUSHED", "CARBON", "LINEN"])
+    fun `rendering a surface is deterministic`(e: Engine) {
+        fun px(img: java.awt.image.BufferedImage) =
+            img.getRGB(0, 0, img.width, img.height, null, 0, img.width).toList()
+        assertEquals(px(DialRenderer.render(params(e))), px(DialRenderer.render(params(e)))) {
+            "$e did not reproduce byte for byte"
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Engine::class, names = ["GRAIN", "BRUSHED", "CARBON", "LINEN"])
+    fun `a surface fills the dial rather than leaving it flat`(e: Engine) {
+        // Guards the case where the field is computed but never reaches the
+        // pixels: the dial would render as a plain colour and look exactly like
+        // the engine silently doing nothing.
+        val img = DialRenderer.render(params(e))
+        val mid = img.getRGB(DIAL_SIZE / 2, DIAL_SIZE / 2)
+        var different = 0
+        for (y in 100 until 356 step 7) for (x in 100 until 356 step 7) {
+            if (img.getRGB(x, y) != mid) different++
+        }
+        assertTrue(different > 100) { "$e looks flat: only $different sampled pixels differ from the centre" }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Engine::class, names = ["GRAIN", "BRUSHED", "CARBON", "LINEN"])
+    fun `the transfer cost of a surface is pinned`(e: Engine) {
+        // Surfaces are heavier than the stroked engines -- more distinct tones
+        // per pixel. Worth pinning: this crosses to the watch over Bluetooth.
+        val bos = java.io.ByteArrayOutputStream()
+        javax.imageio.ImageIO.write(Quantizer.quantize(DialRenderer.render(params(e)), 64).image, "png", bos)
+        val kb = bos.size() / 1024
+        assertTrue(kb < 200) { "$e quantized to ${kb}KB, too heavy for a Bluetooth transfer" }
+    }
+}

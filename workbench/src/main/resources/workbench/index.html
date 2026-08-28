@@ -622,7 +622,11 @@
 const ENGINES = [
   ["KNOTWORK","Knotwork"], ["BOTANICAL","Botanical"], ["CLOUS","Clous de Paris"],
   ["ROSETTE","Rosette"], ["BARLEYCORN","Barleycorn"], ["SUNBURST","Sunburst"],
-  ["LATTICE","Lattice"], ["TEXTURE","Your image"], ["NONE","Plain"],
+  ["LATTICE","Lattice"],
+  // Generated surfaces. Unlike "Your image" these are parameters, so a face
+  // using one can still be shared to the community.
+  ["GRAIN","Grain"], ["BRUSHED","Brushed metal"], ["CARBON","Carbon"], ["LINEN","Linen"],
+  ["TEXTURE","Your image"], ["NONE","Plain"],
 ];
 
 // Mirrors ComplicationSource in :generator. Those tokens are exactly the

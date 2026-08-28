@@ -156,6 +156,16 @@ object ParamCodec {
             relief = 1.4, contrast = 30.0, rotate = 45.0, vignette = 30.0,
             dialColor = "#2B2E33", inkColor = "#ECEAE5", sheen = 16.0
         ),
+        "Brushed Steel" to DialParams(
+            engine = Engine.BRUSHED, scale = 20.0, contrast = 34.0, relief = 2.2,
+            rotate = 20.0, vignette = 22.0, sheen = 24.0,
+            dialColor = "#6E7378", inkColor = "#FCFCFA"
+        ),
+        "Carbon Black" to DialParams(
+            engine = Engine.CARBON, scale = 16.0, contrast = 30.0, relief = 1.8,
+            rotate = 45.0, vignette = 30.0, sheen = 12.0,
+            dialColor = "#26282B", inkColor = "#E8E6E1"
+        ),
         "Botanical Sand" to DialParams(engine = Engine.BOTANICAL),
         "Clous de Paris" to DialParams(
             engine = Engine.CLOUS, scale = 22.0, depth = 4.0, contrast = 34.0,

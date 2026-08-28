@@ -20,7 +20,14 @@ typealias Polyline = List<Pt>
  * out exactly this case: "Users import their own photos locally; those never
  * enter the shared catalog."
  */
-enum class Engine { LATTICE, CLOUS, ROSETTE, BARLEYCORN, SUNBURST, BOTANICAL, KNOTWORK, TEXTURE, NONE }
+enum class Engine {
+    LATTICE, CLOUS, ROSETTE, BARLEYCORN, SUNBURST, BOTANICAL, KNOTWORK,
+    // Generated surfaces. Like TEXTURE they emit no geometry, but unlike
+    // TEXTURE they are parameters, so a face using one CAN be shared to the
+    // catalog. See TextureField.
+    GRAIN, BRUSHED, CARBON, LINEN,
+    TEXTURE, NONE
+}
 
 /**
  * What a complication slot shows.
@@ -167,6 +174,9 @@ data class Layout(
 /**
  * Bump ONLY when adding an engine or a parameter. Never when changing geometry.
  *
+ * v4 (2026-08-28) added the generated-surface engines GRAIN, BRUSHED, CARBON and
+ * LINEN. No existing engine changed: PatternEngines.v4 delegates to v3.
+ *
  * v3 (2026-08-28) makes the AMBIENT ink colour readable on a black screen (see
  * [AmbientPalette]). No geometry changed: PatternEngines.v3 delegates to v2
  * wholesale. It is a version bump because it changes what a STORED face renders
@@ -177,7 +187,7 @@ data class Layout(
  * they cannot drift. A face stored with generatorVersion=1 still renders through
  * the v1 branch, byte for byte.
  */
-const val CURRENT_GENERATOR_VERSION = 3
+const val CURRENT_GENERATOR_VERSION = 4
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456
