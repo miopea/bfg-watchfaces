@@ -23,6 +23,43 @@ params -> pack builds APK -> validator issues token -> Data Layer -> addWatchFac
 
 No network call anywhere in that chain.
 
+### Why there are two apps, and why that is not a choice
+
+The Data Layer hop above is the part people expect to be able to skip, so it is
+worth saying plainly: **a small app on the watch is mandatory.**
+
+`WatchFacePushManager` is the only way to install a face, and its entire surface
+runs on the watch — the library declares `<uses-library android:name="wear-sdk"
+android:required="true" />`, so an app linking it cannot install on a phone or
+tablet at all. Its install call is:
+
+```kotlin
+addWatchFace(apk: ParcelFileDescriptor, validationToken: String): WatchFaceDetails
+```
+
+A `ParcelFileDescriptor` is a handle to a LOCAL file. There is no "send this to
+the paired watch" call anywhere in the API, so the APK has to already be a file
+on the watch before anything can install it. Getting it there is the Data Layer's
+job, and something on the watch has to be listening.
+
+So the split is forced:
+
+| Where | Does |
+| --- | --- |
+| `mobile/` | design, `pack` builds the APK, validator issues the token, sends the bytes |
+| `wear/` | receives the bytes, `addWatchFace`, `setWatchFaceAsActive` |
+
+**The user still installs one thing.** Both modules share
+`applicationId = "com.bfg.watchfaces"`, which is how Wear OS delivers a watch
+component alongside its handheld app — no separate download, no Play trip per
+face. That shared id is also what makes the face package names legal:
+`addWatchFace` rejects anything not starting with the Watch Face Push client's
+own package, and the client is the WATCH app.
+
+`setWatchFaceAsActive` is therefore also watch-side, which is where
+`SET_PUSHED_WATCH_FACE_AS_ACTIVE` has to be granted. See `DECISIONS.md`
+2026-08-28 on the activation prompt.
+
 ## The key architectural fact
 
 **Community faces are parameter files, not images.**

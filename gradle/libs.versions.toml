@@ -1,9 +1,9 @@
 [versions]
 kotlin = "2.0.21"
 agp = "8.7.2"
-wfp-validator = "1.0.0-alpha10"
+wfp-validator = "1.1.0-alpha01"
 playServicesWearable = "18.2.0"
-watchfacePush = "1.0.0-alpha03"
+watchfacePush = "1.0.0"
 junit = "5.11.3"
 
 [libraries]
