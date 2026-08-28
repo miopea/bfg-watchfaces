@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A bare Material 3 shell. The real colours come from the Compose theme, which
+  follows the system palette on Android 12+; this only exists so the window has
+  a sane background before Compose draws, and so the activity has a theme that
+  does not carry an ActionBar.
+-->
+<resources>
+  <style name="Theme.BfgWatchFaces" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

@@ -20,13 +20,31 @@
     <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
 
     <!--
-      TODO: WearableListenerService.
-      Receives the APK over ChannelClient from the phone, then:
-        val mgr = WatchFacePushManagerFactory.createWatchFacePushManager(context)
-        val res = mgr.listWatchFaces()
-        if (res.remainingSlotCount > 0) mgr.addWatchFace(apkFd, token)
-        else mgr.updateWatchFace(res.installedWatchFaceDetails.first().slotId, apkFd, token)
-      Token comes from the Android validator library, generated locally.
+      Receives a face from the device over ChannelClient and installs it.
+      addWatchFace takes a ParcelFileDescriptor — a LOCAL file — and there is
+      no "send to the paired watch" call anywhere in the API, so something on
+      the watch has to be holding the bytes. That is the whole reason this app
+      exists; see docs/SPEC.md, "Why there are two apps".
     -->
+    <service
+        android:name=".FaceReceiverService"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
+        <data android:scheme="wear" android:host="*" android:pathPrefix="/bfg-watchfaces" />
+      </intent-filter>
+    </service>
+
+    <!--
+      Hosts the one irreversible permission request, which Android only allows
+      from an Activity. No layout: the system dialog is the interface, and the
+      explanation already happened on the device before the face was sent.
+    -->
+    <activity
+        android:name=".ActivationRequestActivity"
+        android:exported="false"
+        android:theme="@android:style/Theme.Translucent.NoTitleBar"
+        android:excludeFromRecents="true"
+        android:noHistory="true" />
   </application>
 </manifest>

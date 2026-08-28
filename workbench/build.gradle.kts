@@ -5,6 +5,7 @@ plugins { alias(libs.plugins.kotlin.jvm) }
 // the dependency-free definition of the file format.
 dependencies {
     implementation(project(":generator"))
+    implementation(project(":appcore"))
 
     // Xerces + XPath2, for live XSD 1.1 validation in the browser. Same jars
     // WffSchemaTest uses. Populated by scripts/bootstrap.sh; not committed.

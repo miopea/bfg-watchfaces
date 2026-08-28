@@ -5,6 +5,17 @@ wfp-validator = "1.1.0-alpha01"
 playServicesWearable = "18.2.0"
 watchfacePush = "1.0.0"
 junit = "5.11.3"
+# 2026.02.00, not the newest: Compose 1.12 requires compileSdk 37 and AGP 8.13.2
+# caps at 36 -- and 36 is a floor here, because androidx.wear.watchfacepush
+# refuses anything lower. This BOM pins compose-ui 1.10.3, which compiles
+# against 36. Moving it forward means moving AGP and the compileSdk together.
+composeBom = "2026.02.00"
+# The AndroidX versions below are held back for the SAME reason as the BOM: the
+# newest of each now requires compileSdk 37. They move as a set, with AGP and
+# compileSdk, or not at all.
+activityCompose = "1.12.4"
+lifecycle = "2.9.4"
+coreKtx = "1.17.0"
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
@@ -13,6 +24,19 @@ play-services-wearable = { module = "com.google.android.gms:play-services-wearab
 wear-watchface-push = { module = "androidx.wear.watchfacepush:watchfacepush", version.ref = "watchfacePush" }
 wfp-validator-android = { module = "com.google.android.wearable.watchface.validator:validator-push-android", version.ref = "wfp-validator" }
 wfp-validator-jvm = { module = "com.google.android.wearable.watchface.validator:validator-push", version.ref = "wfp-validator" }
+
+# Compose, per DECISIONS 2026-08-28: the shipped app mirrors the localhost app
+# screen for screen, natively. The BOM pins every compose artifact together --
+# never give the individual ones a version, that is how they drift apart.
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+# :wear needs ComponentActivity and the permission-request contract, but no Compose.
+androidx-activity = { module = "androidx.activity:activity-ktx", version.ref = "activityCompose" }
+androidx-lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

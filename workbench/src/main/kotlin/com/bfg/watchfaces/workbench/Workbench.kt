@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.workbench
 
+import com.bfg.watchfaces.appcore.ActivationConsent
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.PatternEngines

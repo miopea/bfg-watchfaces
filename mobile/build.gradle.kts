@@ -29,11 +29,27 @@ android {
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
     buildFeatures { compose = true }
+    // Java and Kotlin must agree, or the build fails with "Inconsistent
+    // JVM-target compatibility" -- the scaffolds set Kotlin to 17 and left Java
+    // at the 1.8 default, which only shows up once there is Kotlin to compile.
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     kotlinOptions { jvmTarget = "17" }
 }
 
 dependencies {
     implementation(project(":generator"))
+    implementation(project(":appcore"))
+
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime)
+    implementation(libs.androidx.core.ktx)
     implementation(libs.play.services.wearable)   // Data Layer: Channel/Message/Capability
     implementation(libs.wfp.validator.android)    // local token generation, no network
 

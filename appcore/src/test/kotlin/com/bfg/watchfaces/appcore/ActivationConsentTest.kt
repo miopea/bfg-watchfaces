@@ -1,6 +1,6 @@
-package com.bfg.watchfaces.workbench
+package com.bfg.watchfaces.appcore
 
-import com.bfg.watchfaces.workbench.ActivationConsent.State
+import com.bfg.watchfaces.appcore.ActivationConsent.State
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull

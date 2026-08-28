@@ -21,6 +21,11 @@ jobs:
       # compiled or run by this job.
       - run: ./gradlew :generator:test
 
+      # Rules and words the shipped apps share -- including the one-shot
+      # activation logic, whose whole assurance is that it is pure JVM and can
+      # be tested here rather than on a watch nobody has.
+      - run: ./gradlew :appcore:test
+
       # The workbench owns the rasterizer, so it now owns artwork that ships
       # inside the APK. Determinism, quantization budget and the ambient
       # lit-pixel ceiling are all covered here.
@@ -87,6 +92,9 @@ jobs:
 
       - run: ./gradlew :wear:assembleDebug :mobile:assembleDebug
 
+      # The only watch-side logic testable without a watch.
+      - run: ./gradlew :wear:testDebugUnitTest
+
       - name: the APKs contain what they must, and nothing they must not
         run: |
           set -euo pipefail
@@ -114,6 +122,13 @@ jobs:
               echo "FAIL: $apk contains :workbench code" >&2; exit 1
             fi
           done
+
+          # The design app must not carry the Watch Face Push library. It cannot
+          # use it -- the library declares <uses-library wear-sdk required=true>,
+          # which would stop :mobile installing on a phone at all.
+          if unzip -p "$MOBILE" 'classes*.dex' | strings | grep -q "androidx/wear/watchfacepush"; then
+            echo "FAIL: :mobile links Watch Face Push; it cannot install on a phone" >&2; exit 1
+          fi
 
   docs:
     runs-on: ubuntu-latest

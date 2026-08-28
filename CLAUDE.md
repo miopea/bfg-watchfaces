@@ -74,6 +74,7 @@ rejected — not a changelog.
 ```bash
 ./gradlew :generator:test
 ./gradlew :generator:test --tests '*WffSchema*'
+./gradlew :appcore:test
 ./gradlew :workbench:test
 
 ./gradlew :workbench:workbench          # design loop at http://localhost:7777
@@ -112,7 +113,11 @@ Verified — built and run, not assumed:
 - `:generator` — 177 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
-- `:workbench` — 119 tests green. Serves the app at localhost:7777; bakes
+- `:appcore` — 25 tests green. Rules and words the shipped apps share, pure
+  JVM. Not `:generator` (that is the file format) and not `:workbench` (never
+  shipped). Holds `ActivationConsent`, whose one-shot rule guards the only
+  unrecoverable action in the system.
+- `:workbench` — 94 tests green. Serves the app at localhost:7777; bakes
   `dial_bg.png`, `preview.png`, `watchface.xml`, `strings.xml` and the manifest
   package from parameters. Quantization measured at 64 colours, mean error
   0.51/255. Saves designs to `faces/<slug>.json`, the catalog format.
@@ -125,12 +130,14 @@ Verified — built and run, not assumed:
 
 Builds, but has never run:
 
-- `:mobile`, `:wear` — both assemble a real APK and are in `settings.gradle.kts`
-  and CI. `:wear` declares the activation permission; `:mobile` carries the
-  generator. Neither has been installed or launched: there is no emulator here
+- `:mobile`, `:wear` — both assemble a real APK, in `settings.gradle.kts` and
+  CI. `:mobile` has a Compose activation handoff screen behind a launcher
+  activity; `:wear` has the `WearableListenerService` that receives a face and
+  the no-UI activity that makes the one permission request, plus 5 unit tests.
+  **Neither has ever been installed or launched**: no emulator here
   (`/dev/kvm` is unreachable) and Watch Face Push needs Wear OS 6 hardware.
-  Compiling is a much smaller claim than working, and it is the only one made.
-  Both are empty of UI — no Compose screens yet.
+  "It assembles" is a much smaller claim than "it works", and it is the only one
+  being made.
 
 Never tested on hardware:
 

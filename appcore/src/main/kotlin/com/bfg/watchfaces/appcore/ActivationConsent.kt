@@ -1,4 +1,4 @@
-package com.bfg.watchfaces.workbench
+package com.bfg.watchfaces.appcore
 
 /**
  * The one irreversible thing in this system: asking to switch the watch face.
@@ -36,7 +36,7 @@ package com.bfg.watchfaces.workbench
  *
  * ## Pure, so the words are testable
  *
- * Same shape as [WatchDevices]: the judgement lives here and is tested, the
+ * Same shape as `WatchDevices`: the judgement lives here and is tested, the
  * Android call is a thin thing at the edge that does not exist yet. When
  * `:wear` is built this class does not change — it gains a caller.
  */
