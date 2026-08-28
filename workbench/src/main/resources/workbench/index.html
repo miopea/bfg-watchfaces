@@ -256,6 +256,45 @@
   .tunescroll{overflow-y:auto;max-height:calc(56vh - 96px);padding-top:6px}
 
   /* ---- About ---- */
+  /* The About screen is the only promotion in a free app, so it leads with the
+     free claim rather than with a product list. Editorial spacing and hairline
+     rules instead of card chrome -- five boxed cards read as an advert, which
+     is the thing this is trying not to be. */
+  .freehero{
+    padding:22px 20px 20px;border-radius:18px;margin:2px 0 8px;
+    background:
+      radial-gradient(120% 100% at 0% 0%, rgba(201,162,39,.16), transparent 60%),
+      linear-gradient(160deg, var(--surface2), var(--surface));
+    border:1px solid var(--line);
+  }
+  .freemark{
+    display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.18em;
+    color:var(--accent-ink);background:var(--accent);padding:4px 9px;border-radius:6px;
+  }
+  .freehero h2{margin:13px 0 8px;font-size:22px;line-height:1.25;font-weight:680;letter-spacing:-.01em}
+  .freehero p{margin:0 0 8px;font-size:13.5px;color:var(--dim);line-height:1.55}
+  .freehero p.by{margin:12px 0 0;font-size:13px;color:var(--ink)}
+  .freehero p.by strong{color:var(--accent);font-weight:650}
+
+  .prodrow{
+    display:flex;gap:14px;align-items:flex-start;padding:15px 2px;
+    border-bottom:1px solid var(--line);text-decoration:none;color:inherit;
+  }
+  .prodrow:last-child{border-bottom:none}
+  .prodrow:hover .prodname{color:var(--accent)}
+  .prodlogo{
+    width:44px;height:44px;border-radius:11px;flex:none;object-fit:contain;
+    background:var(--surface);padding:6px;border:1px solid var(--line);
+  }
+  .prodname{font-size:15px;font-weight:640;transition:color .15s;display:flex;align-items:center;gap:8px}
+  .prodtag{font-size:12.5px;color:var(--dim);margin-top:4px;line-height:1.5}
+  .prodavail{font-size:11px;color:var(--faint);margin-top:6px;letter-spacing:.02em}
+  .sitelink{
+    display:block;text-align:center;margin-top:22px;padding:13px;border-radius:12px;
+    border:1px solid var(--line);color:var(--dim);text-decoration:none;font-size:13.5px;
+  }
+  .sitelink:hover{border-color:var(--accent);color:var(--accent)}
+
   .brand{display:flex;gap:13px;align-items:center;margin:4px 0 18px}
   .brandmark{
     width:52px;height:52px;border-radius:14px;flex:none;display:grid;place-items:center;
@@ -446,20 +485,19 @@
 
   <section class="screen" id="scr-about" hidden>
     <div class="pad">
-      <div class="brand">
-        <div class="brandmark">BFG</div>
-        <div>
-          <div class="brandname">BFG Solutions</div>
-          <div class="brandsub">Independent software, built small and shipped.</div>
-        </div>
+      <div class="freehero">
+        <div class="freemark">FREE</div>
+        <h2>Every part of this app is free.</h2>
+        <p>No ads. No account. No subscription, no trial, nothing held back for a
+          paid tier. Design as many watch faces as you like and keep them.</p>
+        <p class="by">Built and given away by <strong>BFG Solutions</strong>.</p>
       </div>
-      <p class="microhint" style="margin-bottom:6px">
-        BFG Watch Faces is one of ours. Here is the rest.</p>
-      <div id="productTiers"></div>
-      <a class="btn ghost" id="siteLink" href="https://bfgsolutions.net" target="_blank"
-         rel="noopener noreferrer" style="display:block;text-align:center;text-decoration:none;margin-top:18px">
-        bfgsolutions.net
-      </a>
+
+      <h2 class="sec">Also from BFG Solutions</h2>
+      <div id="productList"></div>
+
+      <a class="sitelink" id="siteLink" href="https://bfgsolutions.net"
+         target="_blank" rel="noopener noreferrer">bfgsolutions.net &rsaquo;</a>
     </div>
   </section>
 
@@ -636,6 +674,10 @@ function show(which){
     $("#tab-"+k).setAttribute("aria-selected", String(k === which));
   }
   $("#title").textContent = which === "studio" && currentName ? currentName : SCREENS[which];
+  // The validity pill describes the face being edited. On Designs, My faces or
+  // About it is decoration at best and confusing at worst -- it was reporting
+  // "Valid" over a page of promotional copy.
+  $("#valid").style.display = (which === "studio") ? "" : "none";
   if (which === "mine") loadMine();
   if (which === "about") renderAbout();
   $(".screen:not([hidden])").scrollTop = 0;
@@ -1050,65 +1092,60 @@ $("#tuneDone").addEventListener("click", closeSheets);
  * ships or changes tier there, it changes here too -- this is a copy, and the
  * site is the original.
  */
-const TIERS = [
-  { title:"Available now", blurb:"Shipping products you can download and use today.", products:[
-    { name:"BudgetBug", status:"live", color:"#4ea96b", avail:"Web · iOS · Android",
-      href:"https://budgetbug.live",
-      tag:"A personal budget tracker that syncs with your bank, tracks recurring bills, and shows you exactly where your money is going." },
-    { name:"Sculpt Studio", status:"live", color:"#e0655a", avail:"Web · iOS · Android",
-      href:"https://bfgsolutions.net/products/sculptstudio",
-      tag:"Goal-driven strength training — a guided session runner, honest progression, a fitness-age dashboard, and an AI coach that can read your data and program your week." },
-    { name:"VoiceBridge", status:"live", color:"#5a9bd8", avail:"Web",
-      href:"https://bfgsolutions.net/products/voicebridge",
-      tag:"Real-time speech translation. Speak once, reach everyone in the room — in their own language." },
-  ]},
-  { title:"In beta", blurb:"Working products still finding their edges. Testers welcome.", products:[
-    { name:"Aria", status:"beta", color:"#c9a227", avail:"Web beta",
-      href:"https://bfgsolutions.net/products/aria",
-      tag:"A voice-training PWA with a singing studio — live pitch dial, range finder, melody trainer, and karaoke-style song mode, all in the browser." },
-  ]},
-  { title:"Open source", blurb:"Developer tools we built for ourselves and published.", products:[
-    { name:"Shotcraft", status:"open-source", color:"#9b8ec4", avail:"CLI · GitHub",
-      href:"https://bfgsolutions.net/products/shotcraft",
-      tag:"Capture your live app and ship App Store-ready screenshots, README hero images, and social cards in one command." },
-    { name:"Swarm", status:"open-source", color:"#7fb3a3", avail:"Linux · macOS · WSL",
-      href:"https://bfgsolutions.net/products/swarm",
-      tag:"A web-based control center for AI coding agents. Manage one agent or ten from a single browser tab — with autopilot, a task board, and email integration." },
-  ]},
+/* Products promoted on the About screen.
+ *
+ * This is a CURATED promo list, not a mirror of bfgsolutions.net. It
+ * deliberately differs from the site's ProductShelf in two ways, decided by the
+ * operator: Aria is omitted because it is still in beta and this is a promotion
+ * rather than a directory, and Swarm comes before Shotcraft. Taglines are the
+ * site's own words, so the site remains the source for those -- if a product
+ * ships or its description changes there, change it here too.
+ *
+ * Logos are bundled from bfg-solutions and served from the jar. The app works
+ * offline apart from the community catalog, and an About screen full of broken
+ * images on a train is worse than no logos.
+ */
+const PRODUCTS = [
+  { name:"BudgetBug", logo:"budgetbug.png", avail:"Web · iOS · Android",
+    href:"https://budgetbug.live", badge:null,
+    tag:"A personal budget tracker that syncs with your bank, tracks recurring bills, and shows you exactly where your money is going." },
+  { name:"Sculpt Studio", logo:"sculptstudio.svg", avail:"Web · iOS · Android",
+    href:"https://bfgsolutions.net/products/sculptstudio", badge:null,
+    tag:"Goal-driven strength training — a guided session runner, honest progression, and an AI coach that can read your data and program your week." },
+  { name:"VoiceBridge", logo:"voicebridge.svg", avail:"Web",
+    href:"https://bfgsolutions.net/products/voicebridge", badge:null,
+    tag:"Real-time speech translation. Speak once, reach everyone in the room — in their own language." },
+  { name:"Swarm", logo:"swarm.svg", avail:"Linux · macOS · WSL",
+    href:"https://bfgsolutions.net/products/swarm", badge:"Free & open source",
+    tag:"A web-based control center for AI coding agents. Manage one agent or ten from a single browser tab." },
+  { name:"Shotcraft", logo:"shotcraft.svg", avail:"CLI · GitHub",
+    href:"https://bfgsolutions.net/products/shotcraft", badge:"Free & open source",
+    tag:"Capture your live app and ship App Store-ready screenshots, README hero images, and social cards in one command." },
 ];
-const BADGE = { live:["live","Live"], beta:["beta","Beta"], "open-source":["oss","Open source"] };
 
 let aboutRendered = false;
 function renderAbout(){
   if (aboutRendered) return;
-  const host = $("#productTiers");
+  const host = $("#productList");
   host.innerHTML = "";
-  for (const tier of TIERS){
-    const sec = document.createElement("div");
-    sec.className = "tier";
-    const h = document.createElement("h4"); h.textContent = tier.title;
-    const bl = document.createElement("p"); bl.className = "tblurb"; bl.textContent = tier.blurb;
-    sec.appendChild(h); sec.appendChild(bl);
-    for (const pr of tier.products){
-      const [cls,label] = BADGE[pr.status];
-      const a = document.createElement("a");
-      a.className = "prod"; a.href = pr.href; a.target = "_blank"; a.rel = "noopener noreferrer";
-      a.innerHTML = `
-        <div class="prodicon" style="background:${pr.color}"></div>
-        <div class="prodbody">
-          <div class="prodname"><span class="pn"></span><span class="badge ${cls}">${label}</span></div>
-          <div class="prodtag"></div>
-          <div class="prodavail"></div>
-        </div>`;
-      // textContent, not innerHTML: this copy is data, and a stray < in a
-      // tagline should render as a character, not as markup.
-      a.querySelector(".prodicon").textContent = pr.name[0];
-      a.querySelector(".pn").textContent = pr.name;
-      a.querySelector(".prodtag").textContent = pr.tag;
-      a.querySelector(".prodavail").textContent = pr.avail;
-      sec.appendChild(a);
-    }
-    host.appendChild(sec);
+  for (const pr of PRODUCTS){
+    const a = document.createElement("a");
+    a.className = "prodrow";
+    a.href = pr.href; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.innerHTML = `
+      <img class="prodlogo" alt="" src="/logos/${pr.logo}">
+      <div style="flex:1;min-width:0">
+        <div class="prodname"><span class="pn"></span>${
+          pr.badge ? `<span class="badge oss">${pr.badge}</span>` : ""}</div>
+        <div class="prodtag"></div>
+        <div class="prodavail"></div>
+      </div>`;
+    // textContent, not innerHTML: this copy is data, and a stray angle bracket
+    // in a tagline should render as a character rather than as markup.
+    a.querySelector(".pn").textContent = pr.name;
+    a.querySelector(".prodtag").textContent = pr.tag;
+    a.querySelector(".prodavail").textContent = pr.avail;
+    host.appendChild(a);
   }
   aboutRendered = true;
 }

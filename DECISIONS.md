@@ -1,5 +1,44 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — The About screen is a promotion, and diverges from the site
+
+The About tab is the only promotion in an app with no ads, no account and no
+paid tier, so it leads with that rather than with a product list: a FREE badge,
+"Every part of this app is free", and the attribution to BFG Solutions. The
+products come second, because the claim is the point of the screen.
+
+Visually it moved from five bordered cards to an editorial list — logo, name,
+one line, platforms, hairline rule. Five boxed cards read as an advert, which is
+the thing a free app's only promotion should least resemble.
+
+### It is a curated list, not a mirror
+
+The previous version copied bfgsolutions.net's ProductShelf and said so. It now
+DELIBERATELY differs, on the operator's call:
+
+- **Aria is omitted.** It is in beta, and this is a promotion rather than a
+  directory.
+- **Swarm comes before Shotcraft.**
+
+Taglines are still the site's own words, so the site remains the source for
+those: if a product ships or its description changes there, it changes here too.
+The divergence is intentional and recorded so nobody "fixes" it back into a
+mirror later.
+
+### Logos are bundled, not fetched
+
+Copied from bfg-solutions into the jar and served from `/logos/`. The app works
+offline apart from the community catalog, and an About screen full of broken
+images on a train is worse than no logos at all. The route accepts a bare
+filename matching `^[a-z0-9_-]+\.(svg|png)$` and nothing else — the name arrives
+in a URL, so anything path-like is refused rather than resolved.
+
+### Found while looking at it
+
+The schema-validity pill was rendering on every screen, including this one — it
+was reporting "Valid" over a page of promotional copy. It describes the face
+being edited, so it now appears only in Studio.
+
 ## 2026-08-28 — generatorVersion 3: ambient ink is lifted, not reused
 
 Ambient is a black screen — the dial fades to alpha 0 and only text remains.

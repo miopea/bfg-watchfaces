@@ -68,6 +68,7 @@ object Workbench {
         server.createContext("/api/textures") { ex -> safe(ex) { serveTextures(ex) } }
         server.createContext("/api/layout") { ex -> safe(ex) { serveLayout(ex) } }
         server.createContext("/api/catalog") { ex -> safe(ex) { serveCatalog(ex) } }
+        server.createContext("/logos/") { ex -> safe(ex) { serveLogo(ex) } }
         server.start()
 
         println()
@@ -156,6 +157,29 @@ object Workbench {
         if (path != "/" && path != "/index.html") { send(ex, 404, "text/plain", "not found".toByteArray()); return }
         val html = javaClass.getResourceAsStream("/workbench/index.html")!!.readBytes()
         send(ex, 200, "text/html; charset=utf-8", html)
+    }
+
+    /**
+     * Product logos for the About screen, served from the jar.
+     *
+     * Bundled rather than fetched from bfgsolutions.net: the app works with no
+     * network except the community catalog, and an About screen with broken
+     * images on a train is worse than no logos at all.
+     */
+    private fun serveLogo(ex: HttpExchange) {
+        // Only a bare filename from the bundled set -- the name arrives in a
+        // URL, so anything path-like is refused rather than resolved.
+        val name = ex.requestURI.path.removePrefix("/logos/")
+        if (!name.matches(Regex("^[a-z0-9_-]+\\.(svg|png)$"))) {
+            send(ex, 404, "text/plain", "not found".toByteArray()); return
+        }
+        val bytes = javaClass.getResourceAsStream("/workbench/logos/$name")?.readBytes()
+        if (bytes == null) { send(ex, 404, "text/plain", "not found".toByteArray()); return }
+        val type = if (name.endsWith(".svg")) "image/svg+xml" else "image/png"
+        ex.responseHeaders.add("Content-Type", type)
+        ex.responseHeaders.add("Cache-Control", "public, max-age=3600")
+        ex.sendResponseHeaders(200, bytes.size.toLong())
+        ex.responseBody.use { it.write(bytes) }
     }
 
     /** The dial texture alone -- literally the bytes that become dial_bg.png. */
