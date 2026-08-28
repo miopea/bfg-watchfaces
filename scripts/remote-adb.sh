@@ -73,6 +73,37 @@ else
   exit 1
 fi
 echo "bridge            : $BRIDGE"
+
+# Something listening on 5038 only proves SSH bound the port. It says nothing
+# about whether the far end answers -- ssh accepts the connection either way and
+# only then tries to reach your adb server. If that fails, adb reports
+# "protocol fault (couldn't read status)", which reads like a broken adb and is
+# actually "the other machine is not running one".
+if ! python3 - "$PORT" <<'PROBE'
+import socket, sys
+port = int(sys.argv[1])
+req = b"host:version"
+try:
+    s = socket.create_connection(("127.0.0.1", port), timeout=6)
+    s.sendall(b"%04x%s" % (len(req), req))
+    sys.exit(0 if s.recv(64) else 1)
+except Exception:
+    sys.exit(1)
+PROBE
+then
+  echo
+  echo "The tunnel is up, but nothing answered on the other side." >&2
+  echo "SSH forwarded the connection and your machine refused it, which means" >&2
+  echo "no adb server is running there." >&2
+  echo >&2
+  echo "On the machine with the watch, run:" >&2
+  echo "    adb devices" >&2
+  echo >&2
+  echo "That starts the server. Plugging in a watch, opening Android Studio or" >&2
+  echo "starting an emulator does it too. No need to reconnect the tunnel." >&2
+  exit 3
+fi
+echo "far end           : answering"
 echo
 
 ADB_SERVER_SOCKET="$SOCKET" "$ADB" devices -l | sed 's/^/  /'
