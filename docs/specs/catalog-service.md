@@ -144,21 +144,91 @@ Payloads are the formats that already exist. `CatalogStore.Entry` is the face
 record and `index.json` is already generated; neither should be redesigned
 because the transport changed.
 
-## Recommended implementation
+## Recommended implementation: Azure Static Web Apps
 
-Cloudflare Workers, with D1 for the queue and Cloudflare's own edge cache for
-reads. Turnstile for R7.
+Operator asked for research: "find out what is there that is free. Ideally
+something we already use? Cloudflare or AZ."
 
-Chosen because it is the only shape that meets every requirement without a bill:
-anonymous writes are trivial, reads are cached at the edge without a second CDN,
-a proof-of-humanity check exists that needs no account and no tracking, and
-storage for a catalog measured in megabytes is nowhere near any threshold.
+**They already use Azure, decisively.** Across the sibling repos there are 325
+files mentioning Azure against 16 mentioning Cloudflare, and the Azure ones are
+real deployments — `azure/webapps-deploy`, `azure/login` with OIDC federated
+credentials, App Service, staging slots. There is no `wrangler.toml` anywhere on
+the machine. Cloudflare would be a new account, a new auth model and a new thing
+to keep alive; Azure is muscle memory and the GitHub OIDC trust is already set
+up.
 
-**This must be confirmed before it is committed to.** "Free" is a claim about
-someone else's pricing page, and the About screen's promise that every part of
-the app is free depends on it staying true. Confirm current limits against real
-numbers — expected faces, expected gallery views — rather than against the word
-"generous".
+The numbers below were read from Microsoft's and Cloudflare's own documentation
+on 2026-08-28, not from memory. Re-check them before committing: free tiers are
+someone else's pricing page and the About screen's promise depends on this.
+
+### The shape
+
+| Piece | What runs it | Free? |
+| --- | --- | --- |
+| Published catalog (`index.json`, `faces/*.json`, `/export`) | Static files on the Static Web App's global CDN | Yes |
+| Submit, report | Managed Azure Functions, included in the Free plan | Yes |
+| Moderation queue | Cosmos DB free tier | Yes, with one caveat below |
+
+The important realisation is that **the published catalog barely needs a
+database.** It changes only when a maintainer approves something, so it is
+static content — served from a CDN with no per-request cost and no query.
+Only the pending queue takes writes, and a queue of things nobody has approved
+yet is tiny.
+
+### Azure Static Web Apps, Free plan
+
+From `learn.microsoft.com/azure/static-web-apps/plans` and `/quotas`:
+
+- Web hosting, GitHub integration, globally distributed static content, and
+  free automatically renewing SSL — all on Free
+- **APIs via Azure Functions: Managed**, included rather than billed separately
+- **Included bandwidth: 100 GB/month**
+- Total storage per app: **500 MB**
+- 10 apps per subscription, 2 custom domains, 3 preview environments
+- **Service Level Agreement: None**
+
+Two of those deserve comment.
+
+**Overage bandwidth on the Free plan is listed as "Unavailable"**, where the
+Standard plan bills $0.20/GB. That is not a limitation here, it is the single
+best property on offer: the Free plan physically cannot generate a bill. For an
+app whose only promotion is "Every part of this app is free. No ads. No account.
+No subscription", a plan that stops serving rather than quietly charging is
+worth more than a larger allowance that can.
+
+**500 MB of app storage** sounds small and is not. A face is ~5KB of JSON, so
+that is roughly 100,000 faces — an order of magnitude past the 10,000-face
+figure `docs/SPEC.md` sizes the design around.
+
+100 GB/month is likewise generous against a few MB of index per gallery load.
+
+No SLA is acceptable for a free community gallery. `MODERATION.md`'s promises
+are about response times, not uptime.
+
+### The queue: Cosmos DB free tier
+
+From `learn.microsoft.com/azure/cosmos-db/free-tier`: the first **1000 RU/s and
+25 GB are free**, and "free tier lasts indefinitely for the lifetime of the
+account". Not a 12-month trial.
+
+**The one thing to check before building.** There can be **one free-tier Cosmos
+account per Azure subscription**, and if another account in the subscription has
+already claimed it the option does not even appear. Given how much else is
+already on Azure here, it may well be taken. If it is, Azure Table Storage costs
+cents per month at this size — but cents is not zero, and the About screen makes
+a promise about zero. Worth confirming before the first resource is created.
+
+### Why not Cloudflare
+
+Genuinely close on the free tier, and it was the earlier recommendation. From
+Cloudflare's own limits pages: Workers Free gives 100,000 requests/day, and D1
+Free gives 1 database at a **500 MB maximum size** with 50 queries per Worker
+invocation. That is ample too.
+
+It loses on the thing the operator actually asked about: it is not what they
+already use. A second cloud account, a second deploy story, a second set of
+credentials and a second thing to remember exists — for a free app maintained by
+one person, that cost is paid forever and the capability gain is nil.
 
 ## Sequencing — do not break the working path first
 
@@ -179,11 +249,33 @@ Removing step 3's route before step 1 exists would leave the app with no
 complaint path at all, which is worse than a complaint path that needs an
 account.
 
-## Open
+## Settled since this was written
 
-- Which backend, if not the recommendation above.
-- Whether the moderation log is public. It is the cheapest way to buy back the
-  auditability that a git history was giving for free.
+Operator decision `01a049b0-053d-7fb3-a2e6-c855678204c8`:
+
+- **Hosting**: research it, "ideally something we already use? Cloudflare or
+  AZ." Answered above — Azure, because that is what is already in use.
+- **Public moderation log**: "Let's figure this out based on the service.
+  Hopefully no." Deferred, leaning against. Nothing below depends on it, and the
+  export endpoint (R6) already covers the portability half of what a public log
+  would have bought.
+- **The old catalog repo**: "Retire it entirely."
+
+### Retiring the repo is LAST, not first
+
+`miopea/bfg-watchfaces-catalog` currently hosts the app's only working complaint
+path — the report form is a GitHub issue template in that repository. Archiving
+it disables issues; deleting it destroys the form outright. Either one, done
+before the replacement exists, leaves the app with no complaint path,
+which Play's UGC rules require before it can ship at all.
+
+So the instruction is authorised and queued, not ignored. It happens at step 4
+of the sequencing above, after the service is deployed and the app points at it.
+
+## Still open
+
 - Whether authors can withdraw a face they submitted. With no account there is
   no way to prove they wrote it, so this may simply not be possible — worth
   deciding rather than discovering.
+- Whether the Cosmos DB free tier is still available on the subscription, which
+  only the account holder can see.
