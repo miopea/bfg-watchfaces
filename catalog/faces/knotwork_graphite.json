@@ -1,0 +1,24 @@
+{
+  "name": "Knotwork Graphite",
+  "slug": "knotwork_graphite",
+  "author": "BFG Solutions",
+  "created": "2026-08-28T03:15:03.416153030Z",
+  "params": {
+    "generatorVersion": 2,
+    "engine": "KNOTWORK",
+    "scale": 22.0, "depth": 2.6, "freq": 3,
+    "stroke": 1.0, "relief": 1.4, "contrast": 30.0,
+    "rotate": 45.0, "vignette": 30.0, "sheen": 16.0,
+    "dialColor": "#2B2E33", "inkColor": "#ECEAE5",
+    "lens": true, "lensAmount": 38.0,
+    "texture": "",
+    "complications": ["DAY_AND_DATE", "STEP_COUNT", "HEART_RATE", "UNREAD_NOTIFICATION_COUNT", "WATCH_BATTERY"],
+    "layout": {
+      "dateY": 99, "dateSize": 21,
+      "timeY": 196, "timeSize": 104, "tracking": 0.0,
+      "complicationY": 273, "complicationSpread": 92,
+      "complicationSize": 19, "batteryY": 344,
+      "fontFamily": "SYNC_TO_DEVICE", "fontWeight": "MEDIUM"
+    }
+  }
+}

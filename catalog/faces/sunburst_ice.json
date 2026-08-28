@@ -1,0 +1,24 @@
+{
+  "name": "Sunburst Ice",
+  "slug": "sunburst_ice",
+  "author": "BFG Solutions",
+  "created": "2026-08-28T03:15:03.562589420Z",
+  "params": {
+    "generatorVersion": 2,
+    "engine": "SUNBURST",
+    "scale": 9.0, "depth": 6.0, "freq": 3,
+    "stroke": 1.2, "relief": 1.4, "contrast": 22.0,
+    "rotate": 45.0, "vignette": 26.0, "sheen": 44.0,
+    "dialColor": "#5A6B77", "inkColor": "#FFFFFF",
+    "lens": true, "lensAmount": 38.0,
+    "texture": "",
+    "complications": ["DAY_AND_DATE", "STEP_COUNT", "HEART_RATE", "UNREAD_NOTIFICATION_COUNT", "WATCH_BATTERY"],
+    "layout": {
+      "dateY": 99, "dateSize": 21,
+      "timeY": 196, "timeSize": 104, "tracking": 0.0,
+      "complicationY": 273, "complicationSpread": 92,
+      "complicationSize": 19, "batteryY": 344,
+      "fontFamily": "SYNC_TO_DEVICE", "fontWeight": "MEDIUM"
+    }
+  }
+}

@@ -22,7 +22,11 @@ debug.keystore
 
 # Faces you design and save in the app. Personal work, not repo content -- the
 # community catalog is a curated set, not whatever is on someone's laptop.
-faces/
+#
+# ANCHORED with a leading slash on purpose. An unanchored `faces/` matches any
+# directory of that name at any depth, which silently swallowed catalog/faces/
+# and pushed an index.json describing seven faces that were not committed.
+/faces/
 
 # Images imported for the TEXTURE engine. Local content, never part of a face
 # and never publishable -- the catalog is parameters only.

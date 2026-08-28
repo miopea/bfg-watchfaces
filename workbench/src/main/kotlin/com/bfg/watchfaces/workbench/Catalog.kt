@@ -23,8 +23,23 @@ object Catalog {
         val dir = CatalogStore.dir(root)
 
         println("catalog: ${dir.relativeTo(root)}")
-        if (!dir.isDirectory) {
-            println("  no catalog directory yet -- nothing to validate")
+
+        val faces = (dir.listFiles { f -> f.extension == "json" } ?: emptyArray()).size
+        val indexed = indexedCount(root)
+
+        // An index that disagrees with the faces beside it is worse than no
+        // index at all. This is not hypothetical: an unanchored `faces/` line in
+        // .gitignore matched catalog/faces/ as well as the personal directory,
+        // so index.json was committed describing seven faces that were not.
+        // CI happily validated a directory that was not there and passed.
+        if (indexed > faces) {
+            System.err.println("  index.json describes $indexed face(s) but only $faces are present.")
+            System.err.println("  The faces are missing -- check .gitignore, and see DECISIONS.md 2026-08-28.")
+            kotlin.system.exitProcess(1)
+        }
+
+        if (!dir.isDirectory || faces == 0) {
+            println("  no faces yet -- nothing to validate")
             if (!checkOnly) {
                 CatalogStore.writeIndex(root)
                 println("  wrote an empty ${CatalogStore.indexFile(root).relativeTo(root)}")
@@ -32,7 +47,6 @@ object Catalog {
             return
         }
 
-        val faces = (dir.listFiles { f -> f.extension == "json" } ?: emptyArray()).size
         println("  $faces face(s)")
 
         // A missing schema makes every validation vacuous while still exiting 0.
@@ -75,6 +89,15 @@ object Catalog {
         val n = CatalogStore.writeIndex(root)
         println("  wrote ${CatalogStore.indexFile(root).relativeTo(root)} ($n face(s))")
         println("  served in production from ${CatalogStore.CDN_URL}")
+    }
+
+    /** How many faces the committed index claims, or 0 if there is no index. */
+    private fun indexedCount(root: File): Int {
+        val f = CatalogStore.indexFile(root)
+        if (!f.isFile) return 0
+        return runCatching {
+            Json.num(Json.obj(Json.parse(f.readText())), "count", 0.0).toInt()
+        }.getOrDefault(0)
     }
 
     /** The timestamp changes on every run; it is not drift. */

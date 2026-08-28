@@ -1,0 +1,24 @@
+{
+  "name": "Botanical Sand",
+  "slug": "botanical_sand",
+  "author": "BFG Solutions",
+  "created": "2026-08-28T03:15:03.455206023Z",
+  "params": {
+    "generatorVersion": 2,
+    "engine": "BOTANICAL",
+    "scale": 40.0, "depth": 5.0, "freq": 7,
+    "stroke": 1.2, "relief": 1.4, "contrast": 30.0,
+    "rotate": 45.0, "vignette": 18.0, "sheen": 30.0,
+    "dialColor": "#7D7369", "inkColor": "#FCF9F1",
+    "lens": true, "lensAmount": 38.0,
+    "texture": "",
+    "complications": ["DAY_AND_DATE", "STEP_COUNT", "HEART_RATE", "UNREAD_NOTIFICATION_COUNT", "WATCH_BATTERY"],
+    "layout": {
+      "dateY": 99, "dateSize": 21,
+      "timeY": 196, "timeSize": 104, "tracking": 0.0,
+      "complicationY": 273, "complicationSpread": 92,
+      "complicationSize": 19, "batteryY": 344,
+      "fontFamily": "SYNC_TO_DEVICE", "fontWeight": "MEDIUM"
+    }
+  }
+}

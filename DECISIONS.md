@@ -1,5 +1,42 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — An unanchored gitignore line published an index with no faces
+
+Immediately after the catalog landed, CI went green having validated **nothing**.
+The log read:
+
+```text
+catalog: catalog/faces
+  no catalog directory yet -- nothing to validate
+```
+
+`.gitignore` carried `faces/` for the personal save directory. Unanchored, that
+pattern matches a directory of that name **at any depth**, so it also matched
+`catalog/faces/`. `git add catalog` therefore committed `catalog/index.json` —
+which describes seven faces — and none of the faces. The pushed repo had an
+index pointing at nothing.
+
+Two things went wrong and both are worth keeping:
+
+**The gitignore pattern.** Now `/faces/`, anchored to the repo root. This is a
+general trap: `build/`, `faces/`, `textures/` and friends all match at any depth
+unless anchored, and the failure is invisible because the file simply never
+appears in `git status`.
+
+**The gate treated absence as success.** "No catalog directory" exited 0, which
+is right for a repo that has no catalog and wrong for one that does. Absence of
+a signal was read as absence of a problem — the same defect class the CI standard
+warns about, committed in the very check written to enforce that standard.
+
+The fix is a consistency check rather than a louder message: `index.json`
+declares a count, so if the index claims more faces than are present, the build
+fails and names `.gitignore` as the likely cause. An index that disagrees with
+the faces beside it is worse than no index.
+
+Verified by reproducing it: moving `catalog/faces` aside makes the task exit 1
+with "index.json describes 7 face(s) but only 0 are present", and restoring it
+passes. That is the check the original push needed and did not have.
+
 ## 2026-08-28 — The catalog is real, and the gallery reads it
 
 docs/SPEC.md described the community catalog as "later". It is built.
