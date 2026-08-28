@@ -66,6 +66,8 @@ object Workbench {
         server.createContext("/api/build") { ex -> safe(ex) { serveBuild(ex) } }
         server.createContext("/api/faces") { ex -> safe(ex) { serveFaces(ex) } }
         server.createContext("/api/textures") { ex -> safe(ex) { serveTextures(ex) } }
+        server.createContext("/api/layout") { ex -> safe(ex) { serveLayout(ex) } }
+        server.createContext("/api/catalog") { ex -> safe(ex) { serveCatalog(ex) } }
         server.start()
 
         println()
@@ -261,6 +263,59 @@ object Workbench {
      * These never leave the machine and never enter a stored face -- the face
      * keeps only the content hash. A TEXTURE face is local-only by construction.
      */
+    /**
+     * The community catalog.
+     *
+     * GET lists it. POST stages a saved face as a submission -- it writes the
+     * file and validates it, and stops there. Opening the pull request is the
+     * author's action: a design tool that pushes to a public repo on a button
+     * press is a mistake waiting to happen.
+     */
+    private fun serveCatalog(ex: HttpExchange) {
+        val q = query(ex)
+        when (ex.requestMethod.uppercase()) {
+            "POST" -> {
+                val slug = q["slug"].orEmpty()
+                val face = FaceStore.load(root, slug)
+                if (face == null) { json(ex, """{"ok":false,"error":"no saved face '$slug'"}"""); return }
+                if (face.params.isLocalOnly) {
+                    json(ex, """{"ok":false,"error":${jsonStr(
+                        "This face uses an imported image. The catalog is parameters only, so it stays on this machine."
+                    )}}"""); return
+                }
+                val (file, problems) = CatalogStore.submit(root, face, q["author"].orEmpty())
+                if (problems.isNotEmpty()) {
+                    json(ex, """{"ok":false,"error":${jsonStr(problems.joinToString("; ") { it.message })}}""")
+                    return
+                }
+                CatalogStore.writeIndex(root)
+                json(ex, """{"ok":true,"path":${jsonStr(file.relativeTo(root).path)},"slug":${jsonStr(face.slug)}}""")
+            }
+            "DELETE" -> {
+                val slug = q["slug"].orEmpty()
+                val f = File(CatalogStore.dir(root), "${FaceStore.slugify(slug)}.json")
+                val gone = f.isFile && f.delete()
+                if (gone) CatalogStore.writeIndex(root)
+                json(ex, """{"ok":$gone}""")
+            }
+            else -> {
+                val entries = CatalogStore.list(root).joinToString(",") { e ->
+                    """{"slug":${jsonStr(e.slug)},"name":${jsonStr(e.name)},"author":${jsonStr(e.author)},""" +
+                    """"engine":${jsonStr(e.params.engine.name)},"created":${jsonStr(e.created)},""" +
+                    """"query":${jsonStr(ParamCodec.toQuery(e.params))}}"""
+                }
+                json(ex, """{"cdn":${jsonStr(CatalogStore.CDN_URL)},"faces":[$entries]}""")
+            }
+        }
+    }
+
+    /** What SlotGeometry actually used, so a clamped control can say so. */
+    private fun serveLayout(ex: HttpExchange) {
+        val e = com.bfg.watchfaces.generator.SlotGeometry.effective(params(ex))
+        json(ex, """{"size":${e.size},"spread":${e.spread},""" +
+                 """"sizeClamped":${e.sizeClamped},"spreadClamped":${e.spreadClamped}}""")
+    }
+
     private fun serveTextures(ex: HttpExchange) {
         when (ex.requestMethod.uppercase()) {
             "POST" -> {

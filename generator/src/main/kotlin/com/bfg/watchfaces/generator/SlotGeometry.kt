@@ -111,6 +111,28 @@ object SlotGeometry {
      */
     fun boxes(p: DialParams): LinkedHashMap<SlotPosition, Box> = layoutAt(p, fittedSize(p))
 
+    /**
+     * What the layout actually used, versus what was asked for.
+     *
+     * Both size and spacing get clamped -- by the rim, by each other, and by the
+     * clock. A control whose value is silently overridden feels broken, so the
+     * UI can show the effective numbers instead of pretending the request won.
+     */
+    data class Effective(val size: Int, val spread: Int, val sizeClamped: Boolean, val spreadClamped: Boolean)
+
+    fun effective(p: DialParams): Effective {
+        val size = fittedSize(p)
+        val boxes = layoutAt(p, size)
+        val row = listOf(SlotPosition.LEFT, SlotPosition.MIDDLE, SlotPosition.RIGHT).mapNotNull { boxes[it] }
+        val spread = if (row.size > 1) row[1].x - row[0].x else p.layout.complicationSpread
+        return Effective(
+            size = size,
+            spread = spread,
+            sizeClamped = size != p.layout.complicationSize,
+            spreadClamped = row.size > 1 && spread != p.layout.complicationSpread
+        )
+    }
+
     /** The size actually used, which is [Layout.complicationSize] unless it did not fit. */
     fun fittedSize(p: DialParams): Int {
         val requested = p.layout.complicationSize.coerceIn(MIN_SIZE, MAX_SIZE)

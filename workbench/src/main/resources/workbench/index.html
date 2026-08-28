@@ -339,8 +339,19 @@
   <!-- ============ DESIGNS ============ -->
   <section class="screen" id="scr-designs">
     <div class="pad">
-      <h2 class="sec">Start from a style</h2>
-      <div class="grid" id="presetGrid"></div>
+      <div class="seg segfull" id="galleryTabs" style="margin-bottom:4px">
+        <button data-src="styles" aria-pressed="true">Styles</button>
+        <button data-src="community">Community</button>
+      </div>
+      <div id="stylesPane">
+        <h2 class="sec">Start from a style</h2>
+        <div class="grid" id="presetGrid"></div>
+      </div>
+      <div id="communityPane" hidden>
+        <h2 class="sec">Community catalog</h2>
+        <p class="microhint" id="catalogNote" style="margin:0 0 12px"></p>
+        <div class="grid" id="catalogGrid"></div>
+      </div>
     </div>
   </section>
 
@@ -381,7 +392,7 @@
       </button>
 
       <h2 class="sec">Complications</h2>
-      <div class="comprow" style="margin-bottom:14px">
+      <div class="comprow">
         <label>Size</label>
         <div class="seg segfull" id="compSize">
           <button data-size="16">Small</button>
@@ -389,6 +400,15 @@
           <button data-size="23">Large</button>
         </div>
       </div>
+      <div class="comprow">
+        <label>Spacing</label>
+        <div class="seg segfull" id="compSpread">
+          <button data-spread="84">Tight</button>
+          <button data-spread="92">Normal</button>
+          <button data-spread="110">Wide</button>
+        </div>
+      </div>
+      <p class="microhint" id="layoutNote" style="margin:0 0 14px"></p>
       <div id="compRows"></div>
       <p class="microhint">Slots set to Off are removed from the face entirely — the
         remaining ones re-centre rather than leaving a gap.</p>
@@ -483,6 +503,20 @@
       <button class="chipbtn" id="tuneDone">Done</button>
     </div>
     <div class="tunescroll" id="tuneRows"></div>
+  </div>
+
+  <div class="sheet" id="sheetShare">
+    <div class="grab"></div>
+    <h3>Share to the catalog</h3>
+    <p class="hint">Writes <code>catalog/faces/&lt;slug&gt;.json</code> and validates it.
+      It does not open a pull request — publishing is your call. Commit the file and
+      open a PR when you are ready.</p>
+    <input type="text" id="shareAuthor" placeholder="Your name or handle" maxlength="60" autocomplete="off">
+    <div class="btnrow">
+      <button class="btn ghost" id="shareCancel">Cancel</button>
+      <button class="btn primary" id="shareConfirm">Stage submission</button>
+    </div>
+    <pre class="out" id="shareOut" hidden></pre>
   </div>
 
   <div class="sheet" id="sheetColor">
@@ -648,9 +682,38 @@ sizeSeg.querySelectorAll("button").forEach(b => {
     refresh();
   });
 });
+const spreadSeg = $("#compSpread");
+spreadSeg.querySelectorAll("button").forEach(b => {
+  b.addEventListener("click", () => {
+    state.complicationSpread = parseInt(b.dataset.spread, 10);
+    syncSize();
+    refresh();
+  });
+});
+
 function syncSize(){
   sizeSeg.querySelectorAll("button").forEach(b =>
     b.setAttribute("aria-pressed", String(parseInt(b.dataset.size,10) === state.complicationSize)));
+  // Nearest preset wins the highlight: the Fine tune slider can land between
+  // them, and leaving every button unlit reads as broken.
+  const opts = [...spreadSeg.querySelectorAll("button")];
+  const near = opts.reduce((a,b) =>
+    Math.abs(b.dataset.spread - state.complicationSpread) < Math.abs(a.dataset.spread - state.complicationSpread) ? b : a);
+  opts.forEach(b => b.setAttribute("aria-pressed", String(b === near)));
+}
+
+/* The geometry clamps size and spacing against the rim, the clock and each
+ * other. Saying so beats a control that silently does nothing. */
+async function refreshLayoutNote(){
+  try{
+    const e = await fetch(`/api/layout?${qs()}`).then(r=>r.json());
+    const bits = [];
+    if (e.sizeClamped) bits.push(`size reduced to ${e.size} to fit`);
+    if (e.spreadClamped) bits.push(`spacing adjusted to ${e.spread}`);
+    $("#layoutNote").textContent = bits.length
+      ? bits.join(" · ") + " — the dial ran out of room."
+      : "";
+  }catch(e){ /* transient while dragging */ }
 }
 
 function swatchRow(host, colors, key){
@@ -728,6 +791,7 @@ async function doRefresh(){
   try{
     const v = await fetch(`/api/validate?${q}`).then(r => r.json());
     if (mine !== seq) return;
+    refreshLayoutNote();
     const pill = $("#valid");
     if (!v.available){ pill.className = "pill"; $("#validText").textContent = "no schema"; return; }
     pill.className = "pill " + (v.valid ? "ok" : "bad");
@@ -765,6 +829,86 @@ async function loadPresets(){
   }
 }
 
+/* ---------------- community catalog ----------------
+ * The gallery reads the LOCAL catalog through the workbench. In production the
+ * same index is served from jsDelivr (not raw.githubusercontent.com, which is
+ * rate limited and not a CDN) -- the server reports that URL so the app never
+ * has it hardcoded in two places.
+ *
+ * Thumbnails are rendered from parameters by the same renderer as everything
+ * else. A catalog face is ~1KB of JSON; there are no images to ship.
+ */
+let catalogLoaded = false;
+$("#galleryTabs").querySelectorAll("button").forEach(b => {
+  b.addEventListener("click", () => {
+    const src = b.dataset.src;
+    $("#galleryTabs").querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-pressed", String(x === b)));
+    $("#stylesPane").hidden = src !== "styles";
+    $("#communityPane").hidden = src !== "community";
+    if (src === "community" && !catalogLoaded) loadCatalog();
+  });
+});
+
+async function loadCatalog(){
+  const grid = $("#catalogGrid");
+  grid.innerHTML = `<p class="microhint" style="grid-column:1/-1">Loading…</p>`;
+  const data = await fetch("/api/catalog").then(r=>r.json());
+  catalogLoaded = true;
+  $("#catalogNote").textContent =
+    `${data.faces.length} face${data.faces.length===1?"":"s"} · parameters only, a few KB each · published via jsDelivr`;
+  grid.innerHTML = "";
+  if (!data.faces.length){
+    grid.innerHTML = `<p class="microhint" style="grid-column:1/-1">
+      Nothing published yet. Save a face, then Share it from My faces.</p>`;
+    return;
+  }
+  for (const f of data.faces){
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<img loading="lazy" alt="" src="/api/face.png?${f.query}&size=340">
+      <div class="nm"></div><div class="sub"></div>`;
+    card.querySelector(".nm").textContent = f.name;
+    card.querySelector(".sub").textContent = f.author ? `by ${f.author}` : "unattributed";
+    card.addEventListener("click", () => {
+      applyQuery(f.query);
+      currentName = f.name;
+      syncTune(); show("studio"); refresh();
+    });
+    grid.appendChild(card);
+  }
+}
+
+/* ---------------- share to catalog ---------------- */
+let shareSlug = null;
+$("#shareCancel").addEventListener("click", closeSheets);
+$("#shareConfirm").addEventListener("click", async () => {
+  if (!shareSlug) return;
+  const out = $("#shareOut");
+  out.hidden = false;
+  out.textContent = "validating…";
+  const author = encodeURIComponent($("#shareAuthor").value.trim());
+  const r = await fetch(`/api/catalog?slug=${encodeURIComponent(shareSlug)}&author=${author}`,
+                        { method:"POST" }).then(r=>r.json());
+  if (r.ok){
+    out.textContent =
+      `Staged ${r.path}
+
+It validated: parses, renders, and emits schema-valid WFF.
+
+` +
+      `Next:
+  git add ${r.path} catalog/index.json
+  git commit -m "catalog: add ${r.slug}"
+` +
+      `  then open a pull request`;
+    catalogLoaded = false;             // the gallery is stale now
+    toast("Submission staged");
+  } else {
+    out.textContent = "Refused:\n" + (r.error || "unknown");
+  }
+});
+
 /* ---------------- my faces ---------------- */
 async function loadMine(){
   const host = $("#mineList");
@@ -789,6 +933,7 @@ async function loadMine(){
       <div class="acts">
         <button class="mini" data-act="open">Open</button>
         <button class="mini" data-act="install">Install</button>
+        <button class="mini" data-act="share">Share</button>
         <button class="mini danger" data-act="del">Delete</button>
       </div>`;
     row.querySelector(".nm").textContent = f.name;
@@ -801,6 +946,13 @@ async function loadMine(){
       $("#installOut").hidden = true; $("#installGo").disabled = false;
       $("#installGo").textContent = "Build APK";
       openSheet("#sheetInstall");
+    });
+    row.querySelector('[data-act="share"]').addEventListener("click", () => {
+      shareSlug = f.slug;
+      $("#shareAuthor").value = "";
+      $("#shareOut").hidden = true;
+      openSheet("#sheetShare");
+      setTimeout(() => $("#shareAuthor").focus(), 260);
     });
     row.querySelector('[data-act="del"]').addEventListener("click", async () => {
       await fetch(`/api/faces?slug=${encodeURIComponent(f.slug)}`, { method:"DELETE" });
