@@ -120,14 +120,14 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 
 Verified — built and run, not assumed:
 
-- `:generator` — 327 tests green, including validation against Google's official
+- `:generator` — 335 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
 - `:appcore` — 30 tests green. Rules and words the shipped apps share, pure
   JVM. Not `:generator` (that is the file format) and not `:workbench` (never
   shipped). Holds `ActivationConsent`, whose one-shot rule guards the only
   unrecoverable action in the system.
-- `:workbench` — 94 tests green. Serves the app at localhost:7777; bakes
+- `:workbench` — 98 tests green. Serves the app at localhost:7777; bakes
   `dial_bg.png`, `preview.png`, `watchface.xml`, `strings.xml` and the manifest
   package from parameters. Quantization measured at 64 colours, mean error
   0.51/255. Saves designs to `faces/<slug>.json`, the catalog format.

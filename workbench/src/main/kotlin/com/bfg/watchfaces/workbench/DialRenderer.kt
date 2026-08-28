@@ -4,6 +4,7 @@ import com.bfg.watchfaces.generator.DIAL_CENTER
 import com.bfg.watchfaces.generator.DIAL_RADIUS
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.DialShading
 import com.bfg.watchfaces.generator.EngravedStroke
 import com.bfg.watchfaces.generator.PatternEngines
 import com.bfg.watchfaces.generator.TextureField
@@ -97,10 +98,10 @@ object DialRenderer {
         val procedural = TextureField.kindFor(p.engine)
         if (texture != null) drawTexture(g, texture, p)
         else if (procedural != null) drawProcedural(g, procedural, p, dial, size)
-        else drawSheen(g, dial, p.sheen)
+        else drawSheen(g, p)
 
         if (texture == null && procedural == null) drawPattern(g, p, dial, ink)
-        drawVignette(g, p.vignette)
+        drawVignette(g, p)
 
         g.dispose()
         return img
@@ -129,7 +130,7 @@ object DialRenderer {
             g.color = alpha(hex(p.dialColor), (fade * 235).toInt())
             g.fillRect(0, 0, DIAL_SIZE, DIAL_SIZE)
         }
-        drawSheen(g, hex(p.dialColor), p.sheen * 0.5)
+        drawSheen(g, p.copy(sheen = p.sheen * 0.5))
     }
 
     /**
@@ -191,7 +192,7 @@ object DialRenderer {
         g.clip(Ellipse2D.Double(0.0, 0.0, size.toDouble(), size.toDouble()))
         g.drawImage(img, 0, 0, null)
         g.transform = old
-        drawSheen(g, dial, p.sheen)
+        drawSheen(g, p)
     }
 
     /** Lighten or darken a channel by t in roughly [-1, 1]. */
@@ -203,16 +204,15 @@ object DialRenderer {
     }
 
     /** Soft directional lustre, as if light falls across brushed metal. */
-    private fun drawSheen(g: java.awt.Graphics2D, dial: Color, sheen: Double) {
-        if (sheen <= 0.0) return
-        val k = (sheen / 100.0).coerceIn(0.0, 1.0)
-        val light = alpha(mix(dial, Color.WHITE, 0.75), (k * 90).toInt())
-        val dark = alpha(mix(dial, Color.BLACK, 0.55), (k * 70).toInt())
+    private fun drawSheen(g: java.awt.Graphics2D, params: DialParams) {
+        // Described in :generator so the Android renderer gets the identical
+        // gradient rather than a second copy of these constants.
+        val spec = DialShading.sheen(params) ?: return
         g.paint = java.awt.LinearGradientPaint(
-            Point2D.Double(DIAL_SIZE * 0.12, DIAL_SIZE * 0.05),
-            Point2D.Double(DIAL_SIZE * 0.88, DIAL_SIZE * 0.95),
-            floatArrayOf(0.0f, 0.5f, 1.0f),
-            arrayOf(light, alpha(dial, 0), dark)
+            Point2D.Double(spec.fromX, spec.fromY),
+            Point2D.Double(spec.toX, spec.toY),
+            spec.stops.map { it.at }.toFloatArray(),
+            spec.stops.map { Color(it.argb, true) }.toTypedArray()
         )
         g.fillRect(0, 0, DIAL_SIZE, DIAL_SIZE)
     }
@@ -286,14 +286,13 @@ object DialRenderer {
     }
 
     /** Darkened rim. Keeps the eye on the time and hides engine edge artifacts. */
-    private fun drawVignette(g: java.awt.Graphics2D, vignette: Double) {
-        if (vignette <= 0.0) return
-        val k = (vignette / 100.0).coerceIn(0.0, 1.0)
+    private fun drawVignette(g: java.awt.Graphics2D, params: DialParams) {
+        val spec = DialShading.vignette(params) ?: return
         g.paint = RadialGradientPaint(
-            Point2D.Double(DIAL_CENTER, DIAL_CENTER),
-            DIAL_RADIUS.toFloat(),
-            floatArrayOf(0.0f, 0.55f, 1.0f),
-            arrayOf(Color(0, 0, 0, 0), Color(0, 0, 0, (k * 40).toInt()), Color(0, 0, 0, (k * 235).toInt())),
+            Point2D.Double(spec.centerX, spec.centerY),
+            spec.radius.toFloat(),
+            spec.stops.map { it.at }.toFloatArray(),
+            spec.stops.map { Color(it.argb, true) }.toTypedArray(),
             MultipleGradientPaint.CycleMethod.NO_CYCLE
         )
         g.fillRect(0, 0, DIAL_SIZE, DIAL_SIZE)

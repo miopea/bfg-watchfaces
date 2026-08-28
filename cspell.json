@@ -63,6 +63,7 @@
     "logcat",
     "mdpi",
     "nodpi",
+    "nogroup",
     "protoc",
     "miopea",
     "luminance",

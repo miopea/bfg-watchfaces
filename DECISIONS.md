@@ -1,5 +1,60 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — The Android renderer, and why the emulator is not an option
+
+`:mobile` can draw a dial. `AndroidDialRenderer` is the second rasterizer
+`DECISIONS.md` 2026-08-27 warned about, built the way 2026-08-28 said to build
+it: with nothing in it worth drifting.
+
+### The defence is not a pixel comparison, because there cannot be one
+
+One renderer is AWT on the JVM; the other is Android `Canvas` on hardware that
+does not exist here. No byte comparison between them can ever be run on this
+machine.
+
+So the property being defended is different: **neither renderer decides
+anything.** `EngravedStroke` owns the three stroke passes, `DialShading` now
+owns the sheen and the vignette, `PatternEngines` owns the geometry.
+`AndroidDialRenderer` contains no colour arithmetic, no offsets, no gradient
+stops and no stroke widths — and `RendererParityTest` asserts that absence by
+reading the source, because an absence cannot be asserted any other way. If a
+dial ever looks wrong on device, the bug is a drawing call, not a judgement.
+
+`DialShading` was extracted the same way the stroke passes were, and checked the
+same way: twelve sheen × vignette combinations rendered byte-identically before
+and after.
+
+### Deliberately not ported
+
+The generated surfaces and imported images fall back to a plain dial for now —
+`TextureField` is pure and ports directly, but the per-pixel shading loop is real
+work and deserves its own pass. The lens is absent on purpose: 2026-08-27 records
+that it never reaches the emitted WFF, so drawing it on device would make the
+preview differ from the installed face in the one direction that matters.
+
+### The emulator: it is KVM, and there is no way round it
+
+Worth recording because it looks like it should have an answer, and two were
+tried.
+
+`/dev/kvm` is owned by `nobody:nogroup` because the kvm group (gid 993) is not
+mapped into this user namespace, which maps only 1000 and 65534. The emulator
+refuses outright: "x86_64 emulation currently requires hardware acceleration!"
+
+The obvious escape is an **arm64** system image, since the SDK ships
+`qemu-system-aarch64` and full software emulation needs no KVM. Wear OS 6 arm64
+exists, and it was installed and tried. The emulator rejects it:
+
+> `FATAL | Avd's CPU Architecture 'arm64' is not supported by the QEMU2 emulator
+> on x86_64 host. System image must match the host architecture.`
+
+That binary is for arm64 HOSTS. There is no cross-architecture path. Both routes
+are closed, and the x86_64 image was restored so that fixing KVM is the only
+remaining gap.
+
+A second, quieter blocker surfaced on the way: the disk is at 98%. Even a
+workable image would not have fit without freeing space first.
+
 ## 2026-08-28 — The controls live in `:generator`, and a slider was lying
 
 `ControlInventory` replaces the hardcoded control lists in the app. Both front
