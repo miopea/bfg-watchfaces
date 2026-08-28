@@ -51,6 +51,11 @@ its name when someone saves it, and that name becomes the carousel label, the
 hardcoded face identity — that is what "Silver Sand" was, and it went away on
 2026-08-27.
 
+**Controls come from `ControlInventory`.** Which sliders exist, their ranges and
+their order live in `:generator`; both UIs build from it. Labels and the curated
+engine order stay in the UI — those are presentation. Do not hardcode a control
+list in a front end.
+
 **Slot positions come from `SlotGeometry`, not from arithmetic you write.** The
 emitter and the preview both call it. They used to compute boxes independently
 with a test asserting they matched, and they matched while overlapping on both
@@ -115,7 +120,7 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 
 Verified — built and run, not assumed:
 
-- `:generator` — 190 tests green, including validation against Google's official
+- `:generator` — 327 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
 - `:appcore` — 30 tests green. Rules and words the shipped apps share, pure

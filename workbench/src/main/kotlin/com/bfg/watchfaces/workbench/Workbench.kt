@@ -72,6 +72,7 @@ object Workbench {
         server.createContext("/logos/") { ex -> safe(ex) { serveLogo(ex) } }
         server.createContext("/api/devices") { ex -> safe(ex) { serveDevices(ex) } }
         server.createContext("/api/activation") { ex -> safe(ex) { serveActivation(ex) } }
+        server.createContext("/api/controls") { ex -> safe(ex) { serveControls(ex) } }
         server.start()
 
         println()
@@ -384,6 +385,28 @@ object Workbench {
             """"blocked":${d.blockedReason?.let { jsonStr(it) } ?: "null"}}"""
         }
         json(ex, """{"available":true,"devices":[$rows]}""")
+    }
+
+    /**
+     * Everything a UI needs to build its own controls.
+     *
+     * The app used to hardcode these lists and a test checked they matched
+     * :generator. Now it builds itself from this, so the two cannot disagree
+     * rather than being checked for disagreement — see ControlInventory.
+     *
+     * Labels are NOT here, deliberately. They are presentation and belong to
+     * whichever front end is drawing.
+     */
+    private fun serveControls(ex: HttpExchange) {
+        val controls = com.bfg.watchfaces.generator.ControlInventory.CONTROLS.joinToString(",") { c ->
+            """{"id":${jsonStr(c.id)},"min":${c.min},"max":${c.max},"step":${c.step},""" +
+            """"target":${jsonStr(c.target.name)},"integral":${c.integral}}"""
+        }
+        val engines = com.bfg.watchfaces.generator.Engine.entries.joinToString(",") { jsonStr(it.name) }
+        val sources = com.bfg.watchfaces.generator.ComplicationSource.entries.joinToString(",") { jsonStr(it.name) }
+        val slots = com.bfg.watchfaces.generator.SlotPosition.entries.joinToString(",") { jsonStr(it.name) }
+        json(ex, """{"controls":[$controls],"engines":[$engines],""" +
+                 """"complicationSources":[$sources],"slots":[$slots]}""")
     }
 
     /**

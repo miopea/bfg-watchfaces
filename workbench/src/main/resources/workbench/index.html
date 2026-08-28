@@ -680,45 +680,56 @@
  * would be a second renderer and would drift. See DECISIONS.md.
  * ------------------------------------------------------------------ */
 
-const ENGINES = [
-  ["KNOTWORK","Knotwork"], ["BOTANICAL","Botanical"], ["CLOUS","Clous de Paris"],
-  ["ROSETTE","Rosette"], ["BARLEYCORN","Barleycorn"], ["SUNBURST","Sunburst"],
-  ["LATTICE","Lattice"],
+/* WHAT to show comes from :generator via /api/controls. What to CALL it stays
+ * here: labels are presentation, and a watch screen may want shorter words than
+ * a phone. So these are label maps keyed by id, not lists -- if :generator gains
+ * an engine and nobody names it, the id shows through rather than the engine
+ * silently not existing in the app. ControlInventoryLabelsTest checks for that.
+ *
+ * Order is NOT decided here either. The inventory is ordered, so both front ends
+ * present the same controls in the same sequence. */
+const ENGINE_LABELS = {
+  KNOTWORK:"Knotwork", BOTANICAL:"Botanical", CLOUS:"Clous de Paris",
+  ROSETTE:"Rosette", BARLEYCORN:"Barleycorn", SUNBURST:"Sunburst", LATTICE:"Lattice",
   // Generated surfaces. Unlike "Your image" these are parameters, so a face
   // using one can still be shared to the community.
-  ["GRAIN","Grain"], ["BRUSHED","Brushed metal"], ["CARBON","Carbon"], ["LINEN","Linen"],
-  ["TEXTURE","Your image"], ["NONE","Plain"],
-];
+  GRAIN:"Grain", BRUSHED:"Brushed metal", CARBON:"Carbon", LINEN:"Linen",
+  TEXTURE:"Your image", NONE:"Plain",
+};
+let ENGINES = [];        // filled from /api/controls
 
 // Mirrors ComplicationSource in :generator. Those tokens are exactly the
 // schema's defaultProviderListType -- an unlisted one fails validation, which
 // means the face installs and then never appears in the carousel.
-const COMP_SOURCES = [
-  ["NONE","Off"], ["STEP_COUNT","Steps"], ["HEART_RATE","Heart rate"],
-  ["DAY_AND_DATE","Day and date"], ["DATE","Date"], ["DAY_OF_WEEK","Day of week"],
-  ["WATCH_BATTERY","Battery"], ["WORLD_CLOCK","World clock"], ["NEXT_EVENT","Next event"],
-  ["SUNRISE_SUNSET","Sunrise and sunset"], ["UNREAD_NOTIFICATION_COUNT","Notifications"],
-  ["APP_SHORTCUT","App shortcut"], ["FAVORITE_CONTACT","Favourite contact"],
-];
-const COMP_SLOTS = ["Top","Left","Middle","Right","Bottom"];  // order matches SlotPosition
+const COMP_LABELS = {
+  NONE:"Off", STEP_COUNT:"Steps", HEART_RATE:"Heart rate",
+  DAY_AND_DATE:"Day and date", DATE:"Date", DAY_OF_WEEK:"Day of week",
+  WATCH_BATTERY:"Battery", WORLD_CLOCK:"World clock", NEXT_EVENT:"Next event",
+  SUNRISE_SUNSET:"Sunrise and sunset", UNREAD_NOTIFICATION_COUNT:"Notifications",
+  APP_SHORTCUT:"App shortcut", FAVORITE_CONTACT:"Favourite contact",
+};
+let COMP_SOURCES = [];   // filled from /api/controls
+const SLOT_LABELS = { TOP:"Top", LEFT:"Left", MIDDLE:"Middle", RIGHT:"Right", BOTTOM:"Bottom" };
+let COMP_SLOTS = [];     // filled from /api/controls, in SlotPosition order
 
 const DIALS = ["#7D7369","#2B2E33","#23262B","#6E6A66","#8A7343","#5A6B77","#3E4A3F","#7A4A3C","#C9C3B6"];
 const INKS  = ["#FCF9F1","#FFFFFF","#E8E6E1","#C9A227","#1A1A1A"];
 
 /* Slider names are what someone SEES change, not what the parameter is called.
    "Vignette" and "Relief" are the engraver's words for it; nobody wearing the
-   watch has to learn them to darken an edge or deepen a cut. */
-const TUNE = [
-  ["scale","Pattern size",4,80,0.5], ["depth","Depth",0,20,0.1],
-  ["freq","Variation",1,24,1], ["stroke","Line width",0.2,4,0.05],
-  ["relief","Engraving",0,6,0.1], ["rotate","Angle",0,360,1],
-  ["contrast","Contrast",0,100,1], ["sheen","Sheen",0,100,1],
-  ["vignette","Edge shading",0,100,1],
-  ["timeSize","Clock size",40,170,1], ["timeY","Clock position",80,380,1],
-  ["complicationSpread","Spacing",60,150,1],
-  ["complicationY","Middle row",200,360,1],
-  ["dateY","Top slot",40,160,1], ["batteryY","Bottom slot",250,430,1],
-];
+   watch has to learn them to darken an edge or deepen a cut.
+
+   The RANGES are not here any more. min/max/step come from :generator, which is
+   the only place that can know what the geometry tolerates -- a slider that
+   went too far used to be invisible until somebody dragged it. */
+const TUNE_LABELS = {
+  scale:"Pattern size", depth:"Depth", freq:"Variation", stroke:"Line width",
+  relief:"Engraving", rotate:"Angle", contrast:"Contrast", sheen:"Sheen",
+  vignette:"Edge shading", timeSize:"Clock size", timeY:"Clock position",
+  complicationSpread:"Spacing", complicationY:"Middle row",
+  dateY:"Top slot", batteryY:"Bottom slot",
+};
+let TUNE = [];           // filled from /api/controls
 
 const state = {
   engine:"KNOTWORK", scale:26, depth:3, freq:7, stroke:1.05, relief:1.5, contrast:36,
@@ -777,8 +788,11 @@ function closeSheets(){
 }
 $("#scrim").addEventListener("click", closeSheets);
 
-/* ---------------- build the controls ---------------- */
+/* ---------------- build the controls ----------------
+ * These run AFTER /api/controls answers, because what to build is no longer
+ * known at parse time -- it comes from :generator. */
 const chips = $("#engineChips");
+function buildEngineChips(){
 for (const [val,label] of ENGINES){
   const b = document.createElement("button");
   b.textContent = label; b.dataset.engine = val;
@@ -793,9 +807,12 @@ for (const [val,label] of ENGINES){
   chips.appendChild(b);
 }
 
+}
+
 function compList(){ return state.complications.split(",").filter(Boolean); }
 
 const compHost = $("#compRows");
+function buildComplicationRows(){
 COMP_SLOTS.forEach((slotName, idx) => {
   const row = document.createElement("div");
   row.className = "comprow";
@@ -814,6 +831,7 @@ COMP_SLOTS.forEach((slotName, idx) => {
   row.appendChild(lab); row.appendChild(sel);
   compHost.appendChild(row);
 });
+}
 function syncComps(){
   const list = compList();
   COMP_SLOTS.forEach((_, idx) => {
@@ -893,6 +911,7 @@ swatchRow("#dialSw", DIALS, "dialColor");
 swatchRow("#inkSw", INKS, "inkColor");
 
 const tuneHost = $("#tuneRows");
+function buildTuneRows(){
 for (const [key,label,min,max,step] of TUNE){
   const row = document.createElement("div"); row.className = "row";
   row.innerHTML = `<label for="t_${key}">${label}</label>
@@ -905,6 +924,7 @@ for (const [key,label,min,max,step] of TUNE){
     $("#o_"+key).textContent = e.target.value;
     refresh();
   });
+}
 }
 function syncTune(){
   for (const [key] of TUNE){
@@ -1601,8 +1621,37 @@ $("#installGo").addEventListener("click", async () => {
   }
 });
 
+/* The single source of truth for WHICH controls exist, from :generator.
+ * Labels are joined on here; an id with no label shows as the id rather than
+ * disappearing, so a new engine is visible rather than silently unreachable. */
+async function loadControls(){
+  const inv = await fetch("/api/controls").then(r => r.json());
+  // WHICH engines exist is :generator's; the order they are SHOWN in is not.
+  // Knotwork leads because it is the flagship style, which is a presentation
+  // decision like the labels -- the enum's declaration order is not a running
+  // order. Anything :generator gains that is not listed here still appears,
+  // at the end, so a new engine is never unreachable.
+  const order = Object.keys(ENGINE_LABELS);
+  ENGINES = inv.engines
+    .slice()
+    .sort((a, b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib);
+    })
+    .map(id => [id, ENGINE_LABELS[id] || id]);
+  COMP_SOURCES = inv.complicationSources.map(id => [id, COMP_LABELS[id] || id]);
+  COMP_SLOTS = inv.slots.map(id => SLOT_LABELS[id] || id);
+  TUNE = inv.controls.map(c => [c.id, TUNE_LABELS[c.id] || c.id, c.min, c.max, c.step]);
+}
+
 /* ---------------- boot ---------------- */
 (async function boot(){
+  // Before anything reads ENGINES/TUNE/COMP_*: they are empty until this lands.
+  await loadControls();
+  buildEngineChips();
+  buildComplicationRows();
+  buildTuneRows();
+
   // A shared link restores a full design.
   const incoming = new URLSearchParams(location.search);
   let deep = false;

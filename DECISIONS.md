@@ -1,5 +1,53 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — The controls live in `:generator`, and a slider was lying
+
+`ControlInventory` replaces the hardcoded control lists in the app. Both front
+ends now build themselves from it, so they cannot disagree rather than being
+checked for disagreement. `DemoIsTheSpecTest` is gone: asserting that two
+generated things match is noise.
+
+Timed deliberately. `:mobile` exists but its controls were not yet hand-written,
+which is the one window where this costs nothing — before it there was no second
+consumer to design against, after it there would have been three copies.
+
+### The split is identifiers here, words there
+
+Ids, ranges and ordering moved. **Labels did not**, and neither did the starting
+design. `DialParams` already said presentation belongs to the UI, and a watch
+screen may want shorter words than a phone; dragging the copy into `:generator`
+to make a test easier would invent a constraint nobody asked for. The app opens
+on a Knotwork face, which is a curated preset rather than `DialParams`' bare
+defaults, and that distinction stays in the UI where it cannot be erased by
+accident.
+
+An unlabelled id falls back to showing the raw id, so a new engine appears as
+`GUILLOCHE` rather than silently not existing. `ControlLabelsTest` stops that
+shipping.
+
+**Engine ORDER is presentation too**, which the first cut got wrong. Building
+the chip row straight from `Engine.entries` opened the app on Lattice, because
+enum declaration order is not a running order — Knotwork leads because it is the
+flagship. The UI orders them and appends anything it does not recognise, so a
+new engine is never unreachable. Caught by driving the app, not by a test.
+
+### The slider that was lying
+
+The point of moving ranges was that `:generator` could not previously see what
+values a person could reach, so a range wider than the geometry tolerates stayed
+invisible until somebody dragged it.
+
+There was one. **`timeY` offered 80..380, and every value from 304 up makes
+complication slots overlap** with all five switched on — a quarter of the slider
+produced a visibly broken face. `SlotGeometry` cannot rescue it either: a clock
+that low leaves nowhere for a row to go, and it already shrinks slots to
+`MIN_SIZE` before giving up. Narrowed to 300, with the margin and the
+measurement recorded next to the number.
+
+The bound is the worst case, five slots. A face with none could sit the clock
+lower, and a range that changes with the number of complications switched on is
+a slider that moves under the user's finger.
+
 ## 2026-08-28 — google/pack builds our watch face, and is not the default yet
 
 Operator: "try pack-cli in build.sh I don't see a reason we don't just do this
