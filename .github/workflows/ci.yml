@@ -76,9 +76,14 @@ jobs:
       - name: Android SDK 36
         run: |
           set -euo pipefail
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;android-36" "build-tools;36.0.0"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # NOT `yes | sdkmanager --licenses`: sdkmanager stops reading, `yes`
+          # takes SIGPIPE, and pipefail turns that into a failed build. Feed it a
+          # bounded number of answers instead. The install below is the real
+          # gate -- it fails loudly if a licence was actually not accepted, so
+          # nothing is being papered over here.
+          printf 'y\n%.0s' $(seq 1 50) | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
 
       - run: ./gradlew :wear:assembleDebug :mobile:assembleDebug
 
