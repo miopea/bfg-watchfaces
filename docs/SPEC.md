@@ -119,8 +119,13 @@ identical on a soft low-contrast dial. Do this always.
 
 ## Community catalog
 
-Built. `catalog/faces/<slug>.json`, one per face, plus a generated
-`catalog/index.json`.
+Built, and it lives in its own public repository:
+<https://github.com/miopea/bfg-watchfaces-catalog>. `faces/<slug>.json`, one per
+face, plus a generated `index.json`.
+
+It is separate on purpose: strangers opening pull requests against a folder of
+JSON is a very different risk profile from strangers opening them against the
+app's source.
 
 - The index carries name, author, engine and colours only, so a gallery of a
   thousand faces is ONE request. Full parameters stay in the per-face files and
@@ -136,12 +141,17 @@ Built. `catalog/faces/<slug>.json`, one per face, plus a generated
 - The app stages a submission; it does not open the PR. Publishing is the
   author's action, not a button press in a design tool.
 
+Moderation and reporting are documented in the catalog repo's `MODERATION.md`:
+what is disallowed, how to report it, and how fast a report is acted on. Play's
+UGC policy requires a working complaint path for any app surfacing user content.
+
 Still open:
 
-- **Where it lives.** It is in this repo today. Before a public launch it should
-  move to its own repository: strangers opening PRs against the app's source is
-  a different risk profile from strangers opening PRs against a folder of JSON.
-- Play's UGC policy requires in-app reporting and moderation. Budget for it.
+- **The in-app Report action.** The catalog has an issue template and a stated
+  policy; the app does not yet link to it. That is the remaining store-blocking
+  gap.
+- **The catalog repo's CI cannot reach this validator while this repo is
+  private.** See DECISIONS.md 2026-08-28.
 
 ## Ongoing costs
 

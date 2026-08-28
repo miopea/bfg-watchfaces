@@ -19,13 +19,25 @@ object Catalog {
     fun main(args: Array<String>) {
         System.setProperty("java.awt.headless", "true")
         val checkOnly = args.contains("--check")
-        val root = findRoot()
-        val dir = CatalogStore.dir(root)
+        val repoRoot = findRoot()
 
-        println("catalog: ${dir.relativeTo(root)}")
+        // --dir lets the catalog repo's own CI validate its checkout using this
+        // validator, so there is one implementation rather than a copy that
+        // drifts. Without it, resolve the usual places.
+        val explicit = args.firstOrNull { it.startsWith("--dir=") }?.removePrefix("--dir=")
+        val catalogRoot = explicit?.let { File(it) } ?: CatalogStore.resolveRoot(repoRoot)
+        if (catalogRoot == null) {
+            println("no catalog checkout found.")
+            println("  clone ${CatalogStore.REPO_URL} beside this repo, or set BFG_CATALOG_DIR")
+            return
+        }
+        val root = repoRoot          // schema lives here; the catalog may not
+        val dir = CatalogStore.dir(catalogRoot)
+
+        println("catalog: ${dir.absolutePath}")
 
         val faces = (dir.listFiles { f -> f.extension == "json" } ?: emptyArray()).size
-        val indexed = indexedCount(root)
+        val indexed = indexedCount(catalogRoot)
 
         // An index that disagrees with the faces beside it is worse than no
         // index at all. This is not hypothetical: an unanchored `faces/` line in
@@ -41,8 +53,8 @@ object Catalog {
         if (!dir.isDirectory || faces == 0) {
             println("  no faces yet -- nothing to validate")
             if (!checkOnly) {
-                CatalogStore.writeIndex(root)
-                println("  wrote an empty ${CatalogStore.indexFile(root).relativeTo(root)}")
+                CatalogStore.writeIndex(catalogRoot)
+                println("  wrote an empty ${CatalogStore.indexFile(catalogRoot).absolutePath}")
             }
             return
         }
@@ -61,7 +73,7 @@ object Catalog {
             println("$msg. Run scripts/bootstrap.sh.")
         }
 
-        val problems = CatalogStore.validateAll(root)
+        val problems = CatalogStore.validateAll(root, catalogRoot)
         if (problems.isNotEmpty()) {
             System.err.println()
             System.err.println("  ${problems.size} problem(s):")
@@ -76,8 +88,8 @@ object Catalog {
         if (checkOnly) {
             // Regenerate in memory and compare, so a stale committed index is a
             // failure rather than something that silently drifts from the faces.
-            val fresh = CatalogStore.buildIndex(root)
-            val existing = CatalogStore.indexFile(root).takeIf { it.isFile }?.readText() ?: ""
+            val fresh = CatalogStore.buildIndex(catalogRoot)
+            val existing = CatalogStore.indexFile(catalogRoot).takeIf { it.isFile }?.readText() ?: ""
             if (stripGenerated(fresh) != stripGenerated(existing)) {
                 System.err.println("  index.json is out of date. Run: ./gradlew :workbench:catalog")
                 kotlin.system.exitProcess(1)
@@ -86,8 +98,8 @@ object Catalog {
             return
         }
 
-        val n = CatalogStore.writeIndex(root)
-        println("  wrote ${CatalogStore.indexFile(root).relativeTo(root)} ($n face(s))")
+        val n = CatalogStore.writeIndex(catalogRoot)
+        println("  wrote ${CatalogStore.indexFile(catalogRoot).absolutePath} ($n face(s))")
         println("  served in production from ${CatalogStore.CDN_URL}")
     }
 

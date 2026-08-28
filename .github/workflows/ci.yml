@@ -38,15 +38,11 @@ jobs:
           test -s watchface-template/res/drawable-nodpi/preview.png
           test -s watchface-template/res/raw/watchface.xml
 
-      # Every catalog submission must parse, render, and emit schema-valid WFF.
-      # docs/SPEC.md says invalid faces are rejected before human review -- which
-      # is only true if a bad face FAILS THE BUILD. A reviewer cannot see that a
-      # face is schema-invalid by reading the diff, and on a watch the failure is
-      # silence, not an error.
-      #
-      # --check also fails on a stale index.json, so the generated file cannot
-      # drift from the faces it indexes.
-      - run: ./gradlew :workbench:catalog --args="--check"
+      # No catalog step here. The catalog moved to its own public repository and
+      # is validated by ITS CI, using this validator. Running --check here would
+      # find no checkout, print "nothing to validate" and pass -- a step that
+      # measures nothing, which is the defect this file exists to avoid.
+      #   https://github.com/miopea/bfg-watchfaces-catalog
 
       - uses: actions/upload-artifact@v4
         if: failure()

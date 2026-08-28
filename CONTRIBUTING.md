@@ -56,9 +56,13 @@ rather than rejected. Do not store 8-digit colours in `DialParams`.
 
 ## Face submissions
 
-The catalog lives in `catalog/faces/<slug>.json`, with a generated
-`catalog/index.json`. In production it is served from jsDelivr — not
+The catalog is a separate public repository:
+<https://github.com/miopea/bfg-watchfaces-catalog>, holding `faces/<slug>.json`
+and a generated `index.json`. In production it is served from jsDelivr — not
 `raw.githubusercontent.com`, which is rate limited and is not a CDN.
+
+Clone it beside this repo and the workbench finds it automatically; otherwise set
+`BFG_CATALOG_DIR`.
 
 To submit a face:
 
@@ -68,12 +72,13 @@ To submit a face:
 
    ```bash
    ./gradlew :workbench:catalog          # revalidate + rewrite the index
-   git add catalog/faces/<slug>.json catalog/index.json
+   cd ../bfg-watchfaces-catalog
+   git add faces/<slug>.json index.json
    git commit -m "catalog: add <slug>"
    ```
 
-CI runs `./gradlew :workbench:catalog --args="--check"` on every PR. It fails if
-a face does not parse, does not render, emits schema-invalid WFF, has a slug that
+The catalog repo's CI runs this same validator on every PR. It fails if a face
+does not parse, does not render, emits schema-invalid WFF, has a slug that
 disagrees with its name or filename, exceeds 8KB, or if `index.json` is stale.
 
 **This is a build gate, not review advice.** A reviewer cannot see that a face is

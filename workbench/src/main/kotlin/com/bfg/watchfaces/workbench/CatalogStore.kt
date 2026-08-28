@@ -31,7 +31,10 @@ import java.time.Instant
 object CatalogStore {
 
     /** jsDelivr, per docs/SPEC.md. Pinned to a ref so a bad main cannot break clients. */
-    const val CDN_URL = "https://cdn.jsdelivr.net/gh/miopea/bfg-watchfaces@main/catalog/index.json"
+    const val CDN_URL = "https://cdn.jsdelivr.net/gh/miopea/bfg-watchfaces-catalog@main/index.json"
+
+    /** Where submissions are opened, and where a face is reported. */
+    const val REPO_URL = "https://github.com/miopea/bfg-watchfaces-catalog"
 
     /** A face is parameters. Anything much larger than this is not a face. */
     const val MAX_FACE_BYTES = 8 * 1024
@@ -46,8 +49,33 @@ object CatalogStore {
 
     data class Problem(val file: String, val message: String)
 
-    fun dir(root: File): File = File(root, "catalog/faces")
-    fun indexFile(root: File): File = File(root, "catalog/index.json")
+    /**
+     * Resolve the catalog root.
+     *
+     * The catalog is its own public repository now -- strangers opening pull
+     * requests against a folder of JSON is a very different risk profile from
+     * strangers opening them against the app's source. Order of preference:
+     *
+     *   1. BFG_CATALOG_DIR, for anyone working on a checkout somewhere else
+     *   2. a sibling clone, which is what a contributor working on both has
+     *   3. catalog/ inside this repo, which is the legacy in-tree location
+     *
+     * Returns null when none exists; the caller falls back to the CDN.
+     */
+    fun resolveRoot(repoRoot: File): File? {
+        System.getenv("BFG_CATALOG_DIR")?.takeIf { it.isNotBlank() }?.let {
+            val f = File(it)
+            if (File(f, "faces").isDirectory) return f
+        }
+        val sibling = File(repoRoot.parentFile, "bfg-watchfaces-catalog")
+        if (File(sibling, "faces").isDirectory) return sibling
+        val inTree = File(repoRoot, "catalog")
+        if (File(inTree, "faces").isDirectory) return inTree
+        return null
+    }
+
+    fun dir(root: File): File = File(root, "faces")
+    fun indexFile(root: File): File = File(root, "index.json")
 
     // ---- reading ------------------------------------------------------------
 
@@ -133,10 +161,15 @@ object CatalogStore {
         return problems
     }
 
-    /** Validates every face and reports duplicates across the whole catalog. */
-    fun validateAll(root: File): List<Problem> {
-        val files = (dir(root).listFiles { f -> f.extension == "json" } ?: emptyArray()).sortedBy { it.name }
-        val problems = files.flatMap { validate(root, it) }.toMutableList()
+    /**
+     * Validates every face and reports duplicates.
+     *
+     * [schemaRoot] is where the WFF schema lives (the app repo); [catalogRoot]
+     * is the catalog checkout. They are different repositories now.
+     */
+    fun validateAll(schemaRoot: File, catalogRoot: File = schemaRoot): List<Problem> {
+        val files = (dir(catalogRoot).listFiles { f -> f.extension == "json" } ?: emptyArray()).sortedBy { it.name }
+        val problems = files.flatMap { validate(schemaRoot, it) }.toMutableList()
 
         val bySlug = files.groupBy { it.nameWithoutExtension }
         bySlug.filterValues { it.size > 1 }.forEach { (slug, dupes) ->

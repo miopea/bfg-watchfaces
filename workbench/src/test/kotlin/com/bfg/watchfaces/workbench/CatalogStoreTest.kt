@@ -156,19 +156,23 @@ class CatalogStoreTest {
     }
 
     @Test
-    fun `the shipped catalog is valid and its index is current`() {
-        // Guards the real catalog/ in this repo, not a fixture: a committed
-        // index that has drifted from the faces is exactly what CI --check
-        // catches, and this fails the same way locally.
-        val root = repoRoot()
-        if (!CatalogStore.dir(root).isDirectory) return
-        val problems = CatalogStore.validateAll(root)
-        assertTrue(problems.isEmpty()) { "shipped catalog is invalid:\n" + problems.joinToString("\n") }
+    fun `a catalog checkout, if present, is valid and its index is current`() {
+        // The catalog is its own public repository now, so this repo usually has
+        // no checkout and there is nothing to assert. When a contributor DOES
+        // have one beside this repo, holding it to the same bar locally is
+        // cheaper than finding out in the catalog repo's CI.
+        val repo = repoRoot()
+        val catalog = CatalogStore.resolveRoot(repo)
+        org.junit.jupiter.api.Assumptions.assumeTrue(catalog != null) {
+            "no catalog checkout beside this repo -- clone ${CatalogStore.REPO_URL} to include it"
+        }
+        val problems = CatalogStore.validateAll(repo, catalog!!)
+        assertTrue(problems.isEmpty()) { "catalog is invalid:\n" + problems.joinToString("\n") }
 
         fun strip(s: String) = s.lines().filterNot { it.trimStart().startsWith("\"generated\"") }.joinToString("\n")
-        val onDisk = CatalogStore.indexFile(root).takeIf { it.isFile }?.readText().orEmpty()
-        assertEquals(strip(CatalogStore.buildIndex(root)), strip(onDisk)) {
-            "catalog/index.json is stale -- run ./gradlew :workbench:catalog"
+        val onDisk = CatalogStore.indexFile(catalog).takeIf { it.isFile }?.readText().orEmpty()
+        assertEquals(strip(CatalogStore.buildIndex(catalog)), strip(onDisk)) {
+            "index.json is stale -- run ./gradlew :workbench:catalog"
         }
     }
 }
