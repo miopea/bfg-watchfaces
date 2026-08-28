@@ -22,8 +22,11 @@
     display:flex;align-items:center;justify-content:center;
   }
 
-  /* ---- phone shell -------------------------------------------------- */
-  .phone{
+  /* ---- device shell --------------------------------------------------
+     "device", not "phone": this is the app people design faces in, and it runs
+     on a tablet the same way. The frame is only chrome for a desktop browser --
+     on the real thing it fills the screen. */
+  .device{
     width:400px;height:860px;max-height:100vh;position:relative;
     background:var(--bg);border-radius:38px;overflow:hidden;
     box-shadow:0 0 0 10px #16181c, 0 0 0 12px #2a2e35, 0 30px 80px rgba(0,0,0,.7);
@@ -31,7 +34,7 @@
   }
   @media (max-width:520px), (max-height:900px){
     body{align-items:stretch;justify-content:stretch}
-    .phone{width:100%;height:100%;max-height:none;border-radius:0;box-shadow:none}
+    .device{width:100%;height:100%;max-height:none;border-radius:0;box-shadow:none}
   }
 
   .appbar{
@@ -412,7 +415,7 @@
 </style>
 </head>
 <body>
-<div class="phone">
+<div class="device">
 
   <div class="appbar">
     <h1 id="title">Designs</h1>
@@ -1365,7 +1368,7 @@ $("#fileInput").addEventListener("change", async e => {
  * Saturation/brightness pad + hue slider, in-app. Replaces
  * <input type="color">, which delegates to the operating system's own dialog
  * -- a desktop chooser on Windows that cannot be styled and does not belong in
- * a phone UI. Drawing gradients here is fine: this is chrome, not the dial.
+ * a handheld UI. Drawing gradients here is fine: this is chrome, not the dial.
  * The one rule that still holds is that no watch-face PIXEL is drawn here.
  */
 let pickKey = null, pickHost = null, pickH = 30, pickS = 1, pickV = 1;

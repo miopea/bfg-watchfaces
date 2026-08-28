@@ -25,7 +25,7 @@ On Windows, run the shell scripts from WSL or Git Bash.
 
 **Work in `:generator` whenever you can.** Pure Kotlin/JVM, no Android
 dependency, runs in seconds without an emulator. Geometry, params, and WFF
-emission all belong there. Only reach for `:phone` or `:wear` when the task
+emission all belong there. Only reach for `:mobile` or `:wear` when the task
 genuinely needs Android APIs.
 
 **Use the workbench instead of building an APK.** `./gradlew
@@ -109,7 +109,7 @@ Verified — built and run, not assumed:
 - `:generator` — 177 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
-- `:workbench` — 89 tests green. Serves the app at localhost:7777; bakes
+- `:workbench` — 94 tests green. Serves the app at localhost:7777; bakes
   `dial_bg.png`, `preview.png`, `watchface.xml`, `strings.xml` and the manifest
   package from parameters. Quantization measured at 64 colours, mean error
   0.51/255. Saves designs to `faces/<slug>.json`, the catalog format.
@@ -122,7 +122,7 @@ Verified — built and run, not assumed:
 
 Scaffolded, never built or run:
 
-- `:phone`, `:wear` — build files and a manifest only. Commented out of
+- `:mobile`, `:wear` — build files and a manifest only. Commented out of
   `settings.gradle.kts`. Uncomment as you implement them.
 
 Never tested on hardware:

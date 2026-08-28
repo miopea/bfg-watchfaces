@@ -82,9 +82,9 @@ The last two are the expensive ones. Both fail silently.
 
 | Module | Depends on | Ships to a device |
 | --- | --- | --- |
-| `generator/` | nothing | via `phone/` |
+| `generator/` | nothing | via `mobile/` |
 | `workbench/` | `generator/` | no — dev tooling |
-| `phone/`, `wear/` | `generator/` | yes (scaffolds only today) |
+| `mobile/`, `wear/` | `generator/` | yes (scaffolds only today) |
 
 `generator/` is deliberately dependency-free: it is the definition of the stored
 file format, so nothing may make it harder to test on a plain JVM.

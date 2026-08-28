@@ -1,5 +1,108 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — The app you can open is the app that ships, and it is Compose
+
+The localhost app is the SPECIFICATION for the shipped one, not a design toy
+that an Android app later approximates. Every screen, control and flow in it is
+one the shipped app has. Where the two disagree, the shipped app is wrong.
+
+The operator settled the shape of it in the interview, and their answer was not
+one of the options offered:
+
+> "What is the best for the user. A full binary APK that matches the demo or a
+> webview on the device. I want this 100% ON the device (except for the
+> community faces)."
+
+That is a constraint plus a delegation, not a choice between the two. So: a
+native Compose app, everything on the device, community faces over the network
+and nothing else.
+
+### The WebView option does not avoid the second rasterizer, and that changes the argument
+
+The framing this decision inherited was that Compose costs a second rasterizer —
+`DialRenderer` is AWT `Graphics2D`, so `:mobile` would need an Android `Canvas`
+port alongside it — and that a WebView over the same HTML would avoid paying it.
+
+It would not. `java.awt` does not exist on Android either, so a WebView app has
+exactly three ways to get a dial on screen:
+
+- redraw the pattern in JavaScript, which `DECISIONS.md` 2026-08-27 already
+  rejected as a second renderer that starts identical and drifts
+- call back into Kotlin for the PNG — which still has to rasterize with Android
+  `Canvas`, the same port
+- talk to a server, which the whole design exists to avoid
+
+The rasterizer port is owed either way. It is a consequence of shipping to
+Android at all, not of choosing Compose, so it cannot be the tiebreaker. With it
+removed from the scales the question is just which UI is better for the person
+using it, and that is not close: native scrolling and fling, system back,
+TalkBack, font scaling, haptics, and no JavaScript bridge between a slider drag
+and a redraw.
+
+`docs/SPEC.md` already planned for Android `Canvas` to drive both the live
+preview and the baked PNG, so what ships is what was previewed by construction.
+That plan stands; this decision adds that the localhost app defines what is
+drawn around it.
+
+### 100% on the device is reachable, and is already what the scaffold assumes
+
+Worth writing down because "no server anywhere" sounds like an aspiration and is
+not:
+
+- `google/pack` is a Rust library that compiles and signs a WFF APK on-device,
+  with no JDK, no Android SDK and no `android.jar`. Google's own Androidify app
+  uses it, and it can vary the package name, which `reskin.sh` cannot.
+- The Watch Face Push validation token is issued by a local validator —
+  `mobile/build.gradle.kts` already pulls `wfp.validator.android` for exactly
+  that, and the comment on it says "local token generation, no network".
+
+Neither has been run here. They are the scaffold's stated assumptions, recorded
+so the next reader knows the on-device claim rests on those two pieces and can
+check them first rather than discovering the dependency late.
+
+### Rejected: WebView over the same HTML
+
+Tempting because it makes "the app is the spec" true by construction — one file,
+no possibility of drift. Rejected because it pays that with a permanently worse
+app: a bridge between every control and every redraw, hand-built sheets in place
+of real Material ones, and accessibility that has to be re-earned rather than
+inherited. The drift problem is real and is answered below by other means.
+
+### Rejected: the demo as a design reference that :mobile is tested against
+
+This is what "the demo is the spec" was in danger of quietly becoming. It is the
+weakest option because it is the one that requires nobody to ever be careless.
+This repo has been bitten twice by precisely that: `SlotGeometry` exists because
+the slot arithmetic was written twice with a test asserting the copies agreed,
+and they agreed while overlapping on both axes; the JavaScript dial was rejected
+for the same reason before it was written.
+
+### So the correspondence has to be enforced, not asserted
+
+Added `DemoIsTheSpecTest`, which reads `index.html` and checks the app's control
+inventory against `:generator`: every `Engine` is offered, every
+`ComplicationSource` is offered, neither list invents anything the format cannot
+store, and the slot labels are in `SlotPosition` order. The interesting
+direction is the first one — an engine the app does not list is not a small
+omission, it is a piece of the file format no user can reach, which is the app
+having stopped being the spec. Each of the five assertions was ablated and
+fails when its mechanism is removed.
+
+It is a stopgap and says so. The real fix is one control inventory in
+`:generator` that both UIs build themselves from, so the lists cannot disagree
+rather than being checked for disagreement. That is not worth designing yet:
+there is one consumer today, and inventing the abstraction before the second one
+is real is how the wrong shape gets frozen.
+
+### phone/ is now mobile/
+
+The module was `:phone` for an app that runs on a tablet just as well, which is
+the same narrowing the copy pass took out of the UI. Renamed now, while it is an
+empty scaffold commented out of `settings.gradle.kts`, because the alternative
+is renaming it once it has a codebase in it. Android's own Wear project layout
+pairs `mobile/` with `wear/` for this reason. `:wear` keeps its name — that one
+really is a watch.
+
 ## 2026-08-28 — Spacing is one control, and it works on both axes (v5)
 
 "Spacing" moved the middle row and nothing else. Set it to Wide and three slots

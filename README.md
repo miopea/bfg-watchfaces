@@ -1,6 +1,6 @@
 # BFG Watch Faces
 
-Open-source Wear OS watch face generator. Design a dial on your phone, push it
+Open-source Wear OS watch face generator. Design a dial on your own device, push it
 to your watch. No server, no account, no ads.
 
 Requires Wear OS 6+ (Pixel Watch 4 / 5, recent Galaxy Watch).
@@ -30,7 +30,7 @@ That is the whole inner loop for pattern and layout work.
 ./gradlew :workbench:workbench    # then open http://localhost:7777
 ```
 
-A three-tab phone app: browse styles, customise one in the Studio against a live
+A four-tab app: browse styles, customise one in the Studio against a live
 watch preview, name it, and build an installable APK. It validates the emitted
 WFF against Google's XSD **on every change** — which matters more than it sounds,
 because a schema-invalid face installs perfectly and then silently never appears
@@ -75,7 +75,7 @@ On Windows, run the shell scripts from WSL or Git Bash.
 | --- | --- |
 | `generator/` | Pure Kotlin. Engines, params, WFF emitter. **Start here.** |
 | `workbench/` | Localhost design loop, rasterizer, quantizer, headless bake |
-| `phone/` | Compose design UI (scaffold) |
+| `mobile/` | Compose design UI (scaffold) |
 | `wear/` | Watch Face Push host (scaffold) |
 | `watchface-template/` | Verified aapt2 WFF build — packaged per design |
 | `docs/SPEC.md` | Architecture and constraints — read this first |
@@ -86,7 +86,7 @@ On Windows, run the shell scripts from WSL or Git Bash.
 
 A watch face is Watch Face Format: declarative XML plus a background image, no
 code. `generator` turns a small parameter set into that XML and the geometry for
-the dial texture. On a phone, `google/pack` compiles and signs the APK locally
+the dial texture. On the device, `google/pack` compiles and signs the APK locally
 and Watch Face Push installs it on the watch. Nothing touches a server.
 
 Because faces are stored as parameters rather than images, a shared face is a

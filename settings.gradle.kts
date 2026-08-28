@@ -20,5 +20,5 @@ include(":generator")
 include(":workbench")
 
 // Android modules. Uncomment once you have ANDROID_HOME configured locally.
-// include(":phone")
+// include(":mobile")
 // include(":wear")

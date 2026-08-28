@@ -1,12 +1,16 @@
-// SCAFFOLD -- never built or run. Uncomment ":phone" in settings.gradle.kts
+// SCAFFOLD -- never built or run. Uncomment ":mobile" in settings.gradle.kts
 // once ANDROID_HOME is configured.
+//
+// "mobile", not "phone": this is the app people design faces in, and it runs
+// on a tablet just as well. Android's own Wear project layout pairs mobile/
+// with wear/ for the same reason.
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
 }
 
 android {
-    namespace = "com.bfg.watchfaces.phone"
+    namespace = "com.bfg.watchfaces.mobile"
     compileSdk = 35
     defaultConfig {
         // FROZEN AT FIRST PLAY RELEASE. applicationId can never be changed

@@ -1,7 +1,7 @@
 # BFG Watch Faces -- Specification
 
-An open-source Wear OS watch face generator. Users design a dial on their phone
-and push it to their watch. No server, no account, no ads, no cost to run.
+An open-source Wear OS watch face generator. Users design a dial on their own
+device and push it to their watch. No server, no account, no ads, no cost to run.
 
 ## Why this is possible at all
 
@@ -15,7 +15,7 @@ Three pieces landed recently that together remove every reason this needed a bac
    with no JDK, no Android SDK, no `android.jar`. Written specifically for WFF
    packages. Google's own Androidify app uses it.
 
-So the entire pipeline runs on the phone:
+So the entire pipeline runs on the device:
 
 ```text
 params -> pack builds APK -> validator issues token -> Data Layer -> addWatchFace()
@@ -27,7 +27,7 @@ No network call anywhere in that chain.
 
 **Community faces are parameter files, not images.**
 
-A face is ~5KB of JSON. The phone regenerates the artwork locally. Consequences:
+A face is ~5KB of JSON. The device regenerates the artwork locally. Consequences:
 
 - A catalog of 10,000 faces is ~50MB of Git repo. Hosting is free via jsDelivr.
 - **The generator is the file format.** `DialParams` + `PatternEngines` together
@@ -43,7 +43,7 @@ A face is ~5KB of JSON. The phone regenerates the artwork locally. Consequences:
 ```text
 generator/           Pure Kotlin/JVM. No Android. Engines, params, WFF emitter.
                      35 tests, runs in CI without an emulator. Do work here first.
-phone/               Compose app: design UI, pack integration, Data Layer client.
+mobile/              Compose app: design UI, pack integration, Data Layer client.
 wear/                Thin Wear app: WatchFacePushManager, Data Layer listener.
 watchface-template/  Standalone aapt2 WFF project. Packaged per design.
 scripts/             bootstrap, emulator setup, device deploy.
@@ -57,7 +57,7 @@ most, and it must be testable without a device.
 Engines emit `List<Polyline>` in 456x456 dial space. Platform code strokes them.
 One geometry implementation, two renderers:
 
-- `phone`: Android `Canvas` -- drives both the live preview and the baked PNG,
+- `mobile`: Android `Canvas` -- drives both the live preview and the baked PNG,
   so what the user sees is what ships, by construction.
 - CI/tests: geometry assertions only, no rasterization needed.
 
@@ -114,7 +114,7 @@ identical on a soft low-contrast dial. Do this always.
 2. **Design the permission flow.** On paper. Before code.
 3. **`pack` via JNI.** Use Androidify's prebuilt `jniLibs` if the ABIs cover you.
 4. **Data Layer.** `CapabilityClient` discovery, `ChannelClient` transfer.
-5. **Compose design UI.** Ten sliders next to a 456px preview on a phone screen
+5. **Compose design UI.** Ten sliders next to a 456px preview on a handheld screen
    is a genuinely harder design problem than a desktop tool was.
 
 ## Community catalog
