@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.bfg.watchfaces.watchfacepush.moss_knot">
+    package="com.bfg.watchfaces.watchfacepush.knotwork_taupe">
 
   <uses-feature android:name="android.hardware.type.watch" />
 

@@ -1,7 +1,9 @@
 package com.bfg.watchfaces.workbench
 
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.SlotPosition
 import java.awt.Color
 import java.awt.Font
 import java.awt.RenderingHints
@@ -31,7 +33,10 @@ import java.util.Locale
 object FacePreview {
 
     /** Mirrors the emitter's ambient rules so the preview tells the truth about ambient. */
-    fun render(p: DialParams, ambient: Boolean = false, size: Int = DIAL_SIZE, time: LocalDateTime? = null): BufferedImage {
+    fun render(
+        p: DialParams, ambient: Boolean = false, size: Int = DIAL_SIZE,
+        time: LocalDateTime? = null, texture: BufferedImage? = null
+    ): BufferedImage {
         val now = time ?: LocalDateTime.of(2026, 3, 10, 10, 10, 0)
         val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
         val g = img.createGraphics()
@@ -48,15 +53,44 @@ object FacePreview {
         val ink = DialRenderer.hex(p.inkColor)
 
         // Dial image: alpha 255 interactive, Variant AMBIENT alpha 0.
-        if (!ambient) g.drawImage(DialRenderer.render(p, size), 0, 0, null)
+        if (!ambient) g.drawImage(DialRenderer.render(p, size, texture), 0, 0, null)
 
         g.scale(s, s)
 
-        // Date: alpha 255 interactive, AMBIENT alpha 140.
-        val dateAlpha = if (ambient) 140 else 255
-        val dateText = "${now.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase()} ${now.dayOfMonth}"
-        drawCentered(g, dateText, l.dateY - l.dateSize, (l.dateSize * 1.9).toInt(),
-            l.dateSize.toDouble(), Font.PLAIN, withAlpha(ink, dateAlpha), letterSpacing = 0.11)
+        // Five complication slots, positioned with the SAME arithmetic
+        // WffEmitter uses -- including the row re-centring. If those two ever
+        // drift the preview stops being evidence about layout, which is most of
+        // what it is for.
+        //
+        // The date and battery lines are gone: they are ordinary slots now.
+        val w = (l.complicationSize * 4.7).toInt()
+        val iconSize = l.complicationSize * 1.25
+        val textY = (l.complicationSize * 1.4).toInt()
+        val textH = (l.complicationSize * 1.8).toInt()
+
+        fun slot(source: ComplicationSource, x: Int, y: Int, alpha: Int) {
+            if (!source.enabled || alpha <= 0) return
+            val c = withAlpha(ink, alpha)
+            ComplicationIcons.draw(g, source, x + (w - iconSize) / 2.0, y.toDouble(), iconSize, c)
+            drawCenteredIn(g, Complications.sample(source), x, y + textY, w, textH,
+                l.complicationSize * 0.92, Font.PLAIN, c)
+        }
+
+        // TOP keeps a dim ambient variant -- the always-readable position.
+        slot(p.slot(SlotPosition.TOP), DIAL_SIZE / 2 - w / 2,
+             l.dateY - (l.complicationSize * 1.2).toInt(), if (ambient) 140 else 255)
+
+        if (!ambient) {
+            val row = listOf(SlotPosition.LEFT, SlotPosition.MIDDLE, SlotPosition.RIGHT)
+                .map { p.slot(it) }.filter { it.enabled }
+            row.forEachIndexed { index, source ->
+                val offset = (index - (row.size - 1) / 2.0) * l.complicationSpread
+                slot(source, (DIAL_SIZE / 2 + offset - w / 2).toInt(),
+                     l.complicationY - (l.complicationSize * 1.2).toInt(), 255)
+            }
+            slot(p.slot(SlotPosition.BOTTOM), DIAL_SIZE / 2 - w / 2,
+                 l.batteryY - (l.complicationSize * 1.2).toInt(), 255)
+        }
 
         // Time: the emitter ships TWO TimeText elements, one interactive
         // (alpha 255 -> ambient 0) and one ambient-only (alpha 0 -> ambient 255,
@@ -69,27 +103,6 @@ object FacePreview {
         } else {
             drawCentered(g, timeText, l.timeY - l.timeSize / 2, (l.timeSize * 1.4).toInt(),
                 l.timeSize.toDouble(), awtStyle(l.fontWeight), ink)
-        }
-
-        // Complications: alpha 255 interactive, AMBIENT alpha 0.
-        //
-        // Only the slots that are switched on, positioned with the SAME
-        // arithmetic WffEmitter uses -- including the re-centring when a slot is
-        // off. If these two ever disagree the preview stops being evidence about
-        // the layout, which is most of what it is for.
-        if (!ambient) {
-            val active = p.complications.filter { it.enabled }
-            active.forEachIndexed { index, source ->
-                val w = (l.complicationSize * 4.7).toInt()
-                val offset = (index - (active.size - 1) / 2.0) * l.complicationSpread
-                val x = (DIAL_SIZE / 2 + offset - w / 2).toInt()
-                val y = l.complicationY - (l.complicationSize * 1.2).toInt()
-                drawCenteredIn(g, Complications.sample(source), x, y + (l.complicationSize * 1.4).toInt(), w,
-                    (l.complicationSize * 1.8).toInt(), l.complicationSize * 0.92, Font.PLAIN, ink)
-            }
-            // Battery: alpha 255 interactive, AMBIENT alpha 0.
-            drawCentered(g, "78%", l.batteryY - (l.complicationSize * 0.9).toInt(),
-                (l.complicationSize * 1.9).toInt(), l.complicationSize * 0.92, Font.PLAIN, ink)
         }
 
         g.dispose()

@@ -135,18 +135,58 @@ class ComplicationSchemaTest {
     }
 
     @Test
-    fun `active slots are re-centred rather than leaving a hole`() {
+    fun `row slots re-centre rather than leaving a hole`() {
         fun xs(vararg c: ComplicationSource): List<Int> =
             Regex("""<ComplicationSlot slotId="\d+" x="(-?\d+)"""")
                 .findAll(WffEmitter.emit(DialParams(complications = c.toList())))
                 .map { it.groupValues[1].toInt() }.toList()
 
-        val three = xs(ComplicationSource.STEP_COUNT, ComplicationSource.HEART_RATE, ComplicationSource.DATE)
-        val one = xs(ComplicationSource.NONE, ComplicationSource.HEART_RATE, ComplicationSource.NONE)
-        assertEquals(3, three.size)
-        assertEquals(1, one.size)
-        // A single remaining slot must sit where the middle of three sat, not
-        // where its original index would have put it.
-        assertEquals(three[1], one[0]) { "a lone slot did not re-centre: $one vs middle-of-three ${three[1]}" }
+        val N = ComplicationSource.NONE
+        val S = ComplicationSource.STEP_COUNT
+        val H = ComplicationSource.HEART_RATE
+        val D = ComplicationSource.DATE
+
+        // TOP, LEFT, MIDDLE, RIGHT, BOTTOM
+        val fullRow = xs(N, S, H, D, N)
+        val loneRow = xs(N, N, H, N, N)
+        assertEquals(3, fullRow.size)
+        assertEquals(1, loneRow.size)
+        assertEquals(fullRow[1], loneRow[0]) {
+            "a lone row slot did not re-centre: $loneRow vs middle-of-three ${fullRow[1]}"
+        }
+    }
+
+    @Test
+    fun `top and bottom are centred singles`() {
+        val N = ComplicationSource.NONE
+        val B = ComplicationSource.WATCH_BATTERY
+        fun xs(vararg c: ComplicationSource): List<Int> =
+            Regex("""<ComplicationSlot slotId="\d+" x="(-?\d+)"""")
+                .findAll(WffEmitter.emit(DialParams(complications = c.toList())))
+                .map { it.groupValues[1].toInt() }.toList()
+        assertEquals(xs(B, N, N, N, N), xs(N, N, N, N, B)) {
+            "TOP and BOTTOM should share the same centred x"
+        }
+    }
+
+    @Test
+    fun `all five positions can be filled and stay schema valid`() {
+        val xml = WffEmitter.emit(DialParams(complications = listOf(
+            ComplicationSource.DAY_AND_DATE, ComplicationSource.STEP_COUNT,
+            ComplicationSource.HEART_RATE, ComplicationSource.UNREAD_NOTIFICATION_COUNT,
+            ComplicationSource.WATCH_BATTERY)))
+        assertEquals(5, xml.split("<ComplicationSlot").size - 1)
+        assertTrue(validate(xml).isEmpty())
+    }
+
+    @Test
+    fun `slot ids are unique and contiguous`() {
+        // Duplicate slotIds are accepted by the schema and then behave
+        // unpredictably on the watch, so this is checked here rather than there.
+        val ids = Regex("""slotId="(\d+)"""")
+            .findAll(WffEmitter.emit(DialParams()))
+            .map { it.groupValues[1].toInt() }.toList()
+        assertEquals(ids.size, ids.toSet().size) { "duplicate slotId: $ids" }
+        assertEquals((0 until ids.size).toList(), ids) { "slot ids not contiguous from 0: $ids" }
     }
 }

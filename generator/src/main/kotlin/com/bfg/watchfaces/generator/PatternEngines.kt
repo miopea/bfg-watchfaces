@@ -37,6 +37,9 @@ object PatternEngines {
      */
     private fun v2(p: DialParams): List<Polyline> = when (p.engine) {
         Engine.KNOTWORK -> knotwork(p)
+        // TEXTURE has no geometry at all -- the dial is an imported image the
+        // renderer composites. Returning nothing here is correct, not a stub.
+        Engine.TEXTURE -> emptyList()
         else -> v1(p)
     }
 
@@ -49,6 +52,10 @@ object PatternEngines {
         Engine.BOTANICAL -> botanical(p)
         Engine.KNOTWORK -> error(
             "KNOTWORK did not exist at generatorVersion=1. It was added in v2; " +
+            "a face that uses it must store generatorVersion>=2."
+        )
+        Engine.TEXTURE -> error(
+            "TEXTURE did not exist at generatorVersion=1. It was added in v2; " +
             "a face that uses it must store generatorVersion>=2."
         )
         Engine.NONE -> emptyList()

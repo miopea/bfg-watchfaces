@@ -23,3 +23,7 @@ debug.keystore
 # Faces you design and save in the app. Personal work, not repo content -- the
 # community catalog is a curated set, not whatever is on someone's laptop.
 faces/
+
+# Images imported for the TEXTURE engine. Local content, never part of a face
+# and never publishable -- the catalog is parameters only.
+textures/

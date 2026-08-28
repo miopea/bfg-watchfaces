@@ -35,6 +35,7 @@ object ParamCodec {
             sheen = q.dbl("sheen", d.sheen),
             lens = q["lens"]?.let { it == "true" || it == "1" } ?: d.lens,
             lensAmount = q.dbl("lensAmount", d.lensAmount),
+            texture = q["texture"] ?: d.texture,
             complications = Complications.parse(q["complications"]) ?: d.complications,
             layout = Layout(
                 dateY = q.int("dateY", l.dateY),
@@ -101,6 +102,7 @@ object ParamCodec {
   "rotate": ${p.rotate}, "vignette": ${p.vignette}, "sheen": ${p.sheen},
   "dialColor": "${p.dialColor}", "inkColor": "${p.inkColor}",
   "lens": ${p.lens}, "lensAmount": ${p.lensAmount},
+  "texture": "${p.texture}",
   "complications": [${p.complications.joinToString(", ") { "\"${it.name}\"" }}],
   "layout": {
     "dateY": ${l.dateY}, "dateSize": ${l.dateSize},
@@ -119,7 +121,7 @@ object ParamCodec {
             "stroke" to p.stroke, "relief" to p.relief, "contrast" to p.contrast,
             "rotate" to p.rotate, "vignette" to p.vignette, "sheen" to p.sheen,
             "dialColor" to p.dialColor, "inkColor" to p.inkColor,
-            "lens" to p.lens, "lensAmount" to p.lensAmount,
+            "lens" to p.lens, "lensAmount" to p.lensAmount, "texture" to p.texture,
             "complications" to Complications.format(p.complications),
             "dateY" to l.dateY, "dateSize" to l.dateSize, "timeY" to l.timeY,
             "timeSize" to l.timeSize, "tracking" to l.tracking,

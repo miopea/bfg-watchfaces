@@ -31,27 +31,27 @@ object WffEmitter {
         val ink = argb(p.inkColor)
         val inkDim = argb(p.inkColor, 160)
 
-        // Only the slots that are actually switched on, re-centred as a group.
-        // An empty slot is not emitted at all: on the watch it would still cost
-        // a tap target and a frame budget, and it leaves a visible hole.
-        val active = p.complications.filter { it.enabled }
-        val slots = active.mapIndexed { index, source ->
+        // Five positioned slots. TOP and BOTTOM are centred singles; LEFT,
+        // MIDDLE and RIGHT share a row and re-centre among themselves, so
+        // turning one off closes the gap instead of leaving a hole.
+        //
+        // A slot set to NONE is not emitted at all. An empty slot still costs a
+        // tap target and a frame budget on the watch.
+        fun slotXml(source: ComplicationSource, id: Int, x: Int, y: Int, ambientAlpha: Int): String {
             val w = (l.complicationSize * 4.7).toInt()
             val h = (l.complicationSize * 4.0).toInt()
-            val offset = (index - (active.size - 1) / 2.0) * l.complicationSpread
-            val x = (DIAL_SIZE / 2 + offset - w / 2).toInt()
-            val y = l.complicationY - (l.complicationSize * 1.2).toInt()
-            val id = index
-            val provider = source.wff
-            val label = "@string/slot_${source.name.lowercase()}"
-            """
+            val iconW = (l.complicationSize * 1.5).toInt()
+            return """
     <ComplicationSlot slotId="$id" x="$x" y="$y" width="$w" height="$h"
-                      displayName="$label"
+                      displayName="@string/slot_${source.name.lowercase()}"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="0"/>
-      <DefaultProviderPolicy defaultSystemProvider="$provider" defaultSystemProviderType="SHORT_TEXT"/>
+      <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
+      <DefaultProviderPolicy defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
       <BoundingBox x="0" y="0" width="$w" height="$h" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">
+        <PartImage x="${(w - iconW) / 2}" y="0" width="$iconW" height="${(l.complicationSize * 1.25).toInt()}">
+          <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
+        </PartImage>
         <PartText x="0" y="${(l.complicationSize * 1.4).toInt()}" width="$w" height="${(l.complicationSize * 1.8).toInt()}">
           <Text align="CENTER">
             <Font family="${l.fontFamily}" size="${(l.complicationSize * 0.92).toInt()}" color="$ink">
@@ -59,13 +59,36 @@ object WffEmitter {
             </Font>
           </Text>
         </PartText>
-        <PartImage x="${(w - l.complicationSize * 1.5).toInt() / 2}" y="0"
-                   width="${(l.complicationSize * 1.5).toInt()}" height="${(l.complicationSize * 1.25).toInt()}">
-          <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
-        </PartImage>
       </Complication>
     </ComplicationSlot>"""
-        }.joinToString("\n")
+        }
+
+        val w = (l.complicationSize * 4.7).toInt()
+        val slotList = ArrayList<String>()
+        var nextId = 0
+
+        // TOP keeps a dim ambient variant. It is the always-readable position --
+        // it held the date before it became a slot, and DECISIONS.md records the
+        // ambient design as deliberately keeping that line visible at alpha 140.
+        p.slot(SlotPosition.TOP).let { src ->
+            if (src.enabled) slotList += slotXml(src, nextId++, DIAL_SIZE / 2 - w / 2,
+                l.dateY - (l.complicationSize * 1.2).toInt(), 140)
+        }
+
+        val row = listOf(SlotPosition.LEFT, SlotPosition.MIDDLE, SlotPosition.RIGHT)
+            .map { p.slot(it) }.filter { it.enabled }
+        row.forEachIndexed { index, src ->
+            val offset = (index - (row.size - 1) / 2.0) * l.complicationSpread
+            slotList += slotXml(src, nextId++, (DIAL_SIZE / 2 + offset - w / 2).toInt(),
+                l.complicationY - (l.complicationSize * 1.2).toInt(), 0)
+        }
+
+        p.slot(SlotPosition.BOTTOM).let { src ->
+            if (src.enabled) slotList += slotXml(src, nextId++, DIAL_SIZE / 2 - w / 2,
+                l.batteryY - (l.complicationSize * 1.2).toInt(), 0)
+        }
+
+        val slots = slotList.joinToString("\n")
 
         // The emitted file is what ships, and since the workbench bakes it into
         // watchface-template it replaces what used to be a hand-annotated
@@ -100,18 +123,6 @@ object WffEmitter {
       <Image resource="dial_bg"/>
     </PartImage>
 
-    <PartText x="0" y="${l.dateY - l.dateSize}" width="$DIAL_SIZE" height="${(l.dateSize * 1.9).toInt()}" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="140"/>
-      <Text align="CENTER">
-        <Font family="${l.fontFamily}" size="${l.dateSize}" weight="MEDIUM" color="$ink" letterSpacing="0.11">
-          <Template><![CDATA[%s %s]]>
-            <Parameter expression="[DAY_OF_WEEK_S]"/>
-            <Parameter expression="[DAY]"/>
-          </Template>
-        </Font>
-      </Text>
-    </PartText>
-
     <DigitalClock x="0" y="${l.timeY - l.timeSize / 2}" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}">
       <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
                 x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="255">
@@ -125,16 +136,6 @@ object WffEmitter {
       </TimeText>
     </DigitalClock>
 $slots
-
-    <PartText x="0" y="${l.batteryY - (l.complicationSize * 0.9).toInt()}" width="$DIAL_SIZE"
-              height="${(l.complicationSize * 1.9).toInt()}" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="0"/>
-      <Text align="CENTER">
-        <Font family="${l.fontFamily}" size="${(l.complicationSize * 0.92).toInt()}" color="$ink">
-          <Template><![CDATA[%d%%]]><Parameter expression="round([BATTERY_PERCENT])"/></Template>
-        </Font>
-      </Text>
-    </PartText>
 
   </Scene>
 </WatchFace>

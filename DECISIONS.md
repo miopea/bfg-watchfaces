@@ -1,5 +1,75 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-28 — Five slots, provider icons, and an image engine
+
+### Five positions, and the date and battery stop being special
+
+The face had five information areas but only advertised three. The date line at
+the top and the battery line at the bottom were hardcoded `PartText` elements:
+not configurable, not removable, and not visible anywhere in the app as things a
+user owned.
+
+They are ordinary complication slots now — `SlotPosition` is TOP, LEFT, MIDDLE,
+RIGHT, BOTTOM, and the enum's ORDER is the storage order, so it is append-only.
+The row of three re-centres among itself; TOP and BOTTOM are centred singles.
+
+TOP keeps a dim ambient variant (alpha 140) while the others go to 0. That is
+not an arbitrary exception: it is the position that held the date, and the
+ambient design recorded on 2026-08-26 deliberately keeps that one line readable
+while everything else goes dark. Moving it to a slot should not have quietly
+changed the ambient behaviour, so it did not.
+
+`slotId`s are asserted unique and contiguous. Duplicates pass the schema and
+then behave unpredictably on the watch, which is the worst place to find out.
+
+### Icons
+
+Complications render `[COMPLICATION.MONOCHROMATIC_IMAGE]` above the value, which
+the WFF already emitted but nothing previewed. `ComplicationIcons` draws
+stand-ins with the same silhouette and weight as the Wear/Material glyphs for
+the same data, authored on a 24x24 grid so the weights stay consistent when
+scaled.
+
+They are stand-ins on purpose and never reach the APK. On the watch the SYSTEM
+PROVIDER supplies the icon; nothing here is baked into `dial_bg.png`. Like the
+sample values, their job is to answer "does the layout survive an icon this
+size", which is the only question a preview can honestly answer about a provider
+that is not running.
+
+### Engine.TEXTURE — bring your own image
+
+The original ask was to use the mockup PNG as the dial. The parametric KNOTWORK
+engine answered the *design* question, but not the general one: people want
+their own pictures on their watch.
+
+`Engine.TEXTURE` emits **no geometry at all** — the dial is an imported image the
+renderer centre-crops to fill the circle (cover, not contain: a dial with
+letterboxing is not a watch face). Sheen and vignette still apply on top so a
+photo sits on the same dial as the engines rather than looking pasted on, and
+`contrast` fades it toward the dial colour, because pushing artwork back far
+enough for the time to stay readable is the thing most photos get wrong on a
+watch.
+
+Images are content-addressed under `textures/<sha1>.png`, re-encoded on import
+rather than stored verbatim — that proves the bytes decode before they can reach
+the renderer, and strips whatever metadata the original carried. The face stores
+only the hash. Ids are validated against `^[0-9a-f]{40}$` before touching the
+filesystem, since they arrive from a query string on a tool that binds a port.
+
+**A TEXTURE face is local-only, and that is structural rather than a policy we
+could relax.** docs/SPEC.md's catalog is parametric-only for two reasons that
+both still hold: a face has to stay a few KB of JSON, and parameters are the IP
+shield — you cannot encode a copyrighted logo as "knotwork, scale 26, pewter",
+but you can certainly upload one. The SPEC already carved out exactly this case:
+photos are imported locally and never enter the shared catalog.
+`DialParams.isLocalOnly` makes it checkable, and the app says so where the image
+is chosen rather than at submission time.
+
+TEXTURE is excluded from the geometry-coverage and point-budget tests alongside
+NONE. "Produces polylines covering the dial" is not a property a raster engine
+has, and asserting it would have meant weakening a real test for every other
+engine.
+
 ## 2026-08-27 — Complications, and two ways to finish a face
 
 ### Complications are configurable, and the preview tells the truth about them

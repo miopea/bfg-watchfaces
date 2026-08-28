@@ -8,6 +8,11 @@ Requires Wear OS 6+ (Pixel Watch 4 / 5, recent Galaxy Watch).
 The app is a generator. It ships a library of styles — knotwork, clous de Paris,
 rosette, barleycorn, sunburst, botanical — and you name the faces you make.
 
+Faces carry five complication slots (top, left, middle, right, bottom), and you
+can import your own image as the dial. Generated faces are a few KB of
+parameters and shareable; a face built on your own picture stays on your
+machine.
+
 ## Quick start
 
 ```bash

@@ -71,7 +71,7 @@ object DialRenderer {
      * is always authored in 456x456 dial space and scaled here, so a 912px
      * render for a hi-dpi browser preview is the same image, not a different one.
      */
-    fun render(p: DialParams, size: Int = DIAL_SIZE): BufferedImage {
+    fun render(p: DialParams, size: Int = DIAL_SIZE, texture: BufferedImage? = null): BufferedImage {
         val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
         val g = img.createGraphics()
         hints(g)
@@ -89,12 +89,43 @@ object DialRenderer {
         g.color = dial
         g.fill(circle)
 
-        drawSheen(g, dial, p.sheen)
-        drawPattern(g, p, dial, ink)
+        // An imported image replaces the generated pattern entirely. Sheen and
+        // vignette still apply on top, so a photo sits on the same dial as the
+        // engines rather than looking pasted on.
+        if (texture != null) drawTexture(g, texture, p)
+        else drawSheen(g, dial, p.sheen)
+
+        if (texture == null) drawPattern(g, p, dial, ink)
         drawVignette(g, p.vignette)
 
         g.dispose()
         return img
+    }
+
+    /**
+     * Centre-crop an imported image to fill the dial, preserving aspect ratio.
+     *
+     * Cover, not contain: a dial with letterboxing on it is not a watch face.
+     * [DialParams.contrast] fades it toward the dial colour so imported artwork
+     * can be pushed back far enough for the time to stay readable, which is the
+     * thing most photos get wrong on a watch.
+     */
+    private fun drawTexture(g: java.awt.Graphics2D, tex: BufferedImage, p: DialParams) {
+        val scale = maxOf(DIAL_SIZE.toDouble() / tex.width, DIAL_SIZE.toDouble() / tex.height)
+        val w = tex.width * scale
+        val h = tex.height * scale
+        val at = AffineTransform.getTranslateInstance((DIAL_SIZE - w) / 2, (DIAL_SIZE - h) / 2)
+        at.scale(scale, scale)
+        g.drawImage(tex, at, null)
+
+        // contrast 100 = image as-is; lower fades it into the dial colour so the
+        // numerals stay legible over it.
+        val fade = (1.0 - (p.contrast / 100.0)).coerceIn(0.0, 1.0)
+        if (fade > 0.0) {
+            g.color = alpha(hex(p.dialColor), (fade * 235).toInt())
+            g.fillRect(0, 0, DIAL_SIZE, DIAL_SIZE)
+        }
+        drawSheen(g, hex(p.dialColor), p.sheen * 0.5)
     }
 
     /** Soft directional lustre, as if light falls across brushed metal. */

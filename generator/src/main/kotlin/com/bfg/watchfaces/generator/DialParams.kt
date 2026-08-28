@@ -9,7 +9,18 @@ data class Pt(val x: Double, val y: Double)
 /** An open polyline. Engines emit these; renderers stroke them. */
 typealias Polyline = List<Pt>
 
-enum class Engine { LATTICE, CLOUS, ROSETTE, BARLEYCORN, SUNBURST, BOTANICAL, KNOTWORK, NONE }
+/**
+ * TEXTURE is the odd one out and deliberately so: it emits NO geometry. The
+ * dial comes from an image the user supplied, composited by the renderer.
+ *
+ * That makes a TEXTURE face un-shareable. docs/SPEC.md's catalog is
+ * parametric-only -- both because a face has to stay ~5KB of JSON and because
+ * parameters are the IP shield: you cannot encode someone's logo as "knotwork,
+ * scale 26, pewter", but you certainly can upload it. The SPEC already carves
+ * out exactly this case: "Users import their own photos locally; those never
+ * enter the shared catalog."
+ */
+enum class Engine { LATTICE, CLOUS, ROSETTE, BARLEYCORN, SUNBURST, BOTANICAL, KNOTWORK, TEXTURE, NONE }
 
 /**
  * What a complication slot shows.
@@ -42,6 +53,20 @@ enum class ComplicationSource(val wff: String?) {
 }
 
 /**
+ * Where a complication sits on the dial.
+ *
+ * Five positions, and the ORDER of this enum is the order
+ * [DialParams.complications] is stored in -- adding one in the middle would
+ * re-map every stored face, so append only.
+ *
+ * TOP and BOTTOM used to be hardcoded PartText elements: the date and the
+ * battery percentage. They were not configurable and could not be turned off,
+ * which meant the face had five information areas but only advertised three.
+ * They are ordinary slots now.
+ */
+enum class SlotPosition { TOP, LEFT, MIDDLE, RIGHT, BOTTOM }
+
+/**
  * Everything needed to reproduce a dial.
  *
  * IMPORTANT - [generatorVersion] is load-bearing.
@@ -72,6 +97,15 @@ data class DialParams(
     val inkColor: String = "#FCF9F1",
     val sheen: Double = 30.0,
 
+    /**
+     * Id of an imported image, used only by [Engine.TEXTURE]. Empty means none,
+     * and TEXTURE with no image falls back to a plain dial rather than failing.
+     *
+     * This is a LOCAL reference, not content: the bytes live outside the face.
+     * A face carrying one cannot be shared, which [Engine.TEXTURE] documents.
+     */
+    val texture: String = "",
+
     /** Draw the pattern OVER the numerals rather than behind them. */
     val lens: Boolean = true,
     val lensAmount: Double = 38.0,
@@ -86,9 +120,11 @@ data class DialParams(
      * one off closes the gap instead of leaving a hole.
      */
     val complications: List<ComplicationSource> = listOf(
-        ComplicationSource.STEP_COUNT,
-        ComplicationSource.HEART_RATE,
-        ComplicationSource.DAY_AND_DATE
+        ComplicationSource.DAY_AND_DATE,               // TOP
+        ComplicationSource.STEP_COUNT,                 // LEFT
+        ComplicationSource.HEART_RATE,                 // MIDDLE
+        ComplicationSource.UNREAD_NOTIFICATION_COUNT,  // RIGHT
+        ComplicationSource.WATCH_BATTERY               // BOTTOM
     )
 ) {
     init {
@@ -100,12 +136,20 @@ data class DialParams(
         require(HEX.matches(inkColor)) { "inkColor must be #RRGGBB, got $inkColor" }
     }
 
+    /** True when this face depends on a local image and cannot enter the catalog. */
+    val isLocalOnly: Boolean get() = engine == Engine.TEXTURE && texture.isNotBlank()
+
+    /** The source at [pos], or NONE when the stored list is short/absent. */
+    fun slot(pos: SlotPosition): ComplicationSource =
+        complications.getOrElse(pos.ordinal) { ComplicationSource.NONE }
+
     companion object {
         private val HEX = Regex("^#[0-9A-Fa-f]{6}$")
     }
 }
 
 data class Layout(
+    /** Y of the TOP complication slot. Was the fixed date line. */
     val dateY: Int = 118,
     val dateSize: Int = 21,
     val timeY: Int = 196,
@@ -114,6 +158,7 @@ data class Layout(
     val complicationY: Int = 286,
     val complicationSpread: Int = 86,
     val complicationSize: Int = 19,
+    /** Y of the BOTTOM complication slot. Was the fixed battery line. */
     val batteryY: Int = 348,
     val fontFamily: String = "SYNC_TO_DEVICE",
     val fontWeight: String = "MEDIUM"

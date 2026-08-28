@@ -233,6 +233,24 @@
   }
   .colorfoot input[type=text]{margin:0;font-family:var(--mono);text-transform:uppercase}
 
+  .uploader{
+    display:block;text-align:center;padding:16px;border:1.5px dashed var(--line);
+    border-radius:12px;color:var(--dim);font-size:13.5px;cursor:pointer;margin-bottom:12px;
+  }
+  .uploader:hover{border-color:var(--accent);color:var(--ink)}
+  .texgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+  .texgrid .tex{
+    position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;cursor:pointer;
+    border:2px solid transparent;background:#000;
+  }
+  .texgrid .tex img{width:100%;height:100%;object-fit:cover;display:block}
+  .texgrid .tex[aria-pressed="true"]{border-color:var(--accent)}
+  .texgrid .tex .del{
+    position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;
+    background:rgba(0,0,0,.65);color:#fff;border:none;font-size:11px;line-height:1;
+    cursor:pointer;display:grid;place-items:center;
+  }
+
   .comprow{display:grid;grid-template-columns:58px 1fr;gap:10px;align-items:center;margin-bottom:9px}
   .comprow label{font-size:12.5px;color:var(--dim)}
   .comprow select{
@@ -279,6 +297,18 @@
 
       <h2 class="sec">Pattern</h2>
       <div class="chips" id="engineChips"></div>
+
+      <div id="textureBlock" hidden>
+        <h2 class="sec">Your image</h2>
+        <label class="uploader" id="uploader">
+          <input type="file" id="fileInput" accept="image/*" hidden>
+          <span id="uploadLabel">Choose an image…</span>
+        </label>
+        <div class="texgrid" id="texGrid"></div>
+        <p class="microhint">Imported images stay on this machine. A face that uses
+          one can be installed on your watch, but cannot be shared to the community
+          catalog — that is parameters only.</p>
+      </div>
 
       <h2 class="sec">Dial colour</h2>
       <div class="swatches" id="dialSw"></div>
@@ -384,7 +414,7 @@
 const ENGINES = [
   ["KNOTWORK","Knotwork"], ["BOTANICAL","Botanical"], ["CLOUS","Clous de Paris"],
   ["ROSETTE","Rosette"], ["BARLEYCORN","Barleycorn"], ["SUNBURST","Sunburst"],
-  ["LATTICE","Lattice"], ["NONE","Plain"],
+  ["LATTICE","Lattice"], ["TEXTURE","Your image"], ["NONE","Plain"],
 ];
 
 // Mirrors ComplicationSource in :generator. Those tokens are exactly the
@@ -397,7 +427,7 @@ const COMP_SOURCES = [
   ["SUNRISE_SUNSET","Sunrise and sunset"], ["UNREAD_NOTIFICATION_COUNT","Notifications"],
   ["APP_SHORTCUT","App shortcut"], ["FAVORITE_CONTACT","Favourite contact"],
 ];
-const COMP_SLOTS = ["Left","Middle","Right"];
+const COMP_SLOTS = ["Top","Left","Middle","Right","Bottom"];  // order matches SlotPosition
 
 const DIALS = ["#7D7369","#2B2E33","#23262B","#6E6A66","#8A7343","#5A6B77","#3E4A3F","#7A4A3C","#C9C3B6"];
 const INKS  = ["#FCF9F1","#FFFFFF","#E8E6E1","#C9A227","#1A1A1A"];
@@ -412,7 +442,8 @@ const TUNE = [
 const state = {
   engine:"KNOTWORK", scale:26, depth:3, freq:7, stroke:1.05, relief:1.5, contrast:36,
   rotate:45, vignette:20, dialColor:"#7D7369", inkColor:"#FCF9F1", sheen:28,
-  lens:true, lensAmount:38, complications:"STEP_COUNT,HEART_RATE,DAY_AND_DATE",
+  lens:true, lensAmount:38, texture:"",
+  complications:"DAY_AND_DATE,STEP_COUNT,HEART_RATE,UNREAD_NOTIFICATION_COUNT,WATCH_BATTERY",
   dateY:118, dateSize:21, timeY:196, timeSize:104,
   complicationY:286, complicationSpread:86, complicationSize:19, batteryY:348,
   fontFamily:"SYNC_TO_DEVICE", fontWeight:"MEDIUM"
@@ -462,6 +493,7 @@ for (const [val,label] of ENGINES){
     state.engine = val;
     chips.querySelectorAll("button").forEach(x =>
       x.setAttribute("aria-pressed", String(x.dataset.engine === val)));
+    if (textureVisible()) loadTextures();
     refresh();
   });
   chips.appendChild(b);
@@ -544,6 +576,7 @@ function syncTune(){
     x.setAttribute("aria-pressed", String(x.dataset.engine === state.engine)));
   markSw("#dialSw","dialColor"); markSw("#inkSw","inkColor");
   syncComps();
+  textureVisible();
 }
 
 /* ---------------- mode toggle ---------------- */
@@ -651,6 +684,70 @@ async function loadMine(){
     host.appendChild(row);
   }
 }
+
+/* ---------------- textures (Engine.TEXTURE) ----------------
+ * Imported images live server-side, content-addressed. The face stores only
+ * the hash: the bytes are never part of the face, which is what keeps the
+ * catalog format parametric.
+ */
+function textureVisible(){
+  const on = state.engine === "TEXTURE";
+  $("#textureBlock").hidden = !on;
+  return on;
+}
+
+async function loadTextures(){
+  const {textures} = await fetch("/api/textures").then(r=>r.json());
+  const grid = $("#texGrid");
+  grid.innerHTML = "";
+  if (!textures.length){
+    grid.innerHTML = `<p class="microhint" style="grid-column:1/-1;margin:0">
+      Nothing imported yet.</p>`;
+    return;
+  }
+  for (const t of textures){
+    const cell = document.createElement("div");
+    cell.className = "tex";
+    cell.title = t.note;
+    cell.setAttribute("aria-pressed", String(state.texture === t.id));
+    cell.innerHTML = `<img loading="lazy" alt="" src="/api/dial.png?engine=TEXTURE&texture=${t.id}&contrast=100&vignette=0&sheen=0&size=120">
+                      <button class="del" title="Remove">×</button>`;
+    cell.addEventListener("click", e => {
+      if (e.target.classList.contains("del")) return;
+      state.texture = t.id;
+      grid.querySelectorAll(".tex").forEach(c => c.setAttribute("aria-pressed","false"));
+      cell.setAttribute("aria-pressed","true");
+      toast(t.note);
+      refresh();
+    });
+    cell.querySelector(".del").addEventListener("click", async ev => {
+      ev.stopPropagation();
+      await fetch(`/api/textures?id=${t.id}`, {method:"DELETE"});
+      if (state.texture === t.id){ state.texture = ""; refresh(); }
+      loadTextures();
+    });
+    grid.appendChild(cell);
+  }
+}
+
+$("#uploader").addEventListener("click", () => $("#fileInput").click());
+$("#fileInput").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  $("#uploadLabel").textContent = "Importing…";
+  // Raw body, not multipart: the server just needs the bytes, and a hand-rolled
+  // multipart parser would be the only reason this tool needed one.
+  const r = await fetch("/api/textures", { method:"POST", body: f }).then(r=>r.json());
+  $("#uploadLabel").textContent = "Choose an image…";
+  e.target.value = "";
+  if (!r.ok){ toast(r.error || "Could not read that image"); return; }
+  state.texture = r.texture.id;
+  state.engine = "TEXTURE";
+  syncTune();
+  await loadTextures();
+  toast(r.texture.note);
+  refresh();
+});
 
 /* ---------------- colour picker ----------------
  * Saturation/brightness pad + hue slider, in-app. Replaces
@@ -822,6 +919,7 @@ $("#installGo").addEventListener("click", async () => {
     deep = true;
   }
   syncTune();
+  if (textureVisible()) await loadTextures();
   await loadPresets();
   refresh();
   show(deep ? "studio" : "designs");

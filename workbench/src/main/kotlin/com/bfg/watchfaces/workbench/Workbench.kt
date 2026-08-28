@@ -65,6 +65,7 @@ object Workbench {
         server.createContext("/api/export") { ex -> safe(ex) { serveExport(ex) } }
         server.createContext("/api/build") { ex -> safe(ex) { serveBuild(ex) } }
         server.createContext("/api/faces") { ex -> safe(ex) { serveFaces(ex) } }
+        server.createContext("/api/textures") { ex -> safe(ex) { serveTextures(ex) } }
         server.start()
 
         println()
@@ -102,6 +103,11 @@ object Workbench {
     }
 
     private fun params(ex: HttpExchange): DialParams = ParamCodec.fromQuery(query(ex))
+
+    /** The imported image a TEXTURE face refers to, or null for every other engine. */
+    private fun textureFor(p: DialParams): java.awt.image.BufferedImage? =
+        if (p.engine == com.bfg.watchfaces.generator.Engine.TEXTURE && p.texture.isNotBlank())
+            TextureStore.load(root, p.texture) else null
 
     private fun send(ex: HttpExchange, code: Int, type: String, body: ByteArray) {
         ex.responseHeaders.add("Content-Type", type)
@@ -143,7 +149,7 @@ object Workbench {
         val q = query(ex)
         val p = params(ex)
         val size = q["size"]?.toIntOrNull() ?: DIAL_SIZE
-        var img = DialRenderer.render(p, size)
+        var img = DialRenderer.render(p, size, textureFor(p))
         if (q["quantize"] == "true") img = Quantizer.quantize(img, q["colors"]?.toIntOrNull() ?: 64).image
         send(ex, 200, "image/png", png(img))
     }
@@ -153,7 +159,8 @@ object Workbench {
         val q = query(ex)
         val p = params(ex)
         val size = q["size"]?.toIntOrNull() ?: DIAL_SIZE
-        send(ex, 200, "image/png", png(FacePreview.render(p, ambient = q["ambient"] == "true", size = size)))
+        send(ex, 200, "image/png",
+            png(FacePreview.render(p, ambient = q["ambient"] == "true", size = size, texture = textureFor(p))))
     }
 
     private fun serveWff(ex: HttpExchange) =
@@ -183,7 +190,7 @@ object Workbench {
         val points = paths.sumOf { it.size }
         val coverage = PatternEngines.coverage(paths)
 
-        val full = DialRenderer.render(p, DIAL_SIZE)
+        val full = DialRenderer.render(p, DIAL_SIZE, textureFor(p))
         val rawBytes = png(full).size
         val q = Quantizer.quantize(full, 64)
         val quantBytes = png(q.image).size
@@ -248,6 +255,32 @@ object Workbench {
         }
     }
 
+    /**
+     * Imported images for TEXTURE faces. POST the raw file bytes as the body.
+     *
+     * These never leave the machine and never enter a stored face -- the face
+     * keeps only the content hash. A TEXTURE face is local-only by construction.
+     */
+    private fun serveTextures(ex: HttpExchange) {
+        when (ex.requestMethod.uppercase()) {
+            "POST" -> {
+                val bytes = ex.requestBody.readBytes()
+                val t = try {
+                    TextureStore.save(root, bytes)
+                } catch (e: IllegalArgumentException) {
+                    json(ex, """{"ok":false,"error":${jsonStr(e.message ?: "could not read that image")}}"""); return
+                }
+                json(ex, """{"ok":true,"texture":${textureJson(t)}}""")
+            }
+            "DELETE" -> json(ex, """{"ok":${TextureStore.delete(root, query(ex)["id"].orEmpty())}}""")
+            else -> json(ex, """{"textures":[${TextureStore.list(root).joinToString(",") { textureJson(it) }}]}""")
+        }
+    }
+
+    private fun textureJson(t: TextureStore.Texture): String =
+        """{"id":${jsonStr(t.id)},"width":${t.width},"height":${t.height},""" +
+        """"bytes":${t.bytes},"note":${jsonStr(TextureStore.qualityNote(t))}}"""
+
     private fun faceJson(f: FaceStore.StoredFace): String =
         """{"slug":${jsonStr(f.slug)},"name":${jsonStr(f.name)},"created":${jsonStr(f.created)},""" +
         """"query":${jsonStr(ParamCodec.toQuery(f.params))}}"""
@@ -265,13 +298,15 @@ object Workbench {
         val slug = FaceStore.slugify(faceName)
 
         // Dial: quantized, because it crosses to the watch over Bluetooth.
-        val dial = Quantizer.quantize(DialRenderer.render(p, DIAL_SIZE), colors)
+        val tex = if (p.engine == com.bfg.watchfaces.generator.Engine.TEXTURE && p.texture.isNotBlank())
+            TextureStore.load(root, p.texture) else null
+        val dial = Quantizer.quantize(DialRenderer.render(p, DIAL_SIZE, tex), colors)
         val dialFile = File(drawable, "dial_bg.png")
         ImageIO.write(dial.image, "png", dialFile)
 
         // Preview: what the carousel shows. res/xml/watch_face_info.xml requires
         // it, and without it aapt2 link fails on an unresolved @drawable/preview.
-        val preview = Quantizer.quantize(FacePreview.render(p, ambient = false, size = DIAL_SIZE), colors)
+        val preview = Quantizer.quantize(FacePreview.render(p, ambient = false, size = DIAL_SIZE, texture = tex), colors)
         val previewFile = File(drawable, "preview.png")
         ImageIO.write(preview.image, "png", previewFile)
 
