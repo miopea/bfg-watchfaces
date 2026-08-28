@@ -9,24 +9,40 @@
 # So the split is: BUILD HERE, RUN THERE. adb is already a client/server
 # protocol over TCP, so one SSH reverse forward is the entire bridge.
 #
-# IN YOUR ~/.ssh/config, on the machine with the watch:
+# SETUP — a SEPARATE ssh host, used only while a watch is plugged in.
 #
-#     RemoteForward 5038 localhost:5037
+# Everything else in a normal config is LocalForward: you reaching services that
+# run HERE. This is the one that goes the other way, and it is only live while
+# there is a watch on your machine. Keeping it apart means a dead adb forward
+# cannot take your app ports down with it.
 #
-# RemoteForward, not LocalForward. LocalForward would listen on YOUR machine and
-# reach this one — the wrong way round. RemoteForward listens HERE and reaches
-# your adb server.
+#     Host bgsdev-watch
+#         HostName 10.2.0.4
+#         User bschleifer
+#         RemoteForward 5038 localhost:5037
+#         # deliberately NO ExitOnForwardFailure: if adb is not running on your
+#         # side, the session should still come up rather than refusing to
+#         # connect at all.
 #
-# And 5038 here rather than 5037, on purpose. Any bare `adb` command run on this
-# box starts a daemon on 5037; with ExitOnForwardFailure yes, a RemoteForward
-# onto an occupied port does not merely fail that forward, it drops the WHOLE
-# session — every app port with it. 5038 is nothing else's default, so the
-# bridge cannot be knocked over by an unrelated adb command.
+# Then, on the machine with the watch:
 #
-# Then here:
+#     adb devices            # starts the local adb server; do this FIRST
+#     ssh -N bgsdev-watch -i C:\temp\swarm_key.pem
+#
+# And here:
 #
 #     export ADB_SERVER_SOCKET=tcp:localhost:5038
 #     scripts/remote-adb.sh
+#
+# Two details that are not arbitrary:
+#
+#   RemoteForward, not LocalForward. LocalForward listens on YOUR machine and
+#   reaches this one — the wrong way round. RemoteForward listens HERE.
+#
+#   5038, not 5037. Any bare `adb` command on this box grabs 5037. If that
+#   collides while ExitOnForwardFailure is set, ssh drops the WHOLE session
+#   rather than just the one forward — which is why this lives on its own host
+#   and its own port.
 #
 # Everything after that — install, shell, screencap — targets whatever is
 # plugged into or emulated on your machine.
