@@ -4,6 +4,8 @@ import java.io.File
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    // Required from Kotlin 2.0 whenever buildFeatures.compose is on.
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -51,6 +53,8 @@ android {
     // Java and Kotlin must agree, or the build fails with "Inconsistent
     // JVM-target compatibility" -- the scaffolds set Kotlin to 17 and left Java
     // at the 1.8 default, which only shows up once there is Kotlin to compile.
+    buildFeatures { compose = true }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -70,4 +74,16 @@ dependencies {
     implementation(libs.androidx.fragment)
     implementation(libs.play.services.wearable)
     implementation(libs.wear.watchface.push)
+
+    // The watch app had no launcher activity at all: installed from Play it was
+    // invisible, which makes it untestable by anyone in a testing ring. Wear
+    // Compose rather than Views because the screen is ROUND -- ScreenScaffold
+    // and TransformingLazyColumn handle the curve and the rotary crown, and
+    // hand-rolling that in a FrameLayout is how a watch app ends up with its
+    // buttons under the bezel.
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.wear.compose.material3)
+    implementation(libs.wear.compose.foundation)
 }

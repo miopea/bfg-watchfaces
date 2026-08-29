@@ -76,6 +76,23 @@
       callback never arrives and the one irreversible answer is silently lost.
       Observed on Wear OS 6, 2026-08-29 — see ActivationRequestActivity.
     -->
+    <!--
+      The launcher entry. Until 2026-08-29 there was none: the app was a
+      listener service and a permission activity, so installed from Play it
+      was invisible and a tester had no way to open it or tell whether it
+      worked. See WatchActivity.
+    -->
+    <activity
+        android:name=".WatchActivity"
+        android:exported="true"
+        android:label="BFG Watch Faces"
+        android:taskAffinity="">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+
     <activity
         android:name=".ActivationRequestActivity"
         android:exported="false"
