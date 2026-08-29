@@ -139,17 +139,18 @@ Verified — built and run, not assumed:
 - `reskin.sh` — swaps resources into a built APK without recompiling.
   (Written and read, but not exercised since the workbench landed.)
 
-Builds, but has never run:
+Installed and driven on emulators (2026-08-29):
 
-- `:mobile`, `:wear` — both assemble a real APK, in `settings.gradle.kts` and
-  CI. `:mobile` has a Compose activation handoff screen behind a launcher
-  activity; `:wear` has the `WearableListenerService` that receives a face and
-  the no-UI activity that makes the one permission request. Their shared rules
-  and the device/watch contract are tested in `:appcore`, not here.
-  **Neither has ever been installed or launched**: no emulator here
-  (`/dev/kvm` is unreachable) and Watch Face Push needs Wear OS 6 hardware.
-  "It assembles" is a much smaller claim than "it works", and it is the only one
-  being made.
+- `:mobile` — the Studio screen from the localhost app: composite preview with
+  clock and complications, ambient toggle, style chips, dial and ink swatches,
+  complication slots, and every slider built from `ControlInventory`. All
+  thirteen styles render. Seen running on an SDK 36 phone emulator.
+- `:wear` — installed on a Wear OS 6 emulator, and `addWatchFace` works from it.
+  See below.
+
+Neither has run on real hardware, and the phone cannot yet BUILD a face to send:
+that needs `google/pack` on the device and the validator wired in. The Studio
+designs; nothing leaves the phone.
 
 Confirmed on a Wear OS 6 emulator (2026-08-29):
 
@@ -177,8 +178,14 @@ Still never tested:
 
 - **An actual watch.** The above is an emulator, which is a smaller claim.
 - **The transport.** `CapabilityClient`, `ChannelClient` and the Bluetooth
-  crossing. Pairing two emulators needs a factory reset of the watch, because a
-  Wear device only advertises while inside its setup wizard.
+  crossing. Pairing two emulators is blocked twice over: each Windows account
+  gets its own `netsimd` (fixed — both now run from one), and a Wear device only
+  advertises while inside its setup wizard, which `user_setup_complete=1` ends.
+  Clearing the provisioning flags makes it discoverable and the phone still
+  finds nothing; Google's documented route is Android Studio's pairing
+  assistant. See `DECISIONS.md` 2026-08-29.
+- **Sending a face.** The phone has no APK to send until `pack` runs on the
+  device. `addWatchFace` was exercised by putting the APK on the watch directly.
 - **The activation permission has still never been requested, and cannot be from
   where the design puts it.** `startActivity` from the install path is refused —
   `Background activity launch blocked`. A `WearableListenerService` is a
