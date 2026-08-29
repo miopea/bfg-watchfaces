@@ -1,5 +1,43 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — The Wear OS track has its own tester list
+
+The opt-in link returned "Your account hasn't yet been invited to participate in
+this app's internal testing program" for an account that was already a tester
+and already had the phone app installed.
+
+**Internal testing is two tracks, not one, and each carries its own testers.**
+The Play Console's track pages are scoped by a form-factor selector at the top
+right — "Phones, Tablets, Chrome OS, Android XR" and "Wear OS only". They are
+separate rows with separate release histories and separate tester lists.
+
+The `Internal Testers` list (2 users) was ticked on the phone track and unticked
+on the Wear OS one, so the Wear track had no testers at all. Its summary read
+**Inactive** while the phone track read Active — which is the tell, and it is
+easy to miss because both pages are titled "Internal testing" and look identical.
+
+Ticking the list flipped the Wear track to Active.
+
+Worth writing down because nothing about it is visible from the API. Reading the
+tracks back with `play-release.py` shows `wear:internal versionCodes=['1004']
+status=completed`, which is true and says nothing about whether a single human
+can install it.
+
+### The full set of gates, in order
+
+For a Wear app to reach a tester's watch, all of these have to be true, and each
+one fails silently in a different way:
+
+1. A Wear bundle released to `wear:internal`. Visible in the API.
+2. Wear OS screenshots on the store listing. Console only.
+3. **Wear OS form factor opted in** under Advanced settings. Console only; until
+   then Play says the app is not compatible with the watch.
+4. **The tester list ticked on the WEAR track specifically.** Console only; until
+   then the opt-in link says the account was never invited.
+
+Three of the four are invisible to the tooling this project uses to verify
+releases. That is the lesson, not the individual settings.
+
 ## 2026-08-29 — Why the watch app was released and still not installable
 
 Released to `wear:internal`, opted in as a tester, and the Play Store on the
