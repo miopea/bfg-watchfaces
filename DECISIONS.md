@@ -1,5 +1,52 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — Both apps run, and the Data Layer needs a pairing nobody can automate
+
+`:mobile` and `:wear` have been installed and launched. Two emulators on the
+operator's laptop — a Wear OS 6 watch and an SDK 36 phone with Play — driven from
+here over the adb bridge.
+
+### What ran
+
+- **`:wear` installs on Wear OS 6.** `FaceReceiverService` is registered with its
+  intent filter, `SET_PUSHED_WATCH_FACE_AS_ACTIVE` shows in requested permissions
+  (ungranted, which is correct for a runtime permission nobody has asked for
+  yet), and `com.google.android.wearable.dwf.receiver` is present, so Push is
+  genuinely supported on this image.
+- **`:mobile` installs and launches on the phone.** The Compose handoff screen
+  renders: the three steps, the numbered markers, the copy straight out of
+  `ActivationConsent`.
+- **"Send to watch" behaves correctly when it cannot.** `FaceSender.findTarget`
+  fails and the screen says "Could not reach your watch. Is Bluetooth on?" — no
+  crash, no silence.
+
+### A defect only a screen could find
+
+The title was drawn UNDER the status bar, overlapping the clock.
+`enableEdgeToEdge()` draws behind the system bars and nothing was applying the
+insets. Fixed with `windowInsetsPadding(WindowInsets.safeDrawing)`.
+
+Worth recording because no test in this repo could have caught it and none
+realistically could: it is not a wrong string, a wrong colour or a wrong number.
+It is a layout that only exists once a real window with real insets is on a real
+screen. The unit tests were all green while it was broken.
+
+### Where the emulator route stops
+
+The Data Layer needs the two emulators PAIRED, and pairing needs
+`com.google.android.wearable.app` — the Wear OS companion — on the phone. The
+Play image ships Play Store and Play services but not that app, and installing it
+requires signing into a Google account.
+
+That is the operator's credential and not something this session should touch, so
+the automated path ends here. Everything up to it is done: both emulators run,
+both apps are installed, and the bridge drives them.
+
+**What that leaves untested**: `CapabilityClient` discovery, the `ChannelClient`
+transfer, `addWatchFace`, slots, and the one-shot activation permission. The
+validator already says a face WOULD be accepted; nothing yet says the transport
+works.
+
 ## 2026-08-29 — The official validator issues tokens for both our builders
 
 `validator-push-cli` 1.1.0-alpha01, run against faces this repo produces. Ten

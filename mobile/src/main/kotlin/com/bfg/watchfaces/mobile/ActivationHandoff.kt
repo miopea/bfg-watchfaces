@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -54,6 +57,11 @@ fun ActivationHandoffScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // safeDrawing, not a fixed top pad: enableEdgeToEdge() draws
+                // behind the status bar, and without this the title sits on top
+                // of the clock and the signal icons. Seen on a real screen, not
+                // reasoned about -- it does not show up in any test.
+                .windowInsetsPadding(WindowInsets.safeDrawing)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp)
         ) {
