@@ -1,5 +1,36 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — Why the watch app was released and still not installable
+
+Released to `wear:internal` as versionCode 1003, opted in, and absent from the
+Play Store on the watch. The cause was one line:
+
+```xml
+<meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
+```
+
+"Non-standalone" is the Wear 2.x arrangement: the watch app was not
+independently installable, and Play pushed it to the watch automatically when
+the phone app was installed. **Wear OS 3 removed that delivery.** A
+non-standalone app is simply not offered on a modern watch — which is exactly
+the symptom: released to a track the tester is opted into, and never in the list.
+
+It was `false` honestly. When it was written this app had no launcher activity
+at all — there was nothing to open and nothing to install on its own, so
+"requires the phone app" was the whole truth. That stopped being true when
+`WatchActivity` landed earlier today. The app now installs, opens, and reports
+whether it is ready and whether it may switch your face.
+
+Needing the phone app to be USEFUL is a different question from being able to
+stand on its own, and only the second one is what this flag means.
+
+Verified in the artefact rather than in the source: `aapt2 dump xmltree` on the
+built APK reads `standalone=true`.
+
+Worth keeping as a pattern: a flag that was correct when written and quietly
+became wrong when the thing it described changed. Nothing failed, nothing
+warned, and the Play Console said the release was live — because it was.
+
 ## 2026-08-29 — The permission nobody asked for
 
 `POST_NOTIFICATIONS` was declared in `:wear`'s manifest and requested nowhere.

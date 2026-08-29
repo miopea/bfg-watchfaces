@@ -47,7 +47,25 @@
       android:label="BFG Watch Faces"
       android:icon="@mipmap/ic_launcher"
       android:roundIcon="@mipmap/ic_launcher_round">
-    <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
+    <!--
+      TRUE, and this is what stops the app appearing in the Play Store on a
+      watch when it is false.
+
+      "Non-standalone" is the Wear 2.x arrangement: the watch app was not
+      independently installable and Play pushed it out automatically when the
+      phone app was installed. Wear OS 3 removed that delivery, so a
+      non-standalone app is simply not offered on a modern watch — which is
+      exactly the symptom, an app released to a track that never appears in the
+      list.
+
+      It was false because when it was written this app had no launcher activity
+      at all: there was nothing to open and nothing to install on its own. That
+      stopped being true when WatchActivity landed. The app now installs, opens,
+      and tells you whether it is ready and whether it may switch your face. It
+      needs the phone app to be USEFUL, which is a different question from
+      whether it can stand on its own.
+    -->
+    <meta-data android:name="com.google.android.wearable.standalone" android:value="true" />
 
     <!--
       Receives a face from the device over ChannelClient and installs it.
