@@ -10,8 +10,8 @@ here over the adb bridge.
 
 - **`:wear` installs on Wear OS 6.** `FaceReceiverService` is registered with its
   intent filter, `SET_PUSHED_WATCH_FACE_AS_ACTIVE` shows in requested permissions
-  (ungranted, which is correct for a runtime permission nobody has asked for
-  yet), and `com.google.android.wearable.dwf.receiver` is present, so Push is
+  (not granted, which is correct for a runtime permission nobody has asked
+  for yet), and `com.google.android.wearable.dwf.receiver` is present, so Push is
   genuinely supported on this image.
 - **`:mobile` installs and launches on the phone.** The Compose handoff screen
   renders: the three steps, the numbered markers, the copy straight out of
