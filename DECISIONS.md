@@ -1,5 +1,52 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — pack on the device: everything but the binary
+
+The on-device build path is written and compiles: `PackBridge` (JNI onto
+google/pack), `ApkSigning` (Android Keystore key, self-signed cert, apksig v2/v3)
+and `FaceBuilder`, which turns `DialParams` into a signed APK carrying only the
+four paths Watch Face Push permits.
+
+**It cannot be finished on this machine.** `libpack_java.so` has to be compiled,
+and this box has no Rust toolchain, no `cargo-ndk`, no Android NDK and no
+`protoc`. `scripts/build-pack-android.sh` does the whole build in one command and
+fails with the exact install lines when a piece is missing.
+
+### Why not Androidify's prebuilt .so, again
+
+`scripts/build-pack.sh` already refused to scavenge them — "unversioned binaries
+nobody here can audit" — and pointing at a device does not change that. There is
+now a second, sharper reason: **theirs is built from UNPATCHED pack.** This repo
+carries `scripts/pack-qualifiers.patch`, without which `res/drawable-nodpi` is
+recorded as density 0 — mdpi, not "unspecified" — and the watch scales a dial
+image that explicitly says do not scale me. That bug was found and fixed here on
+2026-08-28. Taking their binary would silently reintroduce it on the device path
+only, which is the hardest place to notice it.
+
+A third reason emerged while writing the binding: **a JNI symbol encodes the Java
+package.** Androidify's library exports
+`Java_com_android_developers_androidify_watchface_creator_PackPackage_nativeCompilePackage`,
+so using it forces the binding to live in their package. Building ours puts it in
+`com.bfg.watchfaces.mobile.pack`, where it belongs.
+
+### Absent is a state, not a crash
+
+`PackBridge.isAvailable` wraps `System.loadLibrary` in `runCatching`, so a
+checkout that has not run the build script gets a sentence it can show rather
+than an `UnsatisfiedLinkError` at class-load time on someone's phone. The send
+flow builds BEFORE it looks for a watch, deliberately: telling somebody "no watch
+found" when the real problem is that this build cannot pack a face would send
+them into their Bluetooth settings for an hour.
+
+### Signing, and why a throwaway key is the right key
+
+Nothing about a pushed watch face depends on who signed it — Watch Face Push
+trusts the validation token the validator issues for the bytes. So the per-device
+Keystore key is not a weaker version of a real signing key, it is the right shape
+for the job. It also means two phones produce differently-signed APKs for the
+same design, which is why the SLUG and not the signature decides whether a face
+replaces an earlier one.
+
 ## 2026-08-29 — The phone app catches up with the workbench, and what did not
 
 `DECISIONS.md` 2026-08-28 made the localhost app the specification for the phone

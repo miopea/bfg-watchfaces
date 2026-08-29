@@ -1,0 +1,31 @@
+[package]
+name = "pack-java"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# A JNI wrapper around google/pack, so the phone can build a watch face APK
+# with no Android SDK and no aapt2.
+#
+# This crate exists rather than using Androidify's prebuilt libpack_java.so for
+# two reasons, one of them non-obvious:
+#
+#   1. scripts/build-pack.sh already refuses to scavenge those binaries --
+#      "unversioned binaries nobody here can audit" -- and that decision does
+#      not change because the target is now a device.
+#   2. Androidify's .so is built from UNPATCHED pack. This project carries
+#      scripts/pack-qualifiers.patch, without which res/drawable-nodpi is
+#      recorded as mdpi and the watch scales a dial that says do not scale me.
+#      See DECISIONS.md and commit 0c56aa1. Using their binary would silently
+#      reintroduce the bug this project already found and fixed.
+#
+# The JNI symbol name encodes the Java package, so building it ourselves is also
+# what lets the binding live in OUR package instead of com.android.developers.
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.21"
+base64 = "0.22"
+pack-api = { path = "../../build/pack-src/pack-api" }

@@ -2,6 +2,11 @@
 kotlin = "2.0.21"
 agp = "8.13.2"
 wfp-validator = "1.1.0-alpha01"
+# On-device APK build. apksig signs what google/pack compiles -- pack does not
+# sign, and Watch Face Push will not take an unsigned artefact. BouncyCastle is
+# only for minting the self-signed certificate that goes with the Keystore key.
+apksig = "2.3.0"
+bouncycastle = "1.85"
 playServicesWearable = "18.2.0"
 watchfacePush = "1.0.0"
 junit = "5.11.3"
@@ -33,6 +38,8 @@ wear-compose-material3 = { module = "androidx.wear.compose:compose-material3", v
 wear-compose-foundation = { module = "androidx.wear.compose:compose-foundation", version.ref = "wearCompose" }
 wfp-validator-android = { module = "com.google.android.wearable.watchface.validator:validator-push-android", version.ref = "wfp-validator" }
 wfp-validator-jvm = { module = "com.google.android.wearable.watchface.validator:validator-push", version.ref = "wfp-validator" }
+apksig = { module = "com.android.tools.build:apksig", version.ref = "apksig" }
+bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 
 # Compose, per DECISIONS 2026-08-28: the shipped app mirrors the localhost app
 # screen for screen, natively. The BOM pins every compose artifact together --

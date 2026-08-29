@@ -40,6 +40,8 @@ import com.bfg.watchfaces.appcore.ActivationConsent
 import com.bfg.watchfaces.appcore.FaceLibrary
 import com.bfg.watchfaces.appcore.Presets
 import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.mobile.pack.FaceBuilder
+import com.bfg.watchfaces.mobile.pack.PackBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -125,13 +127,13 @@ class MainActivity : ComponentActivity() {
                             ActivationHandoffScreen(
                                 faceName = "your face",
                                 onContinue = {
-                                    status = "Looking for your watch…"
+                                    status = "Building your face…"
                                     scope.launch {
-                                        // Off the main thread: findTarget blocks
-                                        // on the Data Layer.
+                                        // Off the main thread: packing walks the
+                                        // resource table and findTarget blocks on
+                                        // the Data Layer.
                                         status = withContext(Dispatchers.IO) {
-                                            runCatching { describe(FaceSender.findTarget(context)) }
-                                                .getOrElse { "Could not reach your watch. Is Bluetooth on?" }
+                                            buildThenFind(context, params)
                                         }
                                     }
                                 },
@@ -241,9 +243,27 @@ class MainActivity : ComponentActivity() {
      * validation token needs the validator wiring — so claiming a face went
      * anywhere would be a lie the person could check.
      */
+    /**
+     * Build the APK, then look for a watch.
+     *
+     * In that order on purpose: building is the step that can fail for a reason
+     * the person can do nothing about, and telling them "no watch found" when
+     * the real problem is that this build cannot pack a face would send them
+     * looking at their Bluetooth settings for an hour.
+     */
+    private fun buildThenFind(context: android.content.Context, params: DialParams): String {
+        if (!PackBridge.isAvailable) return PackBridge.UNAVAILABLE
+        val built = runCatching { FaceBuilder.build(context, "Untitled", params) }
+            .getOrElse { return "Could not build the face: ${it.message}" }
+        val kb = built.apk.length() / 1024
+        val target = runCatching { FaceSender.findTarget(context) }
+            .getOrElse { return "Built ${built.slug} (${kb}KB), but could not reach your watch." }
+        return "Built ${built.slug} (${kb}KB). " + describe(target)
+    }
+
     private fun describe(target: FaceSender.Target): String = when (target) {
         is FaceSender.Target.Ready ->
-            "Found ${target.name}, with the app installed. Sending is not built yet."
+            "Found ${target.name}, with the app installed. The transfer is the last piece."
         is FaceSender.Target.AppMissing ->
             "${target.name} is connected, but it does not have the app yet. " +
                 "Install BFG Watch Faces on the watch and try again."

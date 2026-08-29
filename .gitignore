@@ -44,3 +44,7 @@ textures/
 *.jks
 *.keystore
 keystore.properties
+
+# Built by scripts/build-pack-android.sh from pinned, patched google/pack.
+# Build output, not source -- and not Androidify's prebuilt binaries either.
+mobile/src/main/jniLibs/
