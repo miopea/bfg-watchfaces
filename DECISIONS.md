@@ -1,5 +1,65 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — On Play internal testing, published by script rather than by hand
+
+`BFG Watch Faces` exists on Google Play as `com.bfg.watchfaces`, in the BFG
+Solutions org account, with both artefacts live on internal testing:
+
+```text
+internal        versionCodes=['1']     status=completed
+wear:internal   versionCodes=['1001']  status=completed
+```
+
+Tester opt-in: `https://play.google.com/apps/internaltest/4701563329381059441`
+
+### The upload is a script, and that was not optional
+
+The browser is the obvious route and it does not work from here. Chrome runs on
+the operator's Windows laptop; the bundles are built on this Linux box; and the
+upload tooling available to this session rejects both the path (not a shared
+file) and the size (19MB against a 10MB cap). Copying a bundle across the bridge
+and clicking through the console would have to happen for every release.
+
+`scripts/play-release.py` does it instead: JWT bearer grant, create edit, upload,
+set track, commit. No browser, no size limit, and it can move to CI unchanged.
+
+### Two things Play refused, both worth keeping
+
+**A Wear bundle cannot ride the phone track.** Uploading both and committing one
+release fails:
+
+```text
+The APK or bundle with version code 1001 requires the Wear OS system feature
+android.hardware.type.watch. To publish this release on the current track,
+remove this artifact.
+```
+
+Play exposes a track per form factor — `internal` and `wear:internal` are
+different tracks, and phone and watch are two releases. The script's `--track`
+choices list both, with the reason in a comment so nobody merges them again.
+
+**Release notes cap at 500 characters.** The honest version of "what does not
+work yet" ran to 648 and was rejected with an HTTP 403.
+
+### Credentials, and one correction to how they were stored
+
+The upload key lives in `~/.keystores`, outside the repo, and its password is in
+1Password. `.gitignore` now refuses `*.jks` and `*.keystore` outright.
+
+Publishing uses `play-publisher@budgetbug-495002`, not the billing service
+account beside it — those identities are separate on purpose. It had no
+retrievable key, so a new one was minted and stored as a 1Password **document**.
+That detail matters: the pre-existing `budgetbug-google-play` item holds its JSON
+with **doubled quotes**, CSV-style, so `json.loads` fails on it and four attempts
+were spent discovering that. A document stores the file byte-for-byte.
+
+### What the testers are actually getting
+
+The release notes say it plainly: the Studio designs faces, and the phone cannot
+yet send one to a watch, because it cannot build a face on device. Activation can
+also fail silently. An internal build that overstates itself is worse than no
+build.
+
 ## 2026-08-29 — Emulator pairing does not work, and the netsim theory is disproven
 
 Two emulators now run locally on KVM, and the pairing attempt was made properly.

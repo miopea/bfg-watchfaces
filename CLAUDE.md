@@ -174,6 +174,20 @@ Watch Face Push installs a face (2026-08-29):
 - Driven by `wear/src/debug`'s `DebugInstallReceiver`, which calls the same
   `FaceInstaller` the channel calls. **This proves the Push half only.**
 
+On Google Play (2026-08-29):
+
+- `com.bfg.watchfaces` is live on **internal testing** in the BFG Solutions org
+  account — phone `versionCode 1` on `internal`, watch `versionCode 1001` on
+  `wear:internal`. Opt-in:
+  `https://play.google.com/apps/internaltest/4701563329381059441`
+- Publish with `scripts/play-release.py`, not the console. It reads the service
+  account from 1Password, uploads and commits in one command. **A Wear bundle
+  cannot go on the phone track** — Play rejects the commit — so phone and watch
+  are two releases.
+- Release signing: upload keystore in `~/.keystores` (outside the repo),
+  password in 1Password, read from the environment at build time. A release
+  build fails loudly rather than emitting an unsigned bundle.
+
 Still never tested:
 
 - **An actual watch.** The above is an emulator, which is a smaller claim.
