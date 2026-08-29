@@ -115,6 +115,22 @@ object ControlInventory {
     fun byId(id: String): Control? = CONTROLS.firstOrNull { it.id == id }
 
     /**
+     * Round a raw value onto the control's own grid, and into its range.
+     *
+     * A continuous slider hands back whatever fraction the finger landed on.
+     * Storing that unrounded is how a `freq` of 6.9997 gets written, and
+     * `freq` is an Int — so the next read is 6 and the slider jumps backwards
+     * under the finger. Rounding here rather than in each front end keeps the
+     * grid in the same place as the [Control.step] that defines it.
+     */
+    fun snap(control: Control, value: Double): Double {
+        val steps = Math.round((value - control.min) / control.step).toDouble()
+        val snapped = control.min + steps * control.step
+        val clamped = snapped.coerceIn(control.min, control.max)
+        return if (control.integral) Math.round(clamped).toDouble() else clamped
+    }
+
+    /**
      * Apply one control's value to a set of parameters.
      *
      * Here rather than in each UI because it is the other half of the same
@@ -138,6 +154,36 @@ object ControlInventory {
         "complicationY" -> p.copy(layout = p.layout.copy(complicationY = value.toInt()))
         "dateY" -> p.copy(layout = p.layout.copy(dateY = value.toInt()))
         "batteryY" -> p.copy(layout = p.layout.copy(batteryY = value.toInt()))
+
+        else -> throw IllegalArgumentException("no control called '$id'")
+    }
+
+    /**
+     * Read one control's current value out of a set of parameters.
+     *
+     * The other half of [with], and here for the same reason. A UI that builds
+     * its sliders from [CONTROLS] has to position each one at where the face
+     * actually is, and without this it would need its own hand-written map from
+     * control id to field — which is exactly the duplicated list this object
+     * exists to delete. Two of them would drift in opposite directions.
+     */
+    fun valueOf(p: DialParams, id: String): Double = when (id) {
+        "scale" -> p.scale
+        "depth" -> p.depth
+        "freq" -> p.freq.toDouble()
+        "stroke" -> p.stroke
+        "relief" -> p.relief
+        "rotate" -> p.rotate
+        "contrast" -> p.contrast
+        "sheen" -> p.sheen
+        "vignette" -> p.vignette
+
+        "timeSize" -> p.layout.timeSize.toDouble()
+        "timeY" -> p.layout.timeY.toDouble()
+        "complicationSpread" -> p.layout.complicationSpread.toDouble()
+        "complicationY" -> p.layout.complicationY.toDouble()
+        "dateY" -> p.layout.dateY.toDouble()
+        "batteryY" -> p.layout.batteryY.toDouble()
 
         else -> throw IllegalArgumentException("no control called '$id'")
     }

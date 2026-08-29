@@ -3,6 +3,7 @@ package com.bfg.watchfaces.generator
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -169,4 +170,73 @@ class ControlInventoryTest {
             }
         }
     }
+
+    @Test
+    fun `every control can be read back after being written`() {
+        // The property that matters for a UI built from the inventory: a slider
+        // reads valueOf to place its thumb and calls with on drag. If those two
+        // disagree for any control, that slider jumps under the finger.
+        var p = DialParams()
+        for (c in ControlInventory.CONTROLS) {
+            for (v in listOf(c.min, c.max, c.min + (c.max - c.min) / 2)) {
+                val rounded = if (c.integral) Math.round(v).toDouble() else v
+                p = ControlInventory.with(p, c.id, rounded)
+                assertEquals(rounded, ControlInventory.valueOf(p, c.id), 1e-9) {
+                    "control '${c.id}' did not read back what was written"
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a fresh face reads inside every control's range`() {
+        // A default that sits outside its own slider is a face nobody can edit
+        // back to where it started.
+        val p = DialParams()
+        for (c in ControlInventory.CONTROLS) {
+            val v = ControlInventory.valueOf(p, c.id)
+            assertTrue(v >= c.min && v <= c.max) {
+                "default ${c.id}=$v is outside its range ${c.min}..${c.max}"
+            }
+        }
+    }
+
+    @Test
+    fun `reading an unknown control fails the same way writing one does`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ControlInventory.valueOf(DialParams(), "nonesuch")
+        }
+    }
+
+
+    @Test
+    fun `snap puts every value on the control's own grid and inside its range`() {
+        for (c in ControlInventory.CONTROLS) {
+            val allowed = c.values().toSet()
+            // Sweep past both ends deliberately: a slider can hand back a value
+            // slightly outside its range from a fast drag.
+            var v = c.min - c.step
+            while (v <= c.max + c.step) {
+                val snapped = ControlInventory.snap(c, v)
+                assertTrue(snapped >= c.min - 1e-9 && snapped <= c.max + 1e-9) {
+                    "${c.id}: snap($v) = $snapped escaped ${c.min}..${c.max}"
+                }
+                assertTrue(allowed.any { kotlin.math.abs(it - snapped) < 1e-6 }) {
+                    "${c.id}: snap($v) = $snapped is not a value the control offers"
+                }
+                v += c.step / 3.0
+            }
+        }
+    }
+
+    @Test
+    fun `snapping an integral control never writes a fraction`() {
+        // freq is stored as an Int. A raw 6.9997 truncates to 6 on write, so the
+        // slider would jump backwards under the finger on every drag.
+        val freq = ControlInventory.byId("freq")!!
+        val snapped = ControlInventory.snap(freq, 6.9997)
+        assertEquals(7.0, snapped, 1e-9)
+        assertEquals(7, ControlInventory.valueOf(ControlInventory.with(DialParams(), "freq", snapped), "freq").toInt())
+    }
+
 }

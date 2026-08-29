@@ -3,15 +3,25 @@ package com.bfg.watchfaces.mobile
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -21,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,16 +44,18 @@ import kotlinx.coroutines.withContext
 /**
  * The design app's entry point.
  *
- * Deliberately thin. `DECISIONS.md` 2026-08-28 commits to the localhost app
- * being the exact specification for this one, so screens arrive by being ported
- * from it rather than invented here. The activation handoff came first because
- * it is the only screen whose absence is unrecoverable — the permission it leads
- * to can be asked once, ever.
+ * `DECISIONS.md` 2026-08-28 commits to the localhost app being the exact
+ * specification for this one, so screens arrive by being ported from it rather
+ * than invented here. [StudioScreen] is that port; the activation handoff came
+ * first only because it is the one screen whose absence is unrecoverable.
  *
  * This does NOT request the activation permission and never will. That belongs
- * to `:wear`; see [ActivationHandoffScreen].
+ * to `:wear` — `androidx.wear.watchfacepush` declares `wear-sdk` as a required
+ * library, so an app linking it will not install on a phone at all.
  */
 class MainActivity : ComponentActivity() {
+
+    private enum class Screen { STUDIO, HANDOFF }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,37 +65,78 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 val context = LocalContext.current
                 val consent = remember { ActivationConsent.load(filesDir) }
+
+                // rememberSaveable so a rotation does not throw away a design.
+                var engineName by rememberSaveable { mutableStateOf(Presentation.STARTING_FACE.engine.name) }
+                var params by remember {
+                    mutableStateOf(Presentation.STARTING_FACE.copy(engine = enumValueOf(engineName)))
+                }
+                var screen by rememberSaveable { mutableStateOf(Screen.STUDIO) }
                 var status by remember { mutableStateOf<String?>(null) }
 
-                Column(Modifier.fillMaxWidth()) {
-                    ActivationHandoffScreen(
-                        faceName = "your face",
-                        onContinue = {
-                            status = "Looking for your watch…"
-                            scope.launch {
-                                // Off the main thread: findTarget blocks on the
-                                // Data Layer.
-                                status = withContext(Dispatchers.IO) {
-                                    runCatching { describe(FaceSender.findTarget(context)) }
-                                        .getOrElse { "Could not reach your watch. Is Bluetooth on?" }
-                                }
+                BackHandler(enabled = screen == Screen.HANDOFF) { screen = Screen.STUDIO }
+
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            // safeDrawing, not a fixed pad: enableEdgeToEdge draws
+                            // behind the status bar, and without this the content
+                            // sits under the clock. Seen on a real screen -- it
+                            // does not show up in any test.
+                            .windowInsetsPadding(WindowInsets.safeDrawing)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        when (screen) {
+                            Screen.STUDIO -> {
+                                StudioScreen(
+                                    params = params,
+                                    onParams = { params = it; engineName = it.engine.name }
+                                )
+                                Button(
+                                    onClick = { screen = Screen.HANDOFF },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                ) { Text("Send to watch") }
+                                Spacer(Modifier.height(24.dp))
                             }
-                        },
-                        onCancel = { finish() }
-                    )
-                    status?.let {
-                        Spacer(Modifier.height(4.dp))
-                        androidx.compose.material3.Text(
-                            text = it,
-                            modifier = Modifier.padding(horizontal = 24.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+
+                            Screen.HANDOFF -> {
+                                ActivationHandoffScreen(
+                                    faceName = "your face",
+                                    onContinue = {
+                                        status = "Looking for your watch…"
+                                        scope.launch {
+                                            // Off the main thread: findTarget blocks
+                                            // on the Data Layer.
+                                            status = withContext(Dispatchers.IO) {
+                                                runCatching { describe(FaceSender.findTarget(context)) }
+                                                    .getOrElse { "Could not reach your watch. Is Bluetooth on?" }
+                                            }
+                                        }
+                                    },
+                                    onCancel = { screen = Screen.STUDIO }
+                                )
+                                status?.let {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = it,
+                                        modifier = Modifier.padding(horizontal = 24.dp),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                ActivationDeniedNote(
+                                    state = consent,
+                                    modifier = Modifier.padding(24.dp)
+                                )
+                            }
+                        }
                     }
-                    ActivationDeniedNote(
-                        state = consent,
-                        modifier = Modifier.padding(24.dp)
-                    )
                 }
             }
         }

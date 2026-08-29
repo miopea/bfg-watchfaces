@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.workbench
 
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -195,6 +196,37 @@ class RenderPipelineTest {
             if (issues != null) assertTrue(issues.isEmpty()) { "$name emits invalid WFF: $issues" }
         }
     }
+    /**
+     * The composite preview, pinned.
+     *
+     * `preview.png` SHIPS — it is the thumbnail the carousel shows — so a change
+     * to how the complication icons or the clock are drawn changes an asset
+     * inside every APK built afterwards. This is the only test that would notice.
+     *
+     * A failure here is not automatically a bug. It means the preview's
+     * appearance changed, and whoever changed it has to say so on purpose.
+     */
+    @Test
+    fun `the composite preview is byte-for-byte what it has always been`() {
+        val faces = listOf(
+            DialParams(),
+            DialParams(engine = Engine.KNOTWORK, dialColor = "#2B2E33", inkColor = "#C9A227"),
+            DialParams(complications = ComplicationSource.entries.take(5))
+        )
+        val actual = faces.map { p ->
+            val img = FacePreview.render(p)
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            for (v in pixels(img)) {
+                md.update((v ushr 24).toByte()); md.update((v ushr 16).toByte())
+                md.update((v ushr 8).toByte()); md.update(v.toByte())
+            }
+            md.digest().joinToString("") { "%02x".format(it) }.take(16)
+        }
+        assertEquals(listOf("f161fc20d0acadfc", "00d9ca560ad79da1", "d8df01efa40bfedc"), actual) {
+            "the composite preview changed; every preview.png built after this differs"
+        }
+    }
+
 }
 
 /**
@@ -260,4 +292,6 @@ class ProceduralSurfaceTest {
         val kb = bos.size() / 1024
         assertTrue(kb < 200) { "$e quantized to ${kb}KB, too heavy for a Bluetooth transfer" }
     }
+
+
 }

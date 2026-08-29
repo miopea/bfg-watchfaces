@@ -1,5 +1,62 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — The phone app is the demo now, and the icons moved to :generator
+
+`:mobile` was 537 lines: a handoff screen and a sender, no design surface at
+all. It now opens on the Studio screen from the localhost app — composite
+preview, style chips, dial and ink swatches, and every slider — which is what
+`DECISIONS.md` 2026-08-28 meant by making that app the exact specification.
+
+Nothing about it is invented. Controls and their ranges come from
+`ControlInventory`, the pixels from `AndroidDialRenderer` and
+`AndroidFacePreview`, and the labels and order from a `Presentation` object that
+holds only presentation. Where the phone and the demo disagree, the demo is
+right and the phone has a bug.
+
+### The complication icons are geometry, so they went where geometry lives
+
+They existed only in the workbench, as ninety lines of AWT calls. Porting them
+by hand into a Canvas renderer would have produced a second copy that drifts —
+the failure this repo has already fixed three times, for stroke passes, shading
+and slot boxes.
+
+So they are `ComplicationGlyphs` in `:generator` now: primitives on a 24-grid,
+with an AWT executor in `:workbench` and a Canvas executor in `:mobile`, neither
+holding a decision. One convention had to be written down rather than inferred —
+the arcs carry AWT angles, counter-clockwise from 3 o'clock, and Android's
+`drawArc` measures clockwise, so it negates both. Getting that wrong draws the
+sunrise glyph as a sunset.
+
+**`preview.png` ships**, which is why this was done carefully rather than
+quickly. It is the carousel thumbnail, built from these icons, and
+`watch_face_info.xml` requires it. `ComplicationIcons` used to say the icons
+"never reach the APK"; that was true of `dial_bg.png` and false of the preview.
+
+The move is guarded by a new golden test that hashes the composite preview for
+three faces. It passed unchanged across the extraction — byte for byte — which
+is the only evidence worth having that a refactor of drawing code changed
+nothing.
+
+### Two bugs the screenshot found that no test would have
+
+**It opened on Botanical.** `DialParams()`'s defaults are the FORMAT's defaults
+and start there; the first chip in the curated list is Knotwork. An app whose
+opening style is not the style it highlights is the same regression caught on
+2026-08-28, arriving by a different route. `Presentation.STARTING_FACE` is the
+studio's opening point — no name, no slug, no package, so it is not the
+hardcoded face identity `CLAUDE.md` forbids.
+
+**Every slider drew a tick per step.** Compose renders `steps` as tick marks,
+and `scale` has 152 of them, so the track came out as a striped bar you could
+not read a position off. The sliders are continuous now and the value is snapped
+on the way in by `ControlInventory.snap`, which also fixes a quieter bug: `freq`
+is stored as an `Int`, so an unrounded 6.9997 truncated to 6 and the slider
+jumped backwards under the finger.
+
+`valueOf` was missing too — the inventory could write a control but not read one,
+so any UI building sliders from it needed its own hand-written map from id to
+field. That is the duplicated list the inventory exists to delete.
+
 ## 2026-08-29 — The face activates itself, and the one-shot had a silent bug
 
 The whole Push half now runs end to end: parameters, APK, validator token,
