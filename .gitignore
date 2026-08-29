@@ -38,3 +38,9 @@ debug.keystore
 # Images imported for the TEXTURE engine. Local content, never part of a face
 # and never publishable -- the catalog is parameters only.
 textures/
+
+# Signing material. The upload keystore lives in ~/.keystores and its password
+# is in 1Password; neither may ever be committed.
+*.jks
+*.keystore
+keystore.properties

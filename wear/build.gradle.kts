@@ -1,3 +1,4 @@
+import java.io.File
 // SCAFFOLD -- never built or run. Uncomment ":wear" in settings.gradle.kts
 // once ANDROID_HOME is configured.
 plugins {
@@ -12,9 +13,41 @@ android {
         applicationId = "com.bfg.watchfaces"  // MUST match the phone app
         minSdk = 36                           // Wear OS 6 = API 36. Push exists nowhere below it.
         targetSdk = 36
-        versionCode = 1
+        // Play requires a UNIQUE versionCode for every artefact in a release, and
+        // the phone and watch apps ship as two artefacts under one listing. The
+        // scheme is "wear = phone + 1000", so the two never collide and it stays
+        // obvious which is which in the console.
+        versionCode = 1001
         versionName = "1.0"
     }
+    /**
+     * Release signing. Identical to `:mobile`'s and deliberately so: both
+     * artefacts go into one Play listing, and Play rejects a release whose APKs
+     * are signed by different keys.
+     *
+     * The password is never in this file or the repo -- see mobile/build.gradle.kts.
+     */
+    signingConfigs {
+        create("release") {
+            val ksPath = System.getenv("BFG_KEYSTORE")
+                ?: "${System.getProperty("user.home")}/.keystores/bfg-watchfaces-upload.jks"
+            val ksPassword = System.getenv("BFG_KEYSTORE_PASSWORD")
+            if (ksPassword != null && File(ksPath).exists()) {
+                storeFile = File(ksPath)
+                storePassword = ksPassword
+                keyAlias = System.getenv("BFG_KEY_ALIAS") ?: "bfg-upload"
+                keyPassword = ksPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+        }
+    }
+
     // Java and Kotlin must agree, or the build fails with "Inconsistent
     // JVM-target compatibility" -- the scaffolds set Kotlin to 17 and left Java
     // at the 1.8 default, which only shows up once there is Kotlin to compile.
@@ -29,6 +62,12 @@ dependencies {
     implementation(project(":appcore"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity)
+    // Explicit, not transitive. activity-ktx drags in fragment 1.1.0, and
+    // registerForActivityResult needs 1.3.0+: below that, FragmentActivity does
+    // not call super.onRequestPermissionsResult() and uses invalid request
+    // codes, so a permission result can be silently lost. ActivationRequestActivity
+    // is exactly that case, and its permission cannot be requested a second time.
+    implementation(libs.androidx.fragment)
     implementation(libs.play.services.wearable)
     implementation(libs.wear.watchface.push)
 }
