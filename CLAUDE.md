@@ -51,6 +51,14 @@ its name when someone saves it, and that name becomes the carousel label, the
 hardcoded face identity — that is what "Silver Sand" was, and it went away on
 2026-08-27.
 
+**The app icon is generated, never hand-drawn.** `BrandMark` in `:workbench`
+describes the mark once; `./gradlew :workbench:brand` writes the Android adaptive
+icon for both apps, the 512px Play PNG and the SVGs under `docs/brand`. All of it
+is checked in — the Android build must not depend on a JVM task having been run.
+Judge any change with `--sheet=`, which crops the way a launcher does: the mask
+takes the middle 72dp of the 108dp layer, not all of it. See `DECISIONS.md`
+2026-08-29.
+
 **Controls come from `ControlInventory`.** Which sliders exist, their ranges and
 their order live in `:generator`; both UIs build from it. Labels and the curated
 engine order stay in the UI — those are presentation. Do not hardcode a control
@@ -91,6 +99,8 @@ rejected — not a changelog.
 ./gradlew :workbench:bake               # dial_bg.png + preview.png + watchface.xml
 ./gradlew :workbench:bake --args="--preset=Rosette Noir"
 ./gradlew :workbench:catalog            # validate catalog + rewrite index.json
+./gradlew :workbench:brand              # launcher icons, Play icon, docs/brand SVGs
+./gradlew :workbench:brand --args="--sheet=/tmp/i.png"   # icon as a launcher masks it
 
 make docs-check                         # markdownlint + cspell over the docs
 
@@ -121,14 +131,14 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 
 Verified — built and run, not assumed:
 
-- `:generator` — 335 tests green, including validation against Google's official
+- `:generator` — 343 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
-- `:appcore` — 30 tests green. Rules and words the shipped apps share, pure
+- `:appcore` — 38 tests green. Rules and words the shipped apps share, pure
   JVM. Not `:generator` (that is the file format) and not `:workbench` (never
   shipped). Holds `ActivationConsent`, whose one-shot rule guards the only
   unrecoverable action in the system.
-- `:workbench` — 98 tests green. Serves the app at localhost:7777; bakes
+- `:workbench` — 118 tests green. Serves the app at localhost:7777; bakes
   `dial_bg.png`, `preview.png`, `watchface.xml`, `strings.xml` and the manifest
   package from parameters. Quantization measured at 64 colours, mean error
   0.51/255. Saves designs to `faces/<slug>.json`, the catalog format.
