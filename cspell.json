@@ -46,6 +46,8 @@
     "colourway",
     "colourways",
     "delists",
+    "dragenter",
+    "dragover",
     "drawables",
     "dumpsys",
     "gpasswd",

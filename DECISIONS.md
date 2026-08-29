@@ -1,5 +1,46 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — How to put a local file into the Play Console from a headless box
+
+The store listing is complete: icon, feature graphic, five phone screenshots,
+name, short and full description. Verified by reading it back with
+`scripts/play-listing.py --show`, not by looking at the page that wrote it.
+
+The API was still refusing listing commits hours after the "Manage store
+presence" grant, so this went through the browser — which has its own problem:
+Chrome runs on the operator's Windows laptop and the assets are generated on this
+Linux box.
+
+**Play has no file input to fill.** `document.querySelectorAll('input[type=file]')`
+returns nothing. Play creates one on demand and calls `.click()`, which opens a
+native dialog — invisible to automation, and it FREEZES the session because
+nothing can dismiss it.
+
+So, in order:
+
+1. Neutralise every route to a dialog first, before touching any button:
+   override `HTMLInputElement.prototype.click` to a no-op for `type=file`, and
+   make `showOpenFilePicker` throw. Do this BEFORE the click, not after.
+2. Create your own `<input type="file">`, attach it to the document, and fill it
+   with the file-upload tool — which can read this machine's paths.
+3. Take `input.files`, build a `DataTransfer`, and dispatch
+   `dragenter`/`dragover`/`drop` on Play's drop zone. Play's asset picker opens
+   with the file already ingested; select it and press Add.
+
+**Address the drop zone by its help text, not by index.** There are eight
+identical "Add assets" elements. Their order CHANGES as slots fill, so an index
+that meant "phone screenshots" before the icon was set means something else
+after — the first attempt silently dropped five screenshots onto nothing.
+
+**Screenshot order is drag-and-drop and it matters.** Play showed them in
+roughly reverse upload order, which put the black always-on screen first — the
+one that looks like a blank rectangle. A real click-drag between thumbnails
+reorders them, where a synthetic drag event does not.
+
+Not done: the listing is SAVED, not submitted. Sending it for review is a
+separate, operator-level decision and there is no reason to make it before the
+app can actually send a face to a watch.
+
 ## 2026-08-29 — Store listing assets upload by API too, and that needed a permission
 
 `scripts/play-listing.py` does for the listing what `play-release.py` does for
