@@ -1,7 +1,6 @@
 package com.bfg.watchfaces.wear
 
 import android.content.Context
-import android.content.Intent
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.wear.watchfacepush.WatchFacePushManagerFactory
@@ -78,6 +77,9 @@ object FaceInstaller {
      * A face has landed. This is the moment operator decision
      * 01a049a1-390b-7b50-a5d3-cc082037bb55 names, and the only time activation
      * can ever be asked.
+     *
+     * It posts a notification rather than opening the dialog directly, because
+     * Android will not let this context open anything: see [ActivationPrompt].
      */
     private fun onFaceInstalled(context: Context, slotId: String) {
         val state = ActivationConsent.load(context.filesDir)
@@ -89,10 +91,7 @@ object FaceInstaller {
             Log.i(TAG, "activation already answered; not asking again")
             return
         }
-        context.startActivity(
-            ActivationRequestActivity.intent(context, slotId)
-                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-        )
+        ActivationPrompt.show(context, slotId)
     }
 
     private const val TAG = "BfgFaceInstaller"

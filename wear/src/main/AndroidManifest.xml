@@ -30,6 +30,15 @@
     com.google.android.wearable.dwf.receiver` shows WatchFaceReceiverService
     guarded by exactly this string. See DECISIONS.md.
   -->
+  <!--
+    Needed to post the notification that carries the activation ask. Android
+    will not let the install path open the dialog directly — the face lands in a
+    background context and the launch is blocked — so the notification IS the
+    route to the one irreversible question. Without this permission `notify` is
+    a silent no-op and the ask simply never happens.
+  -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
   <uses-permission android:name="com.google.wear.permission.PUSH_WATCH_FACES" />
 
   <uses-permission android:name="com.google.wear.permission.SET_PUSHED_WATCH_FACE_AS_ACTIVE" />
@@ -58,11 +67,16 @@
       from an Activity. No layout: the system dialog is the interface, and the
       explanation already happened on the device before the face was sent.
     -->
+    <!--
+      No android:noHistory here, and it must not come back. It finishes this
+      activity as soon as the permission dialog covers it, so the result
+      callback never arrives and the one irreversible answer is silently lost.
+      Observed on Wear OS 6, 2026-08-29 — see ActivationRequestActivity.
+    -->
     <activity
         android:name=".ActivationRequestActivity"
         android:exported="false"
         android:theme="@android:style/Theme.Translucent.NoTitleBar"
-        android:excludeFromRecents="true"
-        android:noHistory="true" />
+        android:excludeFromRecents="true" />
   </application>
 </manifest>

@@ -1,5 +1,69 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — The face activates itself, and the one-shot had a silent bug
+
+The whole Push half now runs end to end: parameters, APK, validator token,
+`addWatchFace`, notification, permission, `setWatchFaceAsActive`. The pushed
+face is the active watch face on the emulator, rendering with live
+complications. Nothing in this paragraph was true this morning.
+
+### A notification is the only route to the ask
+
+`startActivity` from the install path is refused — `Background activity launch
+blocked`, and a `WearableListenerService` is a background context by the same
+rule. [ActivationPrompt] posts a notification instead; the tap is a foreground
+action, so the activity it launches is allowed to start. `dumpsys notification`
+confirms the exemption is attached to the `contentIntent`:
+
+```text
+contentIntent=PendingIntent{... startActivity
+  (allowlist: .../NOTIFICATION_SERVICE/NotificationManagerService)}
+```
+
+It is also better than what the design asked for. The old shape fired a
+one-shot dialog cold on a wrist; this one fires because someone chose to look.
+
+**`POST_NOTIFICATIONS` is not granted by install**, and `notify` is a silent
+no-op without it — the ask would simply never happen, indistinguishable from
+the bug this replaced. `ActivationPrompt` checks `areNotificationsEnabled()`
+and says so rather than failing quietly. **How that permission gets granted in
+production is still open**; it was granted by hand for this test.
+
+### The doc described a safety property the code did not have
+
+`ActivationRequestActivity`'s KDoc has said since it was written that the state
+is "written down BEFORE the dialog is shown as well as after", because "a
+process death mid-dialog must not leave this looking unasked". The code only
+ever wrote in the result callback.
+
+The manifest then made that theoretical hazard real. `android:noHistory="true"`
+finishes an activity as soon as it stops being visible — which is precisely what
+the permission dialog covering it does. Observed: the dialog appeared, the
+activity died, no callback arrived, nothing was written, and the state read
+UNASKED with the ask already spent. On the one action in this system that cannot
+be retried.
+
+Both halves fixed. `noHistory` is gone, with a comment saying why it must not
+come back. `ActivationConsent` gained `ASKING`, written before the request goes
+out; `settle()` recovers an interrupted ask from the only evidence left, which
+is whether the permission actually landed. Absent settles to DENIED and never
+back to UNASKED — Android will not show the dialog again either way, so
+"unasked" would produce an app that believes it can still ask and silently
+never does.
+
+Nine tests cover it, including the full save/die/reload round trip.
+
+### Two notes for anyone driving a headless Wear emulator
+
+Input to a **dozing** screen is silently discarded. Taps looked like they were
+landing on the permission dialog and nothing happened, twice, before
+`dumpsys power` showed `mWakefulness=Dozing`. Send `KEYCODE_WAKEUP` first and
+check, or you will debug your own code for an hour.
+
+The Wear permission dialog is Compose: its text nodes report
+`clickable=false` and carry no resource id. Find the clickable ancestor by
+bounds instead of matching on the label.
+
 ## 2026-08-29 — `addWatchFace` works, and two shipped bugs only running could find
 
 Watch Face Push has installed a face. Not validated, not sideloaded — pushed,

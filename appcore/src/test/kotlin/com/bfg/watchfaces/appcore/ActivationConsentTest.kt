@@ -218,4 +218,87 @@ class ActivationConsentTest {
             assertFalse(s.contains(j, ignoreCase = true)) { "user-facing copy contains '$j': $s" }
         }
     }
+
+    // ---- the ask that never came back ---------------------------------------
+
+    @Test
+    fun `nothing may ask from ASKING`() {
+        // The point of the state. An activity hosting a permission dialog can be
+        // destroyed while the dialog is up -- Wear's own noHistory flag did
+        // exactly that -- and if the only write happened on the result, the next
+        // read would say UNASKED and spend the one shot again.
+        assertFalse(ActivationConsent.canAsk(State.ASKING))
+        assertFalse(ActivationConsent.canActivate(State.ASKING))
+        assertThrows(IllegalArgumentException::class.java) {
+            ActivationConsent.begin(State.ASKING)
+        }
+    }
+
+    @Test
+    fun `begin marks the ask as spent before the dialog is shown`() {
+        assertEquals(State.ASKING, ActivationConsent.begin(State.UNASKED))
+        assertTrue(ActivationConsent.isInterrupted(State.ASKING))
+        assertFalse(ActivationConsent.isInterrupted(State.UNASKED))
+        for (answered in listOf(State.GRANTED, State.DENIED)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                ActivationConsent.begin(answered)
+            }
+        }
+    }
+
+    @Test
+    fun `an interrupted ask settles from the system's own view`() {
+        assertEquals(State.GRANTED, ActivationConsent.settle(State.ASKING, permissionGranted = true))
+        assertEquals(State.DENIED, ActivationConsent.settle(State.ASKING, permissionGranted = false))
+    }
+
+    @Test
+    fun `an interrupted ask with no permission settles to DENIED, never back to UNASKED`() {
+        // The dangerous rounding. Android will not show the dialog again either
+        // way, so calling it unasked produces an app that believes it can still
+        // ask and then silently never does.
+        val settled = ActivationConsent.settle(State.ASKING, permissionGranted = false)
+        assertEquals(State.DENIED, settled)
+        assertFalse(ActivationConsent.canAsk(settled))
+        assertNotNull(ActivationConsent.persistentNote(settled)) {
+            "a settled denial must still tell them how to switch faces by hand"
+        }
+    }
+
+    @Test
+    fun `settle leaves a real answer alone`() {
+        for (answered in listOf(State.UNASKED, State.GRANTED, State.DENIED)) {
+            assertEquals(answered, ActivationConsent.settle(answered, permissionGranted = true))
+            assertEquals(answered, ActivationConsent.settle(answered, permissionGranted = false))
+        }
+    }
+
+    @Test
+    fun `the whole interrupted round trip survives a restart`() {
+        val dir = java.nio.file.Files.createTempDirectory("consent").toFile()
+        ActivationConsent.save(dir, ActivationConsent.begin(ActivationConsent.load(dir)))
+        // process dies here; the result callback never arrives
+        val reloaded = ActivationConsent.load(dir)
+        assertEquals(State.ASKING, reloaded) { "the marker did not survive the write" }
+        ActivationConsent.save(dir, ActivationConsent.settle(reloaded, permissionGranted = true))
+        assertEquals(State.GRANTED, ActivationConsent.load(dir))
+    }
+
+    @Test
+    fun `record still accepts the state begin produced`() {
+        assertEquals(State.GRANTED, ActivationConsent.record(State.ASKING, granted = true))
+        assertEquals(State.DENIED, ActivationConsent.record(State.ASKING, granted = false))
+    }
+
+    @Test
+    fun `the notification copy says what the tap does and that it is once only`() {
+        // The notification is the only route to the dialog -- Android refuses a
+        // background activity launch -- so this copy is the last thing we
+        // control before an irreversible choice.
+        assertTrue(ActivationConsent.NOTIFY_TITLE.isNotBlank())
+        val body = ActivationConsent.NOTIFY_BODY.lowercase()
+        assertTrue("tap" in body) { "does not say what to do: ${ActivationConsent.NOTIFY_BODY}" }
+        assertTrue("once" in body) { "does not warn it is one-shot: ${ActivationConsent.NOTIFY_BODY}" }
+    }
+
 }
