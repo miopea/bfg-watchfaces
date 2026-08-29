@@ -93,8 +93,14 @@ class MainActivity : ComponentActivity() {
                 var faces by remember { mutableStateOf(FaceStorage.list(context)) }
 
                 var tuning by remember { mutableStateOf(false) }
+                var picking by remember { mutableStateOf(false) }
+                var pickingDial by remember { mutableStateOf(true) }
                 var naming by remember { mutableStateOf(false) }
                 val tuneState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+                // Opens fully rather than half: the hex field and the buttons sit below the
+                // pad, and at the partial height they were off screen with no hint that
+                // scrolling would reach them.
+                val colorState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                 val nameState = rememberModalBottomSheetState()
 
                 BackHandler(enabled = handoff) { handoff = false }
@@ -174,7 +180,8 @@ class MainActivity : ComponentActivity() {
                                 onParams = { params = it; engineName = it.engine.name },
                                 ambient = ambient,
                                 onAmbient = { ambient = it },
-                                onTune = { tuning = true }
+                                onTune = { tuning = true },
+                                onCustomColor = { dial -> pickingDial = dial; picking = true }
                             )
                             Column(Modifier.padding(horizontal = 16.dp)) {
                                 Button(
@@ -207,6 +214,19 @@ class MainActivity : ComponentActivity() {
                         onParams = { params = it; engineName = it.engine.name },
                         sheetState = tuneState,
                         onDismiss = { tuning = false }
+                    )
+                }
+                if (picking) {
+                    ColorSheet(
+                        title = if (pickingDial) "Dial colour" else "Hands & text",
+                        initial = if (pickingDial) params.dialColor else params.inkColor,
+                        sheetState = colorState,
+                        onDismiss = { picking = false },
+                        onPick = { hex ->
+                            params = if (pickingDial) params.copy(dialColor = hex)
+                            else params.copy(inkColor = hex)
+                            picking = false
+                        }
                     )
                 }
                 if (naming) {

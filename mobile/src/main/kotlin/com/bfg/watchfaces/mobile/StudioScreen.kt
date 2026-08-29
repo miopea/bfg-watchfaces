@@ -81,6 +81,8 @@ fun StudioScreen(
     ambient: Boolean,
     onAmbient: (Boolean) -> Unit,
     onTune: () -> Unit,
+    /** true for the dial, false for the ink. */
+    onCustomColor: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -97,11 +99,15 @@ fun StudioScreen(
 
         Spacer(Modifier.height(20.dp))
         SectionHeading("Dial")
-        Swatches(Presentation.DIALS, params.dialColor) { onParams(params.copy(dialColor = it)) }
+        Swatches(Presentation.DIALS, params.dialColor, onCustom = { onCustomColor(true) }) {
+            onParams(params.copy(dialColor = it))
+        }
 
         Spacer(Modifier.height(16.dp))
         SectionHeading("Ink")
-        Swatches(Presentation.INKS, params.inkColor) { onParams(params.copy(inkColor = it)) }
+        Swatches(Presentation.INKS, params.inkColor, onCustom = { onCustomColor(false) }) {
+            onParams(params.copy(inkColor = it))
+        }
 
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
@@ -320,11 +326,33 @@ private fun EngineChips(selected: Engine, onSelect: (Engine) -> Unit) {
     }
 }
 
+/**
+ * The colour row, plus the door to any other colour.
+ *
+ * The nine dial swatches are the fast path and cover most designs. The trailing
+ * "+" is the localhost app's custom picker, and it matters more than it looks:
+ * a dial colour is the thing somebody is most likely to have already decided,
+ * from a brand or a photo, and a fixed palette simply cannot express it.
+ */
 @Composable
-private fun Swatches(colors: List<String>, selected: String, onSelect: (String) -> Unit) {
+private fun Swatches(
+    colors: List<String>,
+    selected: String,
+    onCustom: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    // The "+" is OUTSIDE the scrolling row, pinned to the end. Nine 44dp
+    // swatches do not fit a 411dp screen, so inside the scroller the custom
+    // colour would sit past the right edge -- an affordance nobody would find,
+    // and shrinking the swatches to fit would put them under the 48dp touch
+    // target. Pinning costs one swatch of width and makes it always reachable.
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .weight(1f)
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -332,28 +360,48 @@ private fun Swatches(colors: List<String>, selected: String, onSelect: (String) 
             val chosen = hex.equals(selected, ignoreCase = true)
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(44.dp)
                     .clip(CircleShape)
                     .background(Color(EngravedStroke.withAlpha(EngravedStroke.rgb(hex), 255)))
                     .border(
                         width = if (chosen) 3.dp else 1.dp,
                         color = if (chosen) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outlineVariant,
+                        else MaterialTheme.colorScheme.outline,
                         shape = CircleShape
                     )
                     .clickable { onSelect(hex) }
             )
         }
     }
+        Spacer(Modifier.padding(horizontal = 5.dp))
+        // Shown as selected when the current colour is not one of the swatches,
+        // so a custom colour does not look like nothing is chosen.
+        val custom = colors.none { it.equals(selected, ignoreCase = true) }
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(
+                    if (custom) Color(EngravedStroke.withAlpha(EngravedStroke.rgb(selected), 255))
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+                .border(
+                    width = if (custom) 3.dp else 1.dp,
+                    color = if (custom) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outline,
+                    shape = CircleShape
+                )
+                .clickable(onClick = onCustom),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!custom) {
+                Text("+", style = MaterialTheme.typography.titleMedium,
+                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
 }
 
-/**
- * One slider, built entirely from the inventory.
- *
- * Range, step and whether it is a whole number all come from `:generator`. A
- * slider that went too far used to be invisible until somebody dragged it,
- * which is why none of those numbers are written here.
- */
 @Composable
 internal fun SectionHeading(text: String) {
     Text(
