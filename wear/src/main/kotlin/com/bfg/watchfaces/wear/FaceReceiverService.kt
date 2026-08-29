@@ -1,10 +1,7 @@
 package com.bfg.watchfaces.wear
 
-import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.wear.watchfacepush.WatchFacePushManager
-import androidx.wear.watchfacepush.WatchFacePushManagerFactory
-import com.bfg.watchfaces.appcore.ActivationConsent
 import com.bfg.watchfaces.appcore.WatchLink
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.ChannelClient
@@ -17,7 +14,13 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * The watch half. It receives a face from the device and installs it.
+ * The watch half. It receives a face from the device and hands it to
+ * [FaceInstaller].
+ *
+ * This class is now only the transport: read the token off the channel path,
+ * stage the bytes, delegate. What `addWatchFace` does with them lives in
+ * [FaceInstaller], which does not depend on a channel and so can be driven on
+ * a watch with no phone paired to it.
  *
  * Google's guidance describes this app as "primarily a bridge between the phone
  * app and the Watch Face Push APIs", with "not a significant user interface",
@@ -59,7 +62,7 @@ class FaceReceiverService : WearableListenerService() {
                 // Dispatchers.IO, and it avoids pulling in
                 // kotlinx-coroutines-play-services for one call.
                 Tasks.await(client.receiveFile(channel, android.net.Uri.fromFile(staged), false))
-                install(staged, token)
+                report(FaceInstaller.install(this@FaceReceiverService, staged, token))
             }.onFailure {
                 Log.e(TAG, "face did not arrive or would not install", it)
             }
@@ -68,48 +71,13 @@ class FaceReceiverService : WearableListenerService() {
         }
     }
 
-    private suspend fun install(apk: File, token: String) {
-        if (!WatchFacePushManagerFactory.isSupported()) {
-            // Wear OS 6 is a hard floor. Saying so here is cheap; discovering it
-            // as an opaque failure after a Bluetooth transfer is not.
-            Log.w(TAG, "Watch Face Push is not available on this watch")
-            return
-        }
-        val manager = WatchFacePushManagerFactory.createWatchFacePushManager(this)
-
-        ParcelFileDescriptor.open(apk, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-            val existing = manager.listWatchFaces()
-            // Slots are finite. Replacing our own oldest face is better than
-            // failing with ERROR_SLOT_LIMIT_REACHED, which the user cannot act
-            // on and which reads as "the app is broken".
-            val details = if (existing.remainingSlotCount > 0) {
-                manager.addWatchFace(fd, token)
-            } else {
-                val oldest = existing.installedWatchFaceDetails.firstOrNull() ?: return
-                manager.updateWatchFace(oldest.slotId, fd, token)
-            }
-            onFaceInstalled(details.slotId)
-        }
-    }
-
-    /**
-     * A face has landed. This is the moment the decision names, and the only
-     * time this can ever be asked.
-     */
-    private fun onFaceInstalled(slotId: String) {
-        val state = ActivationConsent.load(filesDir)
-        if (!ActivationConsent.canAsk(state)) {
-            // Already answered. Not an error -- it is the rule working, and it
-            // is why canAsk exists rather than a bare permission check: a denial
-            // also leaves the permission missing, and re-reading that as
-            // "ask again" is how the one shot gets spent on someone who said no.
-            return
-        }
-        startActivity(
-            ActivationRequestActivity.intent(this, slotId).apply {
-                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
+    private fun report(result: FaceInstaller.Result) = when (result) {
+        is FaceInstaller.Result.Installed ->
+            Log.i(TAG, "face installed in slot ${result.slotId} (replaced=${result.replaced})")
+        is FaceInstaller.Result.Unsupported ->
+            Log.w(TAG, "this watch does not support Watch Face Push")
+        is FaceInstaller.Result.Failed ->
+            Log.e(TAG, "face would not install", result.cause)
     }
 
     override fun onDestroy() {

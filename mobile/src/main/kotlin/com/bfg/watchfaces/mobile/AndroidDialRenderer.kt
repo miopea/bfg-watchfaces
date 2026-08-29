@@ -14,6 +14,8 @@ import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.DialShading
 import com.bfg.watchfaces.generator.EngravedStroke
 import com.bfg.watchfaces.generator.PatternEngines
+import com.bfg.watchfaces.generator.ProceduralDial
+import com.bfg.watchfaces.generator.TextureField
 import com.bfg.watchfaces.generator.Polyline
 
 /**
@@ -37,11 +39,13 @@ import com.bfg.watchfaces.generator.Polyline
  *
  * ## What is NOT here yet
  *
- * Imported images and the generated surfaces (`GRAIN`, `BRUSHED`, `CARBON`,
- * `LINEN`) fall back to a plain dial. `TextureField` is pure and already in
- * `:generator`, so the field itself ports directly; what has to be written is
- * the per-pixel shading loop, which is a real piece of work and deserves its own
- * pass rather than being rushed in alongside the first draw.
+ * Imported images. `Engine.TEXTURE` needs a bitmap the face only references by
+ * id, so it falls back to a plain dial until there is somewhere on the device to
+ * resolve that id from.
+ *
+ * The generated surfaces used to be missing too. They are not any more: the
+ * shading loop moved to [ProceduralDial] in `:generator`, which is what made
+ * porting them a blit rather than a second copy of the lighting model.
  *
  * The lens is also absent, and deliberately: `DECISIONS.md` 2026-08-27 records
  * that it is a preview-only effect which never reaches the shipped WFF, so
@@ -83,10 +87,36 @@ object AndroidDialRenderer {
         }
         canvas.drawPaint(fill)
 
-        drawSheen(canvas, p)
-        drawPattern(canvas, p)
+        // Order mirrors the workbench renderer exactly: a generated surface
+        // replaces the stroked pattern and draws its own sheen on top, and the
+        // vignette goes over whichever happened.
+        val procedural = TextureField.kindFor(p.engine)
+        if (procedural != null) drawProcedural(canvas, procedural, p, size) else drawSheen(canvas, p)
+        if (procedural == null) drawPattern(canvas, p)
         drawVignette(canvas, p)
         return bitmap
+    }
+
+    /**
+     * A generated surface — GRAIN, BRUSHED, CARBON, LINEN.
+     *
+     * The lighting is [ProceduralDial]'s, computed as raw ARGB in `:generator`;
+     * this only turns the array into a bitmap and puts it down. These four
+     * styles used to fall back to a plain dial here, because the arithmetic
+     * lived in the AWT renderer and copying it would have been a fourth chance
+     * to drift.
+     */
+    private fun drawProcedural(canvas: Canvas, kind: TextureField.Kind, p: DialParams, size: Int) {
+        val px = ProceduralDial.pixels(kind, p, EngravedStroke.rgb(p.dialColor), size)
+        val surface = Bitmap.createBitmap(px, size, size, Bitmap.Config.ARGB_8888)
+        // The pixels are already at render scale, and the canvas is scaled to
+        // dial space -- so undo that for the blit and put it back after.
+        val saved = canvas.save()
+        canvas.scale(DIAL_SIZE.toFloat() / size, DIAL_SIZE.toFloat() / size)
+        canvas.drawBitmap(surface, 0f, 0f, null)
+        canvas.restoreToCount(saved)
+        surface.recycle()
+        drawSheen(canvas, p)
     }
 
     /**

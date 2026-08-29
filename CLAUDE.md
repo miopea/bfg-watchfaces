@@ -139,17 +139,18 @@ Verified — built and run, not assumed:
 - `reskin.sh` — swaps resources into a built APK without recompiling.
   (Written and read, but not exercised since the workbench landed.)
 
-Builds, but has never run:
+Installed and driven on emulators (2026-08-29):
 
-- `:mobile`, `:wear` — both assemble a real APK, in `settings.gradle.kts` and
-  CI. `:mobile` has a Compose activation handoff screen behind a launcher
-  activity; `:wear` has the `WearableListenerService` that receives a face and
-  the no-UI activity that makes the one permission request. Their shared rules
-  and the device/watch contract are tested in `:appcore`, not here.
-  **Neither has ever been installed or launched**: no emulator here
-  (`/dev/kvm` is unreachable) and Watch Face Push needs Wear OS 6 hardware.
-  "It assembles" is a much smaller claim than "it works", and it is the only one
-  being made.
+- `:mobile` — the Studio screen from the localhost app: composite preview with
+  clock and complications, ambient toggle, style chips, dial and ink swatches,
+  complication slots, and every slider built from `ControlInventory`. All
+  thirteen styles render. Seen running on an SDK 36 phone emulator.
+- `:wear` — installed on a Wear OS 6 emulator, and `addWatchFace` works from it.
+  See below.
+
+Neither has run on real hardware, and the phone cannot yet BUILD a face to send:
+that needs `google/pack` on the device and the validator wired in. The Studio
+designs; nothing leaves the phone.
 
 Confirmed on a Wear OS 6 emulator (2026-08-29):
 
@@ -161,10 +162,46 @@ Confirmed on a Wear OS 6 emulator (2026-08-29):
   an SSH reverse forward; this machine cannot run one (`/dev/kvm` unreachable).
   See `scripts/remote-adb.sh`.
 
+Watch Face Push installs a face (2026-08-29):
+
+- **`addWatchFace` works**, with a token from Google's validator, into a slot the
+  system allocated. Run twice it takes the `updateWatchFace` branch instead —
+  **the slot limit on that device is 1**, so the replace path is load-bearing.
+- Doing it found two bugs no test here could: the manifest never requested
+  `com.google.wear.permission.PUSH_WATCH_FACES` (the failure names `bindService`
+  and never says "permission"), and `WatchFacePushManager` needs a context that
+  can bind services, which a `BroadcastReceiver`'s cannot.
+- Driven by `wear/src/debug`'s `DebugInstallReceiver`, which calls the same
+  `FaceInstaller` the channel calls. **This proves the Push half only.**
+
+On Google Play (2026-08-29):
+
+- `com.bfg.watchfaces` is live on **internal testing** in the BFG Solutions org
+  account — phone `versionCode 1` on `internal`, watch `versionCode 1001` on
+  `wear:internal`. Opt-in:
+  `https://play.google.com/apps/internaltest/4701563329381059441`
+- Publish with `scripts/play-release.py`, not the console. It reads the service
+  account from 1Password, uploads and commits in one command. **A Wear bundle
+  cannot go on the phone track** — Play rejects the commit — so phone and watch
+  are two releases.
+- Release signing: upload keystore in `~/.keystores` (outside the repo),
+  password in 1Password, read from the environment at build time. A release
+  build fails loudly rather than emitting an unsigned bundle.
+
 Still never tested:
 
 - **An actual watch.** The above is an emulator, which is a smaller claim.
-- **Watch Face Push.** The face was sideloaded with `adb install`; `addWatchFace`,
-  the validation token, slots and the Bluetooth transfer are all untested.
-- **`:mobile` and `:wear`** have never been installed or launched, so the
-  activation permission has never been requested.
+- **The transport.** `CapabilityClient`, `ChannelClient` and the Bluetooth
+  crossing. Emulators run on this box now (`chmod 0666 /dev/kvm` — the node, not
+  the group; this namespace sets `setgroups=deny`), and two started from one
+  session share a single `netsimd`, so that half is solved. What remains is the
+  Wear OS companion app, which needs a Play sign-in on the phone. **A fresh Wear
+  AVD self-provisions and never runs a pairing wizard** — the earlier claim that
+  a factory reset would help was wrong, see `DECISIONS.md` 2026-08-29.
+- **Sending a face.** The phone has no APK to send until `pack` runs on the
+  device. `addWatchFace` was exercised by putting the APK on the watch directly.
+- **The activation permission has still never been requested, and cannot be from
+  where the design puts it.** `startActivity` from the install path is refused —
+  `Background activity launch blocked`. A `WearableListenerService` is a
+  background context by the same rule, so the shipped path is blocked too. This
+  needs a design decision; see `DECISIONS.md` 2026-08-29.

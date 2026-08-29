@@ -1,5 +1,416 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — On Play internal testing, published by script rather than by hand
+
+`BFG Watch Faces` exists on Google Play as `com.bfg.watchfaces`, in the BFG
+Solutions org account, with both artefacts live on internal testing:
+
+```text
+internal        versionCodes=['1']     status=completed
+wear:internal   versionCodes=['1001']  status=completed
+```
+
+Tester opt-in: `https://play.google.com/apps/internaltest/4701563329381059441`
+
+### The upload is a script, and that was not optional
+
+The browser is the obvious route and it does not work from here. Chrome runs on
+the operator's Windows laptop; the bundles are built on this Linux box; and the
+upload tooling available to this session rejects both the path (not a shared
+file) and the size (19MB against a 10MB cap). Copying a bundle across the bridge
+and clicking through the console would have to happen for every release.
+
+`scripts/play-release.py` does it instead: JWT bearer grant, create edit, upload,
+set track, commit. No browser, no size limit, and it can move to CI unchanged.
+
+### Two things Play refused, both worth keeping
+
+**A Wear bundle cannot ride the phone track.** Uploading both and committing one
+release fails:
+
+```text
+The APK or bundle with version code 1001 requires the Wear OS system feature
+android.hardware.type.watch. To publish this release on the current track,
+remove this artifact.
+```
+
+Play exposes a track per form factor — `internal` and `wear:internal` are
+different tracks, and phone and watch are two releases. The script's `--track`
+choices list both, with the reason in a comment so nobody merges them again.
+
+**Release notes cap at 500 characters.** The honest version of "what does not
+work yet" ran to 648 and was rejected with an HTTP 403.
+
+### Credentials, and one correction to how they were stored
+
+The upload key lives in `~/.keystores`, outside the repo, and its password is in
+1Password. `.gitignore` now refuses `*.jks` and `*.keystore` outright.
+
+Publishing uses `play-publisher@budgetbug-495002`, not the billing service
+account beside it — those identities are separate on purpose. It had no
+retrievable key, so a new one was minted and stored as a 1Password **document**.
+That detail matters: the pre-existing `budgetbug-google-play` item holds its JSON
+with **doubled quotes**, CSV-style, so `json.loads` fails on it and four attempts
+were spent discovering that. A document stores the file byte-for-byte.
+
+### What the testers are actually getting
+
+The release notes say it plainly: the Studio designs faces, and the phone cannot
+yet send one to a watch, because it cannot build a face on device. Activation can
+also fail silently. An internal build that overstates itself is worse than no
+build.
+
+## 2026-08-29 — Emulator pairing does not work, and the netsim theory is disproven
+
+Two emulators now run locally on KVM, and the pairing attempt was made properly.
+It fails, and not for the reason previously recorded here.
+
+### Every precondition was met
+
+One `netsimd`, shared. Both guests attached to it — each log says "Activated
+packet streamer for bluetooth emulation". Watch at
+`SCAN_MODE_CONNECTABLE_DISCOVERABLE`, Bluetooth on both, nearby-devices
+permission granted, companion app installed against a signed-in account. The
+scan finds nothing, indefinitely.
+
+So **the separate-`netsimd` explanation is disproven as sufficient.** It was a
+real defect on the Windows pair — one emulator per account, two virtual networks
+— and fixing it changed nothing. The most likely remaining reading is that
+netsim carries BLE but not classic BR/EDR inquiry, which is what device
+discovery needs. There is no `netsim` CLI shipped with the SDK on either
+machine, only `netsimd`, so the virtual network cannot be inspected or linked by
+hand to confirm it.
+
+Google's documented route is Android Studio's Wear pairing assistant, which does
+not use Bluetooth discovery. That is a GUI IDE, on a headless box, and it was not
+installed.
+
+### What was tried, so nobody repeats it
+
+- Sharing one `netsimd` by starting both emulators from one session. Necessary,
+  not sufficient.
+- `REQUEST_DISCOVERABLE` on the watch, accepted, verified in `dumpsys`.
+- Clearing `user_setup_complete` and `device_provisioned` and rebooting, to force
+  a setup wizard. **A fresh Wear AVD self-provisions**, so there is no wizard to
+  return to — see the correction earlier today.
+- The classic `adb forward tcp:5601` bridge. The companion never offers an
+  emulator as a target.
+
+### What it costs, stated exactly
+
+`CapabilityClient`, `ChannelClient` and the Bluetooth crossing remain untested.
+Everything on the Push side is proven on two independent machines: parameters,
+APK, validator token, `addWatchFace`, slot allocation, `updateWatchFace` on
+re-push, the activation permission, `setWatchFaceAsActive`, face live.
+
+The transport is **not** the last mile. The phone cannot yet BUILD a face to
+send — that needs `google/pack` on-device through JNI and the validator wired in
+— so there are two unbuilt pieces and the other one is larger. The Data Layer is
+ordinary Android plumbing by comparison, and the honest place to prove it is the
+first real watch.
+
+## 2026-08-29 — KVM here, and I was wrong about why pairing fails
+
+The operator ran `chmod 0666 /dev/kvm` on the host and emulators now run on this
+box. `KVM_GET_API_VERSION` returns 12, a Wear OS 6 watch and an SDK 36 phone
+both boot in about two minutes, and `adb devices` lists them locally.
+
+**The fix had to be the device node, not group membership.** This session's
+`/proc/self/gid_map` is `1000 1000 1` and `setgroups` is `deny`, so
+`gpasswd -a <user> kvm` could never have reached it whatever group was named —
+one gid is mapped and supplementary groups are refused outright. The `0666` mode
+bits work because they do not depend on the owner being mapped. Worth writing
+down because **the emulator's own error message tells you to fix the group**, and
+that advice is wrong in a user namespace.
+
+### The correction: a fresh Wear AVD does not run a setup wizard
+
+Earlier today this file said pairing two emulators "costs a factory reset of the
+watch emulator", reasoning that a Wear device only advertises while inside its
+setup wizard and the Windows watch reported `user_setup_complete=1`.
+
+That is wrong. A never-booted Wear OS 6 AVD comes up **already provisioned** —
+`user_setup_complete=1`, `device_provisioned=1`, straight to a rendering watch
+face. The image self-provisions and never runs a pairing wizard at all. So the
+reset would have destroyed the verified carousel state and changed nothing, and
+the earlier entry should not be trusted on this point.
+
+The lesson is narrower than "test your assumptions": the Windows watch had been
+provisioned by *something*, and I read that as evidence a wizard had run and
+completed. It had not. A state that looks like the end of a process is not proof
+the process happened.
+
+### What did survive, and is free here
+
+Two emulators started from one session share a single `netsimd`. On Windows they
+had one each — one from a scheduled task as the bridge account, one from the
+operator's own session — putting them on separate virtual Bluetooth networks by
+construction. That half of the pairing problem does not exist locally.
+
+### Still open
+
+Pairing itself. The local phone has no Google account, so no Wear OS companion
+app, and installing one needs a Play sign-in. Both emulators are headless here
+(there is no display, and `qemu-system-x86_64` links `libpulse.so.0`, which is
+not on this box — `-no-window` selects the headless binary whose libraries all
+resolve). So seeing them at all means mirroring over adb through the existing
+tunnel.
+
+## 2026-08-29 — The generated surfaces render on the phone, and the last renderer decision moved
+
+`AndroidDialRenderer` fell back to a plain dial for `GRAIN`, `BRUSHED`, `CARBON`
+and `LINEN` — four of the thirteen styles, silently wrong rather than broken.
+The file said so honestly and gave the reason: the per-pixel shading loop lived
+in the AWT renderer, and porting it meant copying the lighting model.
+
+So the lighting model left too. `ProceduralDial` in `:generator` returns raw
+ARGB — no platform image type appears in it — and both renderers are now a blit.
+That is the last of the four: `EngravedStroke` took the stroke passes,
+`DialShading` the gradients, `ComplicationGlyphs` the icons, and this the
+surfaces. **No renderer on either platform now decides anything about how a dial
+looks.**
+
+The golden preview test grew two procedural faces before the move, and all five
+hashes were unchanged afterwards. The three pre-existing ones had not shifted
+either, which is the part worth stating: the earlier icon extraction and this one
+are both confirmed inert rather than assumed to be.
+
+`RendererParityTest` covers it the same way as the rest — both renderers must
+call `ProceduralDial.pixels`, and neither may contain `0.55`, `* 6.0` or
+`255 - c`, the constants that would be the natural thing to copy back.
+
+### What is still missing from the phone, and why
+
+`Engine.TEXTURE` — an imported image — still falls back to a plain dial. That is
+not a porting gap: a face references the image by id and the bytes live outside
+the face, so there has to be somewhere on the device to resolve that id from
+before the renderer has anything to draw.
+
+## 2026-08-29 — The phone app is the demo now, and the icons moved to :generator
+
+`:mobile` was 537 lines: a handoff screen and a sender, no design surface at
+all. It now opens on the Studio screen from the localhost app — composite
+preview, style chips, dial and ink swatches, and every slider — which is what
+`DECISIONS.md` 2026-08-28 meant by making that app the exact specification.
+
+Nothing about it is invented. Controls and their ranges come from
+`ControlInventory`, the pixels from `AndroidDialRenderer` and
+`AndroidFacePreview`, and the labels and order from a `Presentation` object that
+holds only presentation. Where the phone and the demo disagree, the demo is
+right and the phone has a bug.
+
+### The complication icons are geometry, so they went where geometry lives
+
+They existed only in the workbench, as ninety lines of AWT calls. Porting them
+by hand into a Canvas renderer would have produced a second copy that drifts —
+the failure this repo has already fixed three times, for stroke passes, shading
+and slot boxes.
+
+So they are `ComplicationGlyphs` in `:generator` now: primitives on a 24-grid,
+with an AWT executor in `:workbench` and a Canvas executor in `:mobile`, neither
+holding a decision. One convention had to be written down rather than inferred —
+the arcs carry AWT angles, counter-clockwise from 3 o'clock, and Android's
+`drawArc` measures clockwise, so it negates both. Getting that wrong draws the
+sunrise glyph as a sunset.
+
+**`preview.png` ships**, which is why this was done carefully rather than
+quickly. It is the carousel thumbnail, built from these icons, and
+`watch_face_info.xml` requires it. `ComplicationIcons` used to say the icons
+"never reach the APK"; that was true of `dial_bg.png` and false of the preview.
+
+The move is guarded by a new golden test that hashes the composite preview for
+three faces. It passed unchanged across the extraction — byte for byte — which
+is the only evidence worth having that a refactor of drawing code changed
+nothing.
+
+### Two bugs the screenshot found that no test would have
+
+**It opened on Botanical.** `DialParams()`'s defaults are the FORMAT's defaults
+and start there; the first chip in the curated list is Knotwork. An app whose
+opening style is not the style it highlights is the same regression caught on
+2026-08-28, arriving by a different route. `Presentation.STARTING_FACE` is the
+studio's opening point — no name, no slug, no package, so it is not the
+hardcoded face identity `CLAUDE.md` forbids.
+
+**Every slider drew a tick per step.** Compose renders `steps` as tick marks,
+and `scale` has 152 of them, so the track came out as a striped bar you could
+not read a position off. The sliders are continuous now and the value is snapped
+on the way in by `ControlInventory.snap`, which also fixes a quieter bug: `freq`
+is stored as an `Int`, so an unrounded 6.9997 truncated to 6 and the slider
+jumped backwards under the finger.
+
+`valueOf` was missing too — the inventory could write a control but not read one,
+so any UI building sliders from it needed its own hand-written map from id to
+field. That is the duplicated list the inventory exists to delete.
+
+## 2026-08-29 — The face activates itself, and the one-shot had a silent bug
+
+The whole Push half now runs end to end: parameters, APK, validator token,
+`addWatchFace`, notification, permission, `setWatchFaceAsActive`. The pushed
+face is the active watch face on the emulator, rendering with live
+complications. Nothing in this paragraph was true this morning.
+
+### A notification is the only route to the ask
+
+`startActivity` from the install path is refused — `Background activity launch
+blocked`, and a `WearableListenerService` is a background context by the same
+rule. [ActivationPrompt] posts a notification instead; the tap is a foreground
+action, so the activity it launches is allowed to start. `dumpsys notification`
+confirms the exemption is attached to the `contentIntent`:
+
+```text
+contentIntent=PendingIntent{... startActivity
+  (allowlist: .../NOTIFICATION_SERVICE/NotificationManagerService)}
+```
+
+It is also better than what the design asked for. The old shape fired a
+one-shot dialog cold on a wrist; this one fires because someone chose to look.
+
+**`POST_NOTIFICATIONS` is not granted by install**, and `notify` is a silent
+no-op without it — the ask would simply never happen, indistinguishable from
+the bug this replaced. `ActivationPrompt` checks `areNotificationsEnabled()`
+and says so rather than failing quietly. **How that permission gets granted in
+production is still open**; it was granted by hand for this test.
+
+### The doc described a safety property the code did not have
+
+`ActivationRequestActivity`'s KDoc has said since it was written that the state
+is "written down BEFORE the dialog is shown as well as after", because "a
+process death mid-dialog must not leave this looking unasked". The code only
+ever wrote in the result callback.
+
+The manifest then made that theoretical hazard real. `android:noHistory="true"`
+finishes an activity as soon as it stops being visible — which is precisely what
+the permission dialog covering it does. Observed: the dialog appeared, the
+activity died, no callback arrived, nothing was written, and the state read
+UNASKED with the ask already spent. On the one action in this system that cannot
+be retried.
+
+Both halves fixed. `noHistory` is gone, with a comment saying why it must not
+come back. `ActivationConsent` gained `ASKING`, written before the request goes
+out; `settle()` recovers an interrupted ask from the only evidence left, which
+is whether the permission actually landed. Absent settles to DENIED and never
+back to UNASKED — Android will not show the dialog again either way, so
+"unasked" would produce an app that believes it can still ask and silently
+never does.
+
+Nine tests cover it, including the full save/die/reload round trip.
+
+### Two notes for anyone driving a headless Wear emulator
+
+Input to a **dozing** screen is silently discarded. Taps looked like they were
+landing on the permission dialog and nothing happened, twice, before
+`dumpsys power` showed `mWakefulness=Dozing`. Send `KEYCODE_WAKEUP` first and
+check, or you will debug your own code for an hour.
+
+The Wear permission dialog is Compose: its text nodes report
+`clickable=false` and carry no resource id. Find the clickable ancestor by
+bounds instead of matching on the label.
+
+## 2026-08-29 — `addWatchFace` works, and two shipped bugs only running could find
+
+Watch Face Push has installed a face. Not validated, not sideloaded — pushed,
+through `WatchFacePushManager`, with a token from Google's validator, into a
+slot the system allocated.
+
+```text
+slots: 1 free, 0 used
+OK slot=55c1e952-c49a-38f2-ae3f-0786a085b15d replaced=false
+```
+
+Run a second time, it reports `0 free, 1 used` and takes the `updateWatchFace`
+branch — `replaced=true`, same slot. So both halves of the slot-limit logic are
+exercised, and **this device's slot limit is 1**, which makes the
+`ERROR_SLOT_LIMIT_REACHED` avoidance load-bearing rather than defensive.
+
+### Two bugs in shipped code, both invisible to every test we have
+
+**The manifest never asked for permission to use the API.** `wear/` declared
+`SET_PUSHED_WATCH_FACE_AS_ACTIVE` and stopped. Every Push call needs
+`com.google.wear.permission.PUSH_WATCH_FACES` as well, and nothing tells you:
+the library's own manifest declares no permission at all, only a `<queries>`
+entry, so the merged manifest looks complete. The failure is
+
+```text
+SecurityException: Not allowed to bind to service Intent {
+  act=com.google.wear.ACTION_PUSH_WATCH_FACES ... }
+```
+
+which names `bindService` and never says "permission". Read off the watch
+instead of guessed: `dumpsys package com.google.android.wearable.dwf.receiver`
+shows `WatchFaceReceiverService` guarded by exactly that string. It is
+`prot=normal`, so declaring it is enough. This was not a harness artefact — the
+Data Layer path would have hit the identical wall on the first real face.
+
+**`WatchFacePushManager` needs a context that can bind services.** A
+`BroadcastReceiver`'s cannot, and throws `ReceiverCallNotAllowedException` from
+inside `listWatchFaces`. `FaceInstaller` now normalises to
+`applicationContext`, which is correct for every caller and costs nothing.
+
+### The activation prompt cannot work the way the decision describes
+
+Operator decision 01a049a1-390b-7b50-a5d3-cc082037bb55 puts the one irreversible
+ask on the watch, the first time a face lands. The install does reach
+`onFaceInstalled`, which does call `startActivity`. Android refuses it:
+
+```text
+Background activity launch blocked! goo.gle/android-bal
+  cmp=com.bfg.watchfaces/.wear.ActivationRequestActivity
+  callingUidProcState: RECEIVER
+```
+
+This is not about the debug harness. A `WearableListenerService` handling
+`onChannelOpened` is a background context by exactly the same rule, so the
+shipped path is blocked identically. **The permission has still never been
+requested**, and it cannot be from where the design puts it.
+
+Not fixed here, because the fix is a design choice and the thing being chosen
+about is unrecoverable. The options, none free:
+
+- **A notification on the watch that launches the activity when tapped.** Keeps
+  the decision's intent — asked when a face lands, in context — and satisfies
+  BAL, because the tap is a foreground action. Costs a notification channel and
+  a second tap. This is the recommendation.
+- **Ask when the watch app is opened.** Already rejected on 2026-08-28, and the
+  reason still holds: a companion app is often never deliberately opened.
+- **Ask from the phone.** Impossible. `androidx.wear.watchfacepush` declares
+  `<uses-library android:name="wear-sdk" android:required="true" />`, so an app
+  linking it will not install on a phone.
+
+### `FaceInstaller`, and why the install left the service
+
+The install logic lived inside `FaceReceiverService.onChannelOpened`, which
+welded the only genuinely novel calls in the project to a transport that needs a
+paired phone. Nothing about Push requires a channel: `addWatchFace` takes a
+descriptor to a local file and does not care who wrote it.
+
+So it moved to `FaceInstaller`, and `wear/src/debug` gained a receiver that
+drives it from `adb`. In `src/debug` and not behind a `BuildConfig.DEBUG` check:
+an exported receiver that installs an arbitrary APK must not exist in a release
+build, and a source set is the only version of that guarantee the compiler
+enforces.
+
+**This proves the Push half and says nothing about the transport half.**
+`CapabilityClient`, `ChannelClient` and the Bluetooth crossing remain untested.
+
+### Pairing two emulators needs a factory reset, which is why it was not done
+
+The phone paired far enough to matter: Play signed in, "Wear OS by Google"
+installed, consent accepted, and `CompanionAssociationActivity` scanning. It
+finds nothing, for two stacked reasons.
+
+First, **each account gets its own `netsimd`** — the emulator's virtual
+Bluetooth network. The watch ran from a scheduled task as the bridge account and
+the phone from the operator's own session, putting them on separate networks by
+construction. Both now run from the same principal and share one.
+
+Second, and not fixable by configuration: the watch reports
+`user_setup_complete=1` and `device_provisioned=1`. **A Wear device only
+advertises for pairing while it is inside its setup wizard.** Pairing therefore
+costs a factory reset of the watch emulator, which would destroy the verified
+carousel result from earlier today. Not spent, because the shortcut above
+reaches the code that mattered without it.
+
 ## 2026-08-29 — Both apps run, and the Data Layer needs a pairing nobody can automate
 
 `:mobile` and `:wear` have been installed and launched. Two emulators on the

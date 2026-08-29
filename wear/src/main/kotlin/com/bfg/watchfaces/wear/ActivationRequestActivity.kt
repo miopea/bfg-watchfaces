@@ -3,6 +3,7 @@ package com.bfg.watchfaces.wear
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -29,9 +30,22 @@ import com.bfg.watchfaces.appcore.ActivationConsent
  * `SET_PUSHED_WATCH_FACE_AS_ACTIVE` cannot be requested a second time after a
  * denial. A second attempt is not refused with an error you can see — it simply
  * never reaches the user. So the state is written down BEFORE the dialog is
- * shown as well as after: a process death mid-dialog must not leave this
- * looking unasked, because that is the one bug that costs somebody their only
- * chance silently.
+ * shown as well as after: a death mid-dialog must not leave this looking
+ * unasked, because that is the one bug that costs somebody their only chance
+ * silently.
+ *
+ * That paragraph was here before the code was, and the code did not do it. The
+ * only write happened in the result callback. Found on a Wear OS 6 emulator on
+ * 2026-08-29, where the manifest's `android:noHistory="true"` finished this
+ * activity the moment the permission dialog covered it — so the callback never
+ * arrived, nothing was ever written, and the state read UNASKED afterwards with
+ * the ask already spent. Exactly the failure the paragraph describes.
+ *
+ * Both halves are fixed: `noHistory` is gone, and [ActivationConsent.begin]
+ * now writes [ActivationConsent.State.ASKING] before the request goes out.
+ * Coming back to find that marker means the answer was lost, and
+ * [ActivationConsent.settle] recovers it from the only evidence left — whether
+ * the permission actually landed.
  */
 class ActivationRequestActivity : ComponentActivity() {
 
@@ -45,19 +59,39 @@ class ActivationRequestActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val state = ActivationConsent.load(filesDir)
+
+        if (ActivationConsent.isInterrupted(state)) {
+            // A previous attempt put the dialog up and never heard back. The
+            // system's own view of the permission is the only evidence left.
+            val settled = ActivationConsent.settle(state, permissionGranted = isPermissionGranted())
+            ActivationConsent.save(filesDir, settled)
+            Log.i(TAG, "recovered an interrupted request as $settled")
+            finish()
+            return
+        }
         if (!ActivationConsent.canAsk(state)) {
             // Reached twice somehow. Do nothing rather than ask again.
             finish()
             return
         }
+
+        // Written BEFORE the request goes out, not after. If this activity dies
+        // while the dialog is up, the branch above is what recovers it.
+        ActivationConsent.save(filesDir, ActivationConsent.begin(state))
         request.launch(ActivationConsent.PERMISSION)
     }
 
     private fun record(granted: Boolean) {
         val state = ActivationConsent.load(filesDir)
-        if (!ActivationConsent.canAsk(state)) return
+        // ASKING is the expected state here; UNASKED would mean the write above
+        // did not land. Anything already answered is left alone.
+        if (state == ActivationConsent.State.GRANTED || state == ActivationConsent.State.DENIED) return
         ActivationConsent.save(filesDir, ActivationConsent.record(state, granted))
+        Log.i(TAG, "activation answered: granted=$granted")
     }
+
+    private fun isPermissionGranted(): Boolean =
+        checkSelfPermission(ActivationConsent.PERMISSION) == PackageManager.PERMISSION_GRANTED
 
     /**
      * Put the face they just sent on the watch.

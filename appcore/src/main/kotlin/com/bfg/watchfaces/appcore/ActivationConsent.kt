@@ -57,7 +57,22 @@ object ActivationConsent {
         GRANTED,
 
         /** They said no. Terminal — Android will not carry a second request. */
-        DENIED
+        DENIED,
+
+        /**
+         * The dialog has been put up and no answer has come back yet.
+         *
+         * Written BEFORE the system dialog appears, which is the whole point of
+         * it existing. The request may only ever be made once, and an activity
+         * hosting a permission dialog can be destroyed while that dialog is on
+         * screen — so if the only write happened on the result, a death
+         * mid-dialog would leave this reading UNASKED and the app would spend
+         * the one shot a second time on someone who had already answered.
+         *
+         * Nothing asks from here. [settle] turns it into a real answer by
+         * looking at whether the permission actually landed.
+         */
+        ASKING
     }
 
     /**
@@ -77,11 +92,43 @@ object ActivationConsent {
      * second request that looks like it worked.
      */
     fun record(state: State, granted: Boolean): State {
-        require(canAsk(state)) {
+        require(state == State.UNASKED || state == State.ASKING) {
             "asked for activation while $state; the request may only be made once per install"
         }
         return if (granted) State.GRANTED else State.DENIED
     }
+
+    /**
+     * Mark the ask as spent, before the dialog is shown.
+     *
+     * Save the result of this to disk BEFORE calling into the system, not
+     * after. See [State.ASKING] for what that buys.
+     */
+    fun begin(state: State): State {
+        require(canAsk(state)) {
+            "began an activation request while $state; it may only be made once per install"
+        }
+        return State.ASKING
+    }
+
+    /** Did a previous attempt put the dialog up and never hear back? */
+    fun isInterrupted(state: State): Boolean = state == State.ASKING
+
+    /**
+     * Turn an interrupted ask into a real answer.
+     *
+     * [permissionGranted] is the system's own view, which is the only evidence
+     * left once the callback is gone. Absent means denied rather than unasked:
+     * Android will not show the dialog again either way, so treating it as
+     * unasked would produce an app that believes it can still ask and silently
+     * never does.
+     */
+    fun settle(state: State, permissionGranted: Boolean): State =
+        if (state == State.ASKING) {
+            if (permissionGranted) State.GRANTED else State.DENIED
+        } else {
+            state
+        }
 
     /** Can the app switch a face on for them, or must they do it themselves? */
     fun canActivate(state: State): Boolean = state == State.GRANTED
@@ -151,6 +198,43 @@ object ActivationConsent {
     const val DENIED_NOTE =
         "Faces you send will arrive on your watch, but you switch to them yourself: " +
         "press and hold your current watch face, then scroll to the one you sent."
+
+    // ---- getting to the ask at all ------------------------------------------
+    //
+    // Android will not let the install path open the permission dialog. The
+    // face lands in a background context -- a WearableListenerService handling
+    // onChannelOpened -- and `startActivity` from there is refused outright:
+    //
+    //     Background activity launch blocked! callingUidProcState: RECEIVER
+    //
+    // Observed on a Wear OS 6 emulator, 2026-08-29. So something has to carry
+    // the ask from "a face landed" to "the person is looking at the watch", and
+    // a notification is the only bridge Android offers: the tap is a foreground
+    // action, which is exactly what the block is asking for.
+    //
+    // This is why the copy below is not decoration. It is the entire
+    // explanation the person gets on the watch before a one-shot dialog.
+
+    /** Notification channel, shown in the watch's own notification settings. */
+    const val NOTIFY_CHANNEL_NAME = "New watch faces"
+
+    /**
+     * Leads with the good news, not with a request.
+     *
+     * The face is already installed by the time this appears. Someone who never
+     * taps has lost nothing, and the notification must not imply otherwise.
+     */
+    const val NOTIFY_TITLE = "Your new watch face is ready"
+
+    /**
+     * Says what the tap does AND that it is a one-time question.
+     *
+     * The one-shot warning belongs here as well as in the dialog: Android's
+     * dialog is one line it does not let us write, so this is the last place we
+     * control before an irreversible choice.
+     */
+    const val NOTIFY_BODY =
+        "Tap to let the app switch to it for you. You will only be asked once."
 
     /**
      * The note to show for a given state, or null when there is nothing to say.

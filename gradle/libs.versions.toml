@@ -14,6 +14,10 @@ composeBom = "2026.02.00"
 # newest of each now requires compileSdk 37. They move as a set, with AGP and
 # compileSdk, or not at all.
 activityCompose = "1.12.4"
+# The floor for registerForActivityResult. :wear pulled 1.1.0 transitively, whose
+# FragmentActivity skips super.onRequestPermissionsResult() and uses invalid
+# request codes -- on the one permission that cannot be asked twice.
+fragment = "1.3.6"
 lifecycle = "2.9.4"
 coreKtx = "1.17.0"
 
@@ -35,6 +39,7 @@ compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview"
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 # :wear needs ComponentActivity and the permission-request contract, but no Compose.
 androidx-activity = { module = "androidx.activity:activity-ktx", version.ref = "activityCompose" }
+androidx-fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
 androidx-lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 

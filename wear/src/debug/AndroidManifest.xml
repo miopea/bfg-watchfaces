@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only. Merged into debug builds and no others, which is what keeps an
+  exported "install this APK" receiver out of anything shippable.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
+  <application>
+    <receiver
+        android:name=".DebugInstallReceiver"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="com.bfg.watchfaces.DEBUG_INSTALL" />
+      </intent-filter>
+    </receiver>
+
+    <!--
+      Exported for debug builds ONLY, so the activation flow can be driven from
+      adb. In production this activity is reachable from exactly one place: the
+      notification's PendingIntent. Being unexported is part of that guarantee,
+      which is why this override lives here and not in the real manifest.
+    -->
+    <activity
+        android:name=".ActivationRequestActivity"
+        android:exported="true"
+        tools:replace="android:exported" />
+  </application>
+</manifest>

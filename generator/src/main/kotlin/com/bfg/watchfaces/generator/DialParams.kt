@@ -150,6 +150,21 @@ data class DialParams(
     fun slot(pos: SlotPosition): ComplicationSource =
         complications.getOrElse(pos.ordinal) { ComplicationSource.NONE }
 
+    /**
+     * The same face with one slot changed.
+     *
+     * Pads with NONE rather than failing on a short list, because [slot] already
+     * treats a short list as "the rest are off" and the two have to agree — a
+     * face stored with three complications must be editable in its fifth slot
+     * without a UI first having to know that.
+     */
+    fun withSlot(pos: SlotPosition, source: ComplicationSource): DialParams {
+        val next = ArrayList(complications)
+        while (next.size <= pos.ordinal) next.add(ComplicationSource.NONE)
+        next[pos.ordinal] = source
+        return copy(complications = next)
+    }
+
     companion object {
         private val HEX = Regex("^#[0-9A-Fa-f]{6}$")
     }

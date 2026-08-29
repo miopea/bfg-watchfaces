@@ -1,3 +1,4 @@
+import java.io.File
 // SCAFFOLD -- never built or run. Uncomment ":mobile" in settings.gradle.kts
 // once ANDROID_HOME is configured.
 //
@@ -32,6 +33,47 @@ android {
     // Java and Kotlin must agree, or the build fails with "Inconsistent
     // JVM-target compatibility" -- the scaffolds set Kotlin to 17 and left Java
     // at the 1.8 default, which only shows up once there is Kotlin to compile.
+    /**
+     * Release signing, for the Play upload key.
+     *
+     * The password is NEVER in this file, in gradle.properties, or in the repo.
+     * It comes from the environment, and the only place it is stored is
+     * 1Password (vault BFG, "BFG Watch Faces — Play upload keystore"). Build a
+     * release with:
+     *
+     *     eval "$(op-login)"
+     *     export BFG_KEYSTORE_PASSWORD="$(op item get za3jiqmw75cajm7s24hveksl5q \
+     *         --vault=BFG --fields label=password --reveal)"
+     *     ./gradlew :mobile:bundleRelease
+     *
+     * The keystore lives OUTSIDE the repo (~/.keystores) so it cannot be
+     * committed by accident, and this is only the UPLOAD key -- Play App Signing
+     * holds the real one, so losing this is recoverable through Play support.
+     * Losing the app signing key would not be.
+     */
+    signingConfigs {
+        create("release") {
+            val ksPath = System.getenv("BFG_KEYSTORE")
+                ?: "${System.getProperty("user.home")}/.keystores/bfg-watchfaces-upload.jks"
+            val ksPassword = System.getenv("BFG_KEYSTORE_PASSWORD")
+            if (ksPassword != null && File(ksPath).exists()) {
+                storeFile = File(ksPath)
+                storePassword = ksPassword
+                keyAlias = System.getenv("BFG_KEY_ALIAS") ?: "bfg-upload"
+                keyPassword = ksPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // Fail loudly rather than emit an unsigned bundle that Play rejects
+            // with a message about the upload key rather than about this.
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
