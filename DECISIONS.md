@@ -1,5 +1,35 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — The generated surfaces render on the phone, and the last renderer decision moved
+
+`AndroidDialRenderer` fell back to a plain dial for `GRAIN`, `BRUSHED`, `CARBON`
+and `LINEN` — four of the thirteen styles, silently wrong rather than broken.
+The file said so honestly and gave the reason: the per-pixel shading loop lived
+in the AWT renderer, and porting it meant copying the lighting model.
+
+So the lighting model left too. `ProceduralDial` in `:generator` returns raw
+ARGB — no platform image type appears in it — and both renderers are now a blit.
+That is the last of the four: `EngravedStroke` took the stroke passes,
+`DialShading` the gradients, `ComplicationGlyphs` the icons, and this the
+surfaces. **No renderer on either platform now decides anything about how a dial
+looks.**
+
+The golden preview test grew two procedural faces before the move, and all five
+hashes were unchanged afterwards. The three pre-existing ones had not shifted
+either, which is the part worth stating: the earlier icon extraction and this one
+are both confirmed inert rather than assumed to be.
+
+`RendererParityTest` covers it the same way as the rest — both renderers must
+call `ProceduralDial.pixels`, and neither may contain `0.55`, `* 6.0` or
+`255 - c`, the constants that would be the natural thing to copy back.
+
+### What is still missing from the phone, and why
+
+`Engine.TEXTURE` — an imported image — still falls back to a plain dial. That is
+not a porting gap: a face references the image by id and the bytes live outside
+the face, so there has to be somewhere on the device to resolve that id from
+before the renderer has anything to draw.
+
 ## 2026-08-29 — The phone app is the demo now, and the icons moved to :generator
 
 `:mobile` was 537 lines: a handoff screen and a sender, no design surface at

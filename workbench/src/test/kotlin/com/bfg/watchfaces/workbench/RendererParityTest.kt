@@ -72,6 +72,30 @@ class RendererParityTest {
         }
     }
 
+    @Test
+    fun `both renderers ask generator to shade a generated surface`() {
+        // GRAIN, BRUSHED, CARBON and LINEN. The Android renderer used to fall
+        // back to a plain dial for all four because the lighting model lived
+        // here; a copy of it would have been the fourth chance to drift.
+        for (p in listOf(android, awt)) {
+            assertTrue(source(p).contains("ProceduralDial.pixels")) {
+                "$p shades generated surfaces itself; the four texture styles can now diverge"
+            }
+        }
+    }
+
+    @Test
+    fun `neither renderer keeps the lighting constants`() {
+        for (p in listOf(android, awt)) {
+            val s = source(p)
+            for (magic in listOf("0.55", "* 6.0", "255 - c")) {
+                assertTrue(!s.contains(magic)) {
+                    "$p hardcodes '$magic' from the procedural lighting; that belongs to ProceduralDial"
+                }
+            }
+        }
+    }
+
     // ---- the complication glyphs, which have the same hazard ----------------
 
     private val androidIcons = "../mobile/src/main/kotlin/com/bfg/watchfaces/mobile/AndroidComplicationIcons.kt"

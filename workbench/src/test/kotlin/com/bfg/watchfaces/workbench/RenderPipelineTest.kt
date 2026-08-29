@@ -211,7 +211,11 @@ class RenderPipelineTest {
         val faces = listOf(
             DialParams(),
             DialParams(engine = Engine.KNOTWORK, dialColor = "#2B2E33", inkColor = "#C9A227"),
-            DialParams(complications = ComplicationSource.entries.take(5))
+            DialParams(complications = ComplicationSource.entries.take(5)),
+            // A generated surface, so the procedural shading is pinned too. The
+            // stroked engines do not exercise it at all.
+            DialParams(engine = Engine.BRUSHED, contrast = 62.0, relief = 3.4),
+            DialParams(engine = Engine.GRAIN, dialColor = "#3E4A3F")
         )
         val actual = faces.map { p ->
             val img = FacePreview.render(p)
@@ -222,7 +226,7 @@ class RenderPipelineTest {
             }
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
-        assertEquals(listOf("f161fc20d0acadfc", "00d9ca560ad79da1", "d8df01efa40bfedc"), actual) {
+        assertEquals(listOf("f161fc20d0acadfc", "00d9ca560ad79da1", "d8df01efa40bfedc", "0f4b86e7c410afaf", "eaa62fd3f6ee8016"), actual) {
             "the composite preview changed; every preview.png built after this differs"
         }
     }
