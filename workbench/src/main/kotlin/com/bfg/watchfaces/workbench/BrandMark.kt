@@ -212,6 +212,13 @@ object BrandMark {
         return Fit(scale, dx = canvas / 2 - c.cx * scale, dy = canvas / 2 - c.cy * scale)
     }
 
+    /** Place the mark's enclosing circle at ([cx], [cy]) with the given [diameter]. */
+    fun fitAt(cx: Double, cy: Double, diameter: Double): Fit {
+        val c = enclosingCircle()
+        val scale = diameter / (c.radius * 2)
+        return Fit(scale, dx = cx - c.cx * scale, dy = cy - c.cy * scale)
+    }
+
     /** The mark at its authored size and position -- what the standalone tile uses. */
     val NATIVE = Fit(1.0, 0.0, 0.0)
 

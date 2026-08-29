@@ -1,5 +1,7 @@
 package com.bfg.watchfaces.workbench
 
+import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.Engine
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Graphics2D
@@ -66,6 +68,36 @@ object Brand {
     internal const val STORE_PX = 512
     internal const val STORE_MARK_FRACTION = 0.78
 
+    internal const val FEATURE_W = 1024
+    internal const val FEATURE_H = 500
+
+    /** A dial on the feature graphic: what to draw, how big, and where its centre goes. */
+    internal data class Placed(val params: DialParams, val size: Int, val cx: Int, val cy: Int)
+
+    /**
+     * Three real faces, in the brand's own colours, stepping back to the left.
+     * Ordered back to front. The largest runs off three edges, because a
+     * promotional image that fits tidily inside its box looks like a diagram.
+     */
+    internal val FEATURE_DIALS = listOf(
+        // Higher contrast and heavier relief than a face would normally carry.
+        // At a few hundred pixels the default engraving is a texture you can
+        // only see if you already know it is there, and the whole point of this
+        // image is that someone who has never seen the app can see it.
+        Placed(DialParams(engine = Engine.SUNBURST, scale = 16.0, rotate = 0.0,
+                          stroke = 1.5, relief = 1.9, contrast = 52.0,
+                          dialColor = "#1C181A", inkColor = "#D09AAB",
+                          sheen = 30.0, vignette = 24.0, lens = false), 210, 300, 172),
+        Placed(DialParams(engine = Engine.CLOUS, scale = 20.0, rotate = 45.0,
+                          stroke = 1.4, relief = 1.8, contrast = 46.0,
+                          dialColor = "#D09AAB", inkColor = "#3A2029",
+                          sheen = 34.0, vignette = 16.0, lens = false), 330, 455, 330),
+        Placed(DialParams(engine = Engine.ROSETTE, scale = 30.0, freq = 9, rotate = 8.0,
+                          stroke = 1.7, relief = 2.2, contrast = 58.0,
+                          dialColor = "#80475C", inkColor = "#F4E6EB",
+                          sheen = 30.0, vignette = 20.0, lens = false), 620, 760, 250)
+    )
+
     @JvmStatic
     fun main(args: Array<String>) {
         System.setProperty("java.awt.headless", "true")
@@ -92,6 +124,7 @@ object Brand {
         write(File(brand, "icon-light.svg"), tileSvg(BrandMark.Palette.LIGHT))
         write(File(brand, "icon-dark.svg"), tileSvg(BrandMark.Palette.DARK))
         writePng(File(brand, "play-icon-512.png"), storeIcon())
+        writePng(File(brand, "play-feature-1024x500.png"), featureGraphic())
 
         // --sheet=<path> renders the icon as the launcher will actually mask it,
         // at the sizes it is actually seen. Not checked in and not shipped: it
@@ -256,6 +289,49 @@ object Brand {
         }
         g.dispose()
         return sheet
+    }
+
+    /**
+     * Play's feature graphic, 1024x500.
+     *
+     * ## No words, on purpose
+     *
+     * Play overlays the app name and icon on this in several placements and
+     * crops it in others, so text here is either duplicated or cut in half.
+     * Which is fortunate: the only serif fonts on the build machine are DejaVu
+     * and Liberation, and the BFG wordmark set in Liberation Serif would
+     * contradict the brand it is carrying.
+     *
+     * ## The dials are real
+     *
+     * These are [DialRenderer] output from actual [DialParams] -- the same call
+     * the workbench preview and the shipped `dial_bg.png` make. A promotional
+     * image drawn separately would be a drawing OF the product; this is the
+     * product. Change an engine and this picture changes with it.
+     *
+     * The left third is deliberately empty. That is where Play puts the icon
+     * and the name.
+     */
+    internal fun featureGraphic(): BufferedImage {
+        val img = BufferedImage(FEATURE_W, FEATURE_H, BufferedImage.TYPE_INT_ARGB)
+        val g = img.createGraphics()
+        quality(g)
+        g.color = Color.decode(BrandMark.Palette.LIGHT.ground)
+        g.fillRect(0, 0, FEATURE_W, FEATURE_H)
+
+        // Back to front, so the largest sits on top and bleeds off the right.
+        for (placed in FEATURE_DIALS) {
+            val dial = DialRenderer.render(placed.params, placed.size)
+            g.drawImage(dial, placed.cx - placed.size / 2, placed.cy - placed.size / 2, null)
+        }
+
+        // The mark itself on the open left, in the ink of the light palette and
+        // with no tile behind it -- the ground is already the tile's colour.
+        // Without it that third reads as an image that got cropped; with it, it
+        // reads as a composition, and it ties the banner to the launcher icon.
+        draw(g, BrandMark.fitAt(116.0, 342.0, 136.0), BrandMark.Palette.LIGHT)
+        g.dispose()
+        return img
     }
 
     // ---- AWT executor -----------------------------------------------------

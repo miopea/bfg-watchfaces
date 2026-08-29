@@ -187,6 +187,50 @@ class BrandMarkTest {
         assertEquals(Color.decodeRgb(BrandMark.Palette.LIGHT.ground), img.getRGB(2, 2) and 0xFFFFFF)
     }
 
+    @Test
+    fun `the feature graphic is the size Play demands, and opaque`() {
+        val img = Brand.featureGraphic()
+        assertEquals(Brand.FEATURE_W, img.width)
+        assertEquals(Brand.FEATURE_H, img.height)
+        for (x in 0 until img.width step 11) {
+            for (y in 0 until img.height step 11) {
+                assertEquals(0xFF, img.getRGB(x, y) ushr 24) { "($x, $y) is not opaque" }
+            }
+        }
+    }
+
+    @Test
+    fun `the feature graphic keeps its left clear and runs off its right`() {
+        // Play overlays the icon and name over the left of this image in some
+        // placements and crops the edges in others. A composition that drifted
+        // to the middle would satisfy neither, and looks like a diagram.
+        val img = Brand.featureGraphic()
+        val ground = Color.decodeRgb(BrandMark.Palette.LIGHT.ground)
+        for (y in 0 until img.height step 7) {
+            assertEquals(ground, img.getRGB(2, y) and 0xFFFFFF) {
+                "something reaches the left edge at y=$y"
+            }
+        }
+        val bleeding = (0 until img.height step 7).count {
+            (img.getRGB(img.width - 2, it) and 0xFFFFFF) != ground
+        }
+        assertTrue(bleeding > 20) { "nothing runs off the right edge; only $bleeding rows differ" }
+    }
+
+    @Test
+    fun `the feature graphic shows real dials, not a drawing of them`() {
+        // Every dial is DialRenderer output from DialParams -- the same call the
+        // workbench preview and the shipped dial_bg.png make. If someone
+        // replaces them with static art, this stops being true.
+        assertTrue(Brand.FEATURE_DIALS.size >= 3)
+        assertEquals(Brand.FEATURE_DIALS.size, Brand.FEATURE_DIALS.map { it.params.engine }.toSet().size) {
+            "two dials use the same engine; the point is to show the range"
+        }
+        for (placed in Brand.FEATURE_DIALS) {
+            assertTrue(!placed.params.lens) { "the lens is a preview-only effect and never reaches a face" }
+        }
+    }
+
     private object Color {
         fun decodeRgb(hex: String) = hex.removePrefix("#").toInt(16)
     }
