@@ -204,9 +204,11 @@ object Brand {
     // ---- Play store icon --------------------------------------------------
 
     internal fun storeIcon(): BufferedImage {
-        // TYPE_INT_RGB, not ARGB: Play rejects a store icon with an alpha
-        // channel, and a transparent one would show black behind the corners.
-        val img = BufferedImage(STORE_PX, STORE_PX, BufferedImage.TYPE_INT_RGB)
+        // 32-bit ARGB, and every pixel fully opaque. Play asks for a 32-bit PNG
+        // and then composites any transparency against white, so the channel has
+        // to be there and has to be full -- a 24-bit file and a see-through one
+        // fail in opposite directions.
+        val img = BufferedImage(STORE_PX, STORE_PX, BufferedImage.TYPE_INT_ARGB)
         val g = img.createGraphics()
         quality(g)
         g.color = Color.decode(BrandMark.Palette.LIGHT.ground)

@@ -1,5 +1,38 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — Store listing assets upload by API too, and that needed a permission
+
+`scripts/play-listing.py` does for the listing what `play-release.py` does for
+tracks: reads it, sets the words, uploads the icon, feature graphic and
+screenshots. Same reason — the assets are generated on this Linux box and the
+console's file picker runs on a Windows laptop, so "drag the PNG in" means
+copying every asset across the bridge for every revision. The file input is not
+in the accessibility tree either, so browser automation cannot reach it: clicking
+the button opens a native dialog with nothing on the other side of it.
+
+### The permission that was missing, and how it fails
+
+`play-publisher@budgetbug-495002` held "Release apps to testing tracks" and not
+**"Manage store presence"**. The failure is worth writing down because it is
+misleading in two ways:
+
+- The image UPLOAD succeeds. Play accepts the PNG, returns an image id, and only
+  the `edits:commit` fails.
+- The commit fails with a bare `403 PERMISSION_DENIED / "The caller does not have
+  permission"` that names neither the permission nor the listing.
+
+An edit containing no changes at all commits fine under the same credentials,
+which is how the block was localised to the listing content rather than to
+committing edits. That two-line diagnostic is worth keeping in mind for the next
+opaque 403.
+
+Granted on 2026-08-29 with the operator's go-ahead, scoped to this app: the
+console shows the app's permission count going 8 to 9. It does **not** include
+production release.
+
+**The grant is not immediate.** The console showed 9 straight away and the API
+still returned 403 several minutes later.
+
 ## 2026-08-29 — The app icon: H6 with an onion crown, generated from one description
 
 The app shipped to internal testing with `icon=''` — no launcher icon at all.

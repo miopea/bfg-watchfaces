@@ -174,7 +174,14 @@ class BrandMarkTest {
         val img = Brand.storeIcon()
         assertEquals(Brand.STORE_PX, img.width)
         assertEquals(Brand.STORE_PX, img.height)
-        assertTrue(!img.colorModel.hasAlpha()) { "Play rejects a store icon with an alpha channel" }
+        assertTrue(img.colorModel.hasAlpha()) { "Play asks for a 32-bit PNG" }
+        for (x in 0 until img.width step 7) {
+            for (y in 0 until img.height step 7) {
+                assertEquals(0xFF, img.getRGB(x, y) ushr 24) {
+                    "($x, $y) is not opaque; Play composites transparency against white"
+                }
+            }
+        }
         // A corner is ground colour: the mark is inset, not bleeding to the edge
         // where Play's own rounding would cut it.
         assertEquals(Color.decodeRgb(BrandMark.Palette.LIGHT.ground), img.getRGB(2, 2) and 0xFFFFFF)
