@@ -30,8 +30,12 @@ Granted on 2026-08-29 with the operator's go-ahead, scoped to this app: the
 console shows the app's permission count going 8 to 9. It does **not** include
 production release.
 
-**The grant is not immediate.** The console showed 9 straight away and the API
-still returned 403 several minutes later.
+**The grant is not immediate, and a careless probe will tell you it worked.**
+The console showed 9 straight away and the API was still returning 403 twenty
+minutes later. A probe that PUT the listing back with its existing values did
+commit — but Play treats an unchanged listing as a no-op, so that commit
+authorised nothing and was not evidence of anything. Any probe of this has to
+change a value.
 
 ## 2026-08-29 — The app icon: H6 with an onion crown, generated from one description
 
