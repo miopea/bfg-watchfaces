@@ -1,5 +1,58 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — A face from this repo is on a watch face carousel
+
+`docs/SPEC.md` build order, step one: "Install `watchface-template` on a real
+watch. Everything else assumes this works. Until a face appears in the carousel,
+nothing downstream matters."
+
+It appears. Selected, active, rendering: the knotwork dial in pewter, the time,
+and every complication populated with live system data — date, step count,
+notifications, battery.
+
+### What is actually proven
+
+On a Wear OS 6 emulator (`sdk_gwear_x86_64`, release 16, SDK 36):
+
+- an APK built by `watchface-template/build.sh` installs and reports Success
+- it appears in the watch face picker **by name**, alongside the stock faces
+- it can be selected and becomes the active face
+- it renders correctly, with complications bound to real data
+- `dumpsys wallpaper` confirms
+  `com.google.wear.watchface.runtime/DeclarativeWatchFaceRuntime0` is rendering
+  it — the WFF runtime, which is how a declarative face is supposed to be drawn
+
+### What is NOT proven, and must not be read into this
+
+- **This is an emulator, not a watch.** Much larger than anything this repo
+  could claim before, and smaller than "it works on a wrist".
+- **Watch Face Push was not exercised.** The face was sideloaded with
+  `adb install`. `addWatchFace`, the validation token, slots and the Bluetooth
+  transfer remain untested.
+- **The activation permission was not requested.** `:mobile` and `:wear` have
+  still never been installed or launched.
+- The `nodpi` memory question is still unmeasured.
+
+### A wrong turn worth recording
+
+Midway through, `cmd package query-services -a WallpaperService` did not list the
+face, and that was read as "the system has not registered it". Wrong: a WFF face
+is not a wallpaper service. The shared runtime renders it, and only the runtime's
+component appears in that list. The face was in the picker the whole time.
+
+What actually answered it was walking the picker with `KEYCODE_DPAD_DOWN` and
+reading labels back through `uiautomator dump`. Wear lists scroll by rotary, so
+`input swipe` moved nothing and made the list look empty past the first row —
+which is why earlier passes saw only "Abstract, Adventure".
+
+### How it was reached
+
+The build machine cannot run an emulator at all: `/dev/kvm` is unreachable from
+its user namespace, and the arm64 escape is closed because the emulator refuses a
+foreign architecture. So the emulator runs on the operator's Windows laptop and
+is driven from here over an SSH reverse forward — `scripts/remote-adb.sh`. Build
+here, run there.
+
 ## 2026-08-28 — The Android renderer, and why the emulator is not an option
 
 `:mobile` can draw a dial. `AndroidDialRenderer` is the second rasterizer

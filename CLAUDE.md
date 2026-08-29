@@ -151,9 +151,20 @@ Builds, but has never run:
   "It assembles" is a much smaller claim than "it works", and it is the only one
   being made.
 
-Never tested on hardware:
+Confirmed on a Wear OS 6 emulator (2026-08-29):
 
-- Everything. No watch face from this repo has been confirmed to appear on a
-  real watch. That is step one and it gates all of the rest. The APK now exists
-  and is installable; what is missing is a Wear OS device or emulator to install
-  it onto.
+- **A face from this repo appears in the watch face carousel, can be selected,
+  and renders with live complications.** `sdk_gwear_x86_64`, release 16, SDK 36.
+  `dumpsys wallpaper` shows `DeclarativeWatchFaceRuntime0` rendering it. This was
+  step one in `docs/SPEC.md` and it gated everything else.
+- The emulator runs on the operator's Windows laptop and is driven from here over
+  an SSH reverse forward; this machine cannot run one (`/dev/kvm` unreachable).
+  See `scripts/remote-adb.sh`.
+
+Still never tested:
+
+- **An actual watch.** The above is an emulator, which is a smaller claim.
+- **Watch Face Push.** The face was sideloaded with `adb install`; `addWatchFace`,
+  the validation token, slots and the Bluetooth transfer are all untested.
+- **`:mobile` and `:wear`** have never been installed or launched, so the
+  activation permission has never been requested.
