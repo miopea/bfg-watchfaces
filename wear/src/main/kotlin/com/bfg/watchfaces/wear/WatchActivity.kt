@@ -1,7 +1,12 @@
 package com.bfg.watchfaces.wear
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -65,16 +70,43 @@ import kotlinx.coroutines.launch
  */
 class WatchActivity : ComponentActivity() {
 
+    /**
+     * Notifications, which the activation prompt cannot live without.
+     *
+     * `POST_NOTIFICATIONS` was declared in the manifest and never requested, and
+     * the failure was completely silent: a face arrives, installs, and
+     * [ActivationPrompt] finds `areNotificationsEnabled()` false and posts
+     * nothing. Nobody is ever asked whether the watch may switch faces, so the
+     * face sits there installed and inactive with no sign anything happened.
+     *
+     * Asked here because this is the only screen, and because a person opening
+     * the app is the one moment when asking is not an ambush. The install path
+     * cannot ask: it is a background context, which is the same wall that stops
+     * it raising the activation dialog itself.
+     */
+    private val askNotifications =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    private fun notificationsGranted(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!notificationsGranted()) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         setContent {
             var consent by remember { mutableStateOf(ActivationConsent.load(filesDir)) }
+            var notifications by remember { mutableStateOf(notificationsGranted()) }
 
             // The permission may be granted or refused in another activity, so
             // re-read on every resume rather than trusting the value we started
             // with -- otherwise the screen keeps offering a button for a dialog
             // that has already been answered.
-            LaunchedOnResume { consent = ActivationConsent.load(filesDir) }
+            LaunchedOnResume {
+                consent = ActivationConsent.load(filesDir)
+                notifications = notificationsGranted()
+            }
 
             MaterialTheme {
                 AppScaffold {
@@ -102,6 +134,27 @@ class WatchActivity : ComponentActivity() {
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.padding(horizontal = 12.dp)
                                 )
+                            }
+                            if (!notifications) {
+                                item { Spacer(Modifier.height(10.dp)) }
+                                item {
+                                    Text(
+                                        "Turn notifications on, or you will not be asked " +
+                                            "when a face arrives.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(horizontal = 12.dp)
+                                    )
+                                }
+                                item {
+                                    Button(
+                                        onClick = {
+                                            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("Allow notifications") }
+                                }
                             }
                             if (ActivationConsent.canAsk(consent)) {
                                 item { Spacer(Modifier.height(10.dp)) }

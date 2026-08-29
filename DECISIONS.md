@@ -1,5 +1,42 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — The permission nobody asked for
+
+`POST_NOTIFICATIONS` was declared in `:wear`'s manifest and requested nowhere.
+On Wear OS 6 that is a runtime permission, and the failure it produces is the
+worst kind:
+
+1. A face arrives and installs correctly.
+2. `ActivationPrompt` checks `areNotificationsEnabled()`, finds false, and posts
+   nothing — it is written to, precisely so `notify` is not a silent no-op.
+3. Nobody is ever asked whether the watch may switch faces.
+4. The face sits there installed and inactive, with no error anywhere.
+
+Somebody testing this for the first time would conclude the whole pipeline was
+broken, and every log line would say it had worked.
+
+`WatchActivity` now asks on open, and shows a red line with a button if the
+answer was no. This is the only screen the watch app has, and a person opening
+it is the one moment when asking is not an ambush. The install path cannot ask —
+it is a background context, the same wall that stops it raising the activation
+dialog directly.
+
+Found by auditing the receiving half before handing it to somebody with real
+hardware, rather than by watching it fail on their wrist.
+
+### And one that was fine, checked anyway
+
+The channel encoding changed earlier today, so the `WearableListenerService`'s
+`android:pathPrefix` was worth re-checking: it is `/bfg-watchfaces`, the constant
+is `/bfg-watchfaces/face/`, and only the segment AFTER that prefix changed. It
+still matches.
+
+It is now a test. The prefix is a hardcoded manifest string and the constant is
+Kotlin, and nothing else connects them — a mismatch means the device opens a
+channel, the service is never invoked, the bytes go nowhere and nothing is
+logged. Same class of silent failure as the capability name, which already had
+a test for the same reason.
+
 ## 2026-08-29 — The channel path carried a token it could not carry
 
 `WatchLink` put the validator's token in the Data Layer channel path raw, and

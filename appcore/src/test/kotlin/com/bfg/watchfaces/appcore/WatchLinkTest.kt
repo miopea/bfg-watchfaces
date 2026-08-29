@@ -2,6 +2,7 @@ package com.bfg.watchfaces.appcore
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -83,6 +84,22 @@ class WatchLinkTest {
         // refuse the path than to hand the watch something that will waste a
         // transfer and then an addWatchFace call.
         assertNull(WatchLink.tokenFromChannelPath(WatchLink.FACE_CHANNEL_PREFIX + "not base64 !!"))
+    }
+
+    @Test
+    fun `the watch listens on the path the device opens`() {
+        // The manifest's pathPrefix is a hardcoded string and FACE_CHANNEL_PREFIX
+        // is Kotlin, so nothing but this test connects them. A mismatch is
+        // silent in the worst way: the device opens the channel, the service is
+        // never invoked, the bytes go nowhere and no error is raised anywhere.
+        val manifest = File("../wear/src/main/AndroidManifest.xml")
+        assertTrue(manifest.isFile) { "not where the test expected: ${manifest.absolutePath}" }
+        val prefix = Regex("""android:pathPrefix="([^"]+)"""")
+            .find(manifest.readText())?.groupValues?.get(1)
+        assertNotNull(prefix) { "no pathPrefix on the channel listener" }
+        assertTrue(WatchLink.FACE_CHANNEL_PREFIX.startsWith(prefix!!)) {
+            "the device opens ${WatchLink.FACE_CHANNEL_PREFIX} and the watch listens on $prefix"
+        }
     }
 
     @Test
