@@ -37,20 +37,48 @@ object WatchLink {
      */
     const val FACE_CHANNEL_PREFIX = "/bfg-watchfaces/face/"
 
-    /** The token from a channel path, or null when the path is not one of ours. */
+    /**
+     * The token from a channel path, or null when the path is not one of ours.
+     *
+     * Undoes [channelPathFor]'s encoding. A segment that is not valid URL-safe
+     * base64 returns null rather than a mangled token: a bad token fails inside
+     * `addWatchFace` AFTER the whole APK has crossed over Bluetooth, which reads
+     * like a transfer bug and is not.
+     */
     fun tokenFromChannelPath(path: String): String? {
         if (!path.startsWith(FACE_CHANNEL_PREFIX)) return null
-        return path.removePrefix(FACE_CHANNEL_PREFIX).takeIf { it.isNotBlank() }
+        val segment = path.removePrefix(FACE_CHANNEL_PREFIX).takeIf { it.isNotBlank() } ?: return null
+        return runCatching {
+            String(java.util.Base64.getUrlDecoder().decode(segment), Charsets.UTF_8)
+        }.getOrNull()?.takeIf { it.isNotBlank() }
     }
 
-    /** The channel path carrying [validationToken]. */
+    /**
+     * The channel path carrying [validationToken].
+     *
+     * ## The token is re-encoded, and that is not fussiness
+     *
+     * The validator's token is STANDARD base64 with a version suffix — measured,
+     * not guessed: `EsHCFGgf0GIQjD5UfB61BgMka8Shjdyk...MmU=:MS4wLjA=`. Standard
+     * base64's alphabet includes `+`, `=` and **`/`**, and a `/` dropped into a
+     * Data Layer path is a new path segment. The receiver would still recover
+     * the token by prefix-stripping, but nothing promises the transport hands
+     * back the path it was given, byte for byte, once it contains separators.
+     *
+     * So the segment is URL-safe base64 of the token's bytes: `[A-Za-z0-9_-]`
+     * and nothing else, whatever the validator produces.
+     *
+     * This file previously assumed a URL-safe token — the old test used
+     * `eyJhbGciOiJI.UzI1NiJ9-_==` — which is what running the real validator on
+     * a device corrected. Nothing has ever crossed this link, so there is no
+     * wire compatibility to keep.
+     */
     fun channelPathFor(validationToken: String): String {
         require(validationToken.isNotBlank()) {
-            // Refused at the sending end, not the receiving one: an empty token
-            // fails inside addWatchFace after the whole APK has crossed, which
-            // reads like a transfer bug and is not.
             "a face cannot be sent without a validation token"
         }
-        return FACE_CHANNEL_PREFIX + validationToken
+        val segment = java.util.Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(validationToken.toByteArray(Charsets.UTF_8))
+        return FACE_CHANNEL_PREFIX + segment
     }
 }

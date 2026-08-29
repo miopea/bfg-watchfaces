@@ -85,6 +85,10 @@ class MainActivity : ComponentActivity() {
                 var tab by rememberSaveable { mutableStateOf(Tab.DESIGNS) }
                 var ambient by rememberSaveable { mutableStateOf(false) }
                 var handoff by rememberSaveable { mutableStateOf(false) }
+                // A face gets its identity when somebody names it. Sending an
+                // unnamed design would put "Untitled" in the carousel and in the
+                // package name, so the send path reuses the last name given.
+                var sendingName by rememberSaveable { mutableStateOf("My Face") }
                 var status by remember { mutableStateOf<String?>(null) }
                 var faces by remember { mutableStateOf(FaceStorage.list(context)) }
 
@@ -125,7 +129,7 @@ class MainActivity : ComponentActivity() {
                                 .verticalScroll(rememberScrollState())
                         ) {
                             ActivationHandoffScreen(
-                                faceName = "your face",
+                                faceName = sendingName,
                                 onContinue = {
                                     status = "Building your face…"
                                     scope.launch {
@@ -133,7 +137,7 @@ class MainActivity : ComponentActivity() {
                                         // resource table and findTarget blocks on
                                         // the Data Layer.
                                         status = withContext(Dispatchers.IO) {
-                                            buildThenFind(context, params)
+                                            buildThenSend(context, sendingName, params)
                                         }
                                     }
                                 },
@@ -212,6 +216,7 @@ class MainActivity : ComponentActivity() {
                         onDismiss = { naming = false },
                         onSave = { name ->
                             FaceStorage.save(context, name, params)
+                            sendingName = name
                             faces = FaceStorage.list(context)
                             naming = false
                             scope.launch { snackbar.showSnackbar("Saved “$name”") }
@@ -251,14 +256,33 @@ class MainActivity : ComponentActivity() {
      * the real problem is that this build cannot pack a face would send them
      * looking at their Bluetooth settings for an hour.
      */
-    private fun buildThenFind(context: android.content.Context, params: DialParams): String {
+    private fun buildThenSend(
+        context: android.content.Context,
+        name: String,
+        params: DialParams
+    ): String {
         if (!PackBridge.isAvailable) return PackBridge.UNAVAILABLE
-        val built = runCatching { FaceBuilder.build(context, "Untitled", params) }
+
+        val built = runCatching { FaceBuilder.build(context, name, params) }
             .getOrElse { return "Could not build the face: ${it.message}" }
         val kb = built.apk.length() / 1024
+
+        // Validate BEFORE looking for a watch. A schema-invalid face installs
+        // and then never appears in the carousel with no error anywhere, so
+        // finding out here costs a second and finding out later costs the whole
+        // transfer plus one of the watch's addWatchFace calls.
+        val token = runCatching { FaceBuilder.validate(context, built.apk) }
+            .getOrElse { return "Built ${built.slug}, but it is not a valid face: ${it.message}" }
+
         val target = runCatching { FaceSender.findTarget(context) }
             .getOrElse { return "Built ${built.slug} (${kb}KB), but could not reach your watch." }
-        return "Built ${built.slug} (${kb}KB). " + describe(target)
+        if (target !is FaceSender.Target.Ready) return "Built ${built.slug} (${kb}KB). " + describe(target)
+
+        return runCatching { FaceSender.send(context, target, built.apk, token) }
+            .fold(
+                onSuccess = { "Sent “$name” (${kb}KB) to ${target.name}." },
+                onFailure = { "Built ${built.slug} (${kb}KB), but the transfer to ${target.name} failed: ${it.message}" }
+            )
     }
 
     private fun describe(target: FaceSender.Target): String = when (target) {

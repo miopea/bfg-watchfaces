@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.appcore
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -20,7 +21,10 @@ class WatchLinkTest {
 
     @Test
     fun `a round trip through the channel path preserves the token`() {
-        val token = "eyJhbGciOiJI.UzI1NiJ9-_=="
+        // A REAL token from the validator, taken off a device run on
+        // 2026-08-29. It is standard base64 with a version suffix, not the
+        // URL-safe shape this test used to assume.
+        val token = "EsHCFGgf0GIQjD5UfB61BgMka8ShjdykSmb1SVS+MmU=:MS4wLjA="
         assertEquals(token, WatchLink.tokenFromChannelPath(WatchLink.channelPathFor(token)))
     }
 
@@ -51,6 +55,36 @@ class WatchLinkTest {
      * The capability is declared in a Wear resource file and looked up by this
      * constant. Nothing in the compiler connects the two, so this reads the file.
      */
+    @Test
+    fun `a token containing a slash cannot split the channel path`() {
+        // The one that would have bitten. Standard base64 includes "/", and a
+        // "/" in a Data Layer path is a new path segment. The encoded form has
+        // to stay a single segment whatever the validator emits.
+        val token = "ab/cd+ef/gh=:MS4wLjA="
+        val path = WatchLink.channelPathFor(token)
+        val segment = path.removePrefix(WatchLink.FACE_CHANNEL_PREFIX)
+        assertFalse(segment.contains("/")) { "the token became two path segments: $path" }
+        assertEquals(token, WatchLink.tokenFromChannelPath(path))
+    }
+
+    @Test
+    fun `every character the encoder emits is safe in a path`() {
+        val token = "EsHCFGgf0GIQjD5UfB61BgMka8ShjdykSmb1SVS+MmU=:MS4wLjA="
+        val segment = WatchLink.channelPathFor(token).removePrefix(WatchLink.FACE_CHANNEL_PREFIX)
+        assertTrue(segment.all { it.isLetterOrDigit() || it == '-' || it == '_' }) {
+            "unsafe character in the path segment: $segment"
+        }
+    }
+
+    @Test
+    fun `a segment that is not our encoding is refused rather than mangled`() {
+        // A bad token fails inside addWatchFace AFTER the whole APK has crossed
+        // over Bluetooth, which reads like a transfer bug and is not. Better to
+        // refuse the path than to hand the watch something that will waste a
+        // transfer and then an addWatchFace call.
+        assertNull(WatchLink.tokenFromChannelPath(WatchLink.FACE_CHANNEL_PREFIX + "not base64 !!"))
+    }
+
     @Test
     fun `the watch advertises exactly the capability the device looks for`() {
         val xml = File("../wear/src/main/res/values/wear.xml")

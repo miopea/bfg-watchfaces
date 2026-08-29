@@ -1,5 +1,57 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — The channel path carried a token it could not carry
+
+`WatchLink` put the validator's token in the Data Layer channel path raw, and
+the test that covered it used `eyJhbGciOiJI.UzI1NiJ9-_==` — a URL-safe shape
+somebody assumed. Running the real validator on a device produced this:
+
+```text
+EsHCFGgf0GIQjD5UfB61BgMka8ShjdykSmb1SVS+MmU=:MS4wLjA=
+```
+
+Standard base64, with a version suffix. Its alphabet includes `+`, `=` and
+**`/`** — and a `/` in a path is a new path segment. The receiver strips a prefix
+so it would have recovered the token anyway, but nothing promises the transport
+hands the path back byte for byte once it contains separators, and the failure
+would be intermittent: fine for most tokens, broken for the ones that happen to
+contain a slash.
+
+The segment is now URL-safe base64 of the token's bytes — `[A-Za-z0-9_-]` and
+nothing else, whatever the validator emits. Three tests cover it, including a
+token with a slash in it. Nothing has ever crossed this link, so there was no
+wire compatibility to keep.
+
+Worth naming the shape of this bug: a test existed, it passed, and it was
+testing an invented value. The fix was not cleverness, it was running the real
+thing once and looking at what came out.
+
+## 2026-08-29 — How far the pipeline gets, exactly
+
+Measured on the emulators, in one run:
+
+```text
+pack available: true
+BUILT   cache/debug_face.apk   520631 bytes   3256ms
+TOKEN   EsHCFGgf0GIQjD5UfB61BgMka8Shjdyk...
+TARGET  NoWatch
+```
+
+Build, sign and validate all work on the device. `findTarget` executes the real
+`CapabilityClient` and `NodeClient` calls without error and correctly reports
+that there is no watch — which is the truth: the two emulators are not paired,
+and `CLAUDE.md` already records that a Wear AVD self-provisions and never runs a
+pairing wizard.
+
+So `FaceSender.send` has still never run. Everything on both sides of it is
+verified; the Bluetooth crossing needs real hardware.
+
+One real bug fell out of trying: `Tasks.await` refuses to run on the main
+thread, and a `BroadcastReceiver`'s `onReceive` IS the main thread. The app was
+always fine — `MainActivity` calls this inside `withContext(Dispatchers.IO)` —
+but `DebugPackReceiver` was not, and now uses `goAsync()` the way `:wear`'s
+receiver already did.
+
 ## 2026-08-29 — pack on the device: the pipeline runs
 
 The on-device build path is written and compiles: `PackBridge` (JNI onto

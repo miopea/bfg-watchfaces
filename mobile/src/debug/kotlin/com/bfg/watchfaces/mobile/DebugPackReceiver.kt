@@ -4,9 +4,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.bfg.watchfaces.appcore.Presets
 import com.bfg.watchfaces.mobile.pack.FaceBuilder
 import com.bfg.watchfaces.mobile.pack.PackBridge
+import com.bfg.watchfaces.mobile.FaceSender
 
 /**
  * Builds a face from the command line, so the pack pipeline can be exercised
@@ -25,6 +30,21 @@ import com.bfg.watchfaces.mobile.pack.PackBridge
 class DebugPackReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        // goAsync + IO, exactly as :wear's DebugInstallReceiver does. onReceive
+        // is the MAIN thread, and Tasks.await refuses to run there --
+        // "Must not be called on the main application thread". Packing is also
+        // seconds of work, which a receiver must not do inline either.
+        val pending = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                run(context, intent)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun run(context: Context, intent: Intent) {
         val name = intent.getStringExtra("name") ?: "Debug Face"
         val presetName = intent.getStringExtra("preset")
         val params = presetName?.let { Presets.byName(it) } ?: Presets.OPENING
@@ -42,9 +62,25 @@ class DebugPackReceiver : BroadcastReceiver() {
                 Log.i(TAG, "  slug     ${it.slug}")
                 Log.i(TAG, "  bytes    ${it.apk.length()}")
                 Log.i(TAG, "  took     ${System.currentTimeMillis() - started}ms")
-                runCatching { FaceBuilder.validate(context, it.apk) }
+                val token = runCatching { FaceBuilder.validate(context, it.apk) }
                     .onSuccess { token -> Log.i(TAG, "  TOKEN    $token") }
                     .onFailure { e -> Log.e(TAG, "  VALIDATION FAILED: ${e.message}") }
+                    .getOrNull()
+
+                // The transport, exercised as far as this pair of emulators
+                // allows. Reported separately from the build so "no watch" can
+                // never be mistaken for "the pipeline is broken".
+                if (token != null) {
+                    val target = runCatching { FaceSender.findTarget(context) }
+                        .onFailure { e -> Log.e(TAG, "  findTarget threw", e) }
+                        .getOrNull()
+                    Log.i(TAG, "  TARGET   $target")
+                    if (target is FaceSender.Target.Ready) {
+                        runCatching { FaceSender.send(context, target, it.apk, token) }
+                            .onSuccess { Log.i(TAG, "  SENT to ${target.name}") }
+                            .onFailure { e -> Log.e(TAG, "  SEND FAILED", e) }
+                    }
+                }
             }
             .onFailure { Log.e(TAG, "BUILD FAILED", it) }
     }
