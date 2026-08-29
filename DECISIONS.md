@@ -1,5 +1,57 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — The phone app catches up with the workbench, and what did not
+
+`DECISIONS.md` 2026-08-28 made the localhost app the specification for the phone
+app. Measured against it on 2026-08-29 the phone app was one scrolling studio
+against four screens, and the gap was not cosmetic: it could not save a face,
+name one, or list one. Nothing downstream — sending to a watch, sharing to a
+catalog — can be built on a screen with nowhere to keep anything.
+
+Now at parity: bottom navigation, Designs (styles gallery), Studio, My faces,
+About, the naming sheet, local save in the catalog format, the Fine tune bottom
+sheet, complication size and spacing, and an Android-standard complication
+picker.
+
+### Three things worth keeping the reasoning for
+
+**The picker was wrong in ways a screenshot cannot show.** It was a `Row` with a
+coloured value and a raw `DropdownMenu` hung off it — no affordance that it
+opened anything, a touch target the width of whatever the text happened to be,
+no field semantics for TalkBack, and a menu anchored to the `Box` rather than the
+control, so it opened over its own label on a short screen.
+`ExposedDropdownMenuBox` is the standard answer and supplies all four.
+
+**Fine tune had to become a sheet.** Inline, the dial had scrolled off the top by
+the time you reached the lower sliders, so you were adjusting an engraving you
+could not see. The localhost app marks that sheet `short` for exactly this
+reason. Fine tuning is a feedback loop and a loop you cannot see is guessing.
+
+**Dynamic colour went away.** Material You is the right default for a utility and
+the wrong one for an app whose entire subject is choosing colours: the chrome
+took its identity from the wallpaper and competed with the swatches, so a person
+could not tell which purple was theirs and which was the phone's. The scheme is
+now the brand's, the same plum and blush as the launcher icon.
+
+### Still missing, deliberately
+
+- **Community.** Needs the catalog service, which is its own task and is held
+  for an operator interview. The tab exists and says honestly that nothing is
+  shared yet, rather than inventing faces or pretending to load.
+- **Share and Report.** Both are catalog actions. Same blocker.
+- **Your image (`Engine.TEXTURE`).** `AndroidDialRenderer` has never supported
+  imported bitmaps; that is a renderer gap, not a UI one.
+- **The custom colour picker.** The swatches work; an arbitrary-colour sheet is
+  additive rather than a gap in the flow.
+- **The schema validity pill.** The workbench validates against Google's XSD on
+  every change because it has Xerces and the schema on disk. The phone has
+  neither, and validation belongs at the point a face is packed, not while
+  someone drags a slider.
+
+Verified on the SDK 36 phone emulator, not assumed: all four tabs render, and a
+design named "Midnight Knot" saved to `files/faces/midnight_knot.json` in the
+catalog format and came back on the My faces list with its slug.
+
 ## 2026-08-29 — How to put a local file into the Play Console from a headless box
 
 The store listing is complete: icon, feature graphic, five phone screenshots,

@@ -59,6 +59,13 @@ Judge any change with `--sheet=`, which crops the way a launcher does: the mask
 takes the middle 72dp of the 108dp layer, not all of it. See `DECISIONS.md`
 2026-08-29.
 
+**Shared app rules live in `:appcore`, not `:workbench`.** `Presets`, the face
+JSON (`FaceCodec`), the saved-face library (`FaceLibrary`) and its slug rule are
+there because both shipped apps need them and `:workbench` is never shipped. The
+slug is the Watch Face Push package suffix — a second implementation that
+disagreed would install faces under a different package and silently stop
+replacing them.
+
 **Controls come from `ControlInventory`.** Which sliders exist, their ranges and
 their order live in `:generator`; both UIs build from it. Labels and the curated
 engine order stay in the UI — those are presentation. Do not hardcode a control
@@ -151,10 +158,12 @@ Verified — built and run, not assumed:
 
 Installed and driven on emulators (2026-08-29):
 
-- `:mobile` — the Studio screen from the localhost app: composite preview with
-  clock and complications, ambient toggle, style chips, dial and ink swatches,
-  complication slots, and every slider built from `ControlInventory`. All
-  thirteen styles render. Seen running on an SDK 36 phone emulator.
+- `:mobile` — four screens behind a bottom bar, matching the localhost app:
+  Designs (styles gallery), Studio, My faces, About. Naming, local save in the
+  catalog format, the Fine tune bottom sheet, complication size and spacing, and
+  a Material 3 `ExposedDropdownMenuBox` for each slot. Seen on an SDK 36 phone
+  emulator; a face saved and came back on the list. Community, Share, Report and
+  imported images are deliberately absent — see `DECISIONS.md` 2026-08-29.
 - `:wear` — installed on a Wear OS 6 emulator, and `addWatchFace` works from it.
   See below.
 
