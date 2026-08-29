@@ -2,34 +2,51 @@
 
 ## 2026-08-29 — Why the watch app was released and still not installable
 
-Released to `wear:internal` as versionCode 1003, opted in, and absent from the
-Play Store on the watch. The cause was one line:
+Released to `wear:internal`, opted in as a tester, and the Play Store on the
+watch said **not compatible**. The cause was a Play Console setting, not
+anything in the app:
 
-```xml
-<meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
-```
+**Test and release → Advanced settings → Form factors → Wear OS** has a
+three-step checklist. Two were done — Wear screenshots uploaded, a bundle
+released to a testing track — and the third, **"Opt-in to Wear OS and agree to
+the review policy"**, had never been done. Until it is, Play does not consider
+the app available for Wear OS devices at all, testers included.
 
-"Non-standalone" is the Wear 2.x arrangement: the watch app was not
-independently installable, and Play pushed it to the watch automatically when
-the phone app was installed. **Wear OS 3 removed that delivery.** A
-non-standalone app is simply not offered on a modern watch — which is exactly
-the symptom: released to a track the tester is opted into, and never in the list.
+`developer.android.com/training/wearables/packaging` is explicit:
 
-It was `false` honestly. When it was written this app had no launcher activity
-at all — there was nothing to open and nothing to install on its own, so
-"requires the phone app" was the whole truth. That stopped being true when
-`WatchActivity` landed earlier today. The app now installs, opens, and reports
-whether it is ready and whether it may switch your face.
+> "In the Play Console for your app, click the Test and release menu... Choose
+> Advanced Settings, select the Form factors tab, and click Add form factor.
+> Click Wear OS..."
 
-Needing the phone app to be USEFUL is a different question from being able to
-stand on its own, and only the second one is what this flag means.
+Opting in flips the form factor to **Active** immediately. It does NOT wait for
+the review it warns about — the dialog says the app will be reviewed against the
+Wear OS quality guidelines, and separately that the change can be sent for
+review from Publishing overview, but the distribution setting itself takes effect
+on the spot.
 
-Verified in the artefact rather than in the source: `aapt2 dump xmltree` on the
-built APK reads `standalone=true`.
+### Two things I got wrong on the way, both by guessing instead of reading
 
-Worth keeping as a pattern: a flag that was correct when written and quietly
-became wrong when the thing it described changed. Nothing failed, nothing
-warned, and the Play Console said the release was live — because it was.
+**`standalone` was not the cause.** I changed
+`com.google.android.wearable.standalone` from `false` to `true` on the theory
+that Wear OS 3 stopped delivering non-standalone apps. The documentation says
+the opposite:
+
+> "If the value of `com.google.android.wearable.standalone` is `false`, the app
+> is still downloadable from the Play Store, but it requires its companion
+> mobile app for it to be usable."
+
+That is exactly this app: it installs and opens on its own, and needs the phone
+app to do anything with a face. The value is left at `true` for now because it
+is shipped in 1004 and churning it again proves nothing — but the honest reading
+of the definition ("fully usable without a paired phone") is `false`, and it
+should go back when there is another reason to touch the manifest.
+
+**`minSdk 36` was not the cause either.** The operator's watch is a Pixel Watch 5
+running Wear OS 7, comfortably above the floor.
+
+The pattern in both: I reasoned from a plausible platform rule instead of opening
+the page that states it. The operator's "look at the documentation and stop
+guessing" was the correction, and it was right.
 
 ## 2026-08-29 — The permission nobody asked for
 
