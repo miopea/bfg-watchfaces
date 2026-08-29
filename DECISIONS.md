@@ -1,5 +1,54 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — Emulator pairing does not work, and the netsim theory is disproven
+
+Two emulators now run locally on KVM, and the pairing attempt was made properly.
+It fails, and not for the reason previously recorded here.
+
+### Every precondition was met
+
+One `netsimd`, shared. Both guests attached to it — each log says "Activated
+packet streamer for bluetooth emulation". Watch at
+`SCAN_MODE_CONNECTABLE_DISCOVERABLE`, Bluetooth on both, nearby-devices
+permission granted, companion app installed against a signed-in account. The
+scan finds nothing, indefinitely.
+
+So **the separate-`netsimd` explanation is disproven as sufficient.** It was a
+real defect on the Windows pair — one emulator per account, two virtual networks
+— and fixing it changed nothing. The most likely remaining reading is that
+netsim carries BLE but not classic BR/EDR inquiry, which is what device
+discovery needs. There is no `netsim` CLI shipped with the SDK on either
+machine, only `netsimd`, so the virtual network cannot be inspected or linked by
+hand to confirm it.
+
+Google's documented route is Android Studio's Wear pairing assistant, which does
+not use Bluetooth discovery. That is a GUI IDE, on a headless box, and it was not
+installed.
+
+### What was tried, so nobody repeats it
+
+- Sharing one `netsimd` by starting both emulators from one session. Necessary,
+  not sufficient.
+- `REQUEST_DISCOVERABLE` on the watch, accepted, verified in `dumpsys`.
+- Clearing `user_setup_complete` and `device_provisioned` and rebooting, to force
+  a setup wizard. **A fresh Wear AVD self-provisions**, so there is no wizard to
+  return to — see the correction earlier today.
+- The classic `adb forward tcp:5601` bridge. The companion never offers an
+  emulator as a target.
+
+### What it costs, stated exactly
+
+`CapabilityClient`, `ChannelClient` and the Bluetooth crossing remain untested.
+Everything on the Push side is proven on two independent machines: parameters,
+APK, validator token, `addWatchFace`, slot allocation, `updateWatchFace` on
+re-push, the activation permission, `setWatchFaceAsActive`, face live.
+
+The transport is **not** the last mile. The phone cannot yet BUILD a face to
+send — that needs `google/pack` on-device through JNI and the validator wired in
+— so there are two unbuilt pieces and the other one is larger. The Data Layer is
+ordinary Android plumbing by comparison, and the honest place to prove it is the
+first real watch.
+
 ## 2026-08-29 — KVM here, and I was wrong about why pairing fails
 
 The operator ran `chmod 0666 /dev/kvm` on the host and emulators now run on this

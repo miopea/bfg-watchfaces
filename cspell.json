@@ -82,6 +82,7 @@
     "gpasswd",
     "libpulse",
     "setgroups",
+    "netsim",
     "netsimd",
     "uiautomator",
     "untileable",
