@@ -1,5 +1,68 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — The app icon: H6 with an onion crown, generated from one description
+
+The app shipped to internal testing with `icon=''` — no launcher icon at all.
+The mark chosen to fix that is an open guilloché dial (two arcs, the gap toward
+the lower left) with a domed "onion" crown at two o'clock, in the BFG light
+palette: `#F4E6EB` ground, `#80475C` ink.
+
+### Why a generator and not four drawn files
+
+The same mark has to exist as an Android adaptive icon (two vector drawables on
+a 108dp canvas), a 512px PNG for Play, and an SVG for the docs site. Drawn
+separately those are four chances for the crown to sit at a different angle, and
+nobody notices until they are side by side on a phone. So the shapes are data in
+`BrandMark` and each format is an executor — the arrangement `ComplicationGlyphs`
+already uses, for the same reason.
+
+`./gradlew :workbench:brand` writes all of it. The outputs are **checked in**:
+the Android build must not depend on a JVM task having been run.
+
+Rejected: putting the mark in `:generator`. It is not part of the watch face file
+format, and `:generator` is the definition of that format and nothing else.
+
+### Three things only visible at size, and what they cost
+
+**The hands read as the letter V.** Two hands of near-equal length, near-symmetric
+about vertical, are a chevron and not a watch. The hour hand is now 11.5 units
+against the minute's 18.5, and heavier. Obvious in hindsight; invisible at 96px.
+
+**The crown read as a balloon on a string.** Its stem started at radius 29, inside
+the outer ring at 30.5, so the ring covered the stem and left a floating dot. The
+stem now starts *on* the ring.
+
+**The strokes were sized for an artboard, not a launcher.** The design was judged
+at 120px. Inside a 60dp keyline a 2.6-unit stroke lands on about 1.4 device pixels
+at a 48px launcher icon, and the mark goes grey. Every weight went up roughly 30%.
+This is a deliberate departure from the approved artboards: the alternative is an
+icon that is correct in the file and a smudge on the phone.
+
+### The safe zone is 60dp, not 72dp, and getting it wrong is silent
+
+An adaptive icon's 108dp layer is not what anyone sees. The system reserves 18dp
+on each side for parallax, so the mask applies to the middle **72dp**, and
+Material's keyline for a round motif is **60dp** inside that. Sized to 72dp the
+mark looks perfect in a square preview and loses its crown to the first circular
+mask it meets — there is no error and no warning.
+
+`./gradlew :workbench:brand --args="--sheet=<path>"` renders the icon cropped the
+way a launcher crops it, at 192 down to 24px, in both palettes. That contact sheet
+is what caught all four problems above; a 512px render caught none of them.
+
+### Light, not dark
+
+The dark palette is a near-black tile. On the dark wallpaper of a phone that asked
+for dark mode it stops being an icon and becomes a hole. The dark mark stays in
+`docs/brand` for the site and the README, where there is a page behind it.
+
+### Not built: the Play feature graphic
+
+The remaining store-listing asset is a 1024×500 feature graphic, which needs
+typography. This machine has DejaVu, Liberation and FreeSerif and nothing else —
+setting the BFG wordmark in Liberation Serif would contradict the brand it is
+meant to carry. It waits for a real face rather than shipping a generic one.
+
 ## 2026-08-29 — On Play internal testing, published by script rather than by hand
 
 `BFG Watch Faces` exists on Google Play as `com.bfg.watchfaces`, in the BFG

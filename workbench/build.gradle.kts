@@ -50,3 +50,12 @@ tasks.register<JavaExec>("bake") {
     classpath = sourceSets["main"].runtimeClasspath
     workingDir = rootProject.projectDir
 }
+
+/** Regenerate the app icon from BrandMark. Writes checked-in files. */
+tasks.register<JavaExec>("brand") {
+    group = "bfg"
+    description = "Write the launcher icons, the Play store icon and docs/brand from BrandMark"
+    mainClass.set("com.bfg.watchfaces.workbench.Brand")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
