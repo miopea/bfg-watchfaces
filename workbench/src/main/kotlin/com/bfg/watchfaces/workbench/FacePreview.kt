@@ -15,6 +15,7 @@ import java.awt.image.BufferedImage
 import java.time.LocalDateTime
 import java.time.format.TextStyle
 import java.util.Locale
+import com.bfg.watchfaces.appcore.Complications
 
 /**
  * Composites the dial with the text layers, so the whole face can be judged in a

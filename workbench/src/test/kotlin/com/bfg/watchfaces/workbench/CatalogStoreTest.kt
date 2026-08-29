@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import com.bfg.watchfaces.appcore.FaceLibrary
 
 /**
  * The catalog's rules are the architecture's, not preferences:
@@ -50,7 +51,7 @@ class CatalogStoreTest {
     }
 
     private fun entry(name: String, p: DialParams) = CatalogStore.Entry(
-        slug = FaceStore.slugify(name), name = name, author = "Tester",
+        slug = FaceLibrary.slugify(name), name = name, author = "Tester",
         created = "2026-08-28T00:00:00Z", params = p
     )
 
@@ -118,7 +119,7 @@ class CatalogStoreTest {
     @Test
     fun `submitting a local-only face is refused and leaves nothing staged`(@TempDir tmp: File) {
         val root = stagedRoot(tmp)
-        val face = FaceStore.StoredFace(
+        val face = FaceLibrary.StoredFace(
             "photo_dial", "Photo Dial", "2026-08-28T00:00:00Z",
             DialParams(engine = Engine.TEXTURE, texture = "b".repeat(40))
         )
@@ -196,9 +197,9 @@ class CatalogRootTest {
 
     @Test
     fun `the app root is not a catalog root`(@TempDir tmp: File) {
-        // A private save, in the app repo, exactly where FaceStore puts it.
-        FaceStore.save(tmp, "Private Design", DialParams(engine = Engine.KNOTWORK))
-        assertEquals(1, FaceStore.list(tmp).size)
+        // A private save, in the app repo, exactly where FaceLibrary puts it.
+        FaceLibrary.save(tmp, "Private Design", DialParams(engine = Engine.KNOTWORK))
+        assertEquals(1, FaceLibrary.list(tmp).size)
 
         // With no catalog checkout anywhere near it, resolution must fail rather
         // than quietly landing on the personal directory.
@@ -214,7 +215,7 @@ class CatalogRootTest {
         val catalog = File(tmp, "bfg-watchfaces-catalog").apply { mkdirs() }
         File(catalog, "faces").mkdirs()
 
-        FaceStore.save(app, "Private Design", DialParams(engine = Engine.KNOTWORK))
+        FaceLibrary.save(app, "Private Design", DialParams(engine = Engine.KNOTWORK))
         val resolved = CatalogStore.resolveRoot(app)
         assertEquals(catalog.canonicalFile, resolved?.canonicalFile) { "sibling clone should win" }
 
@@ -235,7 +236,7 @@ class CatalogRootTest {
         File(real, "generator/src/test/resources/wff-schema").takeIf { it.isDirectory }
             ?.copyRecursively(File(app, "generator/src/test/resources/wff-schema"), overwrite = true)
 
-        val face = FaceStore.save(app, "Shared Design", DialParams(engine = Engine.KNOTWORK))
+        val face = FaceLibrary.save(app, "Shared Design", DialParams(engine = Engine.KNOTWORK))
         val (file, problems) = CatalogStore.submit(app, catalog, face, "Tester")
         assertTrue(problems.isEmpty()) { problems.toString() }
 
@@ -243,6 +244,6 @@ class CatalogRootTest {
             "submission landed outside the catalog at ${file.canonicalPath}"
         }
         // And the private copy is untouched, still one face.
-        assertEquals(1, FaceStore.list(app).size)
+        assertEquals(1, FaceLibrary.list(app).size)
     }
 }

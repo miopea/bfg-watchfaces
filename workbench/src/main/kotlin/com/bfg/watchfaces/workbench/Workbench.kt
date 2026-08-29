@@ -15,6 +15,10 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 import javax.imageio.ImageIO
+import com.bfg.watchfaces.appcore.FaceCodec
+import com.bfg.watchfaces.appcore.FaceLibrary
+import com.bfg.watchfaces.appcore.Presets
+import com.bfg.watchfaces.appcore.Complications
 
 /**
  * The workbench: a localhost design loop for watch faces.
@@ -109,7 +113,7 @@ object Workbench {
         }.toMap()
     }
 
-    private fun params(ex: HttpExchange): DialParams = ParamCodec.fromQuery(query(ex))
+    private fun params(ex: HttpExchange): DialParams = FaceCodec.fromQuery(query(ex))
 
     /**
      * The catalog checkout, which is a DIFFERENT repository from this one.
@@ -249,8 +253,8 @@ object Workbench {
     }
 
     private fun servePresets(ex: HttpExchange) {
-        val arr = ParamCodec.presets.entries.joinToString(",") { (name, p) ->
-            """{"name":${jsonStr(name)},"query":${jsonStr(ParamCodec.toQuery(p))}}"""
+        val arr = Presets.ALL.entries.joinToString(",") { (name, p) ->
+            """{"name":${jsonStr(name)},"query":${jsonStr(FaceCodec.toQuery(p))}}"""
         }
         json(ex, """{"presets":[$arr]}""")
     }
@@ -283,15 +287,15 @@ object Workbench {
             "POST" -> {
                 val name = q["name"]?.trim().orEmpty()
                 if (name.isBlank()) { json(ex, """{"ok":false,"error":"a face needs a name"}"""); return }
-                val f = FaceStore.save(root, name, params(ex))
+                val f = FaceLibrary.save(root, name, params(ex))
                 json(ex, """{"ok":true,"face":${faceJson(f)}}""")
             }
             "DELETE" -> {
                 val slug = q["slug"].orEmpty()
-                json(ex, """{"ok":${FaceStore.delete(root, slug)}}""")
+                json(ex, """{"ok":${FaceLibrary.delete(root, slug)}}""")
             }
             else -> {
-                val all = FaceStore.list(root).joinToString(",") { faceJson(it) }
+                val all = FaceLibrary.list(root).joinToString(",") { faceJson(it) }
                 json(ex, """{"faces":[$all]}""")
             }
         }
@@ -318,7 +322,7 @@ object Workbench {
                 val catalog = catalogRoot()
                 if (catalog == null) { json(ex, noCatalogJson()); return }
                 val slug = q["slug"].orEmpty()
-                val face = FaceStore.load(root, slug)
+                val face = FaceLibrary.load(root, slug)
                 if (face == null) {
                     json(ex, """{"ok":false,"error":${jsonStr(
                         "That face is no longer saved on this device."
@@ -343,7 +347,7 @@ object Workbench {
                 val catalog = catalogRoot()
                 if (catalog == null) { json(ex, noCatalogJson()); return }
                 val slug = q["slug"].orEmpty()
-                val f = File(CatalogStore.dir(catalog), "${FaceStore.slugify(slug)}.json")
+                val f = File(CatalogStore.dir(catalog), "${FaceLibrary.slugify(slug)}.json")
                 val gone = f.isFile && f.delete()
                 if (gone) CatalogStore.writeIndex(catalog)
                 json(ex, """{"ok":$gone}""")
@@ -354,7 +358,7 @@ object Workbench {
                 val entries = CatalogStore.list(catalog).joinToString(",") { e ->
                     """{"slug":${jsonStr(e.slug)},"name":${jsonStr(e.name)},"author":${jsonStr(e.author)},""" +
                     """"engine":${jsonStr(e.params.engine.name)},"created":${jsonStr(e.created)},""" +
-                    """"query":${jsonStr(ParamCodec.toQuery(e.params))},""" +
+                    """"query":${jsonStr(FaceCodec.toQuery(e.params))},""" +
                     """"reportUrl":${jsonStr(CatalogStore.reportUrl(e.slug, e.name))}}"""
                 }
                 json(ex, """{"cdn":${jsonStr(CatalogStore.CDN_URL)},"faces":[$entries]}""")
@@ -482,9 +486,9 @@ object Workbench {
         """{"id":${jsonStr(t.id)},"width":${t.width},"height":${t.height},""" +
         """"bytes":${t.bytes},"note":${jsonStr(TextureStore.qualityNote(t))}}"""
 
-    private fun faceJson(f: FaceStore.StoredFace): String =
+    private fun faceJson(f: FaceLibrary.StoredFace): String =
         """{"slug":${jsonStr(f.slug)},"name":${jsonStr(f.name)},"created":${jsonStr(f.created)},""" +
-        """"query":${jsonStr(ParamCodec.toQuery(f.params))}}"""
+        """"query":${jsonStr(FaceCodec.toQuery(f.params))}}"""
 
     /**
      * Writes everything the APK build needs for ONE named design.
@@ -496,7 +500,7 @@ object Workbench {
     fun exportTo(root: File, p: DialParams, colors: Int = 64, faceName: String = "Untitled"): List<String> {
         val tpl = File(root, "watchface-template")
         val drawable = File(tpl, "res/drawable-nodpi").apply { mkdirs() }
-        val slug = FaceStore.slugify(faceName)
+        val slug = FaceLibrary.slugify(faceName)
 
         // Dial: quantized, because it crosses to the watch over Bluetooth.
         val tex = if (p.engine == com.bfg.watchfaces.generator.Engine.TEXTURE && p.texture.isNotBlank())
@@ -565,7 +569,7 @@ $slotStrings
         val p = params(ex)
         val q = query(ex)
         val name = q["name"]?.takeIf { it.isNotBlank() } ?: "Untitled"
-        val slug = FaceStore.slugify(name)
+        val slug = FaceLibrary.slugify(name)
         val written = exportTo(root, p, q["colors"]?.toIntOrNull() ?: 64, name)
         val pb = ProcessBuilder("./build.sh")
             .directory(File(root, "watchface-template"))

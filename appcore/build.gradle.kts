@@ -11,6 +11,10 @@ plugins { alias(libs.plugins.kotlin.jvm) }
 // No Android dependency, on purpose: the rules are then testable on the JVM in
 // CI, which is where the one-shot activation logic gets its assurance.
 dependencies {
+    // The stored face format is DialParams, so the rules that read and write it
+    // need the type. Still no Android dependency: :generator is plain JVM too.
+    api(project(":generator"))
+
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
 }

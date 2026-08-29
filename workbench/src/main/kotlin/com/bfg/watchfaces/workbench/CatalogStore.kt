@@ -5,6 +5,9 @@ import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.WffEmitter
 import java.io.File
 import java.time.Instant
+import com.bfg.watchfaces.appcore.Json
+import com.bfg.watchfaces.appcore.FaceCodec
+import com.bfg.watchfaces.appcore.FaceLibrary
 
 /**
  * The community catalog: `catalog/faces/<slug>.json` plus a generated
@@ -131,11 +134,11 @@ object CatalogStore {
         val o = Json.obj(Json.parse(text))
         val name = Json.str(o, "name", "")
         return Entry(
-            slug = Json.str(o, "slug", FaceStore.slugify(name)),
+            slug = Json.str(o, "slug", FaceLibrary.slugify(name)),
             name = name,
             author = Json.str(o, "author", ""),
             created = Json.str(o, "created", ""),
-            params = ParamCodec.fromJson(Json.obj(o["params"]))
+            params = FaceCodec.fromJson(Json.obj(o["params"]))
         )
     }
 
@@ -144,7 +147,7 @@ object CatalogStore {
   "slug": ${Json.quote(e.slug)},
   "author": ${Json.quote(e.author)},
   "created": ${Json.quote(e.created)},
-  "params": ${ParamCodec.toJson(e.params).prependIndent("  ").trimStart()}
+  "params": ${FaceCodec.toJson(e.params).prependIndent("  ").trimStart()}
 }
 """
 
@@ -170,8 +173,8 @@ object CatalogStore {
         }
 
         if (entry.name.isBlank()) bad("has no name")
-        if (entry.slug != FaceStore.slugify(entry.name)) {
-            bad("slug '${entry.slug}' does not match its name '${entry.name}' (expected '${FaceStore.slugify(entry.name)}')")
+        if (entry.slug != FaceLibrary.slugify(entry.name)) {
+            bad("slug '${entry.slug}' does not match its name '${entry.name}' (expected '${FaceLibrary.slugify(entry.name)}')")
         }
         if (file.nameWithoutExtension != entry.slug) {
             bad("filename does not match slug '${entry.slug}'")
@@ -276,7 +279,7 @@ $rows
     fun submit(
         schemaRoot: File,
         catalogRoot: File,
-        face: FaceStore.StoredFace,
+        face: FaceLibrary.StoredFace,
         author: String
     ): Pair<File, List<Problem>> {
         val entry = Entry(

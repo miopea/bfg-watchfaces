@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.workbench
 
 import java.io.File
+import com.bfg.watchfaces.appcore.Json
 
 /**
  * Validate the community catalog and regenerate its index.

@@ -1,4 +1,4 @@
-package com.bfg.watchfaces.workbench
+package com.bfg.watchfaces.appcore
 
 import com.bfg.watchfaces.generator.ComplicationSource
 

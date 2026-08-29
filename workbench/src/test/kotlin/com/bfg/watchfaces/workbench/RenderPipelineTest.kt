@@ -15,6 +15,8 @@ import org.junit.jupiter.params.provider.EnumSource
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
+import com.bfg.watchfaces.appcore.FaceCodec
+import com.bfg.watchfaces.appcore.Presets
 
 /**
  * The bake path is now load-bearing: it produces the artwork that ships inside
@@ -148,8 +150,8 @@ class RenderPipelineTest {
             engine = Engine.ROSETTE, scale = 17.5, depth = 6.25, freq = 11,
             dialColor = "#23262B", inkColor = "#E8E6E1", lens = false, lensAmount = 12.0
         )
-        val back = ParamCodec.fromQuery(
-            ParamCodec.toQuery(p).split("&").associate {
+        val back = FaceCodec.fromQuery(
+            FaceCodec.toQuery(p).split("&").associate {
                 val i = it.indexOf('=')
                 java.net.URLDecoder.decode(it.substring(0, i), Charsets.UTF_8) to
                     java.net.URLDecoder.decode(it.substring(i + 1), Charsets.UTF_8)
@@ -189,7 +191,7 @@ class RenderPipelineTest {
     @Test
     fun `every preset is renderable and schema valid`() {
         val root = repoRoot()
-        for ((name, p) in ParamCodec.presets) {
+        for ((name, p) in Presets.ALL) {
             val img = DialRenderer.render(p)
             assertTrue(img.width == DIAL_SIZE) { "$name did not render" }
             val issues = WffValidator.validate(root, com.bfg.watchfaces.generator.WffEmitter.emit(p))

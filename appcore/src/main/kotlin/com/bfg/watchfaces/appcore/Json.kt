@@ -1,4 +1,4 @@
-package com.bfg.watchfaces.workbench
+package com.bfg.watchfaces.appcore
 
 /**
  * A minimal JSON reader, just enough for a stored face.
