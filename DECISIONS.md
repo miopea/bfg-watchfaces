@@ -1,5 +1,49 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — The official validator issues tokens for both our builders
+
+`validator-push-cli` 1.1.0-alpha01, run against faces this repo produces. Ten
+checks, all passing, a token issued for each. Three questions that were recorded
+as untestable are now answered.
+
+### Watch Face Push accepts a pack-built APK
+
+The larger result. `google/pack` signs v3 only, in the zip signing block, with no
+`META-INF` at all — where aapt2 plus apksigner also writes a v1 JAR signature.
+DECISIONS 2026-08-28 flagged that as unresolved and "exactly the kind of thing
+that fails silently at install".
+
+It does not fail. The pack-built APK passes `APK signature validation` and gets a
+token, identically to the aapt2 one. The on-device builder is viable.
+
+### The `nodpi` memory worry was unfounded
+
+`Memory footprint validation` passes. That check is the whole reason the
+qualifier mattered: a dial scaled 2x would be 3.3MB a frame against a ~10MB
+ambient budget. Both builders clear it, so `scripts/pack-qualifiers.patch` fixed
+a real correctness bug and the ceiling was never close.
+
+### Everything else Push asks of a face
+
+`Package name`, `Minimum SDK version`, `Watch Face Format version property`,
+`Watch face definition files presence`, `Watch Face Format validator run`, `APK
+size`, `File contents`, `AndroidManifest`. All pass on both builders — so the
+template, the emitter and the manifest are all correct by Google's own reckoning
+rather than by ours.
+
+### Tokens, and where they belong
+
+A token is issued per APK for a named Push client — `-p com.bfg.watchfaces`,
+which is `:wear`'s applicationId. That confirms the shape `WatchLink` already
+assumes: the token describes one specific APK and travels with it. It is not a
+device credential and not reusable across faces.
+
+### What this still is not
+
+Validation is not installation. `addWatchFace` has not been called, no face has
+gone over a Data Layer channel, and the activation permission has not been
+requested. This says a face WOULD be accepted, not that the flow works.
+
 ## 2026-08-29 — A face from this repo is on a watch face carousel
 
 `docs/SPEC.md` build order, step one: "Install `watchface-template` on a real
