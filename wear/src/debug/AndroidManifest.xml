@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only. Merged into debug builds and no others, which is what keeps an
+  exported "install this APK" receiver out of anything shippable.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <receiver
+        android:name=".DebugInstallReceiver"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="com.bfg.watchfaces.DEBUG_INSTALL" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

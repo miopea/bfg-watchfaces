@@ -1,5 +1,109 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — `addWatchFace` works, and two shipped bugs only running could find
+
+Watch Face Push has installed a face. Not validated, not sideloaded — pushed,
+through `WatchFacePushManager`, with a token from Google's validator, into a
+slot the system allocated.
+
+```text
+slots: 1 free, 0 used
+OK slot=55c1e952-c49a-38f2-ae3f-0786a085b15d replaced=false
+```
+
+Run a second time, it reports `0 free, 1 used` and takes the `updateWatchFace`
+branch — `replaced=true`, same slot. So both halves of the slot-limit logic are
+exercised, and **this device's slot limit is 1**, which makes the
+`ERROR_SLOT_LIMIT_REACHED` avoidance load-bearing rather than defensive.
+
+### Two bugs in shipped code, both invisible to every test we have
+
+**The manifest never asked for permission to use the API.** `wear/` declared
+`SET_PUSHED_WATCH_FACE_AS_ACTIVE` and stopped. Every Push call needs
+`com.google.wear.permission.PUSH_WATCH_FACES` as well, and nothing tells you:
+the library's own manifest declares no permission at all, only a `<queries>`
+entry, so the merged manifest looks complete. The failure is
+
+```text
+SecurityException: Not allowed to bind to service Intent {
+  act=com.google.wear.ACTION_PUSH_WATCH_FACES ... }
+```
+
+which names `bindService` and never says "permission". Read off the watch
+instead of guessed: `dumpsys package com.google.android.wearable.dwf.receiver`
+shows `WatchFaceReceiverService` guarded by exactly that string. It is
+`prot=normal`, so declaring it is enough. This was not a harness artefact — the
+Data Layer path would have hit the identical wall on the first real face.
+
+**`WatchFacePushManager` needs a context that can bind services.** A
+`BroadcastReceiver`'s cannot, and throws `ReceiverCallNotAllowedException` from
+inside `listWatchFaces`. `FaceInstaller` now normalises to
+`applicationContext`, which is correct for every caller and costs nothing.
+
+### The activation prompt cannot work the way the decision describes
+
+Operator decision 01a049a1-390b-7b50-a5d3-cc082037bb55 puts the one irreversible
+ask on the watch, the first time a face lands. The install does reach
+`onFaceInstalled`, which does call `startActivity`. Android refuses it:
+
+```text
+Background activity launch blocked! goo.gle/android-bal
+  cmp=com.bfg.watchfaces/.wear.ActivationRequestActivity
+  callingUidProcState: RECEIVER
+```
+
+This is not about the debug harness. A `WearableListenerService` handling
+`onChannelOpened` is a background context by exactly the same rule, so the
+shipped path is blocked identically. **The permission has still never been
+requested**, and it cannot be from where the design puts it.
+
+Not fixed here, because the fix is a design choice and the thing being chosen
+about is unrecoverable. The options, none free:
+
+- **A notification on the watch that launches the activity when tapped.** Keeps
+  the decision's intent — asked when a face lands, in context — and satisfies
+  BAL, because the tap is a foreground action. Costs a notification channel and
+  a second tap. This is the recommendation.
+- **Ask when the watch app is opened.** Already rejected on 2026-08-28, and the
+  reason still holds: a companion app is often never deliberately opened.
+- **Ask from the phone.** Impossible. `androidx.wear.watchfacepush` declares
+  `<uses-library android:name="wear-sdk" android:required="true" />`, so an app
+  linking it will not install on a phone.
+
+### `FaceInstaller`, and why the install left the service
+
+The install logic lived inside `FaceReceiverService.onChannelOpened`, which
+welded the only genuinely novel calls in the project to a transport that needs a
+paired phone. Nothing about Push requires a channel: `addWatchFace` takes a
+descriptor to a local file and does not care who wrote it.
+
+So it moved to `FaceInstaller`, and `wear/src/debug` gained a receiver that
+drives it from `adb`. In `src/debug` and not behind a `BuildConfig.DEBUG` check:
+an exported receiver that installs an arbitrary APK must not exist in a release
+build, and a source set is the only version of that guarantee the compiler
+enforces.
+
+**This proves the Push half and says nothing about the transport half.**
+`CapabilityClient`, `ChannelClient` and the Bluetooth crossing remain untested.
+
+### Pairing two emulators needs a factory reset, which is why it was not done
+
+The phone paired far enough to matter: Play signed in, "Wear OS by Google"
+installed, consent accepted, and `CompanionAssociationActivity` scanning. It
+finds nothing, for two stacked reasons.
+
+First, **each account gets its own `netsimd`** — the emulator's virtual
+Bluetooth network. The watch ran from a scheduled task as the bridge account and
+the phone from the operator's own session, putting them on separate networks by
+construction. Both now run from the same principal and share one.
+
+Second, and not fixable by configuration: the watch reports
+`user_setup_complete=1` and `device_provisioned=1`. **A Wear device only
+advertises for pairing while it is inside its setup wizard.** Pairing therefore
+costs a factory reset of the watch emulator, which would destroy the verified
+carousel result from earlier today. Not spent, because the shortcut above
+reaches the code that mattered without it.
+
 ## 2026-08-29 — Both apps run, and the Data Layer needs a pairing nobody can automate
 
 `:mobile` and `:wear` have been installed and launched. Two emulators on the

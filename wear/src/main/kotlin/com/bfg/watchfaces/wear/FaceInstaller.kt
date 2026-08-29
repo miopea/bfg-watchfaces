@@ -1,0 +1,99 @@
+package com.bfg.watchfaces.wear
+
+import android.content.Context
+import android.content.Intent
+import android.os.ParcelFileDescriptor
+import android.util.Log
+import androidx.wear.watchfacepush.WatchFacePushManagerFactory
+import com.bfg.watchfaces.appcore.ActivationConsent
+import java.io.File
+
+/**
+ * Installing a face, with no opinion about how its bytes arrived.
+ *
+ * This was inside [FaceReceiverService], reachable only from
+ * `onChannelOpened`. That welded the two genuinely novel calls in this project
+ * — `addWatchFace` and the slot handling around it — to a Data Layer channel,
+ * which needs a phone, which needs a pairing. So the part most worth exercising
+ * was the part hardest to reach.
+ *
+ * Nothing about Watch Face Push actually requires a channel: `addWatchFace`
+ * takes a descriptor to a local file and does not care who wrote it. Splitting
+ * the two apart costs one object and makes the install reachable from a debug
+ * harness on a watch with no phone at all. See `DECISIONS.md` 2026-08-29.
+ */
+object FaceInstaller {
+
+    /** What happened, in enough detail for a caller to log or report it. */
+    sealed interface Result {
+        data class Installed(val slotId: String, val replaced: Boolean) : Result
+        data object Unsupported : Result
+        data class Failed(val cause: Throwable) : Result
+    }
+
+    /**
+     * Put [apk] on the watch under [token], and ask about activation if this is
+     * the first face to land.
+     */
+    suspend fun install(caller: Context, apk: File, token: String): Result {
+        // The application context, never the caller's own. WatchFacePushManager
+        // binds to a system service to do anything at all -- listWatchFaces is
+        // already an IPC -- and a BroadcastReceiver's context throws
+        // ReceiverCallNotAllowedException on bindService. Observed on a Wear OS
+        // 6 emulator, 2026-08-29: the failure names bindService and not Push, so
+        // it reads like a bug in the caller rather than a context requirement.
+        val context = caller.applicationContext
+
+        if (!WatchFacePushManagerFactory.isSupported()) {
+            // Wear OS 6 is a hard floor. Saying so here is cheap; discovering it
+            // as an opaque failure after a Bluetooth transfer is not.
+            Log.w(TAG, "Watch Face Push is not available on this watch")
+            return Result.Unsupported
+        }
+        val manager = WatchFacePushManagerFactory.createWatchFacePushManager(context)
+
+        return runCatching {
+            ParcelFileDescriptor.open(apk, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                val existing = manager.listWatchFaces()
+                Log.i(TAG, "slots: ${existing.remainingSlotCount} free, ${existing.installedWatchFaceDetails.size} used")
+                // Slots are finite. Replacing our own oldest face is better than
+                // failing with ERROR_SLOT_LIMIT_REACHED, which the user cannot act
+                // on and which reads as "the app is broken".
+                if (existing.remainingSlotCount > 0) {
+                    val details = manager.addWatchFace(fd, token)
+                    onFaceInstalled(context, details.slotId)
+                    Result.Installed(details.slotId, replaced = false)
+                } else {
+                    val oldest = existing.installedWatchFaceDetails.firstOrNull()
+                        ?: return Result.Failed(IllegalStateException("no free slot and nothing of ours to replace"))
+                    val details = manager.updateWatchFace(oldest.slotId, fd, token)
+                    onFaceInstalled(context, details.slotId)
+                    Result.Installed(details.slotId, replaced = true)
+                }
+            }
+        }.getOrElse { Result.Failed(it) }
+    }
+
+    /**
+     * A face has landed. This is the moment operator decision
+     * 01a049a1-390b-7b50-a5d3-cc082037bb55 names, and the only time activation
+     * can ever be asked.
+     */
+    private fun onFaceInstalled(context: Context, slotId: String) {
+        val state = ActivationConsent.load(context.filesDir)
+        if (!ActivationConsent.canAsk(state)) {
+            // Already answered. Not an error -- it is the rule working, and it
+            // is why canAsk exists rather than a bare permission check: a denial
+            // also leaves the permission missing, and re-reading that as
+            // "ask again" is how the one shot gets spent on someone who said no.
+            Log.i(TAG, "activation already answered; not asking again")
+            return
+        }
+        context.startActivity(
+            ActivationRequestActivity.intent(context, slotId)
+                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+        )
+    }
+
+    private const val TAG = "BfgFaceInstaller"
+}

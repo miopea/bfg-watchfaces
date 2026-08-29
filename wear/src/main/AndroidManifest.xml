@@ -14,6 +14,24 @@
     It is the only irreversible action in the whole system. Design where in the
     flow you ask before you write the code that asks. See docs/SPEC.md.
   -->
+  <!--
+    Required to call the Watch Face Push API AT ALL. Distinct from the
+    activation permission below, and easy to miss: the library's own manifest
+    declares no permission, only a <queries> entry, so nothing in the build
+    tells you this is needed.
+
+    Without it, every Push call fails with
+
+      SecurityException: Not allowed to bind to service Intent {
+        act=com.google.wear.ACTION_PUSH_WATCH_FACES ... }
+
+    which names bindService rather than a missing permission. Read off the
+    watch itself on 2026-08-29 — `dumpsys package
+    com.google.android.wearable.dwf.receiver` shows WatchFaceReceiverService
+    guarded by exactly this string. See DECISIONS.md.
+  -->
+  <uses-permission android:name="com.google.wear.permission.PUSH_WATCH_FACES" />
+
   <uses-permission android:name="com.google.wear.permission.SET_PUSHED_WATCH_FACE_AS_ACTIVE" />
 
   <application android:label="BFG Watch Faces">

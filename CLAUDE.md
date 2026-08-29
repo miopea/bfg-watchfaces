@@ -161,10 +161,26 @@ Confirmed on a Wear OS 6 emulator (2026-08-29):
   an SSH reverse forward; this machine cannot run one (`/dev/kvm` unreachable).
   See `scripts/remote-adb.sh`.
 
+Watch Face Push installs a face (2026-08-29):
+
+- **`addWatchFace` works**, with a token from Google's validator, into a slot the
+  system allocated. Run twice it takes the `updateWatchFace` branch instead —
+  **the slot limit on that device is 1**, so the replace path is load-bearing.
+- Doing it found two bugs no test here could: the manifest never requested
+  `com.google.wear.permission.PUSH_WATCH_FACES` (the failure names `bindService`
+  and never says "permission"), and `WatchFacePushManager` needs a context that
+  can bind services, which a `BroadcastReceiver`'s cannot.
+- Driven by `wear/src/debug`'s `DebugInstallReceiver`, which calls the same
+  `FaceInstaller` the channel calls. **This proves the Push half only.**
+
 Still never tested:
 
 - **An actual watch.** The above is an emulator, which is a smaller claim.
-- **Watch Face Push.** The face was sideloaded with `adb install`; `addWatchFace`,
-  the validation token, slots and the Bluetooth transfer are all untested.
-- **`:mobile` and `:wear`** have never been installed or launched, so the
-  activation permission has never been requested.
+- **The transport.** `CapabilityClient`, `ChannelClient` and the Bluetooth
+  crossing. Pairing two emulators needs a factory reset of the watch, because a
+  Wear device only advertises while inside its setup wizard.
+- **The activation permission has still never been requested, and cannot be from
+  where the design puts it.** `startActivity` from the install path is refused —
+  `Background activity launch blocked`. A `WearableListenerService` is a
+  background context by the same rule, so the shipped path is blocked too. This
+  needs a design decision; see `DECISIONS.md` 2026-08-29.
