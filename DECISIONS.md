@@ -1,16 +1,42 @@
 # DECISIONS.md — BFG Watch Faces
 
-## 2026-08-29 — pack on the device: everything but the binary
+## 2026-08-29 — pack on the device: the pipeline runs
 
 The on-device build path is written and compiles: `PackBridge` (JNI onto
 google/pack), `ApkSigning` (Android Keystore key, self-signed cert, apksig v2/v3)
 and `FaceBuilder`, which turns `DialParams` into a signed APK carrying only the
 four paths Watch Face Push permits.
 
-**It cannot be finished on this machine.** `libpack_java.so` has to be compiled,
-and this box has no Rust toolchain, no `cargo-ndk`, no Android NDK and no
-`protoc`. `scripts/build-pack-android.sh` does the whole build in one command and
-fails with the exact install lines when a piece is missing.
+**It runs.** With the operator's go-ahead the toolchain went on this box —
+rustup with the minimal profile, the four Android targets, `cargo-ndk`, a
+user-level `protoc`, and NDK r27c — and `scripts/build-pack-android.sh` produced
+`libpack_java.so` for all four ABIs from the pinned, patched pack.
+
+Measured on the SDK 36 phone emulator, not assumed:
+
+```text
+pack available: true
+BUILT   /data/user/0/com.bfg.watchfaces/cache/debug_face.apk
+package com.bfg.watchfaces.watchfacepush.debug_face
+bytes   520631
+took    2687ms
+TOKEN   EsHCFGgf0GIQjD5UfB61BgMka8ShjdykSmb1SVS+MmU=:...
+```
+
+`aapt2 dump` on the APK the PHONE built shows exactly the permitted paths and
+nothing else — no `kotlin/`, no `DebugProbesKt.bin` — signed `CN=BFG Watch
+Faces`, and **`(nodpi)` read back out of the resource table**. That last line is
+the patch earning its keep: Androidify's prebuilt binary would have recorded
+those two drawables as mdpi.
+
+That APK then installed on the Wear OS 6 emulator through the existing
+`DebugInstallReceiver`, took the slot from the previous face, and
+`DeclarativeWatchFaceRuntime` rendered it with live complications.
+
+**What that does NOT prove.** The APK crossed from phone to watch by `adb`, not
+over Bluetooth. `CapabilityClient` and `ChannelClient` are still the untested
+link, and they are now the only thing between here and a face that a person can
+send from their own phone.
 
 ### Why not Androidify's prebuilt .so, again
 

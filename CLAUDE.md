@@ -167,9 +167,21 @@ Installed and driven on emulators (2026-08-29):
 - `:wear` — installed on a Wear OS 6 emulator, and `addWatchFace` works from it.
   See below.
 
-Neither has run on real hardware, and the phone cannot yet BUILD a face to send:
-that needs `google/pack` on the device and the validator wired in. The Studio
-designs; nothing leaves the phone.
+Neither has run on real hardware. The phone CAN now build a face: `google/pack`
+runs on the device through `PackBridge`, `ApkSigning` signs it, and the validator
+issues the token — measured at 2.7s for a 520KB APK on an emulator. What is left
+is the transport: the APK reached the watch by `adb`, not over Bluetooth.
+
+Building the native library needs a toolchain, once:
+
+```bash
+scripts/build-pack.sh          # clones + patches pack, builds the desktop CLI
+scripts/build-pack-android.sh  # libpack_java.so for four ABIs, into jniLibs/
+```
+
+Needs rustup, `cargo install cargo-ndk`, protoc and an NDK; the script says so
+and names the install lines. The `.so` files are gitignored build output, and
+deliberately not Androidify's prebuilt ones — see `docs/THIRD-PARTY.md`.
 
 Confirmed on a Wear OS 6 emulator (2026-08-29):
 

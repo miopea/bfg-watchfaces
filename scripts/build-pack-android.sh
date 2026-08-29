@@ -68,12 +68,15 @@ if [ ! -d "$WORK/pack-api" ]; then
   echo "no patched pack checkout at $WORK; running build-pack.sh first"
   "$ROOT/scripts/build-pack.sh"
 fi
-grep -q "fn resource_type" "$WORK/pack-api/src/res_dir.rs" 2>/dev/null || \
-  grep -rq "resource_type" "$WORK/pack-api/src" 2>/dev/null || {
-    echo "WARNING: the qualifier patch does not look applied in $WORK." >&2
-    echo "  Delete it and re-run scripts/build-pack.sh." >&2
-    exit 1
-  }
+# get_res_type is the patch's own function. Checking for it beats checking the
+# commit, because a checkout can be at the right commit and un-patched.
+grep -rq "get_res_type" "$WORK/pack-asset-compiler/src" 2>/dev/null || {
+  echo "ERROR: pack-qualifiers.patch is not applied in $WORK." >&2
+  echo "  Without it res/drawable-nodpi is recorded as mdpi and the watch" >&2
+  echo "  scales a dial that says do not scale me." >&2
+  echo "  Delete that directory and re-run scripts/build-pack.sh." >&2
+  exit 1
+}
 
 for abi in $ABIS; do
   echo "building $abi..."

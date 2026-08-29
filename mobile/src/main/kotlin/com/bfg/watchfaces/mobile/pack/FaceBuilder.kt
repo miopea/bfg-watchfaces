@@ -8,6 +8,7 @@ import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.WffEmitter
 import com.bfg.watchfaces.mobile.AndroidDialRenderer
 import com.bfg.watchfaces.mobile.AndroidFacePreview
+import com.google.android.wearable.watchface.validator.client.DwfValidatorFactory
 import java.io.ByteArrayOutputStream
 import java.io.File
 
@@ -52,6 +53,27 @@ object FaceBuilder {
         "${context.packageName}.watchfacepush.$slug"
 
     data class Built(val apk: File, val packageName: String, val slug: String)
+
+    /**
+     * The validation token `addWatchFace` requires.
+     *
+     * This is the ONLY thing that catches a schema-invalid face. Such a face
+     * compiles, links, signs, installs — and then never appears in the
+     * carousel, with no runtime error anywhere. `WffSchemaTest` is that guard on
+     * the desktop; this is the same guard on the device, and it runs locally
+     * with no network.
+     *
+     * Separate from [build] because a caller that only wants the bytes — a test,
+     * an export — should not have to carry the validator.
+     */
+    fun validate(context: Context, apk: File): String {
+        val result = DwfValidatorFactory.create().validate(apk, context.packageName)
+        val failures = result.failures()
+        check(failures.isEmpty()) {
+            "the face is not valid and would install without ever appearing: $failures"
+        }
+        return result.validationToken()
+    }
 
     /**
      * Build a signed APK for [params] under [name].
