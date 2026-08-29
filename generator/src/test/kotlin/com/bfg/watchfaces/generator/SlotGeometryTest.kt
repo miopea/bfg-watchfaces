@@ -114,6 +114,40 @@ class SlotGeometryTest {
             }
         }
     }
+    // ---- editing a slot ------------------------------------------------------
+
+    @Test
+    fun `withSlot changes one slot and leaves the others alone`() {
+        val p = DialParams()
+        val edited = p.withSlot(SlotPosition.MIDDLE, ComplicationSource.WORLD_CLOCK)
+        assertEquals(ComplicationSource.WORLD_CLOCK, edited.slot(SlotPosition.MIDDLE))
+        for (pos in SlotPosition.entries) {
+            if (pos == SlotPosition.MIDDLE) continue
+            assertEquals(p.slot(pos), edited.slot(pos)) { "$pos changed too" }
+        }
+    }
+
+    @Test
+    fun `withSlot agrees with slot about a short list`() {
+        // slot() already reads a short list as "the rest are off". A setter that
+        // could not write past the end would make a face stored with three
+        // complications uneditable in its fifth slot.
+        val short = DialParams(complications = listOf(ComplicationSource.DATE))
+        assertEquals(ComplicationSource.NONE, short.slot(SlotPosition.BOTTOM))
+        val edited = short.withSlot(SlotPosition.BOTTOM, ComplicationSource.WATCH_BATTERY)
+        assertEquals(ComplicationSource.WATCH_BATTERY, edited.slot(SlotPosition.BOTTOM))
+        assertEquals(ComplicationSource.DATE, edited.slot(SlotPosition.TOP))
+        assertEquals(ComplicationSource.NONE, edited.slot(SlotPosition.MIDDLE))
+    }
+
+    @Test
+    fun `turning every slot off leaves a face that still lays out`() {
+        var p = DialParams()
+        for (pos in SlotPosition.entries) p = p.withSlot(pos, ComplicationSource.NONE)
+        // Slots set to NONE are not emitted at all, so there is nothing to place.
+        assertTrue(SlotGeometry.boxes(p).isEmpty()) { "an all-off face still reserves slot boxes" }
+    }
+
 }
 
 /**
@@ -155,4 +189,6 @@ class ClockBandTest {
             "at timeSize=$timeSize the row (${rowTop(p)}) overlaps the digits (${digitsBottom.toInt()})"
         }
     }
+
+
 }

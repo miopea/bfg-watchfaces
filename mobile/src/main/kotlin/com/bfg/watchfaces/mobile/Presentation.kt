@@ -4,6 +4,7 @@ import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.Layout
+import com.bfg.watchfaces.generator.SlotPosition
 
 /**
  * What things are CALLED and what order they appear in.
@@ -113,6 +114,14 @@ object Presentation {
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> "3"
         ComplicationSource.APP_SHORTCUT -> "Maps"
         ComplicationSource.FAVORITE_CONTACT -> "Ann"
+    }
+
+    fun label(pos: SlotPosition): String = when (pos) {
+        SlotPosition.TOP -> "Top"
+        SlotPosition.LEFT -> "Left"
+        SlotPosition.MIDDLE -> "Middle"
+        SlotPosition.RIGHT -> "Right"
+        SlotPosition.BOTTOM -> "Bottom"
     }
 
     /** The swatches, exactly as the localhost app offers them. */

@@ -17,13 +17,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,8 +43,10 @@ import androidx.compose.ui.unit.dp
 import com.bfg.watchfaces.generator.ControlInventory
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.EngravedStroke
+import com.bfg.watchfaces.generator.SlotPosition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -63,6 +71,8 @@ import kotlinx.coroutines.withContext
 fun StudioScreen(
     params: DialParams,
     onParams: (DialParams) -> Unit,
+    ambient: Boolean,
+    onAmbient: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -70,7 +80,8 @@ fun StudioScreen(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        DialPreview(params)
+        DialPreview(params, ambient)
+        AmbientToggle(ambient, onAmbient)
 
         Spacer(Modifier.height(20.dp))
         SectionHeading("Style")
@@ -83,6 +94,12 @@ fun StudioScreen(
         Spacer(Modifier.height(16.dp))
         SectionHeading("Ink")
         Swatches(Presentation.INKS, params.inkColor) { onParams(params.copy(inkColor = it)) }
+
+        Spacer(Modifier.height(20.dp))
+        SectionHeading("Complications")
+        for (pos in SlotPosition.entries) {
+            SlotPicker(pos, params.slot(pos)) { onParams(params.withSlot(pos, it)) }
+        }
 
         for (target in ControlInventory.Target.entries) {
             val controls = ControlInventory.CONTROLS.filter { it.target == target }
@@ -109,10 +126,10 @@ fun StudioScreen(
  * difference between judging a design and judging a square crop of one.
  */
 @Composable
-private fun DialPreview(params: DialParams) {
-    val bitmap by produceState<Bitmap?>(initialValue = null, key1 = params) {
+private fun DialPreview(params: DialParams, ambient: Boolean) {
+    val bitmap by produceState<Bitmap?>(initialValue = null, key1 = params, key2 = ambient) {
         value = withContext(Dispatchers.Default) {
-            runCatching { AndroidFacePreview.render(params, size = DIAL_SIZE) }.getOrNull()
+            runCatching { AndroidFacePreview.render(params, ambient, DIAL_SIZE) }.getOrNull()
         }
     }
     Box(
@@ -121,8 +138,13 @@ private fun DialPreview(params: DialParams) {
             .aspectRatio(1f)
             .clip(CircleShape)
             // The dial colour behind the render, so the first frame after a
-            // change is the right colour rather than a flash of nothing.
-            .background(Color(EngravedStroke.withAlpha(EngravedStroke.rgb(params.dialColor), 255))),
+            // change is the right colour rather than a flash of nothing. In
+            // ambient the face IS black -- the dial image is not drawn at all --
+            // so borrowing the dial colour there would overstate how much is lit.
+            .background(
+                if (ambient) Color.Black
+                else Color(EngravedStroke.withAlpha(EngravedStroke.rgb(params.dialColor), 255))
+            ),
         contentAlignment = Alignment.Center
     ) {
         bitmap?.let {
@@ -132,6 +154,74 @@ private fun DialPreview(params: DialParams) {
                 modifier = Modifier.fillMaxWidth(),
                 contentScale = ContentScale.FillWidth
             )
+        }
+    }
+}
+
+/**
+ * Always-on preview.
+ *
+ * Not decoration: a face is legible in ambient or it is not, and that cannot be
+ * judged from the interactive render. The dial image is dropped entirely and
+ * most slots go to zero alpha, which is the emitter's own behaviour rather than
+ * a dimming effect applied here.
+ */
+@Composable
+private fun AmbientToggle(ambient: Boolean, onAmbient: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text("Always-on", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "How it looks when your wrist is down",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(checked = ambient, onCheckedChange = onAmbient)
+    }
+}
+
+/**
+ * One complication slot.
+ *
+ * A dropdown rather than chips: thirteen sources across five slots is
+ * sixty-five chips, and the demo uses a select for the same reason.
+ */
+@Composable
+private fun SlotPicker(
+    pos: SlotPosition,
+    selected: ComplicationSource,
+    onSelect: (ComplicationSource) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { open = true }
+                .padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(Presentation.label(pos), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = Presentation.label(selected),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            for (source in ComplicationSource.entries) {
+                DropdownMenuItem(
+                    text = { Text(Presentation.label(source)) },
+                    onClick = { onSelect(source); open = false }
+                )
+            }
         }
     }
 }

@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
                 }
                 var screen by rememberSaveable { mutableStateOf(Screen.STUDIO) }
                 var status by remember { mutableStateOf<String?>(null) }
+                var ambient by rememberSaveable { mutableStateOf(false) }
 
                 BackHandler(enabled = screen == Screen.HANDOFF) { screen = Screen.STUDIO }
 
@@ -94,7 +95,9 @@ class MainActivity : ComponentActivity() {
                             Screen.STUDIO -> {
                                 StudioScreen(
                                     params = params,
-                                    onParams = { params = it; engineName = it.engine.name }
+                                    onParams = { params = it; engineName = it.engine.name },
+                                    ambient = ambient,
+                                    onAmbient = { ambient = it }
                                 )
                                 Button(
                                     onClick = { screen = Screen.HANDOFF },

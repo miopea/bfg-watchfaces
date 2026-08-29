@@ -71,4 +71,59 @@ class RendererParityTest {
             "the Android renderer draws the lens, which never reaches the shipped face"
         }
     }
+
+    // ---- the complication glyphs, which have the same hazard ----------------
+
+    private val androidIcons = "../mobile/src/main/kotlin/com/bfg/watchfaces/mobile/AndroidComplicationIcons.kt"
+    private val awtIcons = "src/main/kotlin/com/bfg/watchfaces/workbench/ComplicationIcons.kt"
+    private val androidPreview = "../mobile/src/main/kotlin/com/bfg/watchfaces/mobile/AndroidFacePreview.kt"
+    private val awtPreview = "src/main/kotlin/com/bfg/watchfaces/workbench/FacePreview.kt"
+
+    @Test
+    fun `both icon renderers ask generator for the shapes`() {
+        for (p in listOf(androidIcons, awtIcons)) {
+            assertTrue(source(p).contains("ComplicationGlyphs.shapes")) {
+                "$p no longer uses the shared glyphs; the icons can now diverge, and " +
+                    "preview.png ships"
+            }
+        }
+    }
+
+    @Test
+    fun `neither icon renderer holds a coordinate of its own`() {
+        // Coordinates that appear exactly once in ComplicationGlyphs and nowhere
+        // else. If one turns up in an executor, somebody has started
+        // transcribing the shapes again.
+        for (p in listOf(androidIcons, awtIcons)) {
+            val s = source(p)
+            for (magic in listOf("17.6", "16.2", "10.6", "19.4", "15.2", "13.5")) {
+                assertTrue(!s.contains(magic)) {
+                    "$p hardcodes the glyph coordinate '$magic'; that belongs to ComplicationGlyphs"
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `both previews place slots with SlotGeometry`() {
+        // They used to compute slot boxes independently, with a test asserting
+        // they matched -- and they matched while overlapping on both axes.
+        for (p in listOf(androidPreview, awtPreview)) {
+            assertTrue(source(p).contains("SlotGeometry.boxes")) {
+                "$p lays out complication slots itself; that is the bug SlotGeometry exists to prevent"
+            }
+        }
+    }
+
+    @Test
+    fun `both previews mirror the emitter's ambient rules rather than inventing one`() {
+        for (p in listOf(androidPreview, awtPreview)) {
+            val s = source(p)
+            assertTrue(s.contains("AmbientPalette.forAmbient") && s.contains("generatorVersion >= 3")) {
+                "$p no longer mirrors the v3 ambient ink rule; the preview would show a " +
+                    "legible slot the watch renders as an invisible smudge"
+            }
+        }
+    }
+
 }
