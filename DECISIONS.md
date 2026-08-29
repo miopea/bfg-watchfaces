@@ -1,5 +1,52 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-29 — KVM here, and I was wrong about why pairing fails
+
+The operator ran `chmod 0666 /dev/kvm` on the host and emulators now run on this
+box. `KVM_GET_API_VERSION` returns 12, a Wear OS 6 watch and an SDK 36 phone
+both boot in about two minutes, and `adb devices` lists them locally.
+
+**The fix had to be the device node, not group membership.** This session's
+`/proc/self/gid_map` is `1000 1000 1` and `setgroups` is `deny`, so
+`gpasswd -a <user> kvm` could never have reached it whatever group was named —
+one gid is mapped and supplementary groups are refused outright. The `0666` mode
+bits work because they do not depend on the owner being mapped. Worth writing
+down because **the emulator's own error message tells you to fix the group**, and
+that advice is wrong in a user namespace.
+
+### The correction: a fresh Wear AVD does not run a setup wizard
+
+Earlier today this file said pairing two emulators "costs a factory reset of the
+watch emulator", reasoning that a Wear device only advertises while inside its
+setup wizard and the Windows watch reported `user_setup_complete=1`.
+
+That is wrong. A never-booted Wear OS 6 AVD comes up **already provisioned** —
+`user_setup_complete=1`, `device_provisioned=1`, straight to a rendering watch
+face. The image self-provisions and never runs a pairing wizard at all. So the
+reset would have destroyed the verified carousel state and changed nothing, and
+the earlier entry should not be trusted on this point.
+
+The lesson is narrower than "test your assumptions": the Windows watch had been
+provisioned by *something*, and I read that as evidence a wizard had run and
+completed. It had not. A state that looks like the end of a process is not proof
+the process happened.
+
+### What did survive, and is free here
+
+Two emulators started from one session share a single `netsimd`. On Windows they
+had one each — one from a scheduled task as the bridge account, one from the
+operator's own session — putting them on separate virtual Bluetooth networks by
+construction. That half of the pairing problem does not exist locally.
+
+### Still open
+
+Pairing itself. The local phone has no Google account, so no Wear OS companion
+app, and installing one needs a Play sign-in. Both emulators are headless here
+(there is no display, and `qemu-system-x86_64` links `libpulse.so.0`, which is
+not on this box — `-no-window` selects the headless binary whose libraries all
+resolve). So seeing them at all means mirroring over adb through the existing
+tunnel.
+
 ## 2026-08-29 — The generated surfaces render on the phone, and the last renderer decision moved
 
 `AndroidDialRenderer` fell back to a plain dial for `GRAIN`, `BRUSHED`, `CARBON`

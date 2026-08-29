@@ -178,12 +178,12 @@ Still never tested:
 
 - **An actual watch.** The above is an emulator, which is a smaller claim.
 - **The transport.** `CapabilityClient`, `ChannelClient` and the Bluetooth
-  crossing. Pairing two emulators is blocked twice over: each Windows account
-  gets its own `netsimd` (fixed — both now run from one), and a Wear device only
-  advertises while inside its setup wizard, which `user_setup_complete=1` ends.
-  Clearing the provisioning flags makes it discoverable and the phone still
-  finds nothing; Google's documented route is Android Studio's pairing
-  assistant. See `DECISIONS.md` 2026-08-29.
+  crossing. Emulators run on this box now (`chmod 0666 /dev/kvm` — the node, not
+  the group; this namespace sets `setgroups=deny`), and two started from one
+  session share a single `netsimd`, so that half is solved. What remains is the
+  Wear OS companion app, which needs a Play sign-in on the phone. **A fresh Wear
+  AVD self-provisions and never runs a pairing wizard** — the earlier claim that
+  a factory reset would help was wrong, see `DECISIONS.md` 2026-08-29.
 - **Sending a face.** The phone has no APK to send until `pack` runs on the
   device. `addWatchFace` was exercised by putting the APK on the watch directly.
 - **The activation permission has still never been requested, and cannot be from
