@@ -128,11 +128,19 @@ class MainActivity : ComponentActivity() {
                     snackbarHost = { SnackbarHost(snackbar) }
                 ) { inner ->
                     if (handoff) {
+                        // NOT verticalScroll: ActivationHandoffScreen scrolls
+                        // itself, and a scrolling Column around a scrolling
+                        // Column hands the inner one an infinite height, which
+                        // Compose refuses with "Vertically scrollable component
+                        // was measured with an infinity maximum height
+                        // constraints". It is a hard crash, not a layout
+                        // warning, and it only fires when this screen is
+                        // actually opened -- which is why every emulator run
+                        // missed it.
                         Column(
                             Modifier
                                 .fillMaxSize()
                                 .padding(inner)
-                                .verticalScroll(rememberScrollState())
                         ) {
                             ActivationHandoffScreen(
                                 faceName = sendingName,
@@ -147,18 +155,19 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 },
-                                onCancel = { handoff = false }
+                                onCancel = { handoff = false },
+                                footer = {
+                                    status?.let {
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            text = it,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    ActivationDeniedNote(consent, Modifier.padding(top = 16.dp))
+                                }
                             )
-                            status?.let {
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = it,
-                                    modifier = Modifier.padding(horizontal = 24.dp),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            ActivationDeniedNote(consent, Modifier.padding(24.dp))
                         }
                         return@Scaffold
                     }

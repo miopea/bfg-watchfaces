@@ -51,7 +51,18 @@ fun ActivationHandoffScreen(
     faceName: String,
     onContinue: () -> Unit,
     onCancel: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Anything the host wants below the steps — the send status, the persistent
+     * denied note.
+     *
+     * A slot rather than siblings in the caller, because this screen owns the
+     * scrolling. Placed outside it, they either sat in a SECOND scrolling
+     * container (which crashes: a scrollable measured with infinite height) or
+     * off the bottom of the screen where nobody would see the one line that
+     * says what happened.
+     */
+    footer: @Composable () -> Unit = {}
 ) {
     Surface(modifier = modifier, color = MaterialTheme.colorScheme.surface) {
         Column(
@@ -91,6 +102,7 @@ fun ActivationHandoffScreen(
                 Spacer(Modifier.size(8.dp))
                 Button(onClick = onContinue) { Text("Send to watch") }
             }
+            footer()
         }
     }
 }

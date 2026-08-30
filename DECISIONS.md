@@ -1,5 +1,49 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-30 — The crash on Send, and why every emulator run missed it
+
+Tapping "Send to watch" on a real phone killed the app. Not the native crash I
+expected — I had assumed the arm64 `libpack_java.so`, on the reasoning that only
+the x86_64 one had ever executed. It was a Compose layout crash:
+
+```text
+java.lang.IllegalStateException: Vertically scrollable component was measured
+with an infinity maximum height constraints, which is disallowed.
+```
+
+`MainActivity` wrapped the handoff branch in a `Column(Modifier.verticalScroll())`,
+and `ActivationHandoffScreen` already scrolls itself — it was written as a
+standalone screen before the Scaffold existed. A scrolling container inside a
+scrolling container gives the inner one infinite height, which Compose refuses
+with a hard crash rather than a layout warning.
+
+Introduced on 2026-08-29 in the four-screen rebuild, and it fires only when that
+screen is actually opened.
+
+### Why it survived
+
+Every attempt to reach the handoff screen on the emulator missed. The taps hit a
+segmented control, a system pairing dialog stole focus, the page scrolled between
+the screenshot and the tap. Each time I moved on, because the thing I was checking
+at that moment was something else. **The screen was never once rendered on an
+emulator**, and the only thing that ever reached it was a person with a real phone.
+
+The status line and the persistent denied note moved into a `footer` slot on
+`ActivationHandoffScreen`. Outside it they either sat in the second scrolling
+container that caused this, or fell off the bottom where the one line saying what
+happened would never be read.
+
+### The diagnosis was wrong twice before it was right
+
+`minSdk`, then `standalone`, then `native arm64` — three plausible mechanisms
+reasoned out from what I knew, none of them checked. The 16 KB page alignment
+check was the same instinct and came back clean at `0x4000`. What actually solved
+it was `adb logcat -b crash` on the device that was failing.
+
+The pattern across today: every wrong answer came from reasoning about a system
+instead of reading what it said. Every right answer came from running the real
+thing and looking at the output.
+
 ## 2026-08-29 — The Wear OS track has its own tester list
 
 The opt-in link returned "Your account hasn't yet been invited to participate in
