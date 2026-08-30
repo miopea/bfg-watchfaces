@@ -145,11 +145,11 @@ that IS the line.
 The widest form is computed from a fixed date — Wednesday 30 September — not
 today's. Sizing to today would resize the face on the 1st of the month.
 
-**The v6 and v7 goldens were re-recorded for this, deliberately**, and the entry
+**The v6 and v7 golden hashes were re-recorded for this, deliberately**, and the entry
 in this file is the justification the rule asks for. The change was applied to
 every version rather than gated: a date too small to read beside the clock is a
 defect, reported twice, and preserving it for older faces would be preserving
-the complaint. Only the drawn-date entry moved in either golden, which is the
+the complaint. Only the drawn-date entry moved in either golden set, which is the
 check that nothing else came with it.
 
 ## 2026-08-30 — Units the provider does not supply, and "782"
