@@ -91,18 +91,45 @@ class FaceReceiverService : WearableListenerService() {
                     staged.outputStream().use { out -> stream.copyTo(out) }
                 }
                 Log.i(TAG, "received $received bytes")
-                report(
-                    FaceInstaller.install(
-                        this@FaceReceiverService, staged, token,
-                        resetComplications = WatchLink.resetsComplications(channel.path)
-                    )
+                val result = FaceInstaller.install(
+                    this@FaceReceiverService, staged, token,
+                    resetComplications = WatchLink.resetsComplications(channel.path)
                 )
+                report(result)
+                reply(client, channel, lineFor(result))
             }.onFailure {
                 Log.e(TAG, "face did not arrive or would not install", it)
+                reply(client, channel, WatchLink.Report.failed(it.message ?: it.javaClass.simpleName))
             }
             staged.delete()
             runCatching { Tasks.await(client.close(channel)) }
         }
+    }
+
+    /**
+     * Tell the phone what happened, on the channel it already has open.
+     *
+     * Best effort: a phone on an older build is not reading, and a write that
+     * fails must never turn a successful install into a failure. The face is
+     * already on the watch by this point.
+     */
+    private fun reply(client: ChannelClient, channel: ChannelClient.Channel, line: String) {
+        runCatching {
+            Tasks.await(client.getOutputStream(channel)).use { out ->
+                out.write(line.toByteArray(Charsets.UTF_8))
+                out.flush()
+            }
+            Log.i(TAG, "reported to the phone: $line")
+        }.onFailure { Log.w(TAG, "could not report back; the face is installed regardless", it) }
+    }
+
+    private fun lineFor(result: FaceInstaller.Result): String = when (result) {
+        is FaceInstaller.Result.Installed ->
+            WatchLink.Report.installed(result.active)
+        is FaceInstaller.Result.Unsupported ->
+            WatchLink.Report.failed("this watch does not support Watch Face Push")
+        is FaceInstaller.Result.Failed ->
+            WatchLink.Report.failed(result.cause.message ?: result.cause.javaClass.simpleName)
     }
 
     private fun report(result: FaceInstaller.Result) = when (result) {

@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.bfg.watchfaces.appcore.ActivationConsent
+import com.bfg.watchfaces.appcore.WatchLink
 import com.bfg.watchfaces.appcore.FaceLibrary
 import com.bfg.watchfaces.appcore.Presets
 import com.bfg.watchfaces.generator.DialParams
@@ -405,20 +406,11 @@ class MainActivity : ComponentActivity() {
 
         return runCatching { FaceSender.send(context, target, built.apk, token) }
             .fold(
-                onSuccess = {
-                    // "Sent" is the honest limit of what this side knows. The
-                    // transfer succeeded; whether the watch SWITCHED to the
-                    // face is decided over there and never reported back.
-                    //
-                    // And it usually does not: setWatchFaceAsActive succeeds
-                    // ONCE per app install and is refused afterwards, so from
-                    // the second send onwards a face installs perfectly and the
-                    // wrist does not change. Saying only "Sent" made that look
-                    // like nothing had happened at all -- reported as "it says
-                    // it sent okay" against a watch showing its default face.
-                    "Sent “$name” to ${target.name}. If your watch does not " +
-                        "change, long-press its face and pick “$name”."
-                },
+                // The WATCH's verdict now, not this side's guess. Null means
+                // it said nothing -- an older build, or it never picked the
+                // transfer up -- and that is reported as unknown rather than
+                // as either outcome. See WatchLink.Report.
+                onSuccess = { report -> WatchLink.Report.describe(name, target.name, report) },
                 onFailure = {
                     Log.e(TAG, "transfer to ${target.name} failed", it)
                     "“$name” didn’t make it to ${target.name}. " +

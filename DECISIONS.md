@@ -121,6 +121,46 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — The watch says what it did, on the channel it already has
+
+"Sending does nothing. It says sent but nothing happens on my watch" — after
+three fixes that were all real and none of which were the cause.
+
+The reason each round cost an evening is that the phone could not tell the
+difference between the outcomes. `FaceSender` resolved when the BYTES were
+across. Installed, refused, installed-but-not-switched, never-picked-up: one
+message for all four. Every diagnosis this week was inference from a symptom
+that could not distinguish them, and inference kept being wrong.
+
+The watch now writes a single line back on the SAME channel before closing it,
+and the phone reads it with a timeout. `OK`, `OK_NOT_ACTIVE`, or `FAILED
+<reason>` — turned into a sentence naming the one action that works:
+
+```text
+"My Face" is on Pixel Watch and switched on.
+"My Face" is on Pixel Watch. Long-press your watch face and pick it.
+Pixel Watch could not install "My Face": the watch has no free watch face slot.
+```
+
+The same channel, not a message or a second connection: it is already open,
+already correlated with this exact face, and needs no new path, listener or
+manifest entry.
+
+**Silence is reported as unknown, not as either outcome.** A watch on an older
+build writes nothing, and the read falls back to what the phone used to say.
+Claiming success or failure on no evidence is the whole bug being fixed here, so
+the degraded path must not do it either.
+
+`FaceInstaller.Result.Installed` carries `active` now, because whether the watch
+SWITCHED is the fact the wearer cares about and it was never captured — the
+activation result was logged and dropped.
+
+**Unverified here, deliberately said:** the reply needs a paired phone and
+watch, and this project's emulators cannot pair. The wording is tested, both
+apps build, and the fallback is safe — but the round trip itself is first
+exercised on the operator's own hardware. That is the same gap that has made
+every transport bug this week expensive, and it is not closed by this change.
+
 ## 2026-08-30 — The reset could delete the face, and was never needed
 
 Audit of what the last three builds introduced, prompted by "fix whatever issue

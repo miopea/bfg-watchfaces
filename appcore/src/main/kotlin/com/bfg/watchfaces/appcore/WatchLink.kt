@@ -113,6 +113,64 @@ object WatchLink {
      * False for anything unrecognised, so an unexpected path can never cost a
      * `setWatchFaceAsActive` call by accident.
      */
+    /**
+     * The one line the watch writes back once it has dealt with a face.
+     *
+     * ## Why this exists
+     *
+     * `FaceSender` resolves when the BYTES are across. Whether the watch then
+     * installed the face, refused it, or installed it and could not switch to
+     * it, all looked identical from the phone: "Sent". Three separate bugs hid
+     * behind that in one week, and each cost hours before anyone could even say
+     * which half was broken. A person holding a phone that says "sent" and a
+     * watch that has not changed has been told nothing.
+     *
+     * Deliberately a plain line on the SAME channel rather than a message or a
+     * second connection: the channel is already open, already correlated with
+     * this exact face, and needs no new path, listener or manifest entry.
+     *
+     * A watch running an older build writes nothing at all. The phone reads
+     * with a timeout and falls back to what it used to say, so this degrades to
+     * the previous behaviour rather than hanging a send.
+     */
+    object Report {
+        const val OK = "OK"
+        const val OK_NOT_ACTIVE = "OK_NOT_ACTIVE"
+        const val FAILED = "FAILED"
+
+        /** At most this many bytes; the phone reads no further. */
+        const val MAX_BYTES = 512
+
+        fun installed(active: Boolean): String = if (active) OK else OK_NOT_ACTIVE
+
+        fun failed(reason: String): String =
+            "$FAILED ${reason.take(400).replace('\n', ' ')}"
+
+        /**
+         * What to show a person, given whatever came back.
+         *
+         * [raw] is null when the watch said nothing -- an older build, or a
+         * transfer the watch never picked up. That is NOT reported as failure:
+         * it is genuinely unknown, and claiming either way is how this went
+         * wrong in the first place.
+         */
+        fun describe(faceName: String, watchName: String, raw: String?): String {
+            val line = raw?.trim().orEmpty()
+            return when {
+                line == OK -> "“$faceName” is on ${watchName} and switched on."
+                line == OK_NOT_ACTIVE ->
+                    "“$faceName” is on ${watchName}. Long-press your watch face and pick it."
+                line.startsWith(FAILED) -> {
+                    val why = line.removePrefix(FAILED).trim()
+                    if (why.isEmpty()) "${watchName} could not install “$faceName”."
+                    else "${watchName} could not install “$faceName”: $why"
+                }
+                else -> "Sent “$faceName” to $watchName, but it did not confirm. " +
+                    "If nothing changed, check the app is up to date on your watch."
+            }
+        }
+    }
+
     fun resetsComplications(path: String): Boolean =
         path.startsWith(FACE_RESET_CHANNEL_PREFIX)
 }

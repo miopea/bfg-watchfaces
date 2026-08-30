@@ -149,4 +149,41 @@ class WatchLinkTest {
         assertNull(WatchLink.tokenFromChannelPath("/bfg-watchfaces/face-reset/"))
     }
 
+
+    @Test
+    fun `the watch's verdict becomes a sentence a person can act on`() {
+        val ok = WatchLink.Report.describe("My Face", "Pixel Watch", WatchLink.Report.OK)
+        assertTrue(ok.contains("switched on")) { ok }
+
+        // The common case after the first send: installed, but the watch will
+        // not switch, because setWatchFaceAsActive succeeds once per install.
+        // It must name the action that works and must NOT read as a failure.
+        val notActive = WatchLink.Report.describe("My Face", "Pixel Watch", WatchLink.Report.OK_NOT_ACTIVE)
+        assertTrue(notActive.contains("Long-press")) { notActive }
+        assertFalse(notActive.lowercase().contains("could not")) { notActive }
+
+        val failed = WatchLink.Report.describe(
+            "My Face", "Pixel Watch", WatchLink.Report.failed("no free watch face slot")
+        )
+        assertTrue(failed.contains("could not install")) { failed }
+        assertTrue(failed.contains("no free watch face slot")) { failed }
+    }
+
+    @Test
+    fun `silence is reported as unknown, not as success or failure`() {
+        // A watch on an older build writes nothing. Claiming either outcome is
+        // exactly how three bugs stayed hidden for a week.
+        val quiet = WatchLink.Report.describe("My Face", "Pixel Watch", null)
+        assertTrue(quiet.contains("did not confirm")) { quiet }
+        assertFalse(quiet.contains("switched on")) { quiet }
+        assertFalse(quiet.contains("could not install")) { quiet }
+    }
+
+    @Test
+    fun `a failure reason cannot run away with the message`() {
+        val huge = WatchLink.Report.failed("x".repeat(5_000) + "\nsecond line")
+        assertTrue(huge.length < WatchLink.Report.MAX_BYTES) { "report is ${huge.length} bytes" }
+        assertFalse(huge.contains("\n")) { "a newline would truncate the read at the phone" }
+    }
+
 }

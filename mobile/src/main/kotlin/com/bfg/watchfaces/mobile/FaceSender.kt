@@ -8,7 +8,10 @@ import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.Node
+import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.Wearable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.io.File
 
 /**
@@ -96,7 +99,7 @@ object FaceSender {
          * it is not simply what every send does.
          */
         resetComplications: Boolean = false
-    ) {
+    ): String? {
         val channelClient = Wearable.getChannelClient(context)
         // Throws on a blank token, at the sending end. See WatchLink.
         val path = WatchLink.channelPathFor(validationToken, resetComplications)
@@ -138,6 +141,49 @@ object FaceSender {
         }
         // Not closed on the happy path: the receiver closes when it has finished
         // reading, which is the end that knows. Closing here races the transfer.
+
+        return awaitReport(channelClient, channel)
     }
+
+    /**
+     * The watch's one-line verdict, or null if it did not give one.
+     *
+     * Everything before this point only establishes that the BYTES left. Three
+     * bugs in one week hid in the gap between that and what the watch actually
+     * did, because "Sent" was the same message whether the face installed,
+     * was refused, or installed without switching.
+     *
+     * Bounded, and on its own thread. A watch running an older build never
+     * writes, and the stream would otherwise block until the channel closed --
+     * turning a working send into a hang. Null means "it did not say", which is
+     * reported as unknown rather than as either outcome.
+     */
+    private fun awaitReport(client: ChannelClient, channel: ChannelClient.Channel): String? {
+        val worker = Executors.newSingleThreadExecutor()
+        return try {
+            worker.submit<String?> {
+                Tasks.await(client.getInputStream(channel)).use { input ->
+                    val buffer = ByteArray(WatchLink.Report.MAX_BYTES)
+                    val read = input.read(buffer)
+                    if (read <= 0) null else String(buffer, 0, read, Charsets.UTF_8)
+                }
+            }.get(REPORT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                ?.also { Log.i(TAG, "watch reported: $it") }
+        } catch (t: Throwable) {
+            Log.w(TAG, "the watch did not report back", t)
+            null
+        } finally {
+            worker.shutdownNow()
+        }
+    }
+
+    /**
+     * How long to wait for that verdict.
+     *
+     * Installing is measured in hundreds of milliseconds; this is generous
+     * enough to cover a slow watch and short enough that a silent one does not
+     * leave someone staring at a spinner.
+     */
+    private const val REPORT_TIMEOUT_SECONDS = 20L
 
 }

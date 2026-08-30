@@ -25,7 +25,16 @@ object FaceInstaller {
 
     /** What happened, in enough detail for a caller to log or report it. */
     sealed interface Result {
-        data class Installed(val slotId: String, val replaced: Boolean) : Result
+        /**
+         * @param active whether the watch actually SWITCHED to this face.
+         *   False is normal, not an error: `setWatchFaceAsActive` succeeds once
+         *   per app install. The phone has to be able to say which happened.
+         */
+        data class Installed(
+            val slotId: String,
+            val replaced: Boolean,
+            val active: Boolean
+        ) : Result
         data object Unsupported : Result
         data class Failed(val cause: Throwable) : Result
     }
@@ -99,8 +108,8 @@ object FaceInstaller {
                     // Still ask to activate. Dropping this was a regression:
                     // before, EVERY install tried, and a face sent to a watch
                     // wearing something else silently stopped switching.
-                    onFaceInstalled(context, details.slotId)
-                    Result.Installed(details.slotId, replaced = true)
+                    val active = onFaceInstalled(context, details.slotId)
+                    Result.Installed(details.slotId, replaced = true, active = active)
                 } else if (ours != null) {
                     // Whether OUR face is the one on the wrist decides if the
                     // new one has to be activated. Ask BEFORE removing it,
@@ -127,12 +136,12 @@ object FaceInstaller {
                     // setWatchFaceAsActive has an undocumented attempt limit
                     // this project has already hit, so it is not spent on a
                     // face that was sitting in the picker anyway.
-                    if (wasActive) onFaceInstalled(context, details.slotId)
-                    Result.Installed(details.slotId, replaced = true)
+                    val active = if (wasActive) onFaceInstalled(context, details.slotId) else false
+                    Result.Installed(details.slotId, replaced = true, active = active)
                 } else if (existing.remainingSlotCount > 0) {
                     val details = manager.addWatchFace(fd, token)
-                    onFaceInstalled(context, details.slotId)
-                    Result.Installed(details.slotId, replaced = false)
+                    val active = onFaceInstalled(context, details.slotId)
+                    Result.Installed(details.slotId, replaced = false, active = active)
                 } else {
                     // Slots are FULL and none of them is ours to replace.
                     //
@@ -168,7 +177,7 @@ object FaceInstaller {
      * It posts a notification rather than opening the dialog directly, because
      * Android will not let this context open anything: see [ActivationPrompt].
      */
-    private fun onFaceInstalled(context: Context, slotId: String) {
+    private fun onFaceInstalled(context: Context, slotId: String): Boolean {
         val state = ActivationConsent.load(context.filesDir)
 
         // Already granted: switch to it. This was the gap.
@@ -181,13 +190,13 @@ object FaceInstaller {
         // is exactly what it looked like on real hardware once the transport
         // finally worked.
         if (ActivationConsent.canActivate(state)) {
-            runCatching {
+            return runCatching {
                 val manager = WatchFacePushManagerFactory.createWatchFacePushManager(context)
                 kotlinx.coroutines.runBlocking { manager.setWatchFaceAsActive(slotId) }
             }
                 .onSuccess { Log.i(TAG, "switched to the new face (slot $slotId)") }
                 .onFailure { Log.e(TAG, "installed, but could not switch to it", it) }
-            return
+                .isSuccess
         }
 
         if (!ActivationConsent.canAsk(state)) {
@@ -196,9 +205,12 @@ object FaceInstaller {
             // "ask again" is how the one shot gets spent on someone who said no.
             // The face stays in the picker for them to choose.
             Log.i(TAG, "activation was refused; installed but not switched")
-            return
+            return false
         }
+        // Asking is not switching: the prompt is a notification the wearer has
+        // to act on, so the face is NOT active when this returns.
         ActivationPrompt.show(context, slotId)
+        return false
     }
 
     private const val TAG = "BfgFaceInstaller"
