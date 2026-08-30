@@ -74,6 +74,15 @@ tasks.register<JavaExec>("contract") {
     workingDir = rootProject.projectDir
 }
 
+/** Work the catalog service's moderation queue. */
+tasks.register<JavaExec>("moderate") {
+    group = "bfg"
+    description = "Review, publish or reject faces in the catalog service's queue"
+    mainClass.set("com.bfg.watchfaces.workbench.Moderate")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
 /** A Watch Face Push validation token for an APK, so it can be pushed by hand. */
 tasks.register<JavaExec>("token") {
     group = "bfg"

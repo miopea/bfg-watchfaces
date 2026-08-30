@@ -108,6 +108,30 @@ kind of thing a hand-maintained test copy loses silently, and the test would
 then pass while the rule was gone. Turnstile uses Cloudflare's documented
 always-passes test keys, so nothing here touches the network.
 
+## Moderating
+
+The queue is worked from the repo, not from a dashboard:
+
+```bash
+export BFG_CATALOG_URL=https://bfg-catalog.<subdomain>.workers.dev
+eval "$(op-login)" && export BFG_MODERATOR_TOKEN="$(op read op://…/moderator-token)"
+
+./gradlew :workbench:moderate                        # review, decide nothing
+./gradlew :workbench:moderate --args="--auto-reject" # reject what provably fails
+./gradlew :workbench:moderate --args="--publish=<id>"
+./gradlew :workbench:moderate --args="--reject=<id> --reason=..."
+./gradlew :workbench:moderate --args="--reports"
+```
+
+**This is where a face meets Google's XSD.** The Worker cannot do it, so if this
+does not run before publication, nothing does. It also renders every face to
+`build/moderation/*.png`, because deciding whether a dial is somebody's logo
+means looking at it.
+
+`--reject` and `--remove` both require a reason. `MODERATION.md` promises
+appeals are answered, and an appeal against a decision with no recorded reason
+cannot be.
+
 ## Deploying
 
 Not done yet, and it needs an interactive login this repo's tooling cannot

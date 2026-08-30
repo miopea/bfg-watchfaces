@@ -9,6 +9,7 @@ import java.time.Instant
 import com.bfg.watchfaces.appcore.Json
 import com.bfg.watchfaces.appcore.FaceCodec
 import com.bfg.watchfaces.appcore.FaceLibrary
+import com.bfg.watchfaces.appcore.PublishedSlug
 
 /**
  * The community catalog: `catalog/faces/<slug>.json` plus a generated
@@ -162,16 +163,50 @@ object CatalogStore {
     // ---- validation ---------------------------------------------------------
 
     /**
-     * Every reason a submission can be refused, checked in one pass so a PR
-     * author sees all of them at once rather than one per CI run.
+     * How a face's slug is expected to relate to its name.
+     *
+     * The two differ and it is not cosmetic. In the git catalog a file is
+     * `<slug>.json` and the slug IS `slugify(name)` — anything else is a
+     * mismatched pair. A face published by the SERVICE carries a random short
+     * id (`midnight_7f3a`) because the slug is the Watch Face Push package
+     * suffix and two strangers may pick the same name.
+     *
+     * Applying the git rule to a service submission would reject every single
+     * one of them. Applying the service rule to a git file would let a
+     * mismatched pair through. So the caller says which world it is in rather
+     * than one rule guessing.
      */
-    fun validate(root: File, file: File): List<Problem> {
-        val problems = mutableListOf<Problem>()
-        fun bad(msg: String) = problems.add(Problem(file.name, msg))
+    enum class SlugRule {
+        /** `<slug>.json` in a git checkout: the slug is exactly `slugify(name)`. */
+        GIT_CATALOG,
 
-        val text = runCatching { file.readText() }.getOrElse {
-            bad("cannot be read: ${it.message}"); return problems
-        }
+        /** Published by the service: `slugify(name)` truncated, plus a short id. */
+        PUBLISHED
+    }
+
+    /**
+     * Every reason a submission can be refused, checked in one pass so an
+     * author sees all of them at once rather than one per attempt.
+     *
+     * Takes the document as TEXT rather than a file, because the moderation
+     * pass validates what came back over HTTP and has nothing on disk to point
+     * at. [label] is only used to name the thing in a [Problem].
+     *
+     * This is the ONLY place a face is checked against Google's XSD. The
+     * catalog service cannot do it — a Worker is JavaScript, the emitter is
+     * Kotlin and the validator is Xerces — so if this does not run before
+     * publication, nothing does. A schema-invalid face installs cleanly,
+     * reports success, and then never appears in the carousel.
+     */
+    fun validateDocument(
+        root: File,
+        label: String,
+        text: String,
+        slugRule: SlugRule = SlugRule.GIT_CATALOG
+    ): List<Problem> {
+        val problems = mutableListOf<Problem>()
+        fun bad(msg: String) = problems.add(Problem(label, msg))
+
         if (text.toByteArray().size > MAX_FACE_BYTES) {
             bad("is ${text.toByteArray().size} bytes; a face is parameters and must stay under $MAX_FACE_BYTES")
         }
@@ -181,11 +216,17 @@ object CatalogStore {
         }
 
         if (entry.name.isBlank()) bad("has no name")
-        if (entry.slug != FaceLibrary.slugify(entry.name)) {
-            bad("slug '${entry.slug}' does not match its name '${entry.name}' (expected '${FaceLibrary.slugify(entry.name)}')")
-        }
-        if (file.nameWithoutExtension != entry.slug) {
-            bad("filename does not match slug '${entry.slug}'")
+        when (slugRule) {
+            SlugRule.GIT_CATALOG ->
+                if (entry.slug != FaceLibrary.slugify(entry.name)) {
+                    bad("slug '${entry.slug}' does not match its name '${entry.name}' (expected '${FaceLibrary.slugify(entry.name)}')")
+                }
+            SlugRule.PUBLISHED ->
+                if (!PublishedSlug.matches(entry.slug, entry.name)) {
+                    bad("slug '${entry.slug}' is not a published slug for '${entry.name}' " +
+                        "(expected '${PublishedSlug.stemFor(entry.name)}_' plus a short id). " +
+                        "The slug is the package name, so the watch would file it under something the gallery does not call it")
+                }
         }
         runCatching { WffEmitter.pushPackageName("com.bfg.watchfaces", entry.slug) }
             .onFailure { bad("slug is not a legal Watch Face Push package segment: ${it.message}") }
@@ -204,13 +245,28 @@ object CatalogStore {
         // unreachable code that looks like protection.
 
         // The one that actually bites: a schema-invalid face installs, reports
-        // success, and never appears. CI is the only place this gets caught.
+        // success, and never appears.
         val xml = runCatching { WffEmitter.emit(entry.params, entry.name) }.getOrElse {
             bad("does not render: ${it.message}"); return problems
         }
         when (val issues = WffValidator.validate(root, xml)) {
             null -> bad("could not be schema-checked: the WFF schema is not installed (run scripts/bootstrap.sh)")
             else -> issues.take(3).forEach { bad("emits schema-invalid WFF at line ${it.line}: ${it.message}") }
+        }
+        return problems
+    }
+
+    /** A face on disk, in a git catalog checkout. */
+    fun validate(root: File, file: File): List<Problem> {
+        val text = runCatching { file.readText() }.getOrElse {
+            return listOf(Problem(file.name, "cannot be read: ${it.message}"))
+        }
+        val problems = validateDocument(root, file.name, text, SlugRule.GIT_CATALOG).toMutableList()
+        // Only meaningful for a file: the service has no filenames.
+        runCatching { parse(text) }.getOrNull()?.let { entry ->
+            if (file.nameWithoutExtension != entry.slug) {
+                problems.add(Problem(file.name, "filename does not match slug '${entry.slug}'"))
+            }
         }
         return problems
     }

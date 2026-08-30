@@ -562,12 +562,51 @@ machine that renders it, and stops being harmless the moment a stranger can
 submit one — a quote closes the attribute. The contract publishes patterns for
 both and the Worker enforces them.
 
+## The moderation pass
+
+Built. `./gradlew :workbench:moderate`, driven by `BFG_CATALOG_URL` and
+`BFG_MODERATOR_TOKEN` from the environment.
+
+It is split in two on purpose. `Moderation` takes a queue row and returns a
+verdict, with no network in it; `Moderate` does the talking. That is what makes
+the load-bearing half provable while the service is not deployed — and it is the
+load-bearing half, because this is the only place in the system where a face
+meets Google's XSD.
+
+Three things it does that are not obvious:
+
+- **It renders every face to a PNG**, into `build/moderation/`. "Slurs and
+  harassment removed on sight" is not a figure of speech, and a queue of
+  parameter blobs is an inbox rather than something one person can work
+  through. The automated half cannot tell you a dial is somebody's logo.
+- **It refuses to run without the schema installed.** Every verdict would come
+  back clean, which is indistinguishable from an empty queue and would publish
+  exactly the faces this pass exists to catch.
+- **The passing verdict is called `LOOKS_FINE`, not `APPROVE`**, and a test
+  asserts no verdict is ever named APPROVE. It means the automated checks found
+  nothing, which says nothing about trademark, impersonation or harassment.
+
+### The slug rule differs between the two catalogs, and getting it wrong is silent
+
+In the git catalog a face is `<slug>.json` and the slug is exactly
+`slugify(name)`. A face published by the SERVICE carries a short random id,
+because the slug is the Watch Face Push package suffix and two strangers can
+pick the same name.
+
+Reusing the git rule in the moderation pass would have refused **every**
+submission the service ever accepted. `CatalogStore.validateDocument` therefore
+takes a `SlugRule` rather than one rule guessing, and `PublishedSlug` in
+`:appcore` holds the published form — construct in the Worker, verify here, both
+downstream of the same two numbers in the generated contract.
+
 ## Still open
 
 - **Deployment.** Nothing exists on the account. It needs an interactive
   `wrangler login`, so it is the operator's action.
-- **The moderation pass itself.** The JVM half that runs the real WFF check over
-  the queue is specified above and not yet built.
+- **The app's submit and report paths.** The service has no client yet: the
+  Community tab still reads a local directory and the report sheet still opens a
+  GitHub issue. That is step 3 of the sequencing, and step 4 does not begin
+  until it is done.
 
 ## Release gates, not tasks
 

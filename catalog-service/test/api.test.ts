@@ -53,6 +53,20 @@ describe("submitting", () => {
     expect(second.slug.startsWith("fixture_face_")).toBe(true);
   });
 
+  it("keeps a published slug inside the package-name limit for a long name", async () => {
+    // The Kotlin side computes the same stem length from the same two contract
+    // numbers (PublishedSlugTest pins that half). This pins this half: the two
+    // are the construct and verify ends of one rule written in two languages,
+    // and a disagreement means the moderation pass refuses every submission.
+    const contract = (await (await SELF.fetch(get("/config"))).json()) as { maxFaceBytes: number };
+    expect(contract.maxFaceBytes).toBeGreaterThan(0);
+
+    const longName = "Midnight ".repeat(6).trim();
+    const { slug } = await submit({ name: longName.slice(0, 40), slug: "midnight_midnight_midnight_midnight_midn" });
+    expect(slug.length).toBeLessThanOrEqual(40);
+    expect(slug).toMatch(/^[a-z][a-z0-9_]*$/);
+  });
+
   it("refuses a byte-identical resubmission", async () => {
     await submit();
     const response = await SELF.fetch(post("/faces", submission()));
