@@ -10,7 +10,7 @@ import com.google.android.gms.wearable.WearableListenerService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
@@ -44,14 +44,27 @@ import java.io.File
  */
 class FaceReceiverService : WearableListenerService() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // No long-lived scope. WearableListenerService callbacks already arrive on
+    // a background thread, and the service is torn down as soon as the callback
+    // returns -- so work launched into a scope here was being cancelled mid
+    // install with "Job was cancelled". Doing it inline keeps the service alive
+    // for exactly as long as the face takes to arrive and install.
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
+        // Logged before anything can fail, because the report people actually
+        // bring is "the phone said sent and the watch did nothing" -- and the
+        // first thing to establish is whether this service was woken at all.
+        Log.i(TAG, "channel opened: ${channel.path}")
+
         // The token rides on the path, issued by the device next to `pack`.
         // No token, no install: see WatchLink.
-        val token = WatchLink.tokenFromChannelPath(channel.path) ?: return
+        val token = WatchLink.tokenFromChannelPath(channel.path)
+        if (token == null) {
+            Log.e(TAG, "not our path, or the token would not decode: ${channel.path}")
+            return
+        }
         val client = Wearable.getChannelClient(this)
-        scope.launch {
+        runBlocking {
             // Staged to a private file first. addWatchFace needs a descriptor it
             // can read, not a stream, and a half-received APK must never reach
             // it -- Push rejects a malformed one, but only after we have spent
@@ -61,7 +74,23 @@ class FaceReceiverService : WearableListenerService() {
                 // Blocking await, deliberately: this is already on
                 // Dispatchers.IO, and it avoids pulling in
                 // kotlinx-coroutines-play-services for one call.
-                Tasks.await(client.receiveFile(channel, android.net.Uri.fromFile(staged), false))
+                // Read the channel's InputStream to EOF rather than calling
+                // receiveFile, and this is the second half of the transport bug.
+                //
+                // receiveFile's Task completes when the transfer has been SET
+                // UP, not when the file has arrived. Awaiting it looked like
+                // success, so this service read a 0-byte file, failed to install
+                // it, and then closed the channel -- which aborted the phone
+                // mid-write with "Channel closed unexpectedly before stream was
+                // finished". Both ends were reporting the other one's fault.
+                //
+                // copyTo blocks until the sender closes its output stream, which
+                // is the only unambiguous signal that a face is complete.
+                val input = Tasks.await(client.getInputStream(channel))
+                val received = input.use { stream ->
+                    staged.outputStream().use { out -> stream.copyTo(out) }
+                }
+                Log.i(TAG, "received $received bytes")
                 report(FaceInstaller.install(this@FaceReceiverService, staged, token))
             }.onFailure {
                 Log.e(TAG, "face did not arrive or would not install", it)
@@ -78,11 +107,6 @@ class FaceReceiverService : WearableListenerService() {
             Log.w(TAG, "this watch does not support Watch Face Push")
         is FaceInstaller.Result.Failed ->
             Log.e(TAG, "face would not install", result.cause)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }
 
     companion object {

@@ -41,9 +41,10 @@ import java.util.Date
  * the same design. That is fine for Push, and it is why the SLUG rather than the
  * signature is what decides whether a face replaces an earlier one.
  *
- * v2 and v3 signatures, no v1. The manifest declares `minSdkVersion 33`, so a
- * JAR signature would be dead weight — and `watchface-template`'s manifest
- * carries that `uses-sdk` for exactly this reason.
+ * v1, v2 and v3. The v1 (JAR) signature is not optional here: Watch Face Push
+ * reads `META-INF/MANIFEST.MF` and rejects an APK without it as malformed, even
+ * though Android installs such an APK without complaint and the Push validator
+ * issues a token for it. See the comment on the signing call.
  */
 object ApkSigning {
 
@@ -61,7 +62,21 @@ object ApkSigning {
         ApkSigner.Builder(listOf(signerConfig)).apply {
             setInputApk(DataSources.asDataSource(ByteBuffer.wrap(unsigned)))
             setOutputApk(sink)
-            setV1SigningEnabled(false)
+            // v1 (JAR) signing is REQUIRED, and this was the bug. Watch Face
+            // Push on Wear OS 7 rejects a v3-only APK with
+            // ERROR_MALFORMED_WATCHFACE_APK -- "The provided watch face is not
+            // a valid Android APK" -- even though Android itself installs it
+            // happily and the Push validator issues a token for it.
+            //
+            // It was off because the face's manifest declares minSdkVersion 33,
+            // so a JAR signature is dead weight as far as the ANDROID INSTALLER
+            // is concerned. That reasoning was sound and about the wrong
+            // consumer: WFP reads META-INF/MANIFEST.MF itself.
+            //
+            // Measured, on a Pixel Watch 5 running Wear OS 7: the identical
+            // pack-built APK is rejected without META-INF and accepted with it.
+            // The Wear OS 6 emulator accepts both, which is why this survived.
+            setV1SigningEnabled(true)
             setV2SigningEnabled(true)
             setV3SigningEnabled(true)
         }.build().sign()

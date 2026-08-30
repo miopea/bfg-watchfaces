@@ -11,6 +11,11 @@ dependencies {
     // WffSchemaTest uses. Populated by scripts/bootstrap.sh; not committed.
     implementation(fileTree("../generator/libs") { include("*.jar") })
 
+    // The Watch Face Push validator, JVM build. Lets a candidate APK be checked
+    // and tokenised here, so pushing one to a watch by hand does not need a
+    // phone app that can mint tokens.
+    implementation(libs.wfp.validator.jvm)
+
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
@@ -56,6 +61,15 @@ tasks.register<JavaExec>("brand") {
     group = "bfg"
     description = "Write the launcher icons, the Play store icon and docs/brand from BrandMark"
     mainClass.set("com.bfg.watchfaces.workbench.Brand")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
+/** A Watch Face Push validation token for an APK, so it can be pushed by hand. */
+tasks.register<JavaExec>("token") {
+    group = "bfg"
+    description = "Print a Watch Face Push validation token for an APK"
+    mainClass.set("com.bfg.watchfaces.workbench.Token")
     classpath = sourceSets["main"].runtimeClasspath
     workingDir = rootProject.projectDir
 }

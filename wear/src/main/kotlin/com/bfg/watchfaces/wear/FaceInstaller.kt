@@ -83,12 +83,32 @@ object FaceInstaller {
      */
     private fun onFaceInstalled(context: Context, slotId: String) {
         val state = ActivationConsent.load(context.filesDir)
+
+        // Already granted: switch to it. This was the gap.
+        //
+        // setWatchFaceAsActive was only ever called from
+        // ActivationRequestActivity, at the instant permission was granted --
+        // so the FIRST face switched and every later one installed silently and
+        // sat in the picker. From outside that is "I sent a face and nothing
+        // happened", which is indistinguishable from the transport failing, and
+        // is exactly what it looked like on real hardware once the transport
+        // finally worked.
+        if (ActivationConsent.canActivate(state)) {
+            runCatching {
+                val manager = WatchFacePushManagerFactory.createWatchFacePushManager(context)
+                kotlinx.coroutines.runBlocking { manager.setWatchFaceAsActive(slotId) }
+            }
+                .onSuccess { Log.i(TAG, "switched to the new face (slot $slotId)") }
+                .onFailure { Log.e(TAG, "installed, but could not switch to it", it) }
+            return
+        }
+
         if (!ActivationConsent.canAsk(state)) {
-            // Already answered. Not an error -- it is the rule working, and it
-            // is why canAsk exists rather than a bare permission check: a denial
-            // also leaves the permission missing, and re-reading that as
+            // Asked once and refused. Nothing can reopen that, by design -- a
+            // denial also leaves the permission missing, and re-reading that as
             // "ask again" is how the one shot gets spent on someone who said no.
-            Log.i(TAG, "activation already answered; not asking again")
+            // The face stays in the picker for them to choose.
+            Log.i(TAG, "activation was refused; installed but not switched")
             return
         }
         ActivationPrompt.show(context, slotId)

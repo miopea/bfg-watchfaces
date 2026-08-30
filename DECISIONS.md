@@ -1,5 +1,82 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-30 — The transport works, and the three bugs that hid inside it
+
+A face designed on a Pixel 11 Pro XL reached a Pixel Watch 5 and installed:
+
+```text
+phone:  BUILT wrist.apk  520822 bytes  1837ms
+        TARGET Ready(Pixel Watch 5)
+        wrote 520822 bytes to the channel
+watch:  channel opened: /bfg-watchfaces/face/YkxoNUNH...
+        received 520822 bytes
+        slots: 0 free, 1 used   -> installed
+```
+
+Three separate bugs, each of which required a real watch to find.
+
+### 1. v1 signing was off, and Watch Face Push needs it
+
+`ApkSigning` had `setV1SigningEnabled(false)`, reasoned as "the face declares
+minSdkVersion 33, so a JAR signature is dead weight". That is true of the ANDROID
+INSTALLER and false of Watch Face Push, which reads `META-INF/MANIFEST.MF`
+itself.
+
+Rejected with `ERROR_MALFORMED_WATCHFACE_APK` — "The provided watch face is not
+a valid Android APK" — while `adb install` of the identical file succeeded and
+the Push validator issued a token for it. The Wear OS 6 emulator accepted it;
+Wear OS 7 does not.
+
+Isolated by pushing the SAME face built two ways: `watchface.apk` (aapt2)
+accepted, `packface.apk` (pack) rejected, then the pack one re-signed with
+`--v1-signing-enabled true` accepted. Content held constant, one variable moved.
+
+### 2. `sendFile(Uri.fromFile(...))` sends nothing, successfully
+
+Google Play services opens that URI from ITS process and uid. Under scoped
+storage neither `cacheDir` nor `getExternalFilesDir` is readable there — and the
+send Task resolves anyway. The watch received 0 bytes and `addWatchFace`
+rejected the empty file as malformed, which is an error about packaging that was
+really about transport.
+
+The bytes now go to `ChannelClient.getOutputStream`, which needs no cross-process
+file access at all.
+
+### 3. `receiveFile` completes when the transfer is SET UP, not finished
+
+The watch awaited it, read a 0-byte file, failed to install, and closed the
+channel — aborting the phone mid-write with `ChannelIOException: Channel closed
+unexpectedly before stream was finished`. **Each end was reporting the other
+end's fault**, which is why the phone's "sent" and the watch's "malformed" were
+both true and neither was the cause.
+
+The receiver now reads `getInputStream` to EOF, which is the only unambiguous
+signal that a face is complete, and does the work inline: launching into a
+service-scoped coroutine got it cancelled on teardown with "Job was cancelled".
+
+### 4. And then it installed and did not switch
+
+`setWatchFaceAsActive` was only ever called from `ActivationRequestActivity`, at
+the instant permission was granted. So the FIRST face switched and every one
+after it installed silently into the picker — which from outside is "I sent a
+face and nothing happened", indistinguishable from the transport failing, and
+exactly what it looked like once the transport finally worked.
+
+`FaceInstaller` now switches whenever `ActivationConsent.canActivate` is true.
+
+Confirmed on the watch: `DeclarativeWatchFaceRuntime` rendering
+`com.bfg.watchfaces.watchfacepush.on`.
+
+### What this cost, and why
+
+Four wrong diagnoses before the first log was read: `minSdk`, `standalone`, a
+native arm64 crash, 16 KB page alignment. Each was a plausible mechanism reasoned
+from what I knew. `adb logcat` on the failing device named every real cause in
+one command.
+
+The emulator pair cannot pair, so this entire path had never run. "Verified on
+the emulator" was doing far less work than it sounded like all week.
+
 ## 2026-08-30 — The crash on Send, and why every emulator run missed it
 
 Tapping "Send to watch" on a real phone killed the app. Not the native crash I

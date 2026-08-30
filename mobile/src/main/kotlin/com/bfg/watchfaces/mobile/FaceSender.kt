@@ -2,6 +2,7 @@ package com.bfg.watchfaces.mobile
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.bfg.watchfaces.appcore.WatchLink
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.CapabilityClient
@@ -38,6 +39,8 @@ import java.io.File
  * the first handoff step is about the companion app rather than about the face.
  */
 object FaceSender {
+
+    private const val TAG = "BfgFaceSender"
 
     /** What the device found when it went looking for somewhere to send a face. */
     sealed interface Target {
@@ -83,11 +86,44 @@ object FaceSender {
         val channelClient = Wearable.getChannelClient(context)
         // Throws on a blank token, at the sending end. See WatchLink.
         val path = WatchLink.channelPathFor(validationToken)
+        // Logged because "it said sent and nothing happened" is otherwise
+        // undebuggable from this side: openChannel and sendFile both resolve
+        // successfully whether or not anything on the watch ever wakes up.
+        Log.i(TAG, "opening channel to ${target.nodeId} (${target.name})")
+        Log.i(TAG, "  path  $path")
+        Log.i(TAG, "  apk   ${apk.absolutePath} (${apk.length()} bytes)")
+
         val channel = Tasks.await(channelClient.openChannel(target.nodeId, path))
         try {
-            Tasks.await(channelClient.sendFile(channel, Uri.fromFile(apk)))
-        } finally {
+            // The bytes are written to the channel's own OutputStream rather
+            // than handed over as a file Uri, and that is not a style choice.
+            //
+            // ChannelClient.sendFile(channel, Uri.fromFile(f)) is opened by
+            // GOOGLE PLAY SERVICES, from its own process and uid. Under scoped
+            // storage neither this app's cacheDir nor its external files dir is
+            // readable there -- and the send Task resolves successfully anyway.
+            // The watch's receiveFile then returns 0 BYTES and addWatchFace
+            // rejects the empty file as a malformed APK, which is an error that
+            // points at the packaging and is really about the transport.
+            //
+            // Measured on a Pixel Watch 5: "520KB sent" in 370ms, nothing
+            // received, twice, from two different source directories.
+            //
+            // Writing the stream ourselves needs no cross-process file access at
+            // all. Closing it is what tells the far end the face is complete.
+            val stream = Tasks.await(channelClient.getOutputStream(channel))
+            var written = 0L
+            stream.use { out ->
+                apk.inputStream().use { input -> written = input.copyTo(out) }
+            }
+            Log.i(TAG, "wrote $written bytes to the channel")
+        } catch (t: Throwable) {
+            Log.e(TAG, "send failed", t)
             runCatching { Tasks.await(channelClient.close(channel)) }
+            throw t
         }
+        // Not closed on the happy path: the receiver closes when it has finished
+        // reading, which is the end that knows. Closing here races the transfer.
     }
+
 }
