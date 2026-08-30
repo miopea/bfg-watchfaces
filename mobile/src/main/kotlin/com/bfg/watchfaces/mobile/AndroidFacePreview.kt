@@ -40,7 +40,6 @@ object AndroidFacePreview {
     private const val SAMPLE_SECOND = 30
 
     /** Kept the same as WffEmitter's, so the preview and the face agree. */
-    private const val CLOCK_SCALE_WITH_SECONDS = 0.82f
 
     fun render(p: DialParams, ambient: Boolean = false, size: Int = DIAL_SIZE): Bitmap {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -62,10 +61,11 @@ object AndroidFacePreview {
         val l = p.layout
         val ink = EngravedStroke.withAlpha(EngravedStroke.rgb(p.inkColor), 255)
 
-        val iconSize = SlotGeometry.iconHeight(l.complicationSize).toFloat()
-        val textY = SlotGeometry.textOffset(l.complicationSize)
-        val textH = SlotGeometry.textHeight(l.complicationSize)
-        val fontSize = SlotGeometry.fontSize(l.complicationSize).toFloat()
+        // The FITTED size, matching the emitter: the boxes come from it too.
+        val fitted = SlotGeometry.fittedSize(p)
+        val iconSize = SlotGeometry.iconHeight(fitted).toFloat()
+        val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
+        val fontSize = SlotGeometry.fontSize(fitted).toFloat()
 
         // From v3 a complication carries an ambient colour Variant when the ink
         // would be unreadable on black. Mirror it, or the preview would show a
@@ -94,7 +94,8 @@ object AndroidFacePreview {
             }
             drawCenteredIn(
                 canvas, Presentation.sample(source),
-                box.x.toFloat(), (box.y + textY).toFloat(),
+                box.x.toFloat(),
+                (box.y + SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)).toFloat(),
                 box.w.toFloat(), textH.toFloat(), fontSize, c, bold = false
             )
         }
@@ -135,7 +136,8 @@ object AndroidFacePreview {
             canvas, timeText,
             0f, (l.timeY - l.timeSize / 2).toFloat(),
             DIAL_SIZE.toFloat(), (l.timeSize * 1.4).toFloat(),
-            if (p.showSeconds && !ambient) l.timeSize * CLOCK_SCALE_WITH_SECONDS else l.timeSize.toFloat(),
+            // Same size with or without seconds; see SecondsBand.
+            l.timeSize.toFloat(),
             timeColor,
             // AWT only has PLAIN and BOLD, and the workbench renders MEDIUM as
             // PLAIN rather than overstate the weight. Match that here, so the
@@ -150,7 +152,7 @@ object AndroidFacePreview {
         if (p.showSeconds && !ambient) {
             drawCenteredIn(
                 canvas, "%02d".format(SAMPLE_SECOND),
-                0f, (l.timeY - l.timeSize / 2 + SecondsBand.offsetY(l)).toFloat(),
+                0f, SecondsBand.topInDial(l).toFloat(),
                 SecondsBand.rightEdge().toFloat(), SecondsBand.height(l).toFloat(),
                 SecondsBand.fontSize(l).toFloat(),
                 withAlpha(timeColor, SecondsBand.ALPHA), bold = false,

@@ -121,6 +121,73 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — Four bugs from a real wrist, and generator v6
+
+Reported after using the published build: turning seconds on shrank everything;
+the seconds sat below the time; "Large" complications were barely larger than
+Medium; and the last complication was always Notifications whatever was picked.
+All four were real. None had a test.
+
+**The clock no longer shrinks.** It was scaled to 82% whenever seconds were on,
+to open a gutter. Measured instead: at full size the widest time runs to x=377
+on a 456 dial, so there are 79 points of gutter and the seconds need 46 at a
+third of the clock's size. They did not fit only because they were held 48 from
+the rim. Inset 24 and they fit beside a full-size clock. Turning a feature on
+must not resize the rest of the face.
+
+**The seconds share the clock's element box**, so both centre on one line,
+instead of sitting 0.72 of the clock's size below its origin.
+
+**Slot ids are now the POSITION, not a running count of the enabled slots.**
+This was the Notifications bug, and it is the worst of the four. Wear stores the
+wearer's complication choice against the slotId, and that choice OVERRIDES
+`DefaultProviderPolicy` permanently — the policy only fills a slot nothing has
+been assigned to. While ids were a running count, turning any slot off
+renumbered every slot after it, so the watch's memory reattached to a different
+position and no amount of choosing in the app could dislodge it. Ids are
+therefore not contiguous, which is fine: slotId is an identifier, not an index.
+
+The old test asserted they were "unique and contiguous" and passed throughout,
+because it emitted `DialParams()` with all five slots on and never turned one
+off. Same blind spot as the schema tests: a fixture that never exercises the
+case cannot see the bug.
+
+**Generator v6: the complication BOX changed, not the dial.** A slot whose glyph
+is off no longer reserves the icon's height or the offset that cleared it, and
+the value's own box drops from 1.7x the slot size to 1.35x — it was 1.85x the
+FONT, half a line of air under every value. That slack was not free: the
+vertical stack of top, clock, row and bottom is what caps complication size, so
+"Large" (28) was silently clamped to 25 and looked like Medium. At v6 it fits,
+and the font goes 18 -> 26 rather than 18 -> 23.
+
+Gated on `generatorVersion` because it moves every slot on a stored face.
+`PatternEngines.v6` delegates to v5; a test asserts every engine renders
+identically across the two, and another pins the v5 box numbers so saved faces
+keep the layout their author saw.
+
+**The metrics used the REQUESTED size while the boxes used the FITTED one.** The
+emitter and both previews derived glyph, text and font from
+`layout.complicationSize` while `SlotGeometry.boxes` used `fittedSize`. At a
+clamped size the text was drawn to a scale its own box was never built for — at
+"Large", a font of 26 inside a box laid out for 25.
+
+**The date had no size control at all**, only a position one, and defaulted to
+21 next to a 104pt clock. It read as a caption. Default 30, and `dateSize` is
+now in `ControlInventory`. Changing the default touches no saved face: the size
+is stored per face.
+
+Two guards earned their keep. The v5 golden broke and was NOT re-recorded: it
+was correct, and the failure was real — the previews called `textHeight(fitted)`
+without a version, so they used v6 metrics to draw a v5 face. Threading
+`p.generatorVersion` through fixed it and the golden passed byte-for-byte. The
+label test caught `dateSize` shipping as a raw parameter name.
+
+Rejected: re-recording the v5 golden's hashes. A golden that is updated whenever it
+fails is a record of what the code does, not of what it should do. It is now
+pinned to `generatorVersion = 5` explicitly rather than riding the default, so
+it cannot drift onto a new version again, and a separate v6 golden covers the
+new box, the glyph-less slot, the drawn date and the seconds.
+
 ## 2026-08-30 — SecondsBand, and seconds that were the wrong colour
 
 The seconds shipped with `0.45` and `48` written out in `WffEmitter`, the

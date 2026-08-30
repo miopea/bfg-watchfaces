@@ -24,11 +24,19 @@ package com.bfg.watchfaces.generator
  */
 object SecondsBand {
 
-    /** Size relative to the clock. Under half, so it reads as a subdial. */
-    const val SCALE = 0.45
+    /** Size relative to the clock. About a third, so it never competes. */
+    const val SCALE = 0.35
 
-    /** How far in from the rim, so the digits clear a round bezel. */
-    const val INSET = 48
+    /**
+     * How far in from the rim.
+     *
+     * 24, not 48. The clock at full size runs to x=377 for the widest time, and
+     * the dial is 456 — so there are 79 points of gutter, and the seconds need
+     * 46 of them at [SCALE]. At an inset of 48 they did not fit beside a
+     * full-size clock, which is what the 0.82 clock shrink was papering over.
+     * Measured, not guessed.
+     */
+    const val INSET = 24
 
     /**
      * How faint, out of 255.
@@ -44,16 +52,36 @@ object SecondsBand {
      */
     const val ALPHA = 190
 
-    private const val Y_FACTOR = 0.72
-    private const val H_FACTOR = 0.6
+    /**
+     * The clock's element box is `timeSize * 1.4` tall and the seconds share it.
+     *
+     * They used to sit at 0.72 of the clock's size BELOW its origin, which put
+     * them under the time rather than beside it. Sharing the box means both are
+     * centred in the same band, so the seconds read as part of the same line —
+     * which is what they are.
+     */
+    private const val CLOCK_BOX = 1.4
 
     /** Font size, in dial units. */
     fun fontSize(l: Layout): Int = (l.timeSize * SCALE).toInt()
 
-    /** Offset DOWN from the clock's own origin — the seconds nest inside it. */
-    fun offsetY(l: Layout): Int = (l.timeSize * Y_FACTOR).toInt()
+    /**
+     * Offset from the clock's own origin. Zero: the seconds share its box, and
+     * therefore its centre line.
+     */
+    fun offsetY(l: Layout): Int = 0
 
-    fun height(l: Layout): Int = (l.timeSize * H_FACTOR).toInt()
+    /** The same height as the clock's box, so both centre on one line. */
+    fun height(l: Layout): Int = (l.timeSize * CLOCK_BOX).toInt()
+
+    /**
+     * Top of the band in DIAL space, for the previews.
+     *
+     * The emitter nests the seconds inside `DigitalClock` and works in its
+     * coordinates; a preview draws straight onto the dial. One function so the
+     * two cannot disagree about which line the seconds sit on.
+     */
+    fun topInDial(l: Layout): Int = l.timeY - l.timeSize / 2 + offsetY(l)
 
     /** Right edge, held in from the rim by [INSET]. */
     fun rightEdge(): Int = DIAL_SIZE - INSET

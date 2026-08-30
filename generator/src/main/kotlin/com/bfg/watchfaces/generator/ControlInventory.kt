@@ -109,6 +109,10 @@ object ControlInventory {
         Control("complicationSpread", 60.0, 150.0, 1.0, Target.LAYOUT, integral = true),
         Control("complicationY", 200.0, 360.0, 1.0, Target.LAYOUT, integral = true),
         Control("dateY", 40.0, 160.0, 1.0, Target.LAYOUT, integral = true),
+        // There was no size control for the drawn date at all -- only where to
+        // put it. So the one complaint anyone could have about it ("pretty
+        // tiny") had no answer in the UI.
+        Control("dateSize", 14.0, 48.0, 1.0, Target.LAYOUT, integral = true),
         Control("batteryY", 250.0, 430.0, 1.0, Target.LAYOUT, integral = true)
     )
 
@@ -153,6 +157,7 @@ object ControlInventory {
         "complicationSpread" -> p.copy(layout = p.layout.copy(complicationSpread = value.toInt()))
         "complicationY" -> p.copy(layout = p.layout.copy(complicationY = value.toInt()))
         "dateY" -> p.copy(layout = p.layout.copy(dateY = value.toInt()))
+        "dateSize" -> p.copy(layout = p.layout.copy(dateSize = value.toInt()))
         "batteryY" -> p.copy(layout = p.layout.copy(batteryY = value.toInt()))
 
         else -> throw IllegalArgumentException("no control called '$id'")
@@ -183,6 +188,7 @@ object ControlInventory {
         "complicationSpread" -> p.layout.complicationSpread.toDouble()
         "complicationY" -> p.layout.complicationY.toDouble()
         "dateY" -> p.layout.dateY.toDouble()
+        "dateSize" -> p.layout.dateSize.toDouble()
         "batteryY" -> p.layout.batteryY.toDouble()
 
         else -> throw IllegalArgumentException("no control called '$id'")

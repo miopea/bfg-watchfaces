@@ -263,7 +263,18 @@ data class DialParams(
 data class Layout(
     /** Y of the TOP complication slot. Was the fixed date line. */
     val dateY: Int = 99,
-    val dateSize: Int = 21,
+    /**
+     * 30, not 21.
+     *
+     * 21 dates from when the only date was a COMPLICATION's label, sized to sit
+     * under a glyph in a slot. The face's own drawn date is a headline sitting
+     * against a 104pt clock, and at 21 it read as a caption -- "pretty tiny",
+     * which is exactly what it looked like on a real phone.
+     *
+     * Changing the default does not touch a saved face: dateSize is stored per
+     * face, so anything already designed keeps the size it was designed at.
+     */
+    val dateSize: Int = 30,
     val timeY: Int = 196,
     val timeSize: Int = 104,
     val tracking: Double = 0.0,
@@ -278,6 +289,15 @@ data class Layout(
 
 /**
  * Bump ONLY when adding an engine or a parameter. Never when changing geometry.
+ *
+ * v6 (2026-08-30) reshapes the complication BOX, not the dial. A slot whose
+ * glyph is off loses the icon's height and the offset that cleared it, and the
+ * value's own box drops from 1.7x the slot size to 1.35x -- it was 1.85x the
+ * font, half a line of air under every value. The vertical stack of top, clock,
+ * row and bottom is what caps complication size, so that slack was being paid
+ * for by the size control: "Large" was silently clamped from 28 to 25, which is
+ * why it looked barely different from Medium. At v6 it fits. PatternEngines.v6
+ * delegates to v5 -- no dial geometry changed.
  *
  * v5 (2026-08-28) makes complicationSpread drive VERTICAL spacing as well as
  * horizontal, so one control loosens the whole layout. No engine changed:
@@ -296,7 +316,7 @@ data class Layout(
  * they cannot drift. A face stored with generatorVersion=1 still renders through
  * the v1 branch, byte for byte.
  */
-const val CURRENT_GENERATOR_VERSION = 5
+const val CURRENT_GENERATOR_VERSION = 6
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

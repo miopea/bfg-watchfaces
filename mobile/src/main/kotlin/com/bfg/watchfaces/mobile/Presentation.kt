@@ -73,6 +73,7 @@ object Presentation {
         "complicationSpread" -> "Spacing"
         "complicationY" -> "Middle row"
         "dateY" -> "Top slot"
+        "dateSize" -> "Date size"
         "batteryY" -> "Bottom slot"
         else -> controlId
     }

@@ -63,15 +63,6 @@ object WffEmitter {
 
     /** Seconds are just under half the clock, which reads as a secondary value. */
 
-    /**
-     * How much the clock shrinks to make room for seconds.
-     *
-     * At the default size the time already spans nearly the whole dial, so there
-     * is no gutter to put seconds in -- rendered beside it they land on top of
-     * the last digit. Giving the clock 82% of its size opens the space, which is
-     * what a mechanical face does too: adding a subdial shrinks the main one.
-     */
-    private const val CLOCK_SCALE_WITH_SECONDS = 0.82
 
     /** How far in from the rim the seconds sit, so they clear a round bezel. */
 
@@ -83,10 +74,11 @@ object WffEmitter {
         // becomes the carousel label; "Untitled" is a placeholder for callers
         // that have not been given one, not a product name.
         val l = p.layout
-        // The clock gives up room when seconds are shown; see
-        // CLOCK_SCALE_WITH_SECONDS.
-        val clockSize =
-            if (p.showSeconds) (l.timeSize * CLOCK_SCALE_WITH_SECONDS).toInt() else l.timeSize
+        // The clock is the same size with or without seconds. It used to shrink
+        // to 82% to open a gutter, which made turning seconds on resize the
+        // whole face -- the seconds fit beside a FULL-size clock once they stop
+        // hugging the rim. See SecondsBand.INSET.
+        val clockSize = l.timeSize
         val ink = argb(p.inkColor)
 
         // The date the FACE draws. dateY and dateSize have been in Layout since
@@ -111,10 +103,15 @@ object WffEmitter {
         // inside the rim -- the previous hand-placed numbers overlapped on both
         // axes and ran into the clock.
         val boxes = SlotGeometry.boxes(p)
-        val iconH = SlotGeometry.iconHeight(l.complicationSize)
-        val textY = SlotGeometry.textOffset(l.complicationSize)
-        val textH = SlotGeometry.textHeight(l.complicationSize)
-        val fontSize = SlotGeometry.fontSize(l.complicationSize)
+        // The FITTED size, not the requested one. These four used to be derived
+        // from l.complicationSize while the boxes came from fittedSize, so at a
+        // clamped size the glyph and the text were drawn to a scale their own
+        // box was never built for -- at "Large" a font of 26 inside a box laid
+        // out for 25.
+        val fitted = SlotGeometry.fittedSize(p)
+        val iconH = SlotGeometry.iconHeight(fitted)
+        val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
+        val fontSize = SlotGeometry.fontSize(fitted)
         val iconW = iconH
 
         // A complication has ONE Font colour for both modes, unlike the clock
@@ -131,8 +128,22 @@ object WffEmitter {
                 "\n          <Variant mode=\"AMBIENT\" target=\"color\" value=\"$inkDim\"/>"
             else ""
 
-        val slots = boxes.entries.mapIndexed { id, (pos, box) ->
+        val slots = boxes.entries.map { (pos, box) ->
             val source = p.slot(pos)
+            // The slot id is the POSITION, not a running count of the enabled
+            // ones. Wear stores the wearer's complication choice against the
+            // slot id and that choice OVERRIDES DefaultProviderPolicy for good
+            // -- the policy only supplies a default for a slot nothing has been
+            // assigned to. So while ids were a running count, turning any slot
+            // off renumbered every slot after it and the watch's memory landed
+            // on the wrong position: the face showed notifications in the last
+            // slot no matter what was picked in the app, and nothing the app
+            // sent could dislodge it.
+            //
+            // Position ids are stable, so a slot keeps its identity when its
+            // neighbours come and go. Ids are therefore NOT contiguous, which
+            // is fine -- slotId is an identifier, not an index.
+            val id = pos.ordinal
             // TOP keeps a dim ambient variant: it is the always-readable
             // position, and the ambient design deliberately keeps that one line
             // visible while everything else goes dark.
@@ -149,7 +160,7 @@ object WffEmitter {
         <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>"""}
-        <PartText x="0" y="$textY" width="${box.w}" height="$textH">$ambientColorVariant
+        <PartText x="0" y="${SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)}" width="${box.w}" height="$textH">$ambientColorVariant
           <Text align="CENTER">
             <Font family="${l.fontFamily}" size="$fontSize" color="$ink">
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
@@ -206,13 +217,15 @@ $dateLine
         <Font family="${l.fontFamily}" size="${l.timeSize}" weight="THIN" color="$inkDim"/>
       </TimeText>${if (!p.showSeconds) "" else """
       <!--
-        Seconds sit in the right gutter beside the time, at just under half its
-        size and in the lightest weight available.
+        Seconds sit in the right gutter beside the time, on the SAME line: they
+        share the clock's element box, so both centre together. About a third of
+        its size, in the lightest weight available.
 
         Not "hh:mm:ss" on the clock itself: that makes every digit the same size,
         so the seconds shout as loudly as the hour and the whole line grows wide
         enough to crowd the rim. The clock is centred, which leaves roughly a
-        hundred points of empty dial on each side, and this uses the right one.
+        seventy-nine points of empty dial on each side at the widest time, and
+        this uses the right one. The clock does not shrink to make room.
 
         Awake only. The ambient TimeText above deliberately has no seconds:
         ambient updates once a minute, so a second digit there would be wrong

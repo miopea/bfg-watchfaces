@@ -29,6 +29,9 @@ object PatternEngines {
         4 -> v4(p)
         // v5 changed complication SPACING, not engine geometry.
         5 -> v4(p)
+        // v6 reshaped the complication BOX (SlotGeometry), not the dial. No
+        // engine changed, so this delegates rather than copying the code.
+        6 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

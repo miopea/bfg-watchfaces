@@ -11,7 +11,7 @@ class GeneratorVersionTest {
 
     @Test
     fun `bumping CURRENT_GENERATOR_VERSION is deliberate`() {
-        assertEquals(5, CURRENT_GENERATOR_VERSION,
+        assertEquals(6, CURRENT_GENERATOR_VERSION,
             "You changed CURRENT_GENERATOR_VERSION. That is fine ONLY if you added a new " +
             "branch in PatternEngines.paths() and left every older branch untouched. " +
             "Existing community faces must keep rendering exactly as their authors saw them. " +
@@ -100,4 +100,55 @@ class GeneratorVersionCompatibilityTest {
             "it should re-seed the tiling, not control how much of it there is"
         }
     }
+
+    /**
+     * v6 changed the complication BOX and nothing on the dial.
+     *
+     * The bump exists because [SlotGeometry] box heights changed, which moves
+     * every slot on a stored face. The dial pattern must be untouched, so this
+     * is the v1-v2 guard again for the new version.
+     */
+    @Test
+    fun `v6 renders every engine identically to v5`() {
+        for (engine in Engine.entries) {
+            if (engine == Engine.TEXTURE) continue      // needs a bitmap, not geometry
+            val v5 = PatternEngines.paths(DialParams(generatorVersion = 5, engine = engine))
+            val v6 = PatternEngines.paths(DialParams(generatorVersion = 6, engine = engine))
+            assertEquals(v5, v6) { "$engine changed between v5 and v6; the dial must be untouched" }
+        }
+    }
+
+    /**
+     * A face stored at v5 keeps the layout its author saw.
+     *
+     * This is the whole point of the bump: v6 slots are laid out with shorter
+     * boxes, which moves them. If the old numbers are not preserved, every
+     * saved face silently re-flows.
+     */
+    @Test
+    fun `v5 slot boxes are exactly what they were before v6 existed`() {
+        val p = DialParams(generatorVersion = 5, layout = Layout(complicationSize = 28))
+        // The pre-v6 constants: one box height of 3.3x whether or not a glyph
+        // is drawn, a text offset of 1.45x, and a text box of 1.7x.
+        assertEquals(SlotGeometry.boxHeight(25, withIcon = true, version = 5), Math.round(25 * 3.3).toInt())
+        assertEquals(SlotGeometry.boxHeight(25, withIcon = false, version = 5), Math.round(25 * 3.3).toInt())
+        assertEquals(SlotGeometry.textHeight(25, version = 5), Math.round(25 * 1.7).toInt())
+        assertEquals(SlotGeometry.textOffset(25, withIcon = false, version = 5), Math.round(25 * 1.45).toInt())
+
+        // And the size it could actually reach is the OLD, clamped one.
+        assertEquals(25, SlotGeometry.fittedSize(p)) {
+            "a v5 face no longer clamps where it used to; stored faces have re-flowed"
+        }
+    }
+
+    /** The bump did what it was for: v6 reaches a size v5 could not. */
+    @Test
+    fun `v6 reaches a larger complication than v5 could`() {
+        val layout = Layout(complicationSize = 28)
+        val v5 = SlotGeometry.fittedSize(DialParams(generatorVersion = 5, layout = layout))
+        val v6 = SlotGeometry.fittedSize(DialParams(generatorVersion = 6, layout = layout))
+        assertTrue(v6 > v5) { "v6 fitted $v6, v5 fitted $v5 -- the bump bought nothing" }
+        assertEquals(28, v6) { "Large should no longer be clamped at all" }
+    }
+
 }

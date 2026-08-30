@@ -75,11 +75,24 @@ object SlotGeometry {
     fun boxWidth(size: Int): Int = (size * 3.9).roundToInt()
 
     /**
-     * Icon over a single line of text, and nothing more. The old 4.0x height
-     * left ~15px of dead space inside every slot, which is what made five slots
-     * look crowded when they were merely mis-measured.
+     * Icon over a single line of text — or just the text.
+     *
+     * A slot whose glyph is off does not need the icon's height OR the offset
+     * that clears it. It used to get both: the value sat low in a box reserving
+     * room for something never drawn, and the wasted height counted against
+     * every OTHER slot, because the vertical stack (top, clock, row, bottom) is
+     * what caps the complication size on a 456 dial. Measured: with all five
+     * slots on, "Large" was silently clamped from 28 to 25.
      */
-    fun boxHeight(size: Int): Int = (size * 3.3).roundToInt()
+    fun boxHeight(
+        size: Int,
+        withIcon: Boolean = true,
+        version: Int = CURRENT_GENERATOR_VERSION
+    ): Int = when {
+        version < 6 -> (size * 3.3).roundToInt()      // v1..v5: one height, icon or not
+        withIcon -> (size * 2.85).roundToInt()
+        else -> textHeight(size, version)
+    }
 
     fun iconHeight(size: Int): Int = (size * 1.25).roundToInt()
 
@@ -108,8 +121,23 @@ object SlotGeometry {
         val h = (l.dateSize * 1.6).roundToInt()
         return Box(0, timeTop - GAP - h, DIAL_SIZE, h)
     }
-    fun textOffset(size: Int): Int = (size * 1.45).roundToInt()
-    fun textHeight(size: Int): Int = (size * 1.7).roundToInt()
+    /** Where the value sits inside its box: below the glyph, or at the top. */
+    fun textOffset(
+        size: Int,
+        withIcon: Boolean = true,
+        version: Int = CURRENT_GENERATOR_VERSION
+    ): Int = if (withIcon || version < 6) (size * 1.45).roundToInt() else 0
+    /**
+     * The value's own box: one line, so 1.35x the slot size.
+     *
+     * It was 1.7x, which is 1.85x the FONT — half a line of empty space under
+     * every value. Harmless on its own, and not harmless in aggregate: the
+     * vertical stack of top, clock, row and bottom is what caps the
+     * complication size, so the slack was being paid for by the size control,
+     * which silently clamped "Large" from 28 down to 25.
+     */
+    fun textHeight(size: Int, version: Int = CURRENT_GENERATOR_VERSION): Int =
+        (size * if (version >= 6) 1.35 else 1.7).roundToInt()
     fun fontSize(size: Int): Int = (size * 0.92).roundToInt()
 
     /** The visual extent of the clock, which slots must not collide with. */
@@ -252,7 +280,9 @@ object SlotGeometry {
     private fun layoutAt(p: DialParams, size: Int, airOverride: Int? = null): LinkedHashMap<SlotPosition, Box> {
         val l = p.layout
         val w = boxWidth(size)
-        val h = boxHeight(size)
+        // Per slot: a glyph-less slot is shorter, which is what frees the
+        // vertical room the size control was running out of.
+        fun hFor(pos: SlotPosition) = boxHeight(size, pos in p.iconSlots, p.generatorVersion)
         val anchor = (size * 1.2).roundToInt()
         val (timeTop, timeBottom) = timeBand(l)
         val air = airOverride ?: verticalAir(p)
@@ -266,6 +296,7 @@ object SlotGeometry {
         val top = p.slot(SlotPosition.TOP)
         var topBottom = 0
         if (top.enabled) {
+            val h = hFor(SlotPosition.TOP)
             var y = l.dateY - anchor - air         // spacing pushes it away from the clock
             y = min(y, timeTop - GAP - h)          // never run into the clock
             // The drawn date sits AT dateY, which is where the top slot anchors
@@ -283,6 +314,7 @@ object SlotGeometry {
             .filter { p.slot(it).enabled }
         var rowBottom = max(topBottom, timeBottom)
         if (rowPositions.isNotEmpty()) {
+            val h = rowPositions.maxOf { hFor(it) }
             var y = l.complicationY - anchor
             y = max(y, timeBottom + GAP)           // below the clock
             y = max(y, topBottom + GAP)            // and below the top slot
@@ -302,7 +334,7 @@ object SlotGeometry {
 
             rowPositions.forEachIndexed { index, pos ->
                 val offset = (index - (rowPositions.size - 1) / 2.0) * spread
-                out[pos] = Box((DIAL_SIZE / 2 + offset - w / 2).roundToInt(), y, w, h)
+                out[pos] = Box((DIAL_SIZE / 2 + offset - w / 2).roundToInt(), y, w, hFor(pos))
             }
             rowBottom = y + h
         }
@@ -310,6 +342,7 @@ object SlotGeometry {
         // ---- BOTTOM: centred, below the row ----
         val bottom = p.slot(SlotPosition.BOTTOM)
         if (bottom.enabled) {
+            val h = hFor(SlotPosition.BOTTOM)
             // Clear of the row, then inside the circle. If those two cannot
             // both hold at this size, the layout is rejected by fits() and the
             // caller retries a size down -- rather than shipping a slot that

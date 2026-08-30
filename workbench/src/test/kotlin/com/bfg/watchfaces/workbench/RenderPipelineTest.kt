@@ -2,6 +2,7 @@ package com.bfg.watchfaces.workbench
 
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.ComplicationSource
+import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -208,16 +209,56 @@ class RenderPipelineTest {
      * A failure here is not automatically a bug. It means the preview's
      * appearance changed, and whoever changed it has to say so on purpose.
      */
+        /**
+     * The same guard for v6, covering what v6 actually introduced.
+     *
+     * [GeneratorVersionTest] asks for golden coverage of a new version, and the
+     * v5 fixture above cannot supply it: it is pinned to v5 on purpose, so it
+     * would never notice the new box heights, the glyph-less slot layout, the
+     * drawn date or the seconds moving onto the clock's line.
+     */
     @Test
-    fun `the composite preview is byte-for-byte what it has always been`() {
+    fun `the v6 preview is pinned too`() {
         val faces = listOf(
-            DialParams(),
-            DialParams(engine = Engine.KNOTWORK, dialColor = "#2B2E33", inkColor = "#C9A227"),
+            DialParams(),                                       // v6 by default
             DialParams(complications = ComplicationSource.entries.take(5)),
+            DialParams(iconSlots = emptySet()),                 // the shorter, glyph-less box
+            DialParams(showSeconds = true),                     // seconds beside a full-size clock
+            DialParams(dateStyle = DateStyle.WEEKDAY_MONTH_DAY) // the drawn date
+        )
+        val actual = faces.map { p ->
+            val img = FacePreview.render(p)
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            for (v in pixels(img)) {
+                md.update((v ushr 24).toByte()); md.update((v ushr 16).toByte())
+                md.update((v ushr 8).toByte()); md.update(v.toByte())
+            }
+            md.digest().joinToString("") { "%02x".format(it) }.take(16)
+        }
+        assertEquals(
+            listOf("f23d4b152ec5f454", "7aa269aa5965891c", "4119f771e59ac813",
+                   "52231f488a043c73", "2a5585f44d928e81"),
+            actual
+        ) { "the v6 preview changed; every face saved at v6 renders differently" }
+    }
+
+@Test
+    fun `the composite preview is byte-for-byte what it has always been`() {
+        // Pinned to v5 EXPLICITLY, not left on the default.
+        //
+        // These hashes are "what it has always been", and the default version
+        // moves. When v6 changed the complication box, every one of them broke
+        // at once -- which reads like the renderer regressed and actually means
+        // the fixture drifted onto a new version. A golden has to name the
+        // version it is a golden OF.
+        val faces = listOf(
+            DialParams(generatorVersion = 5),
+            DialParams(generatorVersion = 5, engine = Engine.KNOTWORK, dialColor = "#2B2E33", inkColor = "#C9A227"),
+            DialParams(generatorVersion = 5, complications = ComplicationSource.entries.take(5)),
             // A generated surface, so the procedural shading is pinned too. The
             // stroked engines do not exercise it at all.
-            DialParams(engine = Engine.BRUSHED, contrast = 62.0, relief = 3.4),
-            DialParams(engine = Engine.GRAIN, dialColor = "#3E4A3F")
+            DialParams(generatorVersion = 5, engine = Engine.BRUSHED, contrast = 62.0, relief = 3.4),
+            DialParams(generatorVersion = 5, engine = Engine.GRAIN, dialColor = "#3E4A3F")
         )
         val actual = faces.map { p ->
             val img = FacePreview.render(p)

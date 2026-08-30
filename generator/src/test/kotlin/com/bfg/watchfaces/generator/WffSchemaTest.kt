@@ -297,13 +297,34 @@ class ComplicationSchemaTest {
     }
 
     @Test
-    fun `slot ids are unique and contiguous`() {
-        // Duplicate slotIds are accepted by the schema and then behave
-        // unpredictably on the watch, so this is checked here rather than there.
-        val ids = Regex("""slotId="(\d+)"""")
-            .findAll(WffEmitter.emit(DialParams()))
-            .map { it.groupValues[1].toInt() }.toList()
-        assertEquals(ids.size, ids.toSet().size) { "duplicate slotId: $ids" }
-        assertEquals((0 until ids.size).toList(), ids) { "slot ids not contiguous from 0: $ids" }
+    fun `a slot keeps its id when other slots are turned off`() {
+        // THE invariant, and the one this file used to get wrong.
+        //
+        // Wear stores the wearer's complication choice against the slotId, and
+        // that choice overrides DefaultProviderPolicy permanently -- the policy
+        // only fills a slot nothing has been assigned to. Ids used to be a
+        // running count of the ENABLED slots, so turning one off renumbered
+        // every slot after it and the watch's memory reattached to the wrong
+        // position. On a real watch the last slot showed notifications no
+        // matter what was chosen in the app, and nothing the app sent could
+        // dislodge it.
+        //
+        // The old test asserted the ids were contiguous from 0, which was true
+        // only because it emitted DialParams() with all five slots on. It never
+        // turned one off, so it never saw the renumbering.
+        val filled = ComplicationSource.STEP_COUNT
+
+        for (off in SlotPosition.entries) {
+            val comps = SlotPosition.entries.map { if (it == off) ComplicationSource.NONE else filled }
+            val xml = WffEmitter.emit(DialParams(complications = comps))
+            val ids = Regex("""slotId="(\d+)"""").findAll(xml)
+                .map { it.groupValues[1].toInt() }.toList()
+
+            assertEquals(ids.size, ids.toSet().size) { "duplicate slotId with $off off: $ids" }
+            assertEquals(
+                SlotPosition.entries.filter { it != off }.map { it.ordinal },
+                ids
+            ) { "turning $off off renumbered the others: $ids" }
+        }
     }
 }

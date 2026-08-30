@@ -38,7 +38,6 @@ import com.bfg.watchfaces.appcore.Complications
 object FacePreview {
 
     /** Both kept identical to WffEmitter's, so the preview and the face agree. */
-    private const val CLOCK_SCALE_WITH_SECONDS = 0.82
 
     /** Mirrors the emitter's ambient rules so the preview tells the truth about ambient. */
     fun render(
@@ -68,10 +67,11 @@ object FacePreview {
         // Slot boxes come from SlotGeometry -- the same call WffEmitter makes.
         // Previously both computed this independently and a test asserted they
         // matched, which guarded a copy rather than removing it.
-        val iconSize = SlotGeometry.iconHeight(l.complicationSize).toDouble()
-        val textY = SlotGeometry.textOffset(l.complicationSize)
-        val textH = SlotGeometry.textHeight(l.complicationSize)
-        val fontSize = SlotGeometry.fontSize(l.complicationSize).toDouble()
+        // The FITTED size, matching the emitter: the boxes come from it too.
+        val fitted = SlotGeometry.fittedSize(p)
+        val iconSize = SlotGeometry.iconHeight(fitted).toDouble()
+        val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
+        val fontSize = SlotGeometry.fontSize(fitted).toDouble()
 
         // From v3 a complication carries an ambient colour Variant when the ink
         // would be unreadable on black. Mirror it, or the preview would show a
@@ -91,6 +91,7 @@ object FacePreview {
             if (pos in p.iconSlots) {
                 ComplicationIcons.draw(g, source, box.x + (box.w - iconSize) / 2.0, box.y.toDouble(), iconSize, c)
             }
+            val textY = SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)
             drawCenteredIn(g, Complications.sample(source), box.x, box.y + textY, box.w, textH,
                 fontSize, Font.PLAIN, c)
         }
@@ -120,8 +121,9 @@ object FacePreview {
             drawCentered(g, timeText, l.timeY - l.timeSize / 2, (l.timeSize * 1.4).toInt(),
                 l.timeSize.toDouble(), Font.PLAIN, ambientInk, thin = true)
         } else {
-            val clockSize =
-                if (p.showSeconds) l.timeSize * CLOCK_SCALE_WITH_SECONDS else l.timeSize.toDouble()
+            // Same size with or without seconds: turning them on must not
+            // resize the face. See SecondsBand.
+            val clockSize = l.timeSize.toDouble()
             drawCentered(g, timeText, l.timeY - l.timeSize / 2, (l.timeSize * 1.4).toInt(),
                 clockSize, awtStyle(l.fontWeight), ink)
         }
@@ -133,10 +135,12 @@ object FacePreview {
             val secs = "%02d".format(now.second)
             g.font = Font(Font.SANS_SERIF, Font.PLAIN, SecondsBand.fontSize(l))
             g.color = withAlpha(ink, SecondsBand.ALPHA)
-            val w = g.fontMetrics.stringWidth(secs)
-            val baseline =
-                l.timeY - l.timeSize / 2 + SecondsBand.offsetY(l) + g.fontMetrics.ascent
-            g.drawString(secs, SecondsBand.rightEdge() - w, baseline)
+            val fm = g.fontMetrics
+            // Centred in the clock's own band, so the seconds sit ON the time's
+            // line rather than under it.
+            val top = SecondsBand.topInDial(l)
+            val baseline = top + (SecondsBand.height(l) + fm.ascent - fm.descent) / 2
+            g.drawString(secs, SecondsBand.rightEdge() - fm.stringWidth(secs), baseline)
         }
 
         g.dispose()
