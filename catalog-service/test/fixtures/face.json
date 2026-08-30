@@ -1,0 +1,29 @@
+{
+  "name": "Fixture Face",
+  "slug": "fixture_face",
+  "author": "The Test Suite",
+  "created": "2026-08-30T00:00:00Z",
+  "params": {
+    "generatorVersion": 8,
+    "engine": "KNOTWORK",
+    "scale": 26.0, "depth": 5.0, "freq": 9,
+    "stroke": 1.2, "relief": 1.4, "contrast": 30.0,
+    "rotate": 45.0, "vignette": 18.0, "sheen": 30.0,
+    "dialColor": "#7D7369", "inkColor": "#FCF9F1",
+    "showSeconds": true,
+    "providers": {"LEFT": "com.example.fit/.StepsProvider"},
+    "iconSlots": ["TOP", "LEFT", "MIDDLE", "RIGHT", "BOTTOM"],
+    "dateStyle": "WEEKDAY_MONTH_DAY", "dateScale": "LARGE",
+    "ring": "STEPS", "hourFormat": "TWELVE",
+    "lens": true, "lensAmount": 38.0,
+    "texture": "",
+    "complications": ["WEATHER_TEMP_CONDITION", "STEP_COUNT+app:com.example.fit/.StepsProvider", "HEART_RATE", "SHORTCUT_MUSIC+open:com.example.music/.PlayerActivity", "WATCH_BATTERY"],
+    "layout": {
+      "dateY": 99, "dateSize": 64,
+      "timeY": 196, "timeSize": 104, "tracking": 0.0,
+      "complicationY": 273, "complicationSpread": 92,
+      "complicationSize": 19, "batteryY": 344,
+      "fontFamily": "SYNC_TO_DEVICE", "fontWeight": "MEDIUM"
+    }
+  }
+}

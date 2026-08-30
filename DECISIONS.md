@@ -1,5 +1,119 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-30 — The catalog service runs on Cloudflare, and validation splits in two
+
+### Cloudflare, decided on merit
+
+The spec recommended Azure on the grounds that the sibling repos use it heavily,
+then reversed itself on the grounds that the only reachable Azure subscription
+belongs to the operator's employer. The operator rejected the framing outright —
+they use both clouds, they do not care who owns the accounts, they want the best
+solution — and chose Cloudflare once the comparison was redone on technical
+merit alone.
+
+What actually decided it, all three specific to this workload:
+
+- **No cold start on the install counter.** `POST /faces/<slug>/installed` fires
+  on every community install and a person is waiting on it. Workers are V8
+  isolates; Static Web Apps' Free-plan Functions cold start in seconds.
+- **D1 is real SQL, so "byte-identical submissions are rejected" is a partial
+  unique index** enforced by the database. On Table Storage it becomes a
+  read-then-write in application code with a race two simultaneous submissions
+  can drive straight through. Cosmos would fix that, and its one free-tier
+  account per subscription is already taken.
+- **Turnstile is a same-platform call**, not a second service with a second
+  credential to rotate.
+
+Rejected, with the reasons named rather than dismissed: Azure's App Insights,
+point-in-time restore and staging slots are real advantages, and they are
+operational maturity for a project that has no on-call, no alerting and no
+restore drill. If this ever needs those, that is when the argument changes.
+
+One ceiling is recorded because it is where this design would first hurt: a
+response served from `caches.default` still costs a Worker invocation, so
+Workers Free's 100,000 requests/day applies to total requests, not cache misses.
+The fix if it is ever approached is Pages or a zone Cache Rule, not a migration.
+
+**The account-ownership argument is retired.** It was raised three times after
+the operator had twice said it was not a factor. It stays in the spec's history
+because it was made, not because it counts.
+
+### The Worker does not know what a face is
+
+A Cloudflare Worker is JavaScript. The thing it has to validate is defined in
+Kotlin. The obvious move — write the ranges and enums out again in TypeScript —
+is exactly the shape this repo has already been hurt by four times, and
+`ControlInventory`'s header says why: "A test that two copies match cannot tell
+you they are both correct."
+
+So `CatalogContract` in `:generator` emits `params-contract.json`, and the
+Worker reads it. Ranges from `ControlInventory`, layout bounds from
+`SlotGeometry`, enums from `DialParams`, the field list from
+`FaceCodec.toQuery`, the colour and ComponentName patterns from `DialParams`'
+own regexes, and the font weights from Watch Face Format's XSD — with a test
+that reads the XSD and fails when the transcription drifts.
+
+It is committed, like the launcher icons and for the same reason: a
+`wrangler deploy` must not depend on a JVM task having been run.
+`ContractFileTest` is what makes the committed copy trustworthy.
+
+**The test fixture is generated too**, from `FaceCodec` and `CatalogStore`, and
+this immediately earned itself. It caught `dateSize` bounded by
+`SlotGeometry.MAX_DATE_SIZE` (56) when the stored default is 64 — those
+constants bound the DERIVED date size, not the stored field, which
+`fittedDateSize` stopped reading when the date became fitted. The service would
+have rejected every genuine submission on a public endpoint, and a hand-written
+fixture would have passed every test while it did.
+
+The general guard added for that class of bug: a test asserting the DEFAULTS
+satisfy every bound the contract states. A validator stricter than the format
+rejects real work and nothing else notices.
+
+### Validation happens twice, in two languages, and that is deliberate
+
+R3 said "submissions validate without a human", written when the catalog was
+git and CI was a JVM. It cannot be satisfied as written — the emitter is Kotlin
+and the schema validator is Xerces, and neither runs in a Worker.
+
+Rejected: porting the emitter to JavaScript. That is a second implementation of
+the file format, and every one of `SlotGeometry`, `ControlInventory`,
+`EngravedStroke` and `FaceCodec` exists because a duplicated implementation had
+already caused a real bug.
+
+Chosen: the Worker checks what is cheap and structural at the POST — ranges,
+enums, colours, unknown fields, and strings that would break out of an XML
+attribute — and the moderation pass runs the real render and the real XSD on the
+JVM before anything is published. Nothing reaches the public without an
+automated verdict, which is what R3 was protecting; the verdict just no longer
+arrives while the submitter waits.
+
+Said plainly because it is the failure nobody can see: a schema-invalid face
+installs cleanly and then never appears in the carousel. There is no error on
+either side, so the automated check is the only signal that exists.
+
+### A boundary that only mattered once strangers could reach it
+
+`WffEmitter` writes `fontFamily` and every ComponentName straight into XML
+attributes with no escaping. Harmless while a face is made on the machine that
+renders it; an injection the moment anyone can submit one, since a quote closes
+the attribute. The contract publishes patterns for both, `DialParams.HEX` and
+`COMPONENT` became public rather than being described a second time, and the
+ComponentName pattern is anchored on the way out — Kotlin's `Regex.matches`
+requires a full match, `RegExp.test` does not, and an unanchored copy would have
+accepted anything wrapped around a valid value.
+
+### Two smaller things
+
+The colour pattern was briefly written as uppercase-only, which reads as tidier
+and would have rejected `#7d7369` on the public endpoint while the app went on
+saving it happily. It is now `DialParams.HEX` itself. A validator stricter than
+the format is a bug only strangers hit.
+
+Duplicate detection no longer matches text in a database error message. It asks
+the database. A driver's error string is not an interface, it differs between
+SQLite builds, and getting it wrong turned every duplicate into five pointless
+retries and a 503 — which is what it did, until the tests said so.
+
 ## 2026-08-30 — The transport works, and the three bugs that hid inside it
 
 A face designed on a Pixel 11 Pro XL reached a Pixel Watch 5 and installed:

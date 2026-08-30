@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.workbench
 
+import com.bfg.watchfaces.generator.CatalogContract
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.WffEmitter
@@ -82,8 +83,15 @@ object CatalogStore {
                "&slug=${enc(slug)}&title=${enc("report: $name")}"
     }
 
-    /** A face is parameters. Anything much larger than this is not a face. */
-    const val MAX_FACE_BYTES = 8 * 1024
+    /**
+     * A face is parameters. Anything much larger than this is not a face.
+     *
+     * The number lives in [CatalogContract] because the catalog service
+     * enforces the same limit from JavaScript, having read it out of the
+     * generated contract. Two constants would be two limits that can disagree,
+     * and the one that disagrees is on the public endpoint.
+     */
+    const val MAX_FACE_BYTES = CatalogContract.MAX_FACE_BYTES
 
     data class Entry(
         val slug: String,

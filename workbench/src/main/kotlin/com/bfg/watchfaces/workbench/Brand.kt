@@ -101,7 +101,7 @@ object Brand {
     @JvmStatic
     fun main(args: Array<String>) {
         System.setProperty("java.awt.headless", "true")
-        val root = findRoot()
+        val root = RepoRoot.find()
         println("brand artwork into ${root.absolutePath}")
 
         val fit = BrandMark.fitInto(ADAPTIVE_CANVAS, ADAPTIVE_KEYLINE)
@@ -383,21 +383,13 @@ object Brand {
     private fun write(file: File, text: String) {
         file.parentFile.mkdirs()
         file.writeText(text)
-        println("  ${file.path.removePrefix(findRoot().path + "/")}")
+        println("  ${file.path.removePrefix(RepoRoot.find().path + "/")}")
     }
 
     private fun writePng(file: File, image: BufferedImage) {
         file.parentFile.mkdirs()
         ImageIO.write(image, "png", file)
-        println("  ${file.path.removePrefix(findRoot().path + "/")} (${image.width}x${image.height})")
+        println("  ${file.path.removePrefix(RepoRoot.find().path + "/")} (${image.width}x${image.height})")
     }
 
-    private fun findRoot(): File {
-        var d: File? = File(System.getProperty("user.dir")).absoluteFile
-        while (d != null) {
-            if (File(d, "settings.gradle.kts").isFile) return d
-            d = d.parentFile
-        }
-        return File(System.getProperty("user.dir")).absoluteFile
-    }
 }

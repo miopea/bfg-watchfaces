@@ -20,7 +20,7 @@ object Catalog {
     fun main(args: Array<String>) {
         System.setProperty("java.awt.headless", "true")
         val checkOnly = args.contains("--check")
-        val repoRoot = findRoot()
+        val repoRoot = RepoRoot.find()
 
         // --dir lets the catalog repo's own CI validate its checkout using this
         // validator, so there is one implementation rather than a copy that
@@ -117,12 +117,4 @@ object Catalog {
     private fun stripGenerated(s: String) =
         s.lines().filterNot { it.trimStart().startsWith("\"generated\"") }.joinToString("\n")
 
-    private fun findRoot(): File {
-        var d: File? = File(System.getProperty("user.dir")).absoluteFile
-        while (d != null) {
-            if (File(d, "settings.gradle.kts").isFile) return d
-            d = d.parentFile
-        }
-        return File(System.getProperty("user.dir")).absoluteFile
-    }
 }

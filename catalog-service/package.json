@@ -1,0 +1,22 @@
+{
+  "name": "bfg-catalog-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Anonymous submit, anonymous report and pre-moderation for the BFG Watch Faces community catalog.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "db:local": "wrangler d1 execute bfg-catalog --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute bfg-catalog --remote --file=schema.sql",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^5.20260830.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.127.1"
+  }
+}

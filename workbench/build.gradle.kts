@@ -65,6 +65,15 @@ tasks.register<JavaExec>("brand") {
     workingDir = rootProject.projectDir
 }
 
+/** Regenerate the catalog service's params contract. Writes a checked-in file. */
+tasks.register<JavaExec>("contract") {
+    group = "bfg"
+    description = "Write catalog-service/params-contract.json from CatalogContract"
+    mainClass.set("com.bfg.watchfaces.workbench.Contract")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
 /** A Watch Face Push validation token for an APK, so it can be pushed by hand. */
 tasks.register<JavaExec>("token") {
     group = "bfg"

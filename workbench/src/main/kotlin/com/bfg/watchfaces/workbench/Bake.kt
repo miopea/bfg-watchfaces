@@ -56,7 +56,7 @@ object Bake {
         // Explicit flags win over the preset, so you can nudge one value.
         val merged = FaceCodec.fromQuery(FaceCodec.toQuery(base).toQueryMap() + kv)
 
-        val root = findRoot()
+        val root = RepoRoot.find()
         println("baking into ${root.absolutePath}")
         println("  \"$faceName\" -- engine=${merged.engine} scale=${merged.scale} dial=${merged.dialColor} ink=${merged.inkColor}")
 
@@ -94,12 +94,4 @@ object Bake {
                 java.net.URLDecoder.decode(it.substring(i + 1), Charsets.UTF_8)
         }.toMap()
 
-    private fun findRoot(): File {
-        var d: File? = File(System.getProperty("user.dir")).absoluteFile
-        while (d != null) {
-            if (File(d, "settings.gradle.kts").isFile) return d
-            d = d.parentFile
-        }
-        return File(System.getProperty("user.dir")).absoluteFile
-    }
 }

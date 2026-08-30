@@ -573,7 +573,16 @@ data class DialParams(
     }
 
     companion object {
-        private val HEX = Regex("^#[0-9A-Fa-f]{6}$")
+        /**
+         * What a stored colour looks like: `#RRGGBB`, either case.
+         *
+         * Public because the catalog service enforces the same rule from
+         * JavaScript, having read it out of the generated contract. It was
+         * briefly written out again there as uppercase-only, which would have
+         * rejected perfectly valid stored faces on a public endpoint — so the
+         * pattern is published rather than described.
+         */
+        val HEX = Regex("^#[0-9A-Fa-f]{6}$")
     }
 }
 
@@ -662,7 +671,7 @@ data class Layout(
  * may contain `$` for a nested class. Nothing else is accepted, because this
  * string is written verbatim into a WFF attribute.
  */
-private val COMPONENT = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*/\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z0-9_$]+)*""")
+val COMPONENT = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*/\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z0-9_$]+)*""")
 
 const val CURRENT_GENERATOR_VERSION = 8
 

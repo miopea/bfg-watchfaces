@@ -475,24 +475,99 @@ Azure would win if this needed to sit inside existing operational tooling —
 monitoring, alerting, an on-call rota. A personal free gallery has none of that,
 and the sibling repos' Azure is not the operator's to borrow for it.
 
-### Recommendation, for the operator to confirm
+### Settled 2026-08-30: Cloudflare
 
-**Move the service to Cloudflare.** The original decision was "ideally something
-we already use", and on the evidence that is Cloudflare: it is the operator's
-own account, the free tier is intact, Workers is already live there, and
-Turnstile is on the same account.
+The operator chose Cloudflare in the terminal — "Cloudflare, go ahead" — after
+instructing that account ownership was not a factor and the choice was to be
+made on technical merit alone. **The ownership argument above is therefore
+retired and must not be raised again.** It is left in the record because it was
+made, not because it still counts.
 
-The numbers were recorded when Azure was chosen and still hold: Workers Free is
-100,000 requests/day and D1 Free is one database at 500 MB — against a catalog
-sized for 10,000 faces of ~5KB each, and an index served from cache.
+The merit case, which is what decided it:
 
-This reverses a settled operator decision on new evidence, so it is written as a
-recommendation rather than applied. Nothing has been created on either account.
+- **Workers have no cold start, and the install counter is on the critical
+  path.** Every install of a community face calls
+  `POST /faces/<slug>/installed`. Workers are V8 isolates; Functions on the
+  Static Web Apps Free plan cold start in seconds. Submit and report are rare
+  enough not to care; the counter is not.
+- **D1 is real SQL, so the dedup rule is enforced by the engine.**
+  "Byte-identical submissions are rejected" is one partial unique index. Table
+  Storage cannot express it, so on Azure it becomes a read-then-write in
+  application code with a race two simultaneous submissions can drive through.
+  Cosmos would fix that and its free tier is taken.
+- **Turnstile is a same-platform call** rather than a second service with a
+  second credential to store and rotate.
+
+Azure's genuine advantages were named and judged not to apply yet: App Insights,
+point-in-time restore, staging slots, and a read path with zero compute per
+gallery view. All of it is operational maturity for a project with no on-call,
+no alerting and no restore drill.
+
+The numbers still hold: Workers Free is 100,000 requests/day and D1 Free is one
+database at 500 MB, against a catalog sized for 10,000 faces of ~5KB each.
+
+**One ceiling is worth writing down**, because it is the place this design would
+first hurt: a response served from `caches.default` still costs a Worker
+invocation, so the 100k/day free limit applies to total requests rather than
+cache misses. Azure's shape avoids that by serving the index as a genuinely
+static file. Cloudflare can match it with Pages or a zone Cache Rule, and that
+is the move if the request count ever approaches the limit — not a migration.
+
+## Validation is split, and the split is the interesting part
+
+R3 says "submissions validate without a human". That was written assuming a JVM
+and it cannot be satisfied as written: a Worker is JavaScript, the emitter is
+Kotlin and the schema validator is Xerces.
+
+Porting either into JavaScript was rejected outright. It would be a second
+implementation of the file format, which is the thing `SlotGeometry`,
+`ControlInventory`, `EngravedStroke` and `FaceCodec` all exist to prevent, and
+each of those was created *after* a duplicated implementation had already caused
+a real bug.
+
+So the check happens in two places:
+
+| Where | What it catches | When |
+| --- | --- | --- |
+| The Worker, from the generated contract | Values outside a slider's range, unknown enum members, malformed colours, unknown fields, and strings that would break out of an XML attribute | At the POST |
+| The moderation pass, on the JVM | Whether the face renders and emits WFF that passes Google's XSD | Before publication |
+
+**Nothing reaches the public without an automated verdict**, which is what R3
+was protecting. What changed is that the verdict no longer arrives while the
+submitter is waiting. That is worth stating plainly because a schema-invalid
+face installs cleanly and then never appears in the carousel — there is no
+error, on either side, so the automated check is the only signal that exists.
+
+### The contract is generated, not written twice
+
+`catalog-service/params-contract.json` comes from `CatalogContract` in
+`:generator` via `./gradlew :workbench:contract`. Ranges come from
+`ControlInventory`, layout bounds from `SlotGeometry`, enums from `DialParams`,
+the field list from `FaceCodec.toQuery`, the colour and ComponentName patterns
+from `DialParams`' own regexes, and the font weights from Watch Face Format's
+XSD. It is committed because a `wrangler deploy` must not depend on a JVM having
+been run, and `ContractFileTest` fails when the committed copy goes stale.
+
+The test fixture is generated by the same task, from `FaceCodec` and
+`CatalogStore`. This is not fastidiousness: the generated fixture immediately
+caught `dateSize` being bounded by `SlotGeometry.MAX_DATE_SIZE` (56) when the
+stored default is 64. Every genuine submission would have been rejected on the
+public endpoint, and every test using a hand-written fixture would have passed.
+
+### One security bound that was not previously needed
+
+`WffEmitter` interpolates `fontFamily` and every ComponentName straight into XML
+attributes with no escaping. That is harmless while every face is made on the
+machine that renders it, and stops being harmless the moment a stranger can
+submit one — a quote closes the attribute. The contract publishes patterns for
+both and the Worker enforces them.
 
 ## Still open
 
-- **Confirmation of the hosting reversal above.** Nothing is built until it is
-  settled, and building on the wrong one is expensive to undo.
+- **Deployment.** Nothing exists on the account. It needs an interactive
+  `wrangler login`, so it is the operator's action.
+- **The moderation pass itself.** The JVM half that runs the real WFF check over
+  the queue is specified above and not yet built.
 
 ## Release gates, not tasks
 

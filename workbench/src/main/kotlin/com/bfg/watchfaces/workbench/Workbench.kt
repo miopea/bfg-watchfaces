@@ -41,16 +41,7 @@ import com.bfg.watchfaces.appcore.Complications
  */
 object Workbench {
 
-    private val root: File by lazy { findRoot() }
-
-    private fun findRoot(): File {
-        var d: File? = File(System.getProperty("user.dir")).absoluteFile
-        while (d != null) {
-            if (File(d, "settings.gradle.kts").isFile) return d
-            d = d.parentFile
-        }
-        return File(System.getProperty("user.dir")).absoluteFile
-    }
+    private val root: File by lazy { RepoRoot.find() }
 
     @JvmStatic
     fun main(args: Array<String>) {

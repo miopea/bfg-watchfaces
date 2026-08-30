@@ -1,0 +1,35 @@
+# The community catalog service.
+#
+# Cloudflare rather than Azure, settled 2026-08-30: the Cosmos free tier in the
+# only reachable subscription is taken, that subscription is the operator's
+# EMPLOYER's, the install counter is on the app's critical path and Workers have
+# no cold start, and Turnstile is on this same account.
+# docs/specs/catalog-service.md carries the full comparison.
+#
+# NOT DEPLOYED. No resource has been created on the account. The database id
+# below is a placeholder; `wrangler d1 create bfg-catalog` prints the real one.
+
+name = "bfg-catalog"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# The published catalog changes only when a maintainer approves something, so
+# reads are served from the edge cache and the database is not touched at all on
+# a cache hit. See CACHE_SECONDS in src/index.ts.
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bfg-catalog"
+database_id = "REPLACE_ME__wrangler_d1_create_bfg-catalog_prints_this"
+
+[vars]
+# Public. The private half is a secret: `wrangler secret put TURNSTILE_SECRET`.
+TURNSTILE_SITE_KEY = ""
+
+# Secrets, set with `wrangler secret put <name>` and never written here:
+#
+#   TURNSTILE_SECRET   proof-of-humanity, from the Turnstile dashboard
+#   MODERATOR_TOKEN    the only credential in the system; guards /admin/*
+#   IP_SALT            salts hashed IPs for rate limiting, so no raw IP is stored
