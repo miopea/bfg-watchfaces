@@ -72,12 +72,31 @@ Stripping every `XmlSafe` call from the emitter fails 5 of the 10 new tests. The
 legal" checks, which do not depend on the emitter calling it — which is correct,
 and worth stating so nobody later reads them as coverage they are not.
 
-### One thing deliberately left alone
+### One thing deliberately left alone, and then not
 
-`Workbench.exportTo` hand-rolls its own escape for `strings.xml` — `&` and `<`
-only, which is correct for element text. It is a second hand-rolled escape and a
-candidate for `XmlSafe.text`, but it is not the emitter and it is not wrong, so
-it stays outside this change rather than widening it.
+`Workbench.exportTo` hand-rolled its own escape for `strings.xml` — `&` and `<`
+only. It stayed outside that change rather than widening it, and was filed
+separately.
+
+**Picked up afterwards, and the "it is not wrong" half turned out to be wrong.**
+`&` and `<` are the only two characters that must ALWAYS be escaped in element
+text, which is the reasoning everyone including me applied. But the XML
+specification also requires `>` to be escaped when it falls in the sequence
+`]]>`, and a face name is exactly the field where a sequence like that arrives.
+Exporting a face called `Bracket ]]> Face` produced a `strings.xml` no parser
+accepts — and that file is built into an APK by aapt2, so the symptom would have
+been a link failure saying nothing about the name.
+
+Established by writing the test first and watching it fail against the existing
+line, rather than by reading the spec and assuming. `XmlSafe.text` escapes `>`
+unconditionally, so substituting it fixed the case as a side effect of removing
+the duplication.
+
+One real difference is recorded rather than glossed: a name containing a bare
+`>` now produces different BYTES than before, because the helper escapes it
+whether or not it is part of `]]>`. It parses to the same string, so the
+resource in the APK is identical. "No behaviour change" was the acceptance line
+and blanket byte-identity would have been a claim too strong to make.
 
 ## 2026-08-30 — The catalog service runs on Cloudflare, and validation splits in two
 
