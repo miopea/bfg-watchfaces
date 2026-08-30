@@ -138,8 +138,25 @@ object WatchLink {
         const val OK_NOT_ACTIVE = "OK_NOT_ACTIVE"
         const val FAILED = "FAILED"
 
-        /** At most this many bytes; the phone reads no further. */
-        const val MAX_BYTES = 512
+        /**
+         * At most this many bytes; the phone reads no further.
+         *
+         * Big enough for the verdict AND the watch's provider catalog, which
+         * rides back on the same reply. A bare emulator has 37 complication
+         * sources; a real watch with apps on it has more.
+         */
+        const val MAX_BYTES = 128 * 1024
+
+        /** Separates the verdict line from the catalog that follows it. */
+        const val SEPARATOR = "\n"
+
+        /** The verdict alone, ignoring any catalog after it. */
+        fun verdictIn(raw: String?): String? =
+            raw?.substringBefore(SEPARATOR)?.trim()?.takeIf { it.isNotEmpty() }
+
+        /** The catalog JSON after the verdict, or null when the watch sent none. */
+        fun catalogIn(raw: String?): String? =
+            raw?.substringAfter(SEPARATOR, "")?.trim()?.takeIf { it.startsWith("[") }
 
         fun installed(active: Boolean): String = if (active) OK else OK_NOT_ACTIVE
 
@@ -155,7 +172,7 @@ object WatchLink {
          * wrong in the first place.
          */
         fun describe(faceName: String, watchName: String, raw: String?): String {
-            val line = raw?.trim().orEmpty()
+            val line = verdictIn(raw).orEmpty()
             return when {
                 line == OK -> "“$faceName” is on ${watchName} and switched on."
                 line == OK_NOT_ACTIVE ->

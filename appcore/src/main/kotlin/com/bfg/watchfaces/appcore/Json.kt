@@ -26,6 +26,9 @@ object Json {
     @Suppress("UNCHECKED_CAST")
     fun obj(v: Any?): Map<String, Any?> = v as? Map<String, Any?> ?: emptyMap()
 
+    /** A parsed value as a list, or empty when it is not one. */
+    fun arr(v: Any?): List<Any?> = v as? List<Any?> ?: emptyList()
+
     fun str(m: Map<String, Any?>, k: String, def: String = ""): String = m[k] as? String ?: def
     fun num(m: Map<String, Any?>, k: String, def: Double): Double = (m[k] as? Double) ?: def
     fun bool(m: Map<String, Any?>, k: String, def: Boolean): Boolean = (m[k] as? Boolean) ?: def

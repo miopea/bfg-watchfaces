@@ -96,7 +96,18 @@ class FaceReceiverService : WearableListenerService() {
                     resetComplications = WatchLink.resetsComplications(channel.path)
                 )
                 report(result)
-                reply(client, channel, lineFor(result))
+                // The verdict, and the watch's provider catalog behind it.
+                //
+                // Complication providers are services on the WATCH, so the
+                // phone cannot enumerate them and its picker could only ever
+                // offer what the build knew. It rides back on a send because
+                // the channel is already open and the watch was reachable by
+                // definition -- no second connection, no background job, and
+                // the picker still works with the watch out of range.
+                val catalog = ProviderCatalog.toJson(
+                    ProviderCatalog.installed(this@FaceReceiverService)
+                )
+                reply(client, channel, lineFor(result) + WatchLink.Report.SEPARATOR + catalog)
             }.onFailure {
                 Log.e(TAG, "face did not arrive or would not install", it)
                 reply(client, channel, WatchLink.Report.failed(it.message ?: it.javaClass.simpleName))

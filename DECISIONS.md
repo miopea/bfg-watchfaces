@@ -121,6 +121,32 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — The watch's provider list, carried by the reply
+
+Backlog item 1, and it became cheap the moment the install report existed: the
+catalog rides back on the SAME reply, behind the verdict line. No second
+connection, no background job, no new path or listener.
+
+A complication provider is a service on the WATCH, so the phone can never
+enumerate them and its picker could only ever offer what the build knew — which
+is why "Google Health isn't in the list" had no answer. `ProviderCatalog` finds
+them with the LEGACY action; the AndroidX spelling returns nothing.
+
+The phone caches what came back, so the list is exactly as fresh as the last
+send. An app installed since will not appear until the next one, and that is the
+accepted price of a picker that opens with the watch charging in another room
+rather than one that needs Bluetooth.
+
+Choosing one writes `primaryProvider` and keeps the system source as the
+fallback, because `defaultSystemProvider` is required and a watch without that
+app has to show something. Choosing a system or drawn source clears the app: a
+slot holds one thing.
+
+Verified on the phone emulator by seeding a catalog the way a watch would:
+"Moon phase / Clock" and "Daily steps / Google Fit" appear under "From your
+watch". The watch half is exercised by the same reply path that carries the
+verdict, which is still first run on real hardware.
+
 ## 2026-08-30 — The date is sized to the clock, not stored
 
 "Scale it close to the width of the time." A stored point size cannot do that:

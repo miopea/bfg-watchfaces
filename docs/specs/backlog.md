@@ -6,7 +6,18 @@ Written 2026-08-30. Ordered by what unblocks the most.
 Decisions already taken are in `DECISIONS.md`; the slot model is specified in
 `slot-content.md`. This file is only the things that are NOT done.
 
-## 1. Third-party complication providers in the picker
+## ~~1. Third-party complication providers in the picker~~ — DONE 2026-08-30
+
+The watch enumerates its providers, the list rides back on a successful send,
+the phone caches it, and the picker offers them under "From your watch" with the
+owning app as a subtitle. Choosing one writes `primaryProvider` with the system
+source kept as the fallback.
+
+The cost, as decided: the list is as fresh as the last send, so an app installed
+since will not appear until the next one. That is what keeps the picker working
+with the watch out of range.
+
+Original note follows.
 
 **Half built.** `ProviderCatalog` (`:wear`) enumerates every complication data
 source installed on the watch — 37 on a bare emulator — and filters to the ones

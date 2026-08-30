@@ -410,7 +410,13 @@ class MainActivity : ComponentActivity() {
                 // it said nothing -- an older build, or it never picked the
                 // transfer up -- and that is reported as unknown rather than
                 // as either outcome. See WatchLink.Report.
-                onSuccess = { report -> WatchLink.Report.describe(name, target.name, report) },
+                onSuccess = { report ->
+                    // The watch sends its provider catalog back with the
+                    // verdict. Keeping it is what lets the picker offer what is
+                    // actually installed rather than only what this build knows.
+                    WatchLink.Report.catalogIn(report)?.let { ProviderCache.save(context, it) }
+                    WatchLink.Report.describe(name, target.name, report)
+                },
                 onFailure = {
                     Log.e(TAG, "transfer to ${target.name} failed", it)
                     "“$name” didn’t make it to ${target.name}. " +

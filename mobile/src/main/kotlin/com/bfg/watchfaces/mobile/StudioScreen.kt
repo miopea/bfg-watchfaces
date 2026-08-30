@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -192,7 +193,20 @@ fun StudioScreen(
                 pos = pos,
                 selected = params.slot(pos),
                 iconOn = pos in params.iconSlots,
-                onSelect = { onParams(params.withSlot(pos, it)) },
+                component = params.providers[pos],
+                onSelect = {
+                    // Choosing a system or drawn source clears any provider
+                    // app: a slot holds ONE thing.
+                    onParams(params.withSlot(pos, it).copy(providers = params.providers - pos))
+                },
+                onApp = { component ->
+                    // The system source stays as the fallback for a watch that
+                    // does not have the app. DefaultProviderPolicy requires one.
+                    val withFallback =
+                        if (params.slot(pos).enabled) params
+                        else params.withSlot(pos, ComplicationSource.DATE)
+                    onParams(withFallback.copy(providers = withFallback.providers + (pos to component)))
+                },
                 onIcon = { on ->
                     val next = if (on) params.iconSlots + pos else params.iconSlots - pos
                     onParams(params.copy(iconSlots = next))
@@ -331,7 +345,10 @@ private fun SlotPicker(
     pos: SlotPosition,
     selected: ComplicationSource,
     iconOn: Boolean,
+    /** The provider app chosen for this slot, if any. */
+    component: String?,
     onSelect: (ComplicationSource) -> Unit,
+    onApp: (String) -> Unit,
     onIcon: (Boolean) -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
@@ -377,6 +394,7 @@ private fun SlotPicker(
                         )
                         HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     }
+                    val fromWatch = ProviderCache.load(LocalContext.current)
                     for ((heading, group) in listOf(
                         null to Presentation.PICKER_COMMON,
                         "More" to Presentation.PICKER_REST
@@ -407,6 +425,45 @@ private fun SlotPicker(
                             Text(Presentation.label(source),
                                  style = MaterialTheme.typography.bodyLarge)
                         }
+                        }
+                    }
+
+                    // What the WATCH reported it has. Empty until the first
+                    // successful send, because the list comes back on one --
+                    // a provider is a service on the watch and the phone cannot
+                    // see it.
+                    if (fromWatch.isNotEmpty()) {
+                        HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                        Text(
+                            "From your watch",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        for (p in fromWatch) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onApp(p.component); open = false }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = component == p.component,
+                                    onClick = { onApp(p.component); open = false }
+                                )
+                                Spacer(Modifier.size(4.dp))
+                                Column {
+                                    Text(p.label, style = MaterialTheme.typography.bodyLarge)
+                                    if (p.app.isNotBlank() && p.app != p.label) {
+                                        Text(
+                                            p.app,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
