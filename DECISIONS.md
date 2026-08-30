@@ -134,7 +134,7 @@ is broken, and updating the watch app over a live face does not break it either.
 What "black background with a time" actually is: Wear's OWN default face. The
 face is installed and simply not the one being worn.
 
-**"Sent" was overclaiming.** `FaceSender` resolves when the TRANSFER completes.
+**"Sent" was claiming too much.** `FaceSender` resolves when the TRANSFER completes.
 Whether the watch then switched to the face is decided on the watch and never
 reported back — and it usually does not switch, because `setWatchFaceAsActive`
 succeeds once per app install and is refused afterwards. So from the second send
@@ -144,7 +144,7 @@ onwards a face installs perfectly, the wrist does not change, and the phone says
 The message now says what this side actually knows, and names the one action
 that works: long-press the face and pick it.
 
-**Still overclaiming, and worth naming:** "Sent" also does not mean INSTALLED.
+**Still claiming too much, and worth naming:** "Sent" also does not mean INSTALLED.
 The phone reports success when the bytes are across; an `addWatchFace` failure
 on the other side is invisible to it. A face that fails to install and a face
 that installs without switching produce the same message. The fix is a reply
