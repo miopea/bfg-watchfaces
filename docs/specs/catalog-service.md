@@ -618,12 +618,78 @@ own public address bound to the SAME database, so a submission through a preview
 URL would land in the real moderation queue and a second public entry point
 would exist that nobody was thinking about.
 
+## The app's client, 2026-08-30
+
+`CatalogService` in `:appcore` is the seam. One base URL, one place to point
+somewhere else — which is what made the whole migration reversible and was the
+condition the sequencing was built around. A test asserts the URL appears in
+exactly one file.
+
+`CatalogTransport` is an interface so tests can answer without a network, with
+one real implementation on `HttpURLConnection` because that works unchanged on
+the JVM and on Android. `java.net.http` is nicer and is API 34+, which would
+have meant two implementations of three methods.
+
+### What is verified, and how
+
+**The read path, on a real Android runtime against the deployed service.** The
+Community tab was driven on an SDK 36 phone emulator: it fetched
+`index.json`, rendered the empty state, and wrote the response to
+`cache/catalog/catalog-index.json` — a document the live Worker stamped
+`"generated":"2026-08-30T23:17:54.876Z"`. That timestamp is the evidence; an
+empty gallery on its own looks exactly like a placeholder.
+
+The discriminating test was taking the network away. With no cache and no
+network the tab says the catalog is not answering, naming the real host in the
+underlying failure. With a cache it shows the cached list, marked.
+
+**Five live tests** run the client against the deployed service
+(`BFG_CATALOG_URL=... ./gradlew :appcore:test --tests '*CatalogLive*'`), and
+skip otherwise so a machine with no network does not fail a build.
+
+### What is NOT verified, and cannot be yet
+
+**Submit and report have never run end to end.** The client methods exist and
+are tested against the seam, including that a refusal surfaces the service's own
+per-field problems rather than collapsing to "failed". But both need a Turnstile
+token, Turnstile is not configured, and the service fail-closes — so the furthest
+either has gone against the live service is a 403 that arrives as a readable
+message. One live test asserts submissions are switched off, and it will FAIL
+when Turnstile lands, which is the intended reminder that this paragraph has
+gone stale.
+
+**There is no submit or report UI.** Building a share button that cannot work
+would be worse than not having one.
+
+### Two things caught by running it
+
+- **A cached empty list was reported as "Nothing shared yet".** That is a claim
+  about the catalog which a phone holding a snapshot of unknown age cannot make.
+  Online and offline looked identical. It now says it is showing what it last
+  downloaded.
+- **The failure message was developer speech** — `Unable to resolve host
+  "bfg-catalog.bfg-solutions.workers.dev": No address associated with hostname`,
+  on a real screen. The transport's cause is now dropped rather than shown.
+
+### A tile fetches its own face
+
+`index.json` carries name, author, engine and two colours — enough to browse,
+deliberately not enough to render, because full parameters for ten thousand
+faces is not an index. Drawing a tile from the engine and colours alone would
+show a face that is not the one somebody submitted. So each tile fetches its own
+parameters and renders them through the one rasterizer; a `LazyVerticalGrid`
+only composes what is visible, so that is a handful of requests and they come
+from the edge cache.
+
 ## Still open
 
 - **Turnstile.** `TURNSTILE_SECRET` is unset, so submit and report answer 403.
   That is the fail-closed path working as designed, and it is also the reason
   the service cannot accept anything yet. It needs a widget created in the
   dashboard.
+- **Submit and report UI**, once Turnstile exists.
+- **Retiring `miopea/bfg-watchfaces-catalog`**, which is LAST. It still hosts the
+  app's only working complaint path.
 - **The app's submit and report paths.** The service has no client yet: the
   Community tab still reads a local directory and the report sheet still opens a
   GitHub issue. That is step 3 of the sequencing, and step 4 does not begin
