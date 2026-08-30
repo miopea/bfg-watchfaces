@@ -121,6 +121,66 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — The slot name was the bug, and generator v7
+
+More wrist reports. The important one: "whatever's in the right position is
+always the exact same as the bottom one".
+
+**Slot names were keyed by the SOURCE, not the POSITION.** `WffEmitter` wrote
+`displayName="@string/slot_${source}"`, so a slot was named after whatever
+happened to be in it. Two slots holding the same source got the SAME name, which
+is what the watch's own editor uses to tell slots apart. `displayName` is the
+name of the SLOT, so it has to say where the slot is.
+
+**And the phone never emitted those strings at all.** `FaceBuilder.strings()`
+emitted `watch_face_name` and nothing else, while the WFF referenced a
+`@string/slot_*` per slot. Every face built on the device shipped dangling
+resource references for its complication names.
+
+Nothing caught it, and the reason is worth recording: the workbench builds with
+aapt2, which FAILS on an unresolved `@string`, so that path was safe by
+accident. The phone builds with `pack`, which does not fail. The face compiled,
+signed, installed and ran with no name for any slot. This is the same shape as
+the schema tests — a check that exists on one path and not the one that ships.
+
+Both are now position-keyed, both builders emit all five names from one place in
+`:appcore`, and a test walks every configuration asserting that every `@string`
+the emitter references is one a builder supplies. It was confirmed to fail with
+the old keying restored.
+
+**v7 shrinks the complication glyph** from 1.25x the slot size to 0.85x. The
+symbol was larger than the number it labels, which is backwards, and the height
+was being paid for by the size control: v6 still ran out at 29.
+
+**The size options are now derived from the layout** rather than fixed at
+14/20/28. The ceiling moves with the face — five slots and a 104pt clock is a
+tight budget, and turning off a slot or a glyph frees real room — so a fixed
+"Large" was sometimes a number the layout refused and silently clamped. "Large"
+now means as large as this face allows.
+
+Honest limit: a five-slot face tops out around 31 (font 29), against v5's 25
+(font 23). "Make Small equal today's Large and scale up from there" is not
+reachable while five slots and a full-size clock share a 456 dial. Said plainly
+rather than papered over.
+
+**TIME_AND_DATE was missing.** Google's `defaultProviderType` has fourteen
+members; this app offered twelve plus NONE. There is no weather provider in that
+list at all, and third-party providers (Google Health and the like) cannot be
+named at build time — they are assigned by the wearer in the watch's editor,
+which is why the slot-name bug mattered more than it looked.
+
+**Seconds go THIN to LIGHT.** At a third of the clock's size THIN stopped
+reading as type. Both previews draw a normal weight because AWT has no light
+face, so this also narrows a gap where the preview was heavier than the face.
+
+**The drawn date goes to 40.** 30 was still a subtitle beside a 104pt clock.
+
+Two fixture lessons, one repeated. The v5 golden broke when `TIME_AND_DATE` was
+added to the enum, because a fixture used `ComplicationSource.entries.take(5)`
+-- a golden must not depend on the length of an enum expected to grow. And the
+v6 golden silently became a v7 golden the moment the version moved, exactly as
+the v5 one had. Every version now pins its own fixture explicitly.
+
 ## 2026-08-30 — Four bugs from a real wrist, and generator v6
 
 Reported after using the published build: turning seconds on shrank everything;

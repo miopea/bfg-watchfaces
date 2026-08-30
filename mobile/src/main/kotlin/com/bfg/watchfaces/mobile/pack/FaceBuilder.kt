@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import com.bfg.watchfaces.appcore.FaceLibrary
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.appcore.Complications
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.WffEmitter
 import com.bfg.watchfaces.mobile.AndroidDialRenderer
@@ -139,12 +140,30 @@ object FaceBuilder {
         }.also { preview.recycle() }
     }
 
-    private fun strings(name: String): String = """
+    /**
+     * Every string the emitted WFF references.
+     *
+     * This used to be `watch_face_name` alone, while [WffEmitter] referenced a
+     * `@string/slot_*` for every complication slot -- so every face this phone
+     * built shipped with dangling resource references and the watch's editor
+     * had no name to tell the slots apart by. Nothing failed at build time.
+     *
+     * All five are emitted whether or not the slot is filled: the resource has
+     * to exist for any face, and five short strings are cheaper than making
+     * this depend on which slots happen to be on.
+     */
+    private fun strings(name: String): String {
+        val slots = Complications.slotStrings().joinToString("\n") { (key, label) ->
+            """  <string name="$key">${escape(label)}</string>"""
+        }
+        return """
         |<?xml version="1.0" encoding="utf-8"?>
         |<resources>
         |  <string name="watch_face_name">${escape(name)}</string>
+        |$slots
         |</resources>
         |""".trimMargin()
+    }
 
     private const val WATCH_FACE_INFO = """<?xml version="1.0" encoding="utf-8"?>
 <WatchFaceInfo>

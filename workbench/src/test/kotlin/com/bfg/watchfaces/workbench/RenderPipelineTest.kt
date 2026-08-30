@@ -217,14 +217,58 @@ class RenderPipelineTest {
      * would never notice the new box heights, the glyph-less slot layout, the
      * drawn date or the seconds moving onto the clock's line.
      */
+    /**
+     * The CURRENT version's golden.
+     *
+     * Every version now has its own pinned fixture, because twice in a row a
+     * golden left on the default silently became a golden for the next version
+     * the moment it was bumped -- and the failure reads like a renderer
+     * regression rather than a fixture that moved.
+     */
+    @Test
+    fun `the v7 preview is pinned too`() {
+        val faces = listOf(
+            DialParams(generatorVersion = 7),
+            DialParams(generatorVersion = 7, complications = listOf(
+                ComplicationSource.NONE, ComplicationSource.STEP_COUNT,
+                ComplicationSource.HEART_RATE, ComplicationSource.DAY_AND_DATE,
+                ComplicationSource.DATE
+            )),
+            DialParams(generatorVersion = 7, iconSlots = emptySet()),
+            DialParams(generatorVersion = 7, showSeconds = true),
+            DialParams(generatorVersion = 7, dateStyle = DateStyle.WEEKDAY_MONTH_DAY)
+        )
+        val actual = faces.map { p ->
+            val img = FacePreview.render(p)
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            for (v in pixels(img)) {
+                md.update((v ushr 24).toByte()); md.update((v ushr 16).toByte())
+                md.update((v ushr 8).toByte()); md.update(v.toByte())
+            }
+            md.digest().joinToString("") { "%02x".format(it) }.take(16)
+        }
+        assertEquals(
+            listOf("80afb3ad447a5859", "308db7e8ad0700db", "4119f771e59ac813",
+                   "653e267cb29671f0", "8f7b19448b588a88"),
+            actual
+        ) { "the v7 preview changed; every face saved at v7 renders differently" }
+    }
+
     @Test
     fun `the v6 preview is pinned too`() {
+        // Pinned to v6 explicitly. Left on the default it silently became a v7
+        // golden the moment the version moved -- the same drift that broke the
+        // v5 fixture, one version later.
         val faces = listOf(
-            DialParams(),                                       // v6 by default
-            DialParams(complications = ComplicationSource.entries.take(5)),
-            DialParams(iconSlots = emptySet()),                 // the shorter, glyph-less box
-            DialParams(showSeconds = true),                     // seconds beside a full-size clock
-            DialParams(dateStyle = DateStyle.WEEKDAY_MONTH_DAY) // the drawn date
+            DialParams(generatorVersion = 6),
+            DialParams(generatorVersion = 6, complications = listOf(
+                ComplicationSource.NONE, ComplicationSource.STEP_COUNT,
+                ComplicationSource.HEART_RATE, ComplicationSource.DAY_AND_DATE,
+                ComplicationSource.DATE
+            )),
+            DialParams(generatorVersion = 6, iconSlots = emptySet()),
+            DialParams(generatorVersion = 6, showSeconds = true),
+            DialParams(generatorVersion = 6, dateStyle = DateStyle.WEEKDAY_MONTH_DAY)
         )
         val actual = faces.map { p ->
             val img = FacePreview.render(p)
@@ -237,7 +281,7 @@ class RenderPipelineTest {
         }
         assertEquals(
             listOf("f23d4b152ec5f454", "7aa269aa5965891c", "4119f771e59ac813",
-                   "52231f488a043c73", "2a5585f44d928e81"),
+                   "52231f488a043c73", "e32440e60833fc31"),
             actual
         ) { "the v6 preview changed; every face saved at v6 renders differently" }
     }
@@ -251,10 +295,19 @@ class RenderPipelineTest {
         // at once -- which reads like the renderer regressed and actually means
         // the fixture drifted onto a new version. A golden has to name the
         // version it is a golden OF.
+        // The complication list is named EXPLICITLY, not entries.take(5).
+        // Adding TIME_AND_DATE to the enum changed what take(5) returned and
+        // broke this golden -- which reads like the renderer regressed and
+        // actually means the fixture moved. A golden must not depend on the
+        // order or length of an enum that is expected to grow.
         val faces = listOf(
             DialParams(generatorVersion = 5),
             DialParams(generatorVersion = 5, engine = Engine.KNOTWORK, dialColor = "#2B2E33", inkColor = "#C9A227"),
-            DialParams(generatorVersion = 5, complications = ComplicationSource.entries.take(5)),
+            DialParams(generatorVersion = 5, complications = listOf(
+                ComplicationSource.NONE, ComplicationSource.STEP_COUNT,
+                ComplicationSource.HEART_RATE, ComplicationSource.DAY_AND_DATE,
+                ComplicationSource.DATE
+            )),
             // A generated surface, so the procedural shading is pinned too. The
             // stroked engines do not exercise it at all.
             DialParams(generatorVersion = 5, engine = Engine.BRUSHED, contrast = 62.0, relief = 3.4),

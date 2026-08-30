@@ -98,7 +98,8 @@ object ComplicationGlyphs {
         ComplicationSource.DATE,
         ComplicationSource.DAY_OF_WEEK -> calendar(dot = false)
         ComplicationSource.NEXT_EVENT -> calendar(dot = true)
-        ComplicationSource.WORLD_CLOCK -> clock()
+        ComplicationSource.WORLD_CLOCK,
+        ComplicationSource.TIME_AND_DATE -> clock()
         ComplicationSource.SUNRISE_SUNSET -> sunrise()
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> bell()
         ComplicationSource.APP_SHORTCUT -> apps()

@@ -521,11 +521,13 @@ object Workbench {
 
         // Carousel label.
         val strings = File(tpl, "res/values/strings.xml").apply { parentFile.mkdirs() }
-        // A slot_<source> string for every ACTIVE complication. The emitter
-        // references these by name, so a missing one is not a cosmetic gap --
-        // aapt2 link fails outright on the unresolved @string.
-        val slotStrings = p.complications.filter { it.enabled }.distinct().joinToString("\n") {
-            """  <string name="slot_${it.name.lowercase()}">${Complications.label(it)}</string>"""
+        // One string per SLOT POSITION, not per source, and all five whether or
+        // not the slot is filled. The emitter references these by name, so a
+        // missing one is not a cosmetic gap -- aapt2 link fails outright on the
+        // unresolved @string. (pack, which the phone uses, does NOT fail, which
+        // is how the phone shipped faces with dangling slot names.)
+        val slotStrings = Complications.slotStrings().joinToString("\n") { (name, label) ->
+            """  <string name="$name">$label</string>"""
         }
         strings.writeText(
             """<?xml version="1.0" encoding="utf-8"?>

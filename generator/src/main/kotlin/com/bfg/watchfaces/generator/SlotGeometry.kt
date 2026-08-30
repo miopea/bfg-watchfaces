@@ -90,11 +90,21 @@ object SlotGeometry {
         version: Int = CURRENT_GENERATOR_VERSION
     ): Int = when {
         version < 6 -> (size * 3.3).roundToInt()      // v1..v5: one height, icon or not
+        withIcon && version >= 7 -> (size * 2.45).roundToInt()
         withIcon -> (size * 2.85).roundToInt()
         else -> textHeight(size, version)
     }
 
-    fun iconHeight(size: Int): Int = (size * 1.25).roundToInt()
+    /**
+     * The glyph, which from v7 is SMALLER than the value it labels.
+     *
+     * It was 1.25x the slot size against a 0.92x value -- the little symbol was
+     * bigger than the number, which is backwards for something whose whole job
+     * is to say what the number means. Shrinking it also buys the vertical room
+     * the size control had run out of.
+     */
+    fun iconHeight(size: Int, version: Int = CURRENT_GENERATOR_VERSION): Int =
+        (size * if (version >= 7) 0.85 else 1.25).roundToInt()
 
     /**
      * Where the face's own drawn date goes, or null when there is not one.
@@ -126,7 +136,11 @@ object SlotGeometry {
         size: Int,
         withIcon: Boolean = true,
         version: Int = CURRENT_GENERATOR_VERSION
-    ): Int = if (withIcon || version < 6) (size * 1.45).roundToInt() else 0
+    ): Int = when {
+        !withIcon && version >= 6 -> 0
+        version >= 7 -> (size * 1.05).roundToInt()   // the glyph above is smaller
+        else -> (size * 1.45).roundToInt()
+    }
     /**
      * The value's own box: one line, so 1.35x the slot size.
      *
@@ -259,6 +273,21 @@ object SlotGeometry {
         }
         return MIN_SIZE
     }
+
+    /**
+     * The biggest complication size THIS face can take.
+     *
+     * Five slots and a 104pt clock on a 456 dial is a genuinely tight budget,
+     * and the ceiling moves with the layout: turn the top slot off and there is
+     * room for much more. A UI that offers a fixed "Large" therefore offers a
+     * number that is sometimes impossible, silently clamps, and looks broken --
+     * which is what "when I select larger they should be larger" was about.
+     *
+     * Offer sizes derived from THIS, and Large always means as large as this
+     * face allows.
+     */
+    fun maxSize(p: DialParams): Int =
+        fittedSize(p.copy(layout = p.layout.copy(complicationSize = MAX_SIZE)))
 
     const val MIN_SIZE = 10
     const val MAX_SIZE = 40

@@ -63,7 +63,7 @@ object AndroidFacePreview {
 
         // The FITTED size, matching the emitter: the boxes come from it too.
         val fitted = SlotGeometry.fittedSize(p)
-        val iconSize = SlotGeometry.iconHeight(fitted).toFloat()
+        val iconSize = SlotGeometry.iconHeight(fitted, p.generatorVersion).toFloat()
         val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
         val fontSize = SlotGeometry.fontSize(fitted).toFloat()
 

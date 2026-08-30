@@ -109,7 +109,7 @@ object WffEmitter {
         // box was never built for -- at "Large" a font of 26 inside a box laid
         // out for 25.
         val fitted = SlotGeometry.fittedSize(p)
-        val iconH = SlotGeometry.iconHeight(fitted)
+        val iconH = SlotGeometry.iconHeight(fitted, p.generatorVersion)
         val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
         val fontSize = SlotGeometry.fontSize(fitted)
         val iconW = iconH
@@ -150,7 +150,7 @@ object WffEmitter {
             val ambientAlpha = if (pos == SlotPosition.TOP) 140 else 0
             """
     <ComplicationSlot slotId="$id" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"
-                      displayName="@string/slot_${source.name.lowercase()}"
+                      displayName="@string/${pos.resource}"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255"
                       isCustomizable="TRUE">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
@@ -234,7 +234,7 @@ $dateLine
       <TimeText format="ss" align="END" alpha="255"
                 x="0" y="${SecondsBand.offsetY(l)}" width="${SecondsBand.rightEdge()}" height="${SecondsBand.height(l)}">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
-        <Font family="${l.fontFamily}" size="${SecondsBand.fontSize(l)}" weight="THIN" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
+        <Font family="${l.fontFamily}" size="${SecondsBand.fontSize(l)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
       </TimeText>"""}
     </DigitalClock>
 $slots

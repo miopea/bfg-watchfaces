@@ -11,7 +11,7 @@ class GeneratorVersionTest {
 
     @Test
     fun `bumping CURRENT_GENERATOR_VERSION is deliberate`() {
-        assertEquals(6, CURRENT_GENERATOR_VERSION,
+        assertEquals(7, CURRENT_GENERATOR_VERSION,
             "You changed CURRENT_GENERATOR_VERSION. That is fine ONLY if you added a new " +
             "branch in PatternEngines.paths() and left every older branch untouched. " +
             "Existing community faces must keep rendering exactly as their authors saw them. " +
@@ -149,6 +149,34 @@ class GeneratorVersionCompatibilityTest {
         val v6 = SlotGeometry.fittedSize(DialParams(generatorVersion = 6, layout = layout))
         assertTrue(v6 > v5) { "v6 fitted $v6, v5 fitted $v5 -- the bump bought nothing" }
         assertEquals(28, v6) { "Large should no longer be clamped at all" }
+    }
+
+
+    /** v7 changed the complication GLYPH and nothing on the dial. */
+    @Test
+    fun `v7 renders every engine identically to v6`() {
+        for (engine in Engine.entries) {
+            if (engine == Engine.TEXTURE) continue
+            val v6 = PatternEngines.paths(DialParams(generatorVersion = 6, engine = engine))
+            val v7 = PatternEngines.paths(DialParams(generatorVersion = 7, engine = engine))
+            assertEquals(v6, v7) { "$engine changed between v6 and v7" }
+        }
+    }
+
+    /** A face stored at v6 keeps the glyph size its author saw. */
+    @Test
+    fun `v6 glyph metrics survive v7`() {
+        assertEquals(Math.round(25 * 1.25).toInt(), SlotGeometry.iconHeight(25, version = 6))
+        assertEquals(Math.round(25 * 0.85).toInt(), SlotGeometry.iconHeight(25, version = 7))
+        assertEquals(29, SlotGeometry.maxSize(DialParams(generatorVersion = 6)))
+    }
+
+    /** And v7 reaches further than v6 could, which is why it exists. */
+    @Test
+    fun `v7 reaches a larger complication than v6`() {
+        val v6 = SlotGeometry.maxSize(DialParams(generatorVersion = 6))
+        val v7 = SlotGeometry.maxSize(DialParams(generatorVersion = 7))
+        assertTrue(v7 > v6) { "v7 max $v7 is no better than v6's $v6" }
     }
 
 }

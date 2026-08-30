@@ -24,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -86,8 +87,23 @@ class MainActivity : ComponentActivity() {
                 val snackbar = remember { SnackbarHostState() }
 
                 // rememberSaveable so a rotation does not throw away a design.
-                var engineName by rememberSaveable { mutableStateOf(Presets.OPENING.engine.name) }
-                var params by remember { mutableStateOf(Presets.OPENING) }
+                // Studio opens on the face that is ON THE WATCH, not on a
+                // preset nobody chose. CurrentFace is a record of what this
+                // phone last sent -- see the note there about when it is right.
+                val onWatch = remember { CurrentFace.load(context) }
+                var engineName by rememberSaveable {
+                    mutableStateOf((onWatch?.params ?: Presets.OPENING).engine.name)
+                }
+                var params by remember { mutableStateOf(onWatch?.params ?: Presets.OPENING) }
+                /**
+                 * The saved face being edited, if any.
+                 *
+                 * Without this, opening a face from My faces kept its
+                 * parameters and lost its identity, so Save asked for a name
+                 * again and made a SECOND face rather than updating the one
+                 * that was open.
+                 */
+                var openSlug by rememberSaveable { mutableStateOf<String?>(null) }
                 var tab by rememberSaveable { mutableStateOf(Tab.DESIGNS) }
                 var ambient by rememberSaveable { mutableStateOf(false) }
                 // The explanation is a one-time modal now, not a screen in the
@@ -98,7 +114,7 @@ class MainActivity : ComponentActivity() {
                 // A face gets its identity when somebody names it. Sending an
                 // unnamed design would put "Untitled" in the carousel and in the
                 // package name, so the send path reuses the last name given.
-                var sendingName by rememberSaveable { mutableStateOf("My Face") }
+                var sendingName by rememberSaveable { mutableStateOf(onWatch?.name ?: "My Face") }
                 var status by remember { mutableStateOf<String?>(null) }
                 var faces by remember { mutableStateOf(FaceStorage.list(context)) }
 
@@ -133,6 +149,9 @@ class MainActivity : ComponentActivity() {
                         // Off the main thread: packing walks the resource table
                         // and the Data Layer calls block.
                         val result = withContext(Dispatchers.IO) { buildThenSend(context, name, face) }
+                        // Only a send that actually landed changes what Studio
+                        // opens on next time.
+                        if (result.startsWith("Sent ")) CurrentFace.record(context, name, face)
                         snackbar.showSnackbar(result, duration = SnackbarDuration.Long)
                     }
                 }
@@ -160,7 +179,9 @@ class MainActivity : ComponentActivity() {
                 ) { inner ->
                     when (tab) {
                         Tab.DESIGNS -> DesignsScreen(
-                            onPick = { params = it; engineName = it.engine.name; tab = Tab.STUDIO },
+                            // A style is a starting point, not a face: it has
+                            // no identity yet, so Save must ask for a name.
+                            onPick = { params = it; engineName = it.engine.name; openSlug = null; tab = Tab.STUDIO },
                             modifier = Modifier.padding(inner)
                         )
 
@@ -179,22 +200,67 @@ class MainActivity : ComponentActivity() {
                                 onCustomColor = { dial -> pickingDial = dial; picking = true }
                             )
                             Column(Modifier.padding(horizontal = 16.dp)) {
+                                val open = openSlug?.let { slug -> faces.firstOrNull { it.slug == slug } }
                                 Button(
-                                    onClick = { naming = true },
+                                    onClick = {
+                                        if (open != null) {
+                                            FaceStorage.save(context, open.name, params)
+                                            faces = FaceStorage.list(context)
+                                            scope.launch {
+                                                snackbar.showSnackbar("Saved “${open.name}”.")
+                                            }
+                                        } else {
+                                            naming = true
+                                        }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
-                                ) { Text("Save to My faces") }
+                                ) { Text(if (open != null) "Save “${open.name}”" else "Save to My faces") }
+                                if (open != null) {
+                                    Spacer(Modifier.height(8.dp))
+                                    // Still reachable, because "make a copy" is
+                                    // a real thing to want -- it is just not
+                                    // what Save should mean.
+                                    TextButton(
+                                        onClick = { naming = true },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("Save as a new face") }
+                                }
                                 Spacer(Modifier.height(8.dp))
                                 Button(
                                     onClick = { requestSend(sendingName, params) },
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text("Send to watch") }
+                                Spacer(Modifier.height(8.dp))
+                                // Choosing which face is active, and which
+                                // provider fills each complication, happens in
+                                // the companion app or on the watch. This app
+                                // cannot do either, so it should at least take
+                                // you there.
+                                TextButton(
+                                    onClick = {
+                                        if (!WatchCompanion.open(context)) {
+                                            scope.launch {
+                                                snackbar.showSnackbar(
+                                                    "Could not open the watch app on this phone."
+                                                )
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Open the watch app to pick complications") }
                             }
                             Spacer(Modifier.height(24.dp))
                         }
 
                         Tab.MINE -> MyFacesScreen(
                             faces = faces,
-                            onOpen = { params = it.params; engineName = it.params.engine.name; tab = Tab.STUDIO },
+                            onOpen = {
+                                params = it.params
+                                engineName = it.params.engine.name
+                                openSlug = it.slug
+                                sendingName = it.name
+                                tab = Tab.STUDIO
+                            },
                             onSend = { requestSend(it.name, it.params) },
                             onDelete = { FaceStorage.delete(context, it.slug); faces = FaceStorage.list(context) },
                             modifier = Modifier.padding(inner)

@@ -46,6 +46,10 @@ enum class ComplicationSource(val wff: String?) {
     STEP_COUNT("STEP_COUNT"),
     HEART_RATE("HEART_RATE"),
     DAY_AND_DATE("DAY_AND_DATE"),
+    // The one system provider this list used to omit. Google's
+    // defaultProviderType has fourteen members; we offered twelve plus NONE,
+    // and TIME_AND_DATE was simply missing rather than excluded for a reason.
+    TIME_AND_DATE("TIME_AND_DATE"),
     DATE("DATE"),
     DAY_OF_WEEK("DAY_OF_WEEK"),
     WATCH_BATTERY("WATCH_BATTERY"),
@@ -71,7 +75,22 @@ enum class ComplicationSource(val wff: String?) {
  * which meant the face had five information areas but only advertised three.
  * They are ordinary slots now.
  */
-enum class SlotPosition { TOP, LEFT, MIDDLE, RIGHT, BOTTOM }
+enum class SlotPosition {
+    TOP, LEFT, MIDDLE, RIGHT, BOTTOM;
+
+    /**
+     * The string resource holding this slot's name in the built APK.
+     *
+     * Keyed by POSITION. It used to be keyed by the SOURCE in the slot
+     * -- `slot_watch_battery` -- which is wrong twice over. `displayName` is
+     * the name the WATCH'S OWN EDITOR shows for a slot, so it has to say where
+     * the slot is, not what is in it right now; and two slots holding the same
+     * source got the same name, which is indistinguishable to that editor.
+     * Reported from a real watch as "the right complication is always the same
+     * as the bottom one".
+     */
+    val resource: String get() = "slot_${name.lowercase()}"
+}
 
 /**
  * The date line the FACE draws, as opposed to a date complication.
@@ -271,10 +290,14 @@ data class Layout(
      * against a 104pt clock, and at 21 it read as a caption -- "pretty tiny",
      * which is exactly what it looked like on a real phone.
      *
+     * 40 after a second look on a real phone: 30 was still reading as a
+     * subtitle. The drawn date is the only other line of type on the dial and
+     * it sits against a 104pt clock, so it has to hold its own.
+     *
      * Changing the default does not touch a saved face: dateSize is stored per
      * face, so anything already designed keeps the size it was designed at.
      */
-    val dateSize: Int = 30,
+    val dateSize: Int = 40,
     val timeY: Int = 196,
     val timeSize: Int = 104,
     val tracking: Double = 0.0,
@@ -289,6 +312,13 @@ data class Layout(
 
 /**
  * Bump ONLY when adding an engine or a parameter. Never when changing geometry.
+ *
+ * v7 (2026-08-30) shrinks the complication GLYPH from 1.25x the slot size to
+ * 0.85x, so the little symbol is smaller than the number it labels rather than
+ * bigger, and the value moves up to meet it. That is a look, and it is also
+ * vertical room: the stack of top, clock, row and bottom is what caps
+ * complication size, and v6 still ran out at 29. PatternEngines.v7 delegates to
+ * v5 -- no dial geometry changed.
  *
  * v6 (2026-08-30) reshapes the complication BOX, not the dial. A slot whose
  * glyph is off loses the icon's height and the offset that cleared it, and the
@@ -316,7 +346,7 @@ data class Layout(
  * they cannot drift. A face stored with generatorVersion=1 still renders through
  * the v1 branch, byte for byte.
  */
-const val CURRENT_GENERATOR_VERSION = 6
+const val CURRENT_GENERATOR_VERSION = 7
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

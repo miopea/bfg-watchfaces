@@ -69,7 +69,7 @@ object FacePreview {
         // matched, which guarded a copy rather than removing it.
         // The FITTED size, matching the emitter: the boxes come from it too.
         val fitted = SlotGeometry.fittedSize(p)
-        val iconSize = SlotGeometry.iconHeight(fitted).toDouble()
+        val iconSize = SlotGeometry.iconHeight(fitted, p.generatorVersion).toDouble()
         val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
         val fontSize = SlotGeometry.fontSize(fitted).toDouble()
 

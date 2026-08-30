@@ -60,6 +60,18 @@ object SecondsBand {
      * centred in the same band, so the seconds read as part of the same line —
      * which is what they are.
      */
+    /**
+     * LIGHT, not THIN.
+     *
+     * THIN is the thinnest weight the format offers and at a third of the
+     * clock's size it stopped reading as type -- "a little bit too fine" on a
+     * real wrist. LIGHT is the next step up and still clearly lighter than the
+     * time beside it. Both previews draw a normal weight (AWT has no light
+     * face), so this also narrows a gap where the preview was heavier than the
+     * built face rather than lighter.
+     */
+    const val WEIGHT = "LIGHT"
+
     private const val CLOCK_BOX = 1.4
 
     /** Font size, in dial units. */

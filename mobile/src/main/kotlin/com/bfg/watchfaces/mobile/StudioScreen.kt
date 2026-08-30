@@ -53,6 +53,8 @@ import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.EngravedStroke
+import com.bfg.watchfaces.generator.SlotGeometry
+import kotlin.math.roundToInt
 import com.bfg.watchfaces.generator.SlotPosition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -137,13 +139,21 @@ fun StudioScreen(
 
         Spacer(Modifier.height(20.dp))
         SectionHeading("Complications")
+        // Derived from what THIS face can actually take, not a fixed 14/20/28.
+        //
+        // Five slots and a 104pt clock on a 456 dial is a tight budget and the
+        // ceiling moves with the layout -- so a fixed "Large" was sometimes a
+        // number the layout refused, and SlotGeometry silently clamped it. That
+        // is why Large looked identical to Medium. Large now means as large as
+        // this face allows; turn a slot or a glyph off and all three grow.
+        val maxComplication = SlotGeometry.maxSize(params)
         ChoiceRow(
             label = "Size",
-            // 14/20/28 rather than 16/19/23. SlotGeometry allows 10..40 and the
-            // old band used a fifth of it, so Small and Large differed by four
-            // points of font size -- a real change that nobody could see, which
-            // reads as a broken control rather than a subtle one.
-            options = listOf("Small" to 14, "Medium" to 20, "Large" to 28),
+            options = listOf(
+                "Small" to (maxComplication * 0.77).roundToInt(),
+                "Medium" to (maxComplication * 0.90).roundToInt(),
+                "Large" to maxComplication
+            ),
             selected = params.layout.complicationSize
         ) { onParams(params.copy(layout = params.layout.copy(complicationSize = it))) }
         ChoiceRow(
