@@ -62,7 +62,6 @@ object WffEmitter {
     }
 
     /** Seconds are just under half the clock, which reads as a secondary value. */
-    private const val SECONDS_SCALE = 0.45
 
     /**
      * How much the clock shrinks to make room for seconds.
@@ -75,7 +74,6 @@ object WffEmitter {
     private const val CLOCK_SCALE_WITH_SECONDS = 0.82
 
     /** How far in from the rim the seconds sit, so they clear a round bezel. */
-    private const val SECONDS_INSET = 48
 
     private fun argb(rgb: String, alpha: Int = 255): String =
         "#%02x%s".format(alpha, rgb.removePrefix("#").lowercase())
@@ -221,9 +219,9 @@ $dateLine
         for most of the minute it was shown.
       -->
       <TimeText format="ss" align="END" alpha="255"
-                x="0" y="${(l.timeSize * 0.72).toInt()}" width="${DIAL_SIZE - SECONDS_INSET}" height="${(l.timeSize * 0.6).toInt()}">
+                x="0" y="${SecondsBand.offsetY(l)}" width="${SecondsBand.rightEdge()}" height="${SecondsBand.height(l)}">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
-        <Font family="${l.fontFamily}" size="${(l.timeSize * SECONDS_SCALE).toInt()}" weight="THIN" color="$inkDim"/>
+        <Font family="${l.fontFamily}" size="${SecondsBand.fontSize(l)}" weight="THIN" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
       </TimeText>"""}
     </DigitalClock>
 $slots

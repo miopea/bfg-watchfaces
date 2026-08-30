@@ -121,6 +121,29 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — SecondsBand, and seconds that were the wrong colour
+
+The seconds shipped with `0.45` and `48` written out in `WffEmitter`, the
+workbench preview and the Android preview. Three copies of one judgement, which
+is the arrangement this file keeps recording as how two renderers drift apart.
+They are now `SecondsBand` in `:generator`, alongside `SlotGeometry` and
+`EngravedStroke`, for the same reason.
+
+Consolidating them found a real disagreement. The emitter coloured the seconds
+`inkDim` — the AMBIENT ink — on an element whose ambient alpha is 0, so it is
+only ever seen awake. From v3 `inkDim` is lifted to clear a contrast floor
+against black, so a pale dial with dark ink built a face with pale seconds on a
+pale dial while both previews drew them dark at alpha 190.
+
+Nothing failed. `WffSchemaTest` validated it happily — a colour is a colour to
+the XSD — and the previews were right, so the only way to see it was to build
+that specific face and look at a watch. The test now pins the seconds to the
+awake ink, and was confirmed to fail (3 failures) with `inkDim` restored.
+
+Rejected: keeping `inkDim` and dimming the previews to match. That is agreeing
+on the wrong answer — the person picked an ink for a dial they can see, and the
+ambient palette exists to solve a problem this element does not have.
+
 ## 2026-08-30 — Glyphs are per slot, and the drawn date sits against the clock
 
 Two features asked for together, and the second one moved the first.

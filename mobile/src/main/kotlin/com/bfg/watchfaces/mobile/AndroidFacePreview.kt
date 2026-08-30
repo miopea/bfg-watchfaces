@@ -10,6 +10,7 @@ import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.EngravedStroke
+import com.bfg.watchfaces.generator.SecondsBand
 import com.bfg.watchfaces.generator.SlotGeometry
 import com.bfg.watchfaces.generator.SlotPosition
 
@@ -39,8 +40,6 @@ object AndroidFacePreview {
     private const val SAMPLE_SECOND = 30
 
     /** Kept the same as WffEmitter's, so the preview and the face agree. */
-    private const val SECONDS_SCALE = 0.45f
-    private const val SECONDS_INSET = 48
     private const val CLOCK_SCALE_WITH_SECONDS = 0.82f
 
     fun render(p: DialParams, ambient: Boolean = false, size: Int = DIAL_SIZE): Bitmap {
@@ -149,12 +148,12 @@ object AndroidFacePreview {
         // clock, lightest weight, awake only. Right-aligned rather than centred,
         // because the clock is centred and this sits in the space it leaves.
         if (p.showSeconds && !ambient) {
-            val secSize = l.timeSize * SECONDS_SCALE
             drawCenteredIn(
                 canvas, "%02d".format(SAMPLE_SECOND),
-                0f, (l.timeY - l.timeSize / 2 + l.timeSize * 0.72f),
-                (DIAL_SIZE - SECONDS_INSET).toFloat(), l.timeSize * 0.6f,
-                secSize, withAlpha(timeColor, 190), bold = false,
+                0f, (l.timeY - l.timeSize / 2 + SecondsBand.offsetY(l)).toFloat(),
+                SecondsBand.rightEdge().toFloat(), SecondsBand.height(l).toFloat(),
+                SecondsBand.fontSize(l).toFloat(),
+                withAlpha(timeColor, SecondsBand.ALPHA), bold = false,
                 alignEnd = true
             )
         }

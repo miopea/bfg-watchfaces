@@ -153,6 +153,33 @@ class WffSchemaTest {
         }
     }
 
+    /**
+     * The seconds are coloured from the AWAKE ink, never the ambient one.
+     *
+     * They were emitted with `inkDim` on an element whose ambient alpha is 0 --
+     * so it is only ever seen awake. From v3 `inkDim` is lifted to clear a
+     * contrast floor against BLACK, which on a pale dial with dark ink built a
+     * face with pale seconds on a pale dial while both previews drew them dark.
+     * Nothing failed. The two just disagreed, which is the failure this repo
+     * keeps paying for.
+     */
+    @Test
+    fun `seconds take the awake ink, not the ambient one`() {
+        // A dark ink on a pale dial: exactly the case where the ambient lift
+        // changes the colour, so the two are distinguishable.
+        val p = DialParams(showSeconds = true, inkColor = "#231F1B", dialColor = "#C9C3B6")
+        val xml = WffEmitter.emit(p)
+
+        val seconds = Regex("""<TimeText format="ss".*?</TimeText>""", RegexOption.DOT_MATCHES_ALL)
+            .find(xml)!!.value
+        val color = Regex("""color="#([0-9a-fA-F]{8})"""").find(seconds)!!.groupValues[1]
+
+        assertEquals("231f1b", color.substring(2).lowercase()) {
+            "the seconds are not the ink the person chose: #$color"
+        }
+        assertEquals(SecondsBand.ALPHA, color.substring(0, 2).toInt(16))
+    }
+
     @Test
     fun `colors are emitted as 8 digit AARRGGBB`() {
         val xml = WffEmitter.emit(DialParams(inkColor = "#FCF9F1"))

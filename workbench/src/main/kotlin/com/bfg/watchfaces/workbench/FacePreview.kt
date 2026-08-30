@@ -5,6 +5,7 @@ import com.bfg.watchfaces.generator.AmbientPalette
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.SecondsBand
 import com.bfg.watchfaces.generator.SlotGeometry
 import com.bfg.watchfaces.generator.SlotPosition
 import java.awt.Color
@@ -37,8 +38,6 @@ import com.bfg.watchfaces.appcore.Complications
 object FacePreview {
 
     /** Both kept identical to WffEmitter's, so the preview and the face agree. */
-    private const val SECONDS_SCALE = 0.45
-    private const val SECONDS_INSET = 48
     private const val CLOCK_SCALE_WITH_SECONDS = 0.82
 
     /** Mirrors the emitter's ambient rules so the preview tells the truth about ambient. */
@@ -132,12 +131,12 @@ object FacePreview {
         // the empty dial it leaves rather than widening the time itself.
         if (p.showSeconds && !ambient) {
             val secs = "%02d".format(now.second)
-            val size = l.timeSize * SECONDS_SCALE
-            g.font = Font(Font.SANS_SERIF, Font.PLAIN, size.toInt())
-            g.color = withAlpha(ink, 190)
+            g.font = Font(Font.SANS_SERIF, Font.PLAIN, SecondsBand.fontSize(l))
+            g.color = withAlpha(ink, SecondsBand.ALPHA)
             val w = g.fontMetrics.stringWidth(secs)
-            val baseline = l.timeY - l.timeSize / 2 + (l.timeSize * 0.72) + g.fontMetrics.ascent
-            g.drawString(secs, (DIAL_SIZE - SECONDS_INSET - w), baseline.toInt())
+            val baseline =
+                l.timeY - l.timeSize / 2 + SecondsBand.offsetY(l) + g.fontMetrics.ascent
+            g.drawString(secs, SecondsBand.rightEdge() - w, baseline)
         }
 
         g.dispose()
