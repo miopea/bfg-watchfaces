@@ -184,7 +184,7 @@
                 with no TITLE at all, so there is still no per cent sign.
                 SHORT_TEXT is what the provider chose to show in a small slot.
               -->
-              <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
+              <Template><![CDATA[%s%%]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>
         </PartText>

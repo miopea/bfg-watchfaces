@@ -158,10 +158,17 @@ object FaceInstaller {
                     // slot with nothing left to attribute it to.
                     Log.e(TAG, "no free slot (${existing.remainingSlotCount}) and " +
                         "none of ours to replace; the face cannot be installed")
+                    // The message names the ONLY way out, because there is no
+                    // API for one: `removeWatchFace` needs a slotId this app
+                    // owns, and the whole problem is that it owns none. The
+                    // wearer cannot be left to work this out -- one did, by
+                    // uninstalling the watch app on a hunch, after an evening
+                    // of sends that all reported success.
                     Result.Failed(
                         IllegalStateException(
-                            "the watch has no free watch face slot, and none of the " +
-                                "faces in it were installed by this app"
+                            "the watch's face slot is full and holds nothing this app " +
+                                "can replace. Reinstall BFG Watch Faces on the watch, " +
+                                "then send again."
                         )
                     )
                 }

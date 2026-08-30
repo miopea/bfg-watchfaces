@@ -61,7 +61,23 @@ enum class Engine {
  * `<Complication>`, and a drawn source has none -- so the value is centred in
  * its box instead, which [SlotGeometry.textOffset] already knows how to do.
  */
-enum class ComplicationSource(val wff: String?, vararg val drawn: String) {
+enum class ComplicationSource(
+    val wff: String?,
+    /**
+     * Literal text around the value, with one `%s` per source.
+     *
+     * Used for a DRAWN source's own text and for a complication's, because the
+     * need is the same: the provider hands over a bare number and the unit is
+     * ours to add. The battery provider supplies "72" with no per cent sign and
+     * no title -- measured on a watch, and asked about twice.
+     *
+     * Only safe because the face definition is authoritative from v8. While the
+     * watch's editor could swap a slot's provider, a hardcoded "%%" could have
+     * ended up after a step count.
+     */
+    val format: String = "%s",
+    vararg val drawn: String
+) {
     NONE(null),
     STEP_COUNT("STEP_COUNT"),
     HEART_RATE("HEART_RATE"),
@@ -72,7 +88,7 @@ enum class ComplicationSource(val wff: String?, vararg val drawn: String) {
     TIME_AND_DATE("TIME_AND_DATE"),
     DATE("DATE"),
     DAY_OF_WEEK("DAY_OF_WEEK"),
-    WATCH_BATTERY("WATCH_BATTERY"),
+    WATCH_BATTERY("WATCH_BATTERY", "%s%%"),
     WORLD_CLOCK("WORLD_CLOCK"),
     NEXT_EVENT("NEXT_EVENT"),
     SUNRISE_SUNSET("SUNRISE_SUNSET"),
@@ -86,10 +102,19 @@ enum class ComplicationSource(val wff: String?, vararg val drawn: String) {
      * `[WEATHER.TEMPERATURE_UNIT]` is a separate source, so the two are
      * concatenated -- the format has no "72 degrees" source that includes it.
      */
-    WEATHER_TEMPERATURE(null, "[WEATHER.TEMPERATURE]", "[WEATHER.TEMPERATURE_UNIT]"),
+    /**
+     * The temperature, with a degree sign we write ourselves.
+     *
+     * NOT `[WEATHER.TEMPERATURE_UNIT]`. That source returns a numeric CODE, not
+     * a symbol, so appending it rendered "782" on a watch: 78, then the unit's
+     * enum value. A literal degree sign is right in either scale, and the scale
+     * itself is the wearer's system setting rather than something a face should
+     * be asserting.
+     */
+    WEATHER_TEMPERATURE(null, "%s°", "[WEATHER.TEMPERATURE]"),
 
     /** "Cloudy". The condition in words rather than a code. */
-    WEATHER_CONDITION(null, "[WEATHER.CONDITION_NAME]");
+    WEATHER_CONDITION(null, "%s", "[WEATHER.CONDITION_NAME]");
 
     val enabled: Boolean get() = wff != null || drawn.isNotEmpty()
 

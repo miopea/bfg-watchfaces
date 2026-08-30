@@ -121,6 +121,33 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — Units the provider does not supply, and "782"
+
+Two from the wrist, both about a bare number with no unit.
+
+**Weather rendered "782".** `[WEATHER.TEMPERATURE_UNIT]` returns a numeric CODE,
+not a symbol, so concatenating it appended the enum value: 78, then 2. It is
+gone. The temperature carries a literal degree sign instead, which is right in
+either scale — and the scale is the wearer's system setting, not something a
+face should assert. Confirmed on a watch.
+
+**The battery had no per cent sign** because the provider supplies "72" with no
+title, which was measured days ago and reported twice since. It now carries one.
+
+The reason that is safe ONLY NOW is worth recording: while `isCustomizable` was
+TRUE the wearer could swap a slot's provider on the watch, so a hardcoded "%%"
+could have ended up after a step count. From v8 the definition is authoritative,
+so a slot holds what the designer chose and a unit belongs to it.
+
+`%%` is the escape for a literal per cent in a WFF Template — tested on a watch
+rather than assumed, because the alternative renders "%s" or swallows the sign,
+and neither shows up in schema validation. Verified: battery "64%", weather "0°"
+on an emulator with no weather data.
+
+One `format` field now serves both a drawn source and a complication, because
+the need is identical: the provider hands over a bare number and the unit is
+ours to add.
+
 ## 2026-08-30 — The watch says what it did, on the channel it already has
 
 "Sending does nothing. It says sent but nothing happens on my watch" — after

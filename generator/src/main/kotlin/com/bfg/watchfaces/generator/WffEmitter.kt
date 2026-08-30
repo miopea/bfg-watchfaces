@@ -177,7 +177,7 @@ object WffEmitter {
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <Text align="CENTER">
         <Font family="${l.fontFamily}" size="$fontSize" color="$ink">$ambientColorVariant
-          <Template><![CDATA[${source.drawn.joinToString("") { "%s" }}]]>${source.drawn.joinToString("") { """<Parameter expression="$it"/>""" }}</Template>
+          <Template><![CDATA[${source.format}]]>${source.drawn.joinToString("") { """<Parameter expression="$it"/>""" }}</Template>
         </Font>
       </Text>
     </PartText>"""
@@ -206,7 +206,7 @@ object WffEmitter {
                 with no TITLE at all, so there is still no per cent sign.
                 SHORT_TEXT is what the provider chose to show in a small slot.
               -->
-              <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
+              <Template><![CDATA[${source.format}]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>
         </PartText>
