@@ -445,6 +445,36 @@ story, second set of credentials, second thing to remember exists" argument does
 not apply either — it is the same account the bot check was already going to use
 after the interview.
 
+### Both are in use, so: which is better and cheaper
+
+| | Cloudflare (BFG Solutions) | Azure (Information Technology EA) |
+| --- | --- | --- |
+| Whose account | The operator's | The employer's |
+| Published catalog | Pages / Workers, cached at the edge, free | Static Web Apps Free, cached at the edge, free |
+| Submit, report, count | Workers Free, 100k requests/day | Managed Functions, included in SWA Free |
+| Moderation queue | D1 Free — 1 database, 500 MB, indefinite | Cosmos free tier TAKEN → Table Storage, pence/month |
+| Bot check | Turnstile, same account, same request | Turnstile, cross-account call |
+| Domain for it | `bfgsolutions.net` already on the account | DNS points from Cloudflare anyway |
+| Can it generate a bill | No — Free stops serving | Storage bills pence to the employer |
+| Already running there | Yes: `budgetbug-email-inbound`, subdomain `bfg-solutions` | Yes, but all of it work |
+
+Two differences are worth more than the rest.
+
+**`POST /faces/<slug>/installed` is on the app's critical path.** Every install
+of a community face makes that call, and Workers run as V8 isolates with
+effectively no cold start, where Functions on the Static Web Apps Free plan cold
+start in seconds. Submit and report are rare enough not to care; the counter is
+not.
+
+**Turnstile is Cloudflare's.** Validating a token from a Worker is one
+same-account call. From Azure it is a cross-cloud hop with a second credential
+to store and rotate — which is the "second cloud" cost the original decision was
+trying to avoid, arriving anyway, just pointing the other way.
+
+Azure would win if this needed to sit inside existing operational tooling —
+monitoring, alerting, an on-call rota. A personal free gallery has none of that,
+and the sibling repos' Azure is not the operator's to borrow for it.
+
 ### Recommendation, for the operator to confirm
 
 **Move the service to Cloudflare.** The original decision was "ideally something
