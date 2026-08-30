@@ -121,6 +121,35 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — A dropped slot check, and a failure the phone cannot see
+
+Follow-up: the face is not in the watch's list at all. So it is not merely
+unselected, it is not installing — and the phone said "Sent" every time.
+
+**A rewrite dropped the free-slot check.** The original refused to call
+`addWatchFace` when `remainingSlotCount` was zero and replaced the oldest of our
+own faces instead. Restructuring the branches for the reset path lost that
+guard, leaving a bare `else -> addWatchFace`. With a full slot that fails with
+`ERROR_SLOT_LIMIT_REACHED`, and the phone — which only learns whether the BYTES
+arrived — still reports success.
+
+It needs a slot that is FULL and holds nothing this install can attribute to
+itself. `listWatchFaces` reports the faces THIS install pushed, so a reinstall
+can leave a face occupying the only slot with nothing left to claim it. Every
+emulator test had a face of ours present, so `ours` was never null and the
+branch was never taken.
+
+Restored, and it now returns a Failed with a sentence a person could act on
+rather than throwing away the reason.
+
+**The real hole is that "Sent" cannot fail.** `FaceSender` resolves when the
+transfer completes. An `addWatchFace` failure, a slot limit, a rejected token —
+all invisible to the phone, all indistinguishable from success. Two bugs this
+week hid behind that, and both cost hours of the operator's time before anyone
+could even tell which half was broken. The install result has to come back over
+the same channel. That is the next thing to build, ahead of the provider
+catalog.
+
 ## 2026-08-30 — "It says it sent okay" and the watch does not change
 
 Reported after 1.12: the watch shows a black background with a time, several

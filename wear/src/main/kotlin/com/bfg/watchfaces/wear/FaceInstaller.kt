@@ -113,10 +113,32 @@ object FaceInstaller {
                     // face that was sitting in the picker anyway.
                     if (wasActive) onFaceInstalled(context, details.slotId)
                     Result.Installed(details.slotId, replaced = true)
-                } else {
+                } else if (existing.remainingSlotCount > 0) {
                     val details = manager.addWatchFace(fd, token)
                     onFaceInstalled(context, details.slotId)
                     Result.Installed(details.slotId, replaced = false)
+                } else {
+                    // Slots are FULL and none of them is ours to replace.
+                    //
+                    // This check was in the original and a rewrite dropped it,
+                    // which turned a reportable situation into a silent one:
+                    // addWatchFace was called into a full slot, failed with
+                    // ERROR_SLOT_LIMIT_REACHED, and the phone -- which only
+                    // learns whether the BYTES arrived -- still said "Sent".
+                    // Every send appeared to work and no face ever appeared.
+                    //
+                    // It happens when a slot holds a face this app can no
+                    // longer see: listWatchFaces reports the faces THIS install
+                    // pushed, so a reinstall can leave one occupying the only
+                    // slot with nothing left to attribute it to.
+                    Log.e(TAG, "no free slot (${existing.remainingSlotCount}) and " +
+                        "none of ours to replace; the face cannot be installed")
+                    Result.Failed(
+                        IllegalStateException(
+                            "the watch has no free watch face slot, and none of the " +
+                                "faces in it were installed by this app"
+                        )
+                    )
                 }
             }
         }.getOrElse { Result.Failed(it) }
