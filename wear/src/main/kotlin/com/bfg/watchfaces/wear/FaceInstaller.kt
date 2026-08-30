@@ -96,6 +96,10 @@ object FaceInstaller {
                     // deactivated.
                     val details = manager.updateWatchFace(ours.slotId, fd, token)
                     Log.i(TAG, "updated slot ${ours.slotId} in place")
+                    // Still ask to activate. Dropping this was a regression:
+                    // before, EVERY install tried, and a face sent to a watch
+                    // wearing something else silently stopped switching.
+                    onFaceInstalled(context, details.slotId)
                     Result.Installed(details.slotId, replaced = true)
                 } else if (ours != null) {
                     // Whether OUR face is the one on the wrist decides if the
@@ -104,9 +108,21 @@ object FaceInstaller {
                     val wasActive = runCatching { manager.isWatchFaceActive(ours.packageName) }
                         .getOrElse { false }
                     Log.i(TAG, "replacing slot ${ours.slotId} (active=$wasActive)")
-                    runCatching { manager.removeWatchFace(ours.slotId) }
-                        .onFailure { Log.w(TAG, "could not remove the old face; adding anyway", it) }
-                    val details = manager.addWatchFace(fd, token)
+                    val removed = runCatching { manager.removeWatchFace(ours.slotId) }
+                        .onFailure { Log.w(TAG, "could not remove the old face", it) }
+                        .isSuccess
+                    // The dangerous moment in the system: the old face is gone
+                    // and the new one is not in yet. If the add fails here the
+                    // wearer is left with NO face of ours -- which looks like
+                    // "I sent it and it is not even in the list". Say that,
+                    // rather than surfacing a generic failure with no hint
+                    // that something was deleted.
+                    val details = runCatching { manager.addWatchFace(fd, token) }
+                        .getOrElse { cause ->
+                            Log.e(TAG, "removed=$removed but the new face could not be added; " +
+                                "this watch now has no face from this app", cause)
+                            throw cause
+                        }
                     // Only re-activate when we displaced the active face.
                     // setWatchFaceAsActive has an undocumented attempt limit
                     // this project has already hit, so it is not spent on a

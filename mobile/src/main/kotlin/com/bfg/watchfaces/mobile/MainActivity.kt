@@ -39,7 +39,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.bfg.watchfaces.appcore.ActivationConsent
-import com.bfg.watchfaces.appcore.ComplicationChange
 import com.bfg.watchfaces.appcore.FaceLibrary
 import com.bfg.watchfaces.appcore.Presets
 import com.bfg.watchfaces.generator.DialParams
@@ -387,13 +386,24 @@ class MainActivity : ComponentActivity() {
             }
         if (target !is FaceSender.Target.Ready) return describe(target)
 
-        // Rebuild the slots only when the complications actually changed. See
-        // ComplicationChange: the reset is what makes the app's choices apply,
-        // and it costs one of a finite number of activation calls.
-        val reset = ComplicationChange.needsReset(CurrentFace.load(context)?.params, params)
-        Log.i(TAG, "sending \u201C$name\u201D (reset complications: $reset)")
+        // NEVER ask the watch to rebuild the slots.
+        //
+        // The reset exists because `isCustomizable="TRUE"` let the watch's
+        // editor own a slot forever, so only a fresh slot would take the
+        // design's complications. From v8 the definition is authoritative and a
+        // plain `updateWatchFace` applies it -- the reset buys nothing.
+        //
+        // And it can destroy the face. Resetting REMOVES the installed face
+        // before adding the new one, so a failure in between leaves the watch
+        // with none at all: "I sent it several times and mine is not even in
+        // the list". It was requested on every complication change, which is
+        // the single most common edit anyone makes.
+        //
+        // The watch still understands the request, and the debug receiver can
+        // still make it. Nothing in the normal path does.
+        Log.i(TAG, "sending \u201C$name\u201D")
 
-        return runCatching { FaceSender.send(context, target, built.apk, token, reset) }
+        return runCatching { FaceSender.send(context, target, built.apk, token) }
             .fold(
                 onSuccess = {
                     // "Sent" is the honest limit of what this side knows. The

@@ -121,6 +121,44 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — The reset could delete the face, and was never needed
+
+Audit of what the last three builds introduced, prompted by "fix whatever issue
+we introduced". Two more regressions, both mine, both in the path the operator
+was actually using.
+
+**The phone asked the watch to REBUILD the slots on every complication change.**
+Resetting removes the installed face and then adds it again. Between those two
+calls the watch has no face from this app, and if the add fails it stays that
+way — which is exactly "I sent it several times and mine is not even in the
+list". It was requested on the single most common edit anyone makes.
+
+Worse, it bought nothing. The reset existed because `isCustomizable="TRUE"` let
+the watch's editor own a slot forever, so only a fresh slot would take the
+design's complications. v8 made the definition authoritative in the same
+release. Measured now: swap two complications, send with NO reset, and the face
+shows the new arrangement — left 64 battery, right 105100 steps. A plain
+`updateWatchFace` applies the design.
+
+So the phone no longer asks. The watch still understands the request and the
+debug receiver can still make it; nothing in the normal path does.
+`ComplicationChange` is deleted rather than left as a decision nobody consults.
+
+**A normal update stopped trying to activate.** Restructuring the branches lost
+`onFaceInstalled` from the update-in-place path, so from v8 a face sent to a
+watch wearing something else could never switch to itself. Every install used to
+try. Restored.
+
+**And the reset branch is loud now.** If the remove succeeds and the add fails,
+the log says so in those words, rather than surfacing a generic failure with no
+hint that something was deleted.
+
+The pattern across all three of this week's regressions is the same: a
+restructure that kept the happy path and quietly dropped a guard —
+`remainingSlotCount`, `onFaceInstalled`, and the reason the reset existed at
+all. Each was invisible because the phone reports success as soon as the bytes
+land.
+
 ## 2026-08-30 — A dropped slot check, and a failure the phone cannot see
 
 Follow-up: the face is not in the watch's list at all. So it is not merely
