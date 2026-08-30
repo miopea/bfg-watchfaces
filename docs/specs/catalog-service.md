@@ -394,11 +394,75 @@ face is parameters — anything cached still previews and still sends to a watch
 Someone can therefore browse and install a face that has since been removed,
 which `MODERATION.md` already admits it cannot prevent on a wrist.
 
+## Checked 2026-08-30: the Azure recommendation does not survive
+
+Both halves of the "check before building" turned out badly, and the second one
+is the important one.
+
+### The Cosmos free tier is already taken
+
+```text
+az cosmosdb list
+  rcgcrm   freeTier=True   rg=crm
+```
+
+One free-tier account per subscription, and `rcgcrm` has it. The option will not
+even appear. Table Storage would be cents a month — and cents is not zero, which
+is exactly what the About screen promises.
+
+### The Azure that is available is the EMPLOYER'S
+
+```text
+az account list
+  Information Technology (EA)   tenant=rcg.org   Enabled     <- the only one
+```
+
+This is the decision that matters, and the spec got it wrong by reasoning from
+the wrong evidence. "They already use Azure, decisively — 325 files across the
+sibling repos" is true, and every one of those repos is work. The Azure in
+question belongs to The Restored Church of God, under an Enterprise Agreement.
+
+BFG Watch Faces is a personal open-source project. Putting its community service
+into an employer's EA subscription is not a hosting choice, it is a question
+about whose resources, whose bill, whose policy and whose ownership — and it is
+not a question this document can answer.
+
+### Cloudflare, checked and working
+
+The operator has their own account, and everything the service needs is
+available on it:
+
+```text
+account: BFG Solutions
+  D1 databases       OK (0 of the free tier's 1 used)
+  Workers scripts    OK (1 already deployed: budgetbug-email-inbound)
+  Turnstile widgets  OK
+  Pages projects     OK
+```
+
+Workers is already in production use on that account, so the "second deploy
+story, second set of credentials, second thing to remember exists" argument does
+not apply either — it is the same account the bot check was already going to use
+after the interview.
+
+### Recommendation, for the operator to confirm
+
+**Move the service to Cloudflare.** The original decision was "ideally something
+we already use", and on the evidence that is Cloudflare: it is the operator's
+own account, the free tier is intact, Workers is already live there, and
+Turnstile is on the same account.
+
+The numbers were recorded when Azure was chosen and still hold: Workers Free is
+100,000 requests/day and D1 Free is one database at 500 MB — against a catalog
+sized for 10,000 faces of ~5KB each, and an index served from cache.
+
+This reverses a settled operator decision on new evidence, so it is written as a
+recommendation rather than applied. Nothing has been created on either account.
+
 ## Still open
 
-- **Whether the Cosmos DB free tier is still available on the subscription**,
-  which only the account holder can see. If it is taken, Table Storage is cents
-  per month — and cents is not zero, which is what About promises.
+- **Confirmation of the hosting reversal above.** Nothing is built until it is
+  settled, and building on the wrong one is expensive to undo.
 
 ## Release gates, not tasks
 
