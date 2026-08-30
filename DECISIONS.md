@@ -121,6 +121,43 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — Remove and re-add, and the activation budget it spends
+
+Operator decision on the `isCustomizable` trade-off: the APP's design wins.
+`FaceInstaller` now removes the installed face and adds a fresh one rather than
+calling `updateWatchFace`, because a fresh slot has nothing assigned to it and
+`DefaultProviderPolicy` therefore applies. `isCustomizable` stays TRUE, so a
+wearer can still pick weather or Google Health on the watch — those choices are
+simply reset by the next send, which was accepted deliberately.
+
+**The cost is not theoretical.** Tried on the emulator immediately afterwards:
+
+```text
+replacing slot 55c1e952 (active=true)
+installed, but could not switch to it
+SetWatchFaceAsActiveException: The maximum number of attempts to set the
+watch face as active has been reached.
+```
+
+Removing the active face deactivates it, so every send now needs a
+`setWatchFaceAsActive`, and that call has an undocumented and finite allowance
+which this session exhausted. The failure mode is worse than the bug it fixes:
+the old face is gone, the new one is not active, and the watch falls back to a
+default. `isWatchFaceActive` is checked before removing so the call is not spent
+on a face that was only sitting in the picker, but that does not help the normal
+case, which is replacing the face you are wearing.
+
+**The fix is to spend it only when it buys something** — reset the slots when
+the complication configuration actually CHANGED, and use `updateWatchFace`
+otherwise. The phone is what knows this: it keeps the last face it sent. But the
+watch is what installs, and the only channel between them is the channel path,
+which already carries the validation token and is parsed by the SHIPPED watch
+app. Changing its shape breaks sends from a new phone to an old watch outright,
+so it needs a watch release alongside, and that is a decision rather than a
+detail.
+
+Not released. Left here with the evidence.
+
 ## 2026-08-30 — isCustomizable is why the app's complication choices never applied
 
 The operator said to check on the emulator before releasing. Doing it found two

@@ -58,16 +58,45 @@ object FaceInstaller {
                 // Slots are finite. Replacing our own oldest face is better than
                 // failing with ERROR_SLOT_LIMIT_REACHED, which the user cannot act
                 // on and which reads as "the app is broken".
-                if (existing.remainingSlotCount > 0) {
+                // REMOVE then ADD, rather than updateWatchFace.
+                //
+                // Operator decision, 2026-08-30. `updateWatchFace` keeps the
+                // slot, and the watch keeps the complication data sources
+                // ASSIGNED to that slot -- `DefaultProviderPolicy` only fills a
+                // slot nothing has been assigned to. So with
+                // `isCustomizable="TRUE"`, which is the only way a wearer can
+                // ever pick weather or Google Health, every complication choice
+                // made in the app after the first install was silently
+                // discarded. Proven on a watch: a face declaring
+                // battery/heart/steps/day-of-week rendered the assignments of a
+                // build before it, unchanged across three different faces.
+                //
+                // A fresh slot has nothing assigned, so the policy applies and
+                // the app's design is what appears. The cost is real and was
+                // accepted deliberately: any complication the wearer changed ON
+                // the watch is reset by the next send, and this spends an
+                // addWatchFace call every time.
+                val ours = existing.installedWatchFaceDetails.firstOrNull()
+                if (ours != null) {
+                    // Whether OUR face is the one on the wrist decides if the
+                    // new one has to be activated. Ask BEFORE removing it,
+                    // because afterwards there is nothing left to ask about.
+                    val wasActive = runCatching { manager.isWatchFaceActive(ours.packageName) }
+                        .getOrElse { false }
+                    Log.i(TAG, "replacing slot ${ours.slotId} (active=$wasActive)")
+                    runCatching { manager.removeWatchFace(ours.slotId) }
+                        .onFailure { Log.w(TAG, "could not remove the old face; adding anyway", it) }
+                    val details = manager.addWatchFace(fd, token)
+                    // Only re-activate when we displaced the active face.
+                    // setWatchFaceAsActive has an undocumented attempt limit
+                    // this project has already hit, so it is not spent on a
+                    // face that was sitting in the picker anyway.
+                    if (wasActive) onFaceInstalled(context, details.slotId)
+                    Result.Installed(details.slotId, replaced = true)
+                } else {
                     val details = manager.addWatchFace(fd, token)
                     onFaceInstalled(context, details.slotId)
                     Result.Installed(details.slotId, replaced = false)
-                } else {
-                    val oldest = existing.installedWatchFaceDetails.firstOrNull()
-                        ?: return Result.Failed(IllegalStateException("no free slot and nothing of ours to replace"))
-                    val details = manager.updateWatchFace(oldest.slotId, fd, token)
-                    onFaceInstalled(context, details.slotId)
-                    Result.Installed(details.slotId, replaced = true)
                 }
             }
         }.getOrElse { Result.Failed(it) }
