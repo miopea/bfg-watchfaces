@@ -1,7 +1,7 @@
 package com.bfg.watchfaces.generator
 
 /**
- * The step-goal ring: where it sits and how thick it is.
+ * The rim ring: where it sits and how thick it is.
  *
  * Here rather than in the emitter because both previews draw it too, and this
  * project's recurring bug is the same number written down in three places.
@@ -15,10 +15,10 @@ package com.bfg.watchfaces.generator
  *
  * ## Why the format can do this unaided
  *
- * `[STEP_PERCENT]` is a first-class WFF source, and `<Transform>` binds an
- * arithmetic expression to any attribute — so the sweep is
- * `[STEP_PERCENT] * 3.6` degrees and the watch keeps it current. No
- * complication, no provider, and nothing for this app to recompute.
+ * `[STEP_PERCENT]`, `[BATTERY_PERCENT]` and the chance of rain are first-class
+ * WFF sources, and `<Transform>` binds an arithmetic expression to any
+ * attribute — so the sweep is that source times 3.6 degrees and the watch keeps
+ * it current. No complication, no provider, and nothing to recompute here.
  */
 object StepRing {
 

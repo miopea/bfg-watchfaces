@@ -360,7 +360,7 @@ class WffSchemaTest {
      */
     @Test
     fun `the step ring binds its sweep and is schema-valid`() {
-        val xml = WffEmitter.emit(DialParams(stepRing = true))
+        val xml = WffEmitter.emit(DialParams(ring = RingSource.STEPS))
         val errors = validate(xml)
         assertTrue(errors.isEmpty()) { "the step ring is not schema-valid:\n" + errors.joinToString("\n") }
 
@@ -375,6 +375,61 @@ class WffSchemaTest {
     @Test
     fun `no step ring means no ring at all`() {
         assertTrue(!WffEmitter.emit(DialParams()).contains("STEP_PERCENT"))
+    }
+
+
+    /** Every ring source is a real percentage the format can bind. */
+    @ParameterizedTest
+    @EnumSource(RingSource::class)
+    fun `every ring source emits schema-valid WFF`(source: RingSource) {
+        val xml = WffEmitter.emit(DialParams(ring = source))
+        val errors = validate(xml)
+        assertTrue(errors.isEmpty()) { "$source: " + errors.joinToString("\n") }
+        if (source.enabled) {
+            assertTrue(xml.contains(source.expression!!)) { "$source did not reach the face" }
+        }
+    }
+
+    /** Every weather reading is drawn, valid, and names its own source. */
+    @ParameterizedTest
+    @EnumSource(ComplicationSource::class)
+    fun `every weather reading is schema-valid`(source: ComplicationSource) {
+        if (!source.name.startsWith("WEATHER")) return
+        val xml = WffEmitter.emit(DialParams(complications = List(5) { source }))
+        val errors = validate(xml)
+        assertTrue(errors.isEmpty()) { "$source: " + errors.joinToString("\n") }
+        for (expression in source.drawn) {
+            assertTrue(xml.contains(expression)) { "$source is missing $expression" }
+        }
+    }
+
+    /**
+     * Two weather sources are in Google's enum, validate against Google's XSD,
+     * and render NOTHING on a watch — taking the whole face with them.
+     *
+     * `WEATHER.TEMPERATURE_HIGH` and `WEATHER.TEMPERATURE_LOW` only exist per
+     * day: `WEATHER.DAYS.0.…`. And `WEATHER.WEATHER.UV_INDEX`, with the
+     * doubled prefix, is a typo in the schema itself.
+     *
+     * Found by installing each source on a watch one at a time and looking. No
+     * amount of validation would have caught either, so this guards the two
+     * spellings rather than the behaviour.
+     */
+    @Test
+    fun `no weather source uses a spelling the watch rejects`() {
+        val dead = listOf(
+            "[WEATHER.TEMPERATURE_HIGH]",
+            "[WEATHER.TEMPERATURE_LOW]",
+            "[WEATHER.WEATHER.UV_INDEX]"
+        )
+        for (source in ComplicationSource.entries) {
+            for (expression in source.drawn) {
+                assertTrue(expression !in dead) {
+                    "$source uses $expression, which validates and renders a black face; " +
+                        "high, low and UV are day-indexed (WEATHER.DAYS.0....)"
+                }
+            }
+        }
     }
 
     @Test

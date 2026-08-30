@@ -125,7 +125,7 @@ object AndroidFacePreview {
             )
         }
 
-        if (p.stepRing && !ambient) {
+        if (p.ring.enabled && !ambient) {
             val b = StepRing.box()
             val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE

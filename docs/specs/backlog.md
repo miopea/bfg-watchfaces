@@ -45,11 +45,12 @@ what can be opened, the list rides back on the same reply, and a slot set to
 "Open an app" names one. Verified on a watch: tapping the slot opened
 `com.google.android.contacts/…ContactsActivity`.
 
-## 3. More weather
+## ~~3. More weather~~ — DONE 2026-08-30
 
-`[WEATHER.TEMPERATURE_HIGH]`, `TEMPERATURE_LOW`, `CHANCE_OF_PRECIPITATION`,
-`UV_INDEX`, `IS_DAY`. Deliberately not offered yet: several are meaningless
-without a label beside them, which is a layout question, not a plumbing one.
+High and low, chance of rain and UV index are all offered, each labelled so the
+number means something. High, low and UV are DAY-INDEXED
+(`WEATHER.DAYS.0....`); the bare spellings are in Google's enum, validate
+against Google's XSD, and render a black face.
 
 `IS_AVAILABLE` / `IS_ERROR` are also unused — the decided behaviour when weather
 is unavailable is to fall back to the slot's system provider, and that is not

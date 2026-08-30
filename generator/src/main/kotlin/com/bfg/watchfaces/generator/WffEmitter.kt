@@ -46,7 +46,7 @@ object WffEmitter {
     }
 
     /**
-     * The step-goal ring: a faint full circle with a bright arc over it.
+     * The rim ring: a faint full circle with a bright arc over it.
      *
      * The sweep is bound with `<Transform>` rather than baked in, so the WATCH
      * keeps it current from `[STEP_PERCENT]`. Nothing here recomputes it and
@@ -58,8 +58,8 @@ object WffEmitter {
      * 107,300 steps. Hidden in ambient: it is decoration, and ambient is a black
      * screen with the time on it.
      */
-    private fun stepRingElement(p: DialParams, ink: String): String {
-        if (!p.stepRing) return ""
+    private fun ringElement(p: DialParams, ink: String): String {
+        val expression = p.ring.expression ?: return ""
         val b = StepRing.box()
         val track = argb(p.inkColor, StepRing.TRACK_ALPHA)
         return """
@@ -72,7 +72,7 @@ object WffEmitter {
       <Arc centerX="${DIAL_CENTER}" centerY="${DIAL_CENTER}" width="${b.w}" height="${b.h}"
            startAngle="0" endAngle="0">
         <Stroke color="$ink" thickness="${StepRing.THICKNESS}" cap="ROUND"/>
-        <Transform target="endAngle" value="clamp([STEP_PERCENT], 0, 100) * ${StepRing.DEGREES_PER_PERCENT}"/>
+        <Transform target="endAngle" value="clamp($expression, 0, 100) * ${StepRing.DEGREES_PER_PERCENT}"/>
       </Arc>
     </PartDraw>"""
     }
@@ -136,7 +136,7 @@ object WffEmitter {
         // the beginning and nothing emitted them -- the date was always a
         // complication, whose wording belongs to the system provider.
         val dateLine = dateElement(p)
-        val stepRing = stepRingElement(p, ink)
+        val ring = ringElement(p, ink)
 
         // Ambient is a black screen. From v3 the ambient ink is lifted to clear
         // a contrast floor while keeping its hue, so a dark ink chosen for a
@@ -299,7 +299,7 @@ object WffEmitter {
       <Image resource="dial_bg"/>
     </PartImage>
 
-$stepRing
+$ring
 $dateLine
     <DigitalClock x="0" y="${l.timeY - l.timeSize / 2}" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}">
       <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"

@@ -53,6 +53,7 @@ import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.HourFormat
+import com.bfg.watchfaces.generator.RingSource
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.Engine
@@ -139,11 +140,13 @@ fun StudioScreen(
             detail = "Only while the watch is awake",
             checked = params.showSeconds
         ) { onParams(params.copy(showSeconds = it)) }
-        SwitchRow(
-            title = "Step goal ring",
-            detail = "Fills around the edge as you walk",
-            checked = params.stepRing
-        ) { onParams(params.copy(stepRing = it)) }
+        OptionRow(
+            label = "Ring",
+            value = params.ring.label,
+            title = "Ring around the edge",
+            options = RingSource.entries.map { it to it.label },
+            selected = params.ring
+        ) { onParams(params.copy(ring = it)) }
         OptionRow(
             label = "Date",
             value = if (params.dateStyle == DateStyle.NONE) params.dateStyle.label

@@ -33,6 +33,9 @@ object Complications {
         ComplicationSource.WEATHER_TEMPERATURE -> "Weather"
         ComplicationSource.WEATHER_CONDITION -> "Conditions"
         ComplicationSource.WEATHER_TEMP_CONDITION -> "Weather and conditions"
+        ComplicationSource.WEATHER_HIGH_LOW -> "High and low"
+        ComplicationSource.WEATHER_RAIN -> "Chance of rain"
+        ComplicationSource.WEATHER_UV -> "UV index"
         ComplicationSource.SHORTCUT_MUSIC -> "Music"
         ComplicationSource.SHORTCUT_ALARM -> "Alarms"
         ComplicationSource.SHORTCUT_SETTINGS -> "Settings"
@@ -69,6 +72,9 @@ object Complications {
         ComplicationSource.WEATHER_TEMPERATURE -> "72°"
         ComplicationSource.WEATHER_CONDITION -> "Cloudy"
         ComplicationSource.WEATHER_TEMP_CONDITION -> "72° Cloudy"
+        ComplicationSource.WEATHER_HIGH_LOW -> "78° / 61°"
+        ComplicationSource.WEATHER_RAIN -> "30%"
+        ComplicationSource.WEATHER_UV -> "UV 6"
         // A shortcut shows only its glyph; there is nothing to read.
         ComplicationSource.SHORTCUT_MUSIC,
         ComplicationSource.SHORTCUT_ALARM,

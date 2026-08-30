@@ -121,6 +121,37 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — Sources that validate and render nothing, and a ring you choose
+
+**The ring shows what you pick.** Steps against the day's goal, the watch
+battery, or the chance of rain — the only three PERCENTAGES Watch Face Format
+offers, and a ring is a proportion of a circle. Heart rate is a number, not a
+fraction of anything, which is why it is not on the list.
+
+`stepRing` was a boolean for exactly one release. The codec still reads it, so a
+face saved in that window opens with its ring intact rather than silently off.
+
+**Two weather sources validate and render nothing.** `WEATHER.TEMPERATURE_HIGH`
+and `WEATHER.TEMPERATURE_LOW` are in Google's enum and pass Google's XSD, and a
+face using either goes BLACK on a watch — everything gone, not just that slot.
+They only exist per day: `WEATHER.DAYS.0.TEMPERATURE_HIGH`. So does UV, and the
+enum's `WEATHER.WEATHER.UV_INDEX` has a doubled prefix that is simply a typo in
+the schema.
+
+Found by installing each source on a watch ONE AT A TIME and looking: battery
+ring renders, chance of rain renders, high/low blank, UV blank. Nothing else
+would have found it — the XSD is the authority everywhere else in this project,
+and here it is wrong twice.
+
+A test now guards the three dead spellings. It cannot test the behaviour, only
+that those strings never come back, and it says so.
+
+The pattern is worth naming now that it has happened three times:
+`[MONTH_DAY]` was a fractional month, `[WEATHER.TEMPERATURE_UNIT]` was a numeric
+code, and these two do not exist at all. Every one validated. The schema
+describes the SHAPE of a face, never what a source means or whether a watch
+implements it, and this project has repeatedly treated validation as proof.
+
 ## 2026-08-30 — A step ring the watch keeps current, and a clock you can read
 
 **The ring costs no slot.** A goal is a proportion, and a proportion reads

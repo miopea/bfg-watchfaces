@@ -3,6 +3,7 @@ package com.bfg.watchfaces.appcore
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.HourFormat
+import com.bfg.watchfaces.generator.RingSource
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
@@ -47,7 +48,7 @@ class FaceCodecTest {
         launchers = mapOf(SlotPosition.MIDDLE to "com.example.player/.Main"),
         dateStyle = DateStyle.WEEKDAY_MONTH_DAY,
         dateScale = DateScale.LARGE,
-        stepRing = true,
+        ring = RingSource.BATTERY,
         hourFormat = HourFormat.TWENTY_FOUR,
         lens = true, lensAmount = 33.0,
         complications = listOf(
@@ -166,6 +167,20 @@ class FaceCodecTest {
         assertEquals("STEP_COUNT", Complications.sourceIn(token))
         assertEquals("com.example.fit/.Provider", Complications.componentIn(token))
         assertEquals("com.example.player/.Main", Complications.launcherIn(token))
+    }
+
+
+    @Test
+    fun `a face saved with the old stepRing flag still opens`() {
+        // The ring was a boolean for one release. Dropping the key would turn
+        // every ring saved in that window off with no way to tell.
+        assertEquals(RingSource.STEPS, FaceCodec.fromQuery(mapOf("stepRing" to "true")).ring)
+        assertEquals(RingSource.NONE, FaceCodec.fromQuery(mapOf("stepRing" to "false")).ring)
+        // And the new key wins when both are present.
+        assertEquals(
+            RingSource.BATTERY,
+            FaceCodec.fromQuery(mapOf("stepRing" to "true", "ring" to "BATTERY")).ring
+        )
     }
 
     /** Top-level property names, read off the data class rather than listed. */

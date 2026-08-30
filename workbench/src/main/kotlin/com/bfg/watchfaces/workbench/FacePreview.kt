@@ -109,7 +109,7 @@ object FacePreview {
 
         // The step ring, matching WffEmitter: a faint full circle with a
         // bright arc over it. Hidden in ambient, like the emitted one.
-        if (p.stepRing && !ambient) {
+        if (p.ring.enabled && !ambient) {
             val b = StepRing.box()
             val sweep = StepRing.sweepDegrees(StepRing.SAMPLE_PERCENT)
             g.stroke = java.awt.BasicStroke(

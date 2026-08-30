@@ -133,6 +133,32 @@ enum class ComplicationSource(
      * temperature and a one-word condition fit side by side. Offering it saves
      * spending two of five slots on the weather.
      */
+    /**
+     * "78° / 61°" — today's high and low.
+     *
+     * The DAY-INDEXED sources, not the bare `[WEATHER.TEMPERATURE_HIGH]`. That
+     * bare form is in Google's enum, validates against their own XSD, and
+     * renders NOTHING AT ALL on a watch — the whole face goes black. High and
+     * low only exist per day, and day 0 is today.
+     */
+    WEATHER_HIGH_LOW(
+        null, "%s° / %s°",
+        "[WEATHER.DAYS.0.TEMPERATURE_HIGH]", "[WEATHER.DAYS.0.TEMPERATURE_LOW]"
+    ),
+
+    /** "30%" — how likely rain is. */
+    WEATHER_RAIN(null, "%s%%", "[WEATHER.CHANCE_OF_PRECIPITATION]"),
+
+    /**
+     * "UV 6", for today.
+     *
+     * NOT `[WEATHER.WEATHER.UV_INDEX]`, which is what the enum lists — the
+     * doubled prefix is a typo in Google's schema. It validates and it renders
+     * nothing, taking the rest of the face with it. UV is day-indexed like the
+     * high and low.
+     */
+    WEATHER_UV(null, "UV %s", "[WEATHER.DAYS.0.UV_INDEX]"),
+
     WEATHER_TEMP_CONDITION(
         null, "%s° %s",
         "[WEATHER.TEMPERATURE]", "[WEATHER.CONDITION_NAME]"
@@ -176,6 +202,9 @@ enum class ComplicationSource(
     val widestValue: Int
         get() = when (this) {
             WEATHER_TEMP_CONDITION -> 10
+            WEATHER_HIGH_LOW -> 9
+            WEATHER_UV -> 5
+            WEATHER_RAIN -> 4
             WEATHER_CONDITION -> 7
             WEATHER_TEMPERATURE -> 4
             else -> 0
@@ -247,6 +276,24 @@ enum class SlotPosition {
  * A 12-hour clock drops the leading zero. "06:10" is a 24-hour habit; on a
  * 12-hour face it reads as a mistake.
  */
+/**
+ * What the rim ring fills up with.
+ *
+ * Anything here has to be a PERCENTAGE, because the ring is a proportion of a
+ * circle — Watch Face Format offers exactly three: steps against the day's
+ * goal, the watch's battery, and the chance of rain. Heart rate is a number,
+ * not a fraction of anything, so it is not on this list however often it gets
+ * asked for.
+ */
+enum class RingSource(val label: String, val expression: String?) {
+    NONE("Off", null),
+    STEPS("Step goal", "[STEP_PERCENT]"),
+    BATTERY("Watch battery", "[BATTERY_PERCENT]"),
+    RAIN("Chance of rain", "[WEATHER.CHANCE_OF_PRECIPITATION]");
+
+    val enabled: Boolean get() = expression != null
+}
+
 enum class HourFormat(val label: String, val wff: String, val pattern: String) {
     DEVICE("Match my watch", "SYNC_TO_DEVICE", "hh:mm"),
     TWELVE("12-hour", "12", "h:mm"),
@@ -428,7 +475,14 @@ data class DialParams(
      * complication at all — `[STEP_PERCENT]` against an `Arc` whose sweep is
      * bound by a `Transform`.
      */
-    val stepRing: Boolean = false,
+    /**
+     * What the rim ring shows, or [RingSource.NONE].
+     *
+     * Replaced a `stepRing` boolean: the ring is a proportion drawn round the
+     * edge, and steps are only one of the things that IS one. The old flag is
+     * still read when opening a face saved with it.
+     */
+    val ring: RingSource = RingSource.NONE,
 
     /** 12 or 24 hours, or whatever the watch is set to. See [HourFormat]. */
     val hourFormat: HourFormat = HourFormat.DEVICE,

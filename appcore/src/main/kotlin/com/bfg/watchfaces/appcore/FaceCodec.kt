@@ -3,6 +3,7 @@ package com.bfg.watchfaces.appcore
 import com.bfg.watchfaces.generator.CURRENT_GENERATOR_VERSION
 import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.HourFormat
+import com.bfg.watchfaces.generator.RingSource
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.SlotPosition
@@ -79,7 +80,13 @@ object FaceCodec {
             dateScale = q["dateScale"]?.let { name ->
                 DateScale.entries.firstOrNull { it.name == name }
             } ?: d.dateScale,
-            stepRing = q["stepRing"]?.let { it == "true" || it == "1" } ?: d.stepRing,
+            // `stepRing` was a boolean for one release before the ring could
+            // show anything else. Still read, so a face saved with it opens.
+            ring = q["ring"]?.let { name -> RingSource.entries.firstOrNull { it.name == name } }
+                ?: q["stepRing"]?.let {
+                    if (it == "true" || it == "1") RingSource.STEPS else RingSource.NONE
+                }
+                ?: d.ring,
             hourFormat = q["hourFormat"]?.let { name ->
                 HourFormat.entries.firstOrNull { it.name == name }
             } ?: d.hourFormat,
@@ -163,7 +170,7 @@ object FaceCodec {
         .joinToString(", ") { "\"${it.key.name}\": \"${it.value}\"" }}},
   "iconSlots": [${p.iconSlots.sortedBy { it.ordinal }.joinToString(", ") { "\"${it.name}\"" }}],
   "dateStyle": "${p.dateStyle}", "dateScale": "${p.dateScale}",
-  "stepRing": ${p.stepRing}, "hourFormat": "${p.hourFormat}",
+  "ring": "${p.ring}", "hourFormat": "${p.hourFormat}",
   "lens": ${p.lens}, "lensAmount": ${p.lensAmount},
   "texture": "${p.texture}",
   "complications": [${Complications.format(p.complications, p.providers, p.launchers).split(",").joinToString(", ") { "\"$it\"" }}],
@@ -197,7 +204,7 @@ object FaceCodec {
                 .joinToString(",") { "${it.key.name}:${it.value}" },
             "dateStyle" to p.dateStyle.name,
             "dateScale" to p.dateScale.name,
-            "stepRing" to p.stepRing,
+            "ring" to p.ring.name,
             "hourFormat" to p.hourFormat.name,
             "lens" to p.lens, "lensAmount" to p.lensAmount, "texture" to p.texture,
             "complications" to Complications.format(p.complications, p.providers, p.launchers),
