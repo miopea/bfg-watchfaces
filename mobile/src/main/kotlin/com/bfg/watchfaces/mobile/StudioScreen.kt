@@ -19,12 +19,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -39,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -49,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bfg.watchfaces.generator.ControlInventory
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.Engine
@@ -105,11 +105,13 @@ fun StudioScreen(
             detail = "Only while the watch is awake",
             checked = params.showSeconds
         ) { onParams(params.copy(showSeconds = it)) }
-        SwitchRow(
-            title = "Complication icons",
-            detail = "The small symbol above each value",
-            checked = params.showComplicationIcons
-        ) { onParams(params.copy(showComplicationIcons = it)) }
+        OptionRow(
+            label = "Date",
+            value = params.dateStyle.label,
+            title = "Date",
+            options = DateStyle.entries.map { it to it.label },
+            selected = params.dateStyle
+        ) { onParams(params.copy(dateStyle = it)) }
 
         Spacer(Modifier.height(20.dp))
         SectionHeading("Style")
@@ -152,7 +154,16 @@ fun StudioScreen(
 
         Spacer(Modifier.height(8.dp))
         for (pos in SlotPosition.entries) {
-            SlotPicker(pos, params.slot(pos)) { onParams(params.withSlot(pos, it)) }
+            SlotPicker(
+                pos = pos,
+                selected = params.slot(pos),
+                iconOn = pos in params.iconSlots,
+                onSelect = { onParams(params.withSlot(pos, it)) },
+                onIcon = { on ->
+                    val next = if (on) params.iconSlots + pos else params.iconSlots - pos
+                    onParams(params.copy(iconSlots = next))
+                }
+            )
         }
         Text(
             "Turn one off and the others move over to fill the space.",
@@ -260,27 +271,6 @@ private fun AmbientToggle(ambient: Boolean, onAmbient: (Boolean) -> Unit) {
 }
 
 /**
- * One complication slot.
- *
- * ## This is an ExposedDropdownMenuBox and it matters that it is
- *
- * The first version was a bare `Row` with a coloured value on the right and a
- * raw `DropdownMenu` hung off it. It looked close enough in a screenshot and was
- * wrong in every way that does not show up in one: no affordance that it opens
- * anything, a touch target that was whatever the text happened to be, no field
- * semantics for TalkBack, and a menu that anchored to the Box rather than to the
- * control, so it opened over the label on a short screen.
- *
- * The Material 3 exposed dropdown is the standard Android answer and supplies
- * all of that: a read-only text field, the trailing chevron people already know,
- * a full-width target, and `menuAnchor` so the list opens where it should. It is
- * also the control this pattern is FOR — one value chosen from a fixed list,
- * with the current value always visible.
- *
- * A dropdown rather than chips because thirteen sources across five slots is
- * sixty-five chips; the localhost app uses a native `select` for the same reason.
- */
-/**
  * One complication slot, chosen from a list with icons.
  *
  * ## Why a list and not the dropdown that was here
@@ -303,7 +293,9 @@ private fun AmbientToggle(ambient: Boolean, onAmbient: (Boolean) -> Unit) {
 private fun SlotPicker(
     pos: SlotPosition,
     selected: ComplicationSource,
-    onSelect: (ComplicationSource) -> Unit
+    iconOn: Boolean,
+    onSelect: (ComplicationSource) -> Unit,
+    onIcon: (Boolean) -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
 
@@ -314,7 +306,9 @@ private fun SlotPicker(
             .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SourceGlyph(selected)
+        // Dimmed rather than hidden when the glyph is off: the row still has to
+        // say WHICH complication this is, and an empty space says nothing.
+        Box(Modifier.alpha(if (iconOn) 1f else 0.3f)) { SourceGlyph(selected) }
         Spacer(Modifier.size(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -334,6 +328,18 @@ private fun SlotPicker(
             title = { Text("${Presentation.label(pos)} complication") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
+                    // Per slot, and inside the slot's own dialog: the reason to
+                    // hide a glyph is almost always about one complication, and
+                    // this is where someone is already deciding about that one.
+                    if (selected != ComplicationSource.NONE) {
+                        SwitchRow(
+                            title = "Show the icon",
+                            detail = "The small symbol above the value",
+                            checked = iconOn,
+                            onChange = onIcon
+                        )
+                        HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                    }
                     for (source in ComplicationSource.entries) {
                         Row(
                             modifier = Modifier
@@ -386,6 +392,73 @@ private fun SourceGlyph(source: ComplicationSource) {
  * choices, not a continuum, and the localhost app draws them as three buttons.
  */
 @OptIn(ExperimentalMaterial3Api::class)
+/**
+ * A row that opens a list, for a choice with more options than fit a segmented
+ * control.
+ *
+ * [ChoiceRow] lays its options out side by side, which works for three short
+ * words and falls apart at five long ones: "Weekday, month and day" next to
+ * four siblings is unreadable at any phone width. Same job, different shape.
+ */
+@Composable
+private fun <T> OptionRow(
+    label: String,
+    value: String,
+    title: String,
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { open = true }
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(value, style = MaterialTheme.typography.bodyLarge)
+        }
+        Text("\u203A", style = MaterialTheme.typography.titleMedium,
+             color = MaterialTheme.colorScheme.outline)
+    }
+
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(title) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    for ((option, text) in options) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(option); open = false }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = option == selected,
+                                onClick = { onSelect(option); open = false }
+                            )
+                            Spacer(Modifier.size(4.dp))
+                            Text(text, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } }
+        )
+    }
+}
+
 @Composable
 private fun ChoiceRow(
     label: String,

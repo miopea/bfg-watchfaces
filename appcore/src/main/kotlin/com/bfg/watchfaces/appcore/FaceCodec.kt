@@ -3,6 +3,7 @@ package com.bfg.watchfaces.appcore
 import com.bfg.watchfaces.generator.CURRENT_GENERATOR_VERSION
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.SlotPosition
 import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.Layout
 
@@ -40,8 +41,17 @@ object FaceCodec {
             inkColor = q["inkColor"]?.normalizeHex() ?: d.inkColor,
             sheen = q.dbl("sheen", d.sheen),
             showSeconds = q["showSeconds"]?.let { it == "true" || it == "1" } ?: d.showSeconds,
-            showComplicationIcons = q["showComplicationIcons"]?.let { it == "true" || it == "1" }
-                ?: d.showComplicationIcons,
+            // `iconSlots` is the current form. `showComplicationIcons` was the
+            // single switch that preceded it and is still read, because faces
+            // were saved with it: false meant no glyph anywhere, true meant all
+            // of them. Written faces only ever carry the new key.
+            iconSlots = q["iconSlots"]?.let { list ->
+                list.split(",").mapNotNull { name ->
+                    SlotPosition.entries.firstOrNull { it.name == name.trim() }
+                }.toSet()
+            } ?: q["showComplicationIcons"]?.let { legacy ->
+                if (legacy == "true" || legacy == "1") SlotPosition.entries.toSet() else emptySet()
+            } ?: d.iconSlots,
             // An unknown name falls back to the default rather than throwing: a
             // face saved by a newer build must still open here, minus whatever
             // this build does not understand.
@@ -87,10 +97,12 @@ object FaceCodec {
         }
         for ((k, v) in o) when {
             k == "layout" -> {}
-            // The catalog stores complications as an array; the query form uses
-            // a comma-separated list. Flatten here so there is exactly one
-            // parser, in fromQuery, rather than two that can disagree.
-            k == "complications" && v is List<*> -> flat[k] = v.joinToString(",") { it.toString() }
+            // The catalog stores lists as arrays -- complications, iconSlots --
+            // and the query form uses a comma-separated string. Flatten ANY
+            // list here so there is exactly one parser, in fromQuery, rather
+            // than two that can disagree. Naming the keys individually is how
+            // iconSlots was silently dropped on its first day.
+            v is List<*> -> flat[k] = v.joinToString(",") { it.toString() }
             else -> put(k, v)
         }
         for ((k, v) in Json.obj(o["layout"])) put(k, v)
@@ -116,7 +128,8 @@ object FaceCodec {
   "stroke": ${p.stroke}, "relief": ${p.relief}, "contrast": ${p.contrast},
   "rotate": ${p.rotate}, "vignette": ${p.vignette}, "sheen": ${p.sheen},
   "dialColor": "${p.dialColor}", "inkColor": "${p.inkColor}",
-  "showSeconds": ${p.showSeconds}, "showComplicationIcons": ${p.showComplicationIcons},
+  "showSeconds": ${p.showSeconds},
+  "iconSlots": [${p.iconSlots.sortedBy { it.ordinal }.joinToString(", ") { "\"${it.name}\"" }}],
   "dateStyle": "${p.dateStyle}",
   "lens": ${p.lens}, "lensAmount": ${p.lensAmount},
   "texture": "${p.texture}",
@@ -146,7 +159,7 @@ object FaceCodec {
             "rotate" to p.rotate, "vignette" to p.vignette, "sheen" to p.sheen,
             "dialColor" to p.dialColor, "inkColor" to p.inkColor,
             "showSeconds" to p.showSeconds,
-            "showComplicationIcons" to p.showComplicationIcons,
+            "iconSlots" to p.iconSlots.sortedBy { it.ordinal }.joinToString(",") { it.name },
             "dateStyle" to p.dateStyle.name,
             "lens" to p.lens, "lensAmount" to p.lensAmount, "texture" to p.texture,
             "complications" to Complications.format(p.complications),

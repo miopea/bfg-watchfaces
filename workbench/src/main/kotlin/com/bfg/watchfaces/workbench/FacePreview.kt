@@ -3,6 +3,7 @@ package com.bfg.watchfaces.workbench
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.AmbientPalette
 import com.bfg.watchfaces.generator.ComplicationSource
+import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.SlotGeometry
 import com.bfg.watchfaces.generator.SlotPosition
@@ -86,13 +87,22 @@ object FacePreview {
             val a = if (ambient) (if (pos == SlotPosition.TOP) 140 else 0) else 255
             if (a <= 0) continue
             val c = withAlpha(if (ambient) ambientSlotInk else ink, a)
-            // Honours showComplicationIcons, or the toggle appears to do nothing
-            // in the one view somebody uses to judge it.
-            if (p.showComplicationIcons) {
+            // Honours iconSlots, or the toggles appear to do nothing in the one
+            // view somebody uses to judge them.
+            if (pos in p.iconSlots) {
                 ComplicationIcons.draw(g, source, box.x + (box.w - iconSize) / 2.0, box.y.toDouble(), iconSize, c)
             }
             drawCenteredIn(g, Complications.sample(source), box.x, box.y + textY, box.w, textH,
                 fontSize, Font.PLAIN, c)
+        }
+
+        // The date the FACE draws, matching WffEmitter's PartText: centred at
+        // dateY, dimmed in ambient rather than hidden. Without this the Date
+        // control changes nothing in the only view anyone judges it in.
+        SlotGeometry.dateBand(p)?.let { band ->
+            val dateInk = if (ambient) withAlpha(ambientSlotInk, 140) else ink
+            drawCentered(g, p.dateStyle.sample(), band.y, band.h,
+                l.dateSize.toDouble(), Font.PLAIN, dateInk)
         }
 
         // Time: the emitter ships TWO TimeText elements, one interactive

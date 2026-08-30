@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import com.bfg.watchfaces.generator.AmbientPalette
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.EngravedStroke
 import com.bfg.watchfaces.generator.SlotGeometry
@@ -81,9 +82,9 @@ object AndroidFacePreview {
             val a = if (ambient) (if (pos == SlotPosition.TOP) 140 else 0) else 255
             if (a <= 0) continue
             val c = withAlpha(if (ambient) ambientSlotInk else ink, a)
-            // Honours showComplicationIcons, or the toggle appears to do nothing
-            // in the one view somebody uses to judge it.
-            if (p.showComplicationIcons) {
+            // Honours iconSlots, or the toggles appear to do nothing in the one
+            // view somebody uses to judge them.
+            if (pos in p.iconSlots) {
                 AndroidComplicationIcons.draw(
                     canvas, source,
                     x = box.x + (box.w - iconSize) / 2f,
@@ -107,6 +108,20 @@ object AndroidFacePreview {
         // show them -- otherwise the toggle appears to do nothing in the one
         // view where it is deliberately absent.
         val timeText = "%02d:%02d".format(if (hh == 0) 12 else hh, SAMPLE_MINUTE)
+        // The date the FACE draws, matching WffEmitter's PartText: centred at
+        // dateY, dimmed in ambient rather than hidden. Without this the Date
+        // control changes nothing in the only view anyone judges it in.
+        SlotGeometry.dateBand(p)?.let { band ->
+            drawCenteredIn(
+                canvas, p.dateStyle.sample(),
+                band.x.toFloat(), band.y.toFloat(),
+                band.w.toFloat(), band.h.toFloat(),
+                l.dateSize.toFloat(),
+                if (ambient) withAlpha(ambientSlotInk, 140) else ink,
+                bold = false
+            )
+        }
+
         val timeColor = if (ambient) {
             // Mirror the emitter's version branch exactly. From v3 the ambient
             // ink clears a contrast floor against black; before that it is the

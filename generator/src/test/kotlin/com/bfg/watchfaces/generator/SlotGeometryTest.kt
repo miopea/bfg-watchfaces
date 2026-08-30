@@ -3,6 +3,7 @@ package com.bfg.watchfaces.generator
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -190,5 +191,46 @@ class ClockBandTest {
         }
     }
 
+
+
+    /**
+     * The drawn date and the top slot never overlap.
+     *
+     * They collided by construction: the top slot anchors at `dateY` and so
+     * does the drawn date, so switching the date on printed it straight through
+     * the top complication. Seen on a phone, not in a test -- which is the
+     * whole reason this file exists, since the slot boxes were once computed in
+     * two places, agreed in a test, and overlapped in reality.
+     */
+    @Test
+    fun `the drawn date never lands on the top slot`() {
+        for (style in DateStyle.entries) {
+            if (style == DateStyle.NONE) continue
+            for (size in listOf(10, 19, 28, 40)) {
+                for (dateSize in listOf(14, 21, 30)) {
+                    val p = DialParams(
+                        dateStyle = style,
+                        layout = Layout(complicationSize = size, dateSize = dateSize)
+                    )
+                    val band = SlotGeometry.dateBand(p)!!
+                    val top = SlotGeometry.boxes(p)[SlotPosition.TOP] ?: continue
+                    assertTrue(top.y + top.h <= band.y) {
+                        "$style at size=$size dateSize=$dateSize: the top slot " +
+                            "(y=${top.y}..${top.y + top.h}) runs into the date " +
+                            "(y=${band.y}..${band.y + band.h})"
+                    }
+                }
+            }
+        }
+    }
+
+    /** With no drawn date, nothing about the top slot changes. */
+    @Test
+    fun `switching the date off leaves the slots exactly where they were`() {
+        val off = DialParams(dateStyle = DateStyle.NONE)
+        assertNull(SlotGeometry.dateBand(off))
+        // The boxes a face emitted before the drawn date existed.
+        assertEquals(SlotGeometry.boxes(DialParams()), SlotGeometry.boxes(off))
+    }
 
 }

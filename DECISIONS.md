@@ -121,6 +121,46 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — Glyphs are per slot, and the drawn date sits against the clock
+
+Two features asked for together, and the second one moved the first.
+
+**Per-slot glyphs.** `showComplicationIcons` was one switch for the whole face.
+The reason to hide a glyph is almost always about ONE complication — a date
+reads as a date without a calendar above it, while a bare number wants the
+footprint that says it is a step count — so a single switch forces that
+judgement on all five. It is now `iconSlots: Set<SlotPosition>`, and the toggle
+lives inside each slot's own dialog, where someone is already deciding about
+that slot. The row's glyph dims rather than vanishing when it is off: the row
+still has to say which complication it is.
+
+`showComplicationIcons` is still READ by the codec, because faces were saved
+with it — false meant no glyph anywhere, true meant all of them. Only the new
+key is written.
+
+**The drawn date does not go at `dateY`.** It did at first, and it printed
+straight through the top complication on a phone. Despite the name, `dateY` has
+always been the TOP SLOT's anchor — `layoutAt` reads it for exactly that — so
+putting the date there put two things in one place. Clamping the slot above the
+date does not work either: at complication size 28 there is no room, and the
+existing floor pushes it back down into the date.
+
+The date now takes the band directly above the clock, which hands the whole
+upper dial back to the top slot and fits at every size. `SlotGeometry.dateBand`
+owns that, because the emitter and BOTH previews need it and the first version
+computed `dateY - dateSize / 2` in all three — the duplicate-geometry mistake
+`SlotGeometry` was created to end.
+
+Rejected: hiding the top complication automatically when the drawn date is on.
+It is a reasonable guess and it is still a guess, made by silently discarding a
+choice someone made. Turning the slot off, or turning its glyph off, are both
+one tap and both visible.
+
+Also rejected: leaving the previews alone. `dateStyle` reached the emitter
+first, so the control changed the built face and nothing on screen — the exact
+complaint ("nothing really changes") that the complication-size fix answered a
+day earlier.
+
 ## 2026-08-30 — A schema test that only tests defaults is not a schema test
 
 `showSeconds` and `dateStyle` shipped to a real phone emitting an XML comment

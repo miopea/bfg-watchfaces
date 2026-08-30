@@ -82,6 +82,32 @@ object SlotGeometry {
     fun boxHeight(size: Int): Int = (size * 3.3).roundToInt()
 
     fun iconHeight(size: Int): Int = (size * 1.25).roundToInt()
+
+    /**
+     * Where the face's own drawn date goes, or null when there is not one.
+     *
+     * Here rather than in the emitter, because the emitter and BOTH previews
+     * need it and the first version of the date computed `dateY - dateSize / 2`
+     * in all three. That is the duplicate-geometry mistake this object was
+     * created to end -- the slot boxes were once computed independently in two
+     * places, agreed in a test, and overlapped on both axes in reality.
+     *
+     * Full width and centred, matching the emitted PartText.
+     *
+     * Placed directly ABOVE THE CLOCK rather than at `dateY`. Despite the name,
+     * `dateY` has always been the TOP SLOT's anchor -- see the top block in
+     * [layoutAt] -- so putting the drawn date there put two things in one place
+     * and left nothing above for the slot. Sitting against the clock instead
+     * gives the whole upper dial back to the top complication, which is what
+     * makes both fit at every complication size.
+     */
+    fun dateBand(p: DialParams): Box? {
+        if (p.dateStyle == DateStyle.NONE) return null
+        val l = p.layout
+        val (timeTop, _) = timeBand(l)
+        val h = (l.dateSize * 1.6).roundToInt()
+        return Box(0, timeTop - GAP - h, DIAL_SIZE, h)
+    }
     fun textOffset(size: Int): Int = (size * 1.45).roundToInt()
     fun textHeight(size: Int): Int = (size * 1.7).roundToInt()
     fun fontSize(size: Int): Int = (size * 0.92).roundToInt()
@@ -242,6 +268,11 @@ object SlotGeometry {
         if (top.enabled) {
             var y = l.dateY - anchor - air         // spacing pushes it away from the clock
             y = min(y, timeTop - GAP - h)          // never run into the clock
+            // The drawn date sits AT dateY, which is where the top slot anchors
+            // -- so with both on they land on each other. The date wins the
+            // band and the slot goes above it. Seen on a phone: "SUN AUG 30"
+            // printed straight through the top complication's own text.
+            dateBand(p)?.let { y = min(y, it.y - GAP - h) }
             y = max(y, highestY)                   // and never leave the circle
             out[SlotPosition.TOP] = Box(DIAL_SIZE / 2 - w / 2, y, w, h)
             topBottom = y + h

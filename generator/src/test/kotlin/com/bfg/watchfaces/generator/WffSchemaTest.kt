@@ -78,9 +78,14 @@ class WffSchemaTest {
     @ParameterizedTest
     @EnumSource(DateStyle::class)
     fun `every date style emits schema-valid WFF`(style: DateStyle) {
+        val iconSets = listOf(
+            emptySet(),
+            SlotPosition.entries.toSet(),
+            setOf(SlotPosition.TOP, SlotPosition.RIGHT)
+        )
         for (seconds in listOf(false, true)) {
-            for (icons in listOf(false, true)) {
-                val p = DialParams(showSeconds = seconds, dateStyle = style, showComplicationIcons = icons)
+            for (icons in iconSets) {
+                val p = DialParams(showSeconds = seconds, dateStyle = style, iconSlots = icons)
                 val errors = validate(WffEmitter.emit(p))
                 assertTrue(errors.isEmpty()) {
                     "date=$style seconds=$seconds icons=$icons is schema-invalid:\n" +

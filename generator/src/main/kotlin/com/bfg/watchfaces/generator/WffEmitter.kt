@@ -48,9 +48,10 @@ object WffEmitter {
         }
         val placeholders = sources.joinToString(" ") { "%s" }
         val parameters = sources.joinToString("") { """<Parameter expression="[$it]"/>""" }
-        val h = (l.dateSize * 1.6).toInt()
+        // SlotGeometry owns where this goes; the top slot is laid out around it.
+        val band = SlotGeometry.dateBand(p) ?: return ""
         return """
-    <PartText x="0" y="${l.dateY - l.dateSize / 2}" width="$DIAL_SIZE" height="$h" alpha="255">
+    <PartText x="${band.x}" y="${band.y}" width="${band.w}" height="${band.h}" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="140"/>
       <Text align="CENTER">
         <Font family="${l.fontFamily}" size="${l.dateSize}" weight="NORMAL" color="${argb(p.inkColor)}">
@@ -146,7 +147,7 @@ object WffEmitter {
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <DefaultProviderPolicy defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
       <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
-      <Complication type="SHORT_TEXT">${if (!p.showComplicationIcons) "" else """
+      <Complication type="SHORT_TEXT">${if (pos !in p.iconSlots) "" else """
         <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>"""}

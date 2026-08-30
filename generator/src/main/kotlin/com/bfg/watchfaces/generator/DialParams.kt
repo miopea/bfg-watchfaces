@@ -100,6 +100,32 @@ enum class DateStyle(val label: String) {
 
     /** `SATURDAY` */
     WEEKDAY("Weekday");
+
+    /**
+     * What this style reads as on a given day.
+     *
+     * Lives here, in `:generator`, because BOTH previews have to show what the
+     * emitter will actually write. A preview that formats the date its own way
+     * is a preview of a different watch face -- and the first version of this
+     * feature shipped with no preview at all, so the control looked broken.
+     *
+     * Uppercase short forms, matching what the complication samples beside it
+     * already draw. The watch supplies the real strings from WFF's own date
+     * sources; this only has to agree about SHAPE.
+     */
+    fun sample(today: java.time.LocalDate = java.time.LocalDate.now()): String {
+        val loc = java.util.Locale.getDefault()
+        fun weekdayShort() = today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, loc)
+        fun weekdayFull() = today.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, loc)
+        fun monthShort() = today.month.getDisplayName(java.time.format.TextStyle.SHORT, loc)
+        return when (this) {
+            NONE -> ""
+            DAY -> "${today.dayOfMonth}"
+            MONTH_DAY -> "${monthShort()} ${today.dayOfMonth}"
+            WEEKDAY_MONTH_DAY -> "${weekdayShort()} ${monthShort()} ${today.dayOfMonth}"
+            WEEKDAY -> weekdayFull()
+        }.uppercase(loc)
+    }
 }
 
 /**
@@ -156,14 +182,18 @@ data class DialParams(
     val showSeconds: Boolean = false,
 
     /**
-     * Draw the little icon above each complication's value.
+     * Which slots draw the little icon above their value.
      *
-     * On by default, because that is what every face emitted before this existed
-     * did. Off gives a text-only dial, which is what you want when the values
-     * already say what they are -- a date reads as a date without a calendar
-     * above it.
+     * Per slot rather than one switch for the face, because the reason to turn a
+     * glyph off is usually about ONE complication: a date reads as a date
+     * without a calendar above it, while a bare number badly wants the footprint
+     * that says it is a step count. A single toggle forces that judgement on all
+     * five at once.
+     *
+     * Every position by default, which is what every face emitted before this
+     * existed did.
      */
-    val showComplicationIcons: Boolean = true,
+    val iconSlots: Set<SlotPosition> = SlotPosition.entries.toSet(),
 
     /**
      * A date drawn by the face itself. See [DateStyle].

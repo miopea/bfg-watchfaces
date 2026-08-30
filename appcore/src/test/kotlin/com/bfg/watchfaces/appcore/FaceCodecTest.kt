@@ -5,6 +5,7 @@ import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.Layout
+import com.bfg.watchfaces.generator.SlotPosition
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -36,7 +37,7 @@ class FaceCodecTest {
         contrast = 61.0, rotate = 22.0, vignette = 44.0, sheen = 55.0,
         dialColor = "#123456", inkColor = "#FEDCBA",
         showSeconds = true,
-        showComplicationIcons = false,
+        iconSlots = setOf(SlotPosition.TOP, SlotPosition.RIGHT),
         dateStyle = DateStyle.WEEKDAY_MONTH_DAY,
         lens = true, lensAmount = 33.0,
         complications = listOf(
@@ -98,6 +99,26 @@ class FaceCodecTest {
     @Test
     fun `an empty query is the default face`() {
         assertEquals(DialParams(), FaceCodec.fromQuery(emptyMap()))
+    }
+
+
+    @Test
+    fun `the old single icon switch still opens a face saved with it`() {
+        // showComplicationIcons preceded iconSlots. Faces were saved with it,
+        // and dropping it would silently turn every glyph back on.
+        val off = FaceCodec.fromQuery(mapOf("showComplicationIcons" to "false"))
+        assertTrue(off.iconSlots.isEmpty()) { "a face saved with glyphs off got them back" }
+
+        val on = FaceCodec.fromQuery(mapOf("showComplicationIcons" to "true"))
+        assertEquals(SlotPosition.entries.toSet(), on.iconSlots)
+    }
+
+    @Test
+    fun `iconSlots wins over the switch it replaced`() {
+        val p = FaceCodec.fromQuery(
+            mapOf("showComplicationIcons" to "false", "iconSlots" to "TOP,BOTTOM")
+        )
+        assertEquals(setOf(SlotPosition.TOP, SlotPosition.BOTTOM), p.iconSlots)
     }
 
     /** Top-level property names, read off the data class rather than listed. */
