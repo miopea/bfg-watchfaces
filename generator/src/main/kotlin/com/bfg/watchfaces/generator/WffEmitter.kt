@@ -76,14 +76,15 @@ object WffEmitter {
             """
     <ComplicationSlot slotId="$id" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"
                       displayName="@string/slot_${source.name.lowercase()}"
-                      supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255">
+                      supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255"
+                      isCustomizable="TRUE">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <DefaultProviderPolicy defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
       <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
-      <Complication type="SHORT_TEXT">
+      <Complication type="SHORT_TEXT">${if (!p.showComplicationIcons) "" else """
         <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
-        </PartImage>
+        </PartImage>"""}
         <PartText x="0" y="$textY" width="${box.w}" height="$textH">$ambientColorVariant
           <Text align="CENTER">
             <Font family="${l.fontFamily}" size="$fontSize" color="$ink">
@@ -129,7 +130,7 @@ object WffEmitter {
     </PartImage>
 
     <DigitalClock x="0" y="${l.timeY - l.timeSize / 2}" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}">
-      <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
+      <TimeText format="${if (p.showSeconds) "hh:mm:ss" else "hh:mm"}" hourFormat="SYNC_TO_DEVICE" align="CENTER"
                 x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="255">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
         <Font family="${l.fontFamily}" size="${l.timeSize}" weight="${l.fontWeight}" color="$ink"/>

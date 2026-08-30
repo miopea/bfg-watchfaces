@@ -113,6 +113,29 @@ data class DialParams(
      */
     val texture: String = "",
 
+    /**
+     * Show seconds while the watch is awake.
+     *
+     * Awake only, always: a ticking second on an always-on display is the most
+     * expensive thing a watch face can draw, and Wear OS updates ambient at most
+     * once a minute anyway, so an ambient seconds digit would simply be wrong
+     * most of the time.
+     *
+     * Defaults to false so every face saved before this existed emits exactly
+     * the XML it always did.
+     */
+    val showSeconds: Boolean = false,
+
+    /**
+     * Draw the little icon above each complication's value.
+     *
+     * On by default, because that is what every face emitted before this existed
+     * did. Off gives a text-only dial, which is what you want when the values
+     * already say what they are -- a date reads as a date without a calendar
+     * above it.
+     */
+    val showComplicationIcons: Boolean = true,
+
     /** Draw the pattern OVER the numerals rather than behind them. */
     val lens: Boolean = true,
     val lensAmount: Double = 38.0,

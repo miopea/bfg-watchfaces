@@ -104,7 +104,7 @@ object Presentation {
         ComplicationSource.NONE -> ""
         ComplicationSource.STEP_COUNT -> "8,412"
         ComplicationSource.HEART_RATE -> "62"
-        ComplicationSource.DAY_AND_DATE -> "MAR 10"
+        ComplicationSource.DAY_AND_DATE -> "TUE MAR 10"
         ComplicationSource.DATE -> "10"
         ComplicationSource.DAY_OF_WEEK -> "TUE"
         ComplicationSource.WATCH_BATTERY -> "78%"

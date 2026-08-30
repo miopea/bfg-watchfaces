@@ -56,6 +56,14 @@ import com.bfg.watchfaces.generator.EngravedStroke
 import com.bfg.watchfaces.generator.SlotPosition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.Canvas
 
 /**
  * The design surface, ported from the localhost app.
@@ -92,6 +100,16 @@ fun StudioScreen(
     ) {
         DialPreview(params, ambient)
         AmbientToggle(ambient, onAmbient)
+        SwitchRow(
+            title = "Show seconds",
+            detail = "Only while the watch is awake",
+            checked = params.showSeconds
+        ) { onParams(params.copy(showSeconds = it)) }
+        SwitchRow(
+            title = "Complication icons",
+            detail = "The small symbol above each value",
+            checked = params.showComplicationIcons
+        ) { onParams(params.copy(showComplicationIcons = it)) }
 
         Spacer(Modifier.height(20.dp))
         SectionHeading("Style")
@@ -119,7 +137,11 @@ fun StudioScreen(
         SectionHeading("Complications")
         ChoiceRow(
             label = "Size",
-            options = listOf("Small" to 16, "Medium" to 19, "Large" to 23),
+            // 14/20/28 rather than 16/19/23. SlotGeometry allows 10..40 and the
+            // old band used a fifth of it, so Small and Large differed by four
+            // points of font size -- a real change that nobody could see, which
+            // reads as a broken control rather than a subtle one.
+            options = listOf("Small" to 14, "Medium" to 20, "Large" to 28),
             selected = params.layout.complicationSize
         ) { onParams(params.copy(layout = params.layout.copy(complicationSize = it))) }
         ChoiceRow(
@@ -189,6 +211,33 @@ private fun DialPreview(params: DialParams, ambient: Boolean) {
  * most slots go to zero alpha, which is the emitter's own behaviour rather than
  * a dimming effect applied here.
  */
+/** A labelled switch. Two of these now, so it is one composable rather than two. */
+@Composable
+private fun SwitchRow(
+    title: String,
+    detail: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
 @Composable
 private fun AmbientToggle(ambient: Boolean, onAmbient: (Boolean) -> Unit) {
     Row(
@@ -231,7 +280,25 @@ private fun AmbientToggle(ambient: Boolean, onAmbient: (Boolean) -> Unit) {
  * A dropdown rather than chips because thirteen sources across five slots is
  * sixty-five chips; the localhost app uses a native `select` for the same reason.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * One complication slot, chosen from a list with icons.
+ *
+ * ## Why a list and not the dropdown that was here
+ *
+ * The dropdown was the standard Material control for "one of a fixed set", and
+ * it was still the wrong one: on the watch, choosing a complication means the
+ * system picker — a full list, each source with its own glyph, because people
+ * recognise the shape faster than they read the word. A phone control that looks
+ * nothing like the thing it is configuring makes you translate between them.
+ *
+ * The glyphs are [ComplicationGlyphs] in `:generator` — the same shapes the dial
+ * preview draws in the slot, so what you pick here is literally what appears
+ * there.
+ *
+ * This sets the face's DEFAULT provider. The watch's own editor can still change
+ * it afterwards, which is what `isCustomizable="TRUE"` on the emitted
+ * `ComplicationSlot` is for.
+ */
 @Composable
 private fun SlotPicker(
     pos: SlotPosition,
@@ -239,30 +306,69 @@ private fun SlotPicker(
     onSelect: (ComplicationSource) -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = open,
-        onExpandedChange = { open = it },
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { open = true }
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        OutlinedTextField(
-            value = Presentation.label(selected),
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(Presentation.label(pos)) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = open) },
-            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-            modifier = Modifier
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                .fillMaxWidth()
+        SourceGlyph(selected)
+        Spacer(Modifier.size(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                Presentation.label(pos),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(Presentation.label(selected), style = MaterialTheme.typography.bodyLarge)
+        }
+        Text("›", style = MaterialTheme.typography.titleMedium,
+             color = MaterialTheme.colorScheme.outline)
+    }
+
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("${Presentation.label(pos)} complication") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    for (source in ComplicationSource.entries) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(source); open = false }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = source == selected,
+                                onClick = { onSelect(source); open = false }
+                            )
+                            SourceGlyph(source)
+                            Spacer(Modifier.size(12.dp))
+                            Text(Presentation.label(source),
+                                 style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } }
         )
-        ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            for (source in ComplicationSource.entries) {
-                DropdownMenuItem(
-                    text = { Text(Presentation.label(source)) },
-                    onClick = { onSelect(source); open = false },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
-                )
-            }
+    }
+}
+
+/** The same glyph the dial preview draws in that slot. */
+@Composable
+private fun SourceGlyph(source: ComplicationSource) {
+    val tint = MaterialTheme.colorScheme.onSurfaceVariant
+    Canvas(Modifier.size(24.dp)) {
+        if (!source.enabled) return@Canvas
+        drawIntoCanvas { canvas ->
+            AndroidComplicationIcons.draw(
+                canvas.nativeCanvas, source, 0f, 0f, size.minDimension, tint.toArgb()
+            )
         }
     }
 }

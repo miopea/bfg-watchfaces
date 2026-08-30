@@ -45,6 +45,8 @@ import com.bfg.watchfaces.mobile.pack.PackBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarDuration
 
 /**
  * The design app.
@@ -84,7 +86,11 @@ class MainActivity : ComponentActivity() {
                 var params by remember { mutableStateOf(Presets.OPENING) }
                 var tab by rememberSaveable { mutableStateOf(Tab.DESIGNS) }
                 var ambient by rememberSaveable { mutableStateOf(false) }
-                var handoff by rememberSaveable { mutableStateOf(false) }
+                // The explanation is a one-time modal now, not a screen in the
+                // way of every send.
+                var explaining by remember { mutableStateOf(false) }
+                var pendingSend by remember { mutableStateOf<Pair<String, DialParams>?>(null) }
+                val explainState = rememberModalBottomSheetState()
                 // A face gets its identity when somebody names it. Sending an
                 // unnamed design would put "Untitled" in the carousel and in the
                 // package name, so the send path reuses the last name given.
@@ -103,17 +109,39 @@ class MainActivity : ComponentActivity() {
                 val colorState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                 val nameState = rememberModalBottomSheetState()
 
-                BackHandler(enabled = handoff) { handoff = false }
-                BackHandler(enabled = !handoff && tab != Tab.DESIGNS) { tab = Tab.DESIGNS }
+                /**
+                 * Send [name], explaining the flow the first time only.
+                 *
+                 * Everything that sends a face goes through here -- the studio
+                 * button and every row of My faces -- so there is one place
+                 * where the explanation, the progress and the result are decided.
+                 */
+                fun requestSend(name: String, face: DialParams) {
+                    if (!Onboarding.hasExplainedSend(context)) {
+                        pendingSend = name to face
+                        explaining = true
+                        return
+                    }
+                    scope.launch {
+                        snackbar.showSnackbar("Building “$name”…", duration = SnackbarDuration.Short)
+                    }
+                    scope.launch {
+                        // Off the main thread: packing walks the resource table
+                        // and the Data Layer calls block.
+                        val result = withContext(Dispatchers.IO) { buildThenSend(context, name, face) }
+                        snackbar.showSnackbar(result, duration = SnackbarDuration.Long)
+                    }
+                }
+
+                BackHandler(enabled = tab != Tab.DESIGNS) { tab = Tab.DESIGNS }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
-                        TopAppBar(title = { Text(if (handoff) "Send to your watch" else tab.label) })
+                        TopAppBar(title = { Text(tab.label) })
                     },
                     bottomBar = {
-                        if (!handoff) {
-                            NavigationBar {
+                        NavigationBar {
                                 for (t in Tab.entries) {
                                     NavigationBarItem(
                                         selected = tab == t,
@@ -122,56 +150,10 @@ class MainActivity : ComponentActivity() {
                                         label = { Text(t.label) }
                                     )
                                 }
-                            }
                         }
                     },
                     snackbarHost = { SnackbarHost(snackbar) }
                 ) { inner ->
-                    if (handoff) {
-                        // NOT verticalScroll: ActivationHandoffScreen scrolls
-                        // itself, and a scrolling Column around a scrolling
-                        // Column hands the inner one an infinite height, which
-                        // Compose refuses with "Vertically scrollable component
-                        // was measured with an infinity maximum height
-                        // constraints". It is a hard crash, not a layout
-                        // warning, and it only fires when this screen is
-                        // actually opened -- which is why every emulator run
-                        // missed it.
-                        Column(
-                            Modifier
-                                .fillMaxSize()
-                                .padding(inner)
-                        ) {
-                            ActivationHandoffScreen(
-                                faceName = sendingName,
-                                onContinue = {
-                                    status = "Building your face…"
-                                    scope.launch {
-                                        // Off the main thread: packing walks the
-                                        // resource table and findTarget blocks on
-                                        // the Data Layer.
-                                        status = withContext(Dispatchers.IO) {
-                                            buildThenSend(context, sendingName, params)
-                                        }
-                                    }
-                                },
-                                onCancel = { handoff = false },
-                                footer = {
-                                    status?.let {
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            text = it,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    ActivationDeniedNote(consent, Modifier.padding(top = 16.dp))
-                                }
-                            )
-                        }
-                        return@Scaffold
-                    }
-
                     when (tab) {
                         Tab.DESIGNS -> DesignsScreen(
                             onPick = { params = it; engineName = it.engine.name; tab = Tab.STUDIO },
@@ -199,7 +181,7 @@ class MainActivity : ComponentActivity() {
                                 ) { Text("Save to My faces") }
                                 Spacer(Modifier.height(8.dp))
                                 Button(
-                                    onClick = { handoff = true },
+                                    onClick = { requestSend(sendingName, params) },
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text("Send to watch") }
                             }
@@ -209,6 +191,7 @@ class MainActivity : ComponentActivity() {
                         Tab.MINE -> MyFacesScreen(
                             faces = faces,
                             onOpen = { params = it.params; engineName = it.params.engine.name; tab = Tab.STUDIO },
+                            onSend = { requestSend(it.name, it.params) },
                             onDelete = { FaceStorage.delete(context, it.slug); faces = FaceStorage.list(context) },
                             modifier = Modifier.padding(inner)
                         )
@@ -224,6 +207,25 @@ class MainActivity : ComponentActivity() {
                         sheetState = tuneState,
                         onDismiss = { tuning = false }
                     )
+                }
+                if (explaining) {
+                    val (name, face) = pendingSend ?: ("your face" to params)
+                    ModalBottomSheet(
+                        onDismissRequest = { explaining = false; pendingSend = null },
+                        sheetState = explainState
+                    ) {
+                        ActivationHandoffScreen(
+                            faceName = name,
+                            onContinue = {
+                                Onboarding.markSendExplained(context)
+                                explaining = false
+                                pendingSend = null
+                                requestSend(name, face)
+                            },
+                            onCancel = { explaining = false; pendingSend = null },
+                            footer = { ActivationDeniedNote(consent, Modifier.padding(top = 12.dp)) }
+                        )
+                    }
                 }
                 if (picking) {
                     ColorSheet(

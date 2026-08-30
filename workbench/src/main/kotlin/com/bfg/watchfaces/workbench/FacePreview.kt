@@ -81,7 +81,11 @@ object FacePreview {
             val a = if (ambient) (if (pos == SlotPosition.TOP) 140 else 0) else 255
             if (a <= 0) continue
             val c = withAlpha(if (ambient) ambientSlotInk else ink, a)
-            ComplicationIcons.draw(g, source, box.x + (box.w - iconSize) / 2.0, box.y.toDouble(), iconSize, c)
+            // Honours showComplicationIcons, or the toggle appears to do nothing
+            // in the one view somebody uses to judge it.
+            if (p.showComplicationIcons) {
+                ComplicationIcons.draw(g, source, box.x + (box.w - iconSize) / 2.0, box.y.toDouble(), iconSize, c)
+            }
             drawCenteredIn(g, Complications.sample(source), box.x, box.y + textY, box.w, textH,
                 fontSize, Font.PLAIN, c)
         }
@@ -90,7 +94,10 @@ object FacePreview {
         // (alpha 255 -> ambient 0) and one ambient-only (alpha 0 -> ambient 255,
         // THIN weight, dimmed ink). Reproduce that split rather than dimming one.
         val hh = now.hour % 12
-        val timeText = "%02d:%02d".format(if (hh == 0) 12 else hh, now.minute)
+        // Awake only, matching the emitter and the Android preview.
+        val timeText =
+            if (p.showSeconds && !ambient) "%02d:%02d:%02d".format(if (hh == 0) 12 else hh, now.minute, now.second)
+            else "%02d:%02d".format(if (hh == 0) 12 else hh, now.minute)
         if (ambient) {
             // Mirror the emitter's version branch exactly. From v3 the ambient
             // ink clears a contrast floor against black; before that it is the

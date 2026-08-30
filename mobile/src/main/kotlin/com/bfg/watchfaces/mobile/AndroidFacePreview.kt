@@ -35,6 +35,7 @@ object AndroidFacePreview {
     /** A fixed time, so a preview does not change under the person mid-edit. */
     private const val SAMPLE_HOUR = 10
     private const val SAMPLE_MINUTE = 10
+    private const val SAMPLE_SECOND = 30
 
     fun render(p: DialParams, ambient: Boolean = false, size: Int = DIAL_SIZE): Bitmap {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -75,13 +76,17 @@ object AndroidFacePreview {
             val a = if (ambient) (if (pos == SlotPosition.TOP) 140 else 0) else 255
             if (a <= 0) continue
             val c = withAlpha(if (ambient) ambientSlotInk else ink, a)
-            AndroidComplicationIcons.draw(
-                canvas, source,
-                x = box.x + (box.w - iconSize) / 2f,
-                y = box.y.toFloat(),
-                size = iconSize,
-                color = c
-            )
+            // Honours showComplicationIcons, or the toggle appears to do nothing
+            // in the one view somebody uses to judge it.
+            if (p.showComplicationIcons) {
+                AndroidComplicationIcons.draw(
+                    canvas, source,
+                    x = box.x + (box.w - iconSize) / 2f,
+                    y = box.y.toFloat(),
+                    size = iconSize,
+                    color = c
+                )
+            }
             drawCenteredIn(
                 canvas, Presentation.sample(source),
                 box.x.toFloat(), (box.y + textY).toFloat(),
@@ -93,7 +98,12 @@ object AndroidFacePreview {
         // (alpha 255 -> ambient 0) and one ambient-only (alpha 0 -> ambient 255,
         // THIN weight, dimmed ink). Reproduce that split rather than dimming one.
         val hh = SAMPLE_HOUR % 12
-        val timeText = "%02d:%02d".format(if (hh == 0) 12 else hh, SAMPLE_MINUTE)
+        // Seconds are an AWAKE-only affordance, so the ambient preview must not
+        // show them -- otherwise the toggle appears to do nothing in the one
+        // view where it is deliberately absent.
+        val timeText =
+            if (p.showSeconds && !ambient) "%02d:%02d:%02d".format(if (hh == 0) 12 else hh, SAMPLE_MINUTE, SAMPLE_SECOND)
+            else "%02d:%02d".format(if (hh == 0) 12 else hh, SAMPLE_MINUTE)
         val timeColor = if (ambient) {
             // Mirror the emitter's version branch exactly. From v3 the ambient
             // ink clears a contrast floor against black; before that it is the

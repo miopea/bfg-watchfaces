@@ -59,6 +59,7 @@ private const val ROW_PX = 160
 fun MyFacesScreen(
     faces: List<FaceLibrary.StoredFace>,
     onOpen: (FaceLibrary.StoredFace) -> Unit,
+    onSend: (FaceLibrary.StoredFace) -> Unit,
     onDelete: (FaceLibrary.StoredFace) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -85,7 +86,12 @@ fun MyFacesScreen(
 
     LazyColumn(modifier = modifier.fillMaxSize()) {
         items(faces, key = { it.slug }) { face ->
-            FaceRow(face, onOpen = { onOpen(face) }, onDelete = { confirming = face })
+            FaceRow(
+                face,
+                onOpen = { onOpen(face) },
+                onSend = { onSend(face) },
+                onDelete = { confirming = face }
+            )
             HorizontalDivider()
         }
     }
@@ -109,6 +115,7 @@ fun MyFacesScreen(
 private fun FaceRow(
     face: FaceLibrary.StoredFace,
     onOpen: () -> Unit,
+    onSend: () -> Unit,
     onDelete: () -> Unit
 ) {
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = face.slug) {
@@ -150,6 +157,9 @@ private fun FaceRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        // Send is the point of having saved it. Putting it behind "open in the
+        // studio, then send" made the list a staging area rather than a library.
+        TextButton(onClick = onSend) { Text("Send") }
         TextButton(onClick = onDelete) { Text("Delete") }
     }
 }
