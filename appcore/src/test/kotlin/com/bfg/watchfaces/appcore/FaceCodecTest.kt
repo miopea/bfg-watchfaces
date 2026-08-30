@@ -2,6 +2,7 @@ package com.bfg.watchfaces.appcore
 
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.DateScale
+import com.bfg.watchfaces.generator.HourFormat
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
@@ -46,6 +47,8 @@ class FaceCodecTest {
         launchers = mapOf(SlotPosition.MIDDLE to "com.example.player/.Main"),
         dateStyle = DateStyle.WEEKDAY_MONTH_DAY,
         dateScale = DateScale.LARGE,
+        stepRing = true,
+        hourFormat = HourFormat.TWENTY_FOUR,
         lens = true, lensAmount = 33.0,
         complications = listOf(
             ComplicationSource.STEP_COUNT, ComplicationSource.HEART_RATE,

@@ -349,6 +349,34 @@ class WffSchemaTest {
         }
     }
 
+    /**
+     * The step ring is drawn by the format and kept current by the WATCH.
+     *
+     * `[STEP_PERCENT]` is a first-class source and `<Transform>` binds an
+     * expression to an attribute, so the sweep updates as someone walks with
+     * nothing re-sent. This is the check that the arrangement is legal — an
+     * expression in the wrong attribute validates as a plain float and then
+     * draws nothing.
+     */
+    @Test
+    fun `the step ring binds its sweep and is schema-valid`() {
+        val xml = WffEmitter.emit(DialParams(stepRing = true))
+        val errors = validate(xml)
+        assertTrue(errors.isEmpty()) { "the step ring is not schema-valid:\n" + errors.joinToString("\n") }
+
+        assertTrue(xml.contains("""<Transform target="endAngle" value="clamp([STEP_PERCENT], 0, 100) * 3.6"/>""")) {
+            "the sweep is not bound to the step count, so the ring never moves"
+        }
+        // A faint track and a bright arc: without the track a part-finished
+        // goal reads as a broken circle rather than progress.
+        assertEquals(2, Regex("<Arc ").findAll(xml).count())
+    }
+
+    @Test
+    fun `no step ring means no ring at all`() {
+        assertTrue(!WffEmitter.emit(DialParams()).contains("STEP_PERCENT"))
+    }
+
     @Test
     fun `colors are emitted as 8 digit AARRGGBB`() {
         val xml = WffEmitter.emit(DialParams(inkColor = "#FCF9F1"))

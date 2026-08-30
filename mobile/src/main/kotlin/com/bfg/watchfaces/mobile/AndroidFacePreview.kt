@@ -7,11 +7,13 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import com.bfg.watchfaces.generator.AmbientPalette
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.ClockText
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.EngravedStroke
 import com.bfg.watchfaces.generator.SecondsBand
 import com.bfg.watchfaces.generator.SlotGeometry
+import com.bfg.watchfaces.generator.StepRing
 import com.bfg.watchfaces.generator.SlotPosition
 
 /**
@@ -104,11 +106,11 @@ object AndroidFacePreview {
         // Time: the emitter ships TWO TimeText elements, one interactive
         // (alpha 255 -> ambient 0) and one ambient-only (alpha 0 -> ambient 255,
         // THIN weight, dimmed ink). Reproduce that split rather than dimming one.
+        val timeText = ClockText.of(p, SAMPLE_HOUR, SAMPLE_MINUTE)
         val hh = SAMPLE_HOUR % 12
         // Seconds are an AWAKE-only affordance, so the ambient preview must not
         // show them -- otherwise the toggle appears to do nothing in the one
         // view where it is deliberately absent.
-        val timeText = "%02d:%02d".format(if (hh == 0) 12 else hh, SAMPLE_MINUTE)
         // The date the FACE draws, matching WffEmitter's PartText: centred at
         // dateY, dimmed in ambient rather than hidden. Without this the Date
         // control changes nothing in the only view anyone judges it in.
@@ -120,6 +122,26 @@ object AndroidFacePreview {
                 SlotGeometry.fittedDateSize(p).toFloat(),
                 if (ambient) withAlpha(ambientSlotInk, 140) else ink,
                 bold = false
+            )
+        }
+
+        if (p.stepRing && !ambient) {
+            val b = StepRing.box()
+            val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = StepRing.THICKNESS.toFloat()
+                strokeCap = Paint.Cap.ROUND
+            }
+            val oval = android.graphics.RectF(
+                b.x.toFloat(), b.y.toFloat(), (b.x + b.w).toFloat(), (b.y + b.h).toFloat()
+            )
+            ringPaint.color = withAlpha(ink, StepRing.TRACK_ALPHA)
+            canvas.drawArc(oval, 0f, 360f, false, ringPaint)
+            ringPaint.color = ink
+            // Android measures clockwise from 3 o'clock, so 12 is -90.
+            canvas.drawArc(
+                oval, -90f,
+                StepRing.sweepDegrees(StepRing.SAMPLE_PERCENT).toFloat(), false, ringPaint
             )
         }
 

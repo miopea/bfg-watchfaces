@@ -57,7 +57,8 @@ built either.
 
 ## 4. Sources in the schema that nothing here offers
 
-- `STEP_GOAL`, `STEP_PERCENT` — a goal ring with no complication involved
+- ~~`STEP_GOAL`, `STEP_PERCENT` — a goal ring~~ DONE 2026-08-30: a rim ring,
+  bound to `[STEP_PERCENT]` with `<Transform>`, costing no slot
 - `HEART_RATE_Z`
 - `ACCELEROMETER_ANGLE_X/Y/Z/XY` with `ACCELEROMETER_IS_SUPPORTED` — what
   tilt-reactive faces are built from

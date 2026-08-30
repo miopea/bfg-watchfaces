@@ -52,6 +52,7 @@ import com.bfg.watchfaces.generator.ControlInventory
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.DateStyle
+import com.bfg.watchfaces.generator.HourFormat
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.Engine
@@ -128,11 +129,21 @@ fun StudioScreen(
                 .padding(horizontal = 16.dp)
         ) {
         AmbientToggle(ambient, onAmbient)
+        ChoiceRow(
+            label = "Time",
+            options = HourFormat.entries.map { it.label to it },
+            selected = params.hourFormat
+        ) { onParams(params.copy(hourFormat = it)) }
         SwitchRow(
             title = "Show seconds",
             detail = "Only while the watch is awake",
             checked = params.showSeconds
         ) { onParams(params.copy(showSeconds = it)) }
+        SwitchRow(
+            title = "Step goal ring",
+            detail = "Fills around the edge as you walk",
+            checked = params.stepRing
+        ) { onParams(params.copy(stepRing = it)) }
         OptionRow(
             label = "Date",
             value = if (params.dateStyle == DateStyle.NONE) params.dateStyle.label

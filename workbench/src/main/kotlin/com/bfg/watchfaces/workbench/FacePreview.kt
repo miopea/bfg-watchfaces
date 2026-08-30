@@ -3,10 +3,12 @@ package com.bfg.watchfaces.workbench
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.AmbientPalette
 import com.bfg.watchfaces.generator.ComplicationSource
+import com.bfg.watchfaces.generator.ClockText
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.SecondsBand
 import com.bfg.watchfaces.generator.SlotGeometry
+import com.bfg.watchfaces.generator.StepRing
 import com.bfg.watchfaces.generator.SlotPosition
 import java.awt.Color
 import java.awt.Font
@@ -105,12 +107,29 @@ object FacePreview {
                 SlotGeometry.fittedDateSize(p).toDouble(), Font.PLAIN, dateInk)
         }
 
+        // The step ring, matching WffEmitter: a faint full circle with a
+        // bright arc over it. Hidden in ambient, like the emitted one.
+        if (p.stepRing && !ambient) {
+            val b = StepRing.box()
+            val sweep = StepRing.sweepDegrees(StepRing.SAMPLE_PERCENT)
+            g.stroke = java.awt.BasicStroke(
+                StepRing.THICKNESS.toFloat(),
+                java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND
+            )
+            g.color = withAlpha(ink, StepRing.TRACK_ALPHA)
+            g.drawArc(b.x, b.y, b.w, b.h, 0, 360)
+            g.color = ink
+            // AWT measures counter-clockwise from 3 o'clock; the ring fills
+            // clockwise from 12, which is 90 minus the sweep.
+            g.drawArc(b.x, b.y, b.w, b.h, 90, -sweep.toInt())
+        }
+
         // Time: the emitter ships TWO TimeText elements, one interactive
         // (alpha 255 -> ambient 0) and one ambient-only (alpha 0 -> ambient 255,
         // THIN weight, dimmed ink). Reproduce that split rather than dimming one.
         val hh = now.hour % 12
         // Awake only, matching the emitter and the Android preview.
-        val timeText = "%02d:%02d".format(if (hh == 0) 12 else hh, now.minute)
+        val timeText = ClockText.of(p, now.hour, now.minute)
         if (ambient) {
             // Mirror the emitter's version branch exactly. From v3 the ambient
             // ink clears a contrast floor against black; before that it is the

@@ -485,6 +485,24 @@ object SlotGeometry {
         // Per slot: a glyph-less slot is shorter, which is what frees the
         // vertical room the size control was running out of.
         fun hFor(pos: SlotPosition) = boxHeight(size, pos in p.iconSlots, p.generatorVersion)
+
+        /**
+         * TOP and BOTTOM are alone on their rows, so they are not held to a
+         * third of the dial the way the middle row is.
+         *
+         * They were, and it showed: a provider returning "Sat, Aug 30" had to
+         * fit a box built for three-across, and the watch shrank the text to
+         * make it — so the top complication read as tiny beside the others
+         * while the emitted font size was identical. Measured on a watch with
+         * the same provider in all five slots: they render the same, and the
+         * difference only appears with a long value.
+         *
+         * Capped rather than given the whole chord: a slot that ran the width
+         * of the dial would stop reading as one of a set.
+         */
+        fun wFor(pos: SlotPosition): Int =
+            if (pos == SlotPosition.TOP || pos == SlotPosition.BOTTOM) (w * 1.7).roundToInt()
+            else w
         val anchor = (size * 1.2).roundToInt()
         val (timeTop, timeBottom) = timeBand(l)
         val air = airOverride ?: verticalAir(p)
@@ -507,7 +525,8 @@ object SlotGeometry {
             // printed straight through the top complication's own text.
             dateBand(p)?.let { y = min(y, it.y - GAP - h) }
             y = max(y, highestY)                   // and never leave the circle
-            out[SlotPosition.TOP] = Box(DIAL_SIZE / 2 - w / 2, y, w, h)
+            val tw = wFor(SlotPosition.TOP)
+            out[SlotPosition.TOP] = Box(DIAL_SIZE / 2 - tw / 2, y, tw, h)
             topBottom = y + h
         }
 
@@ -555,7 +574,8 @@ object SlotGeometry {
             // hangs into the bezel, which is what the clamp used to do.
             var y = max(l.batteryY - anchor + air, rowBottom + GAP + max(0, air))
             y = min(y, lowestBottom - h)
-            out[SlotPosition.BOTTOM] = Box(DIAL_SIZE / 2 - w / 2, y, w, h)
+            val bw = wFor(SlotPosition.BOTTOM)
+            out[SlotPosition.BOTTOM] = Box(DIAL_SIZE / 2 - bw / 2, y, bw, h)
         }
 
         return out

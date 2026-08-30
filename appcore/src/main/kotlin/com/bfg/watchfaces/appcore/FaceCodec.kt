@@ -2,6 +2,7 @@ package com.bfg.watchfaces.appcore
 
 import com.bfg.watchfaces.generator.CURRENT_GENERATOR_VERSION
 import com.bfg.watchfaces.generator.DateScale
+import com.bfg.watchfaces.generator.HourFormat
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.SlotPosition
@@ -78,6 +79,10 @@ object FaceCodec {
             dateScale = q["dateScale"]?.let { name ->
                 DateScale.entries.firstOrNull { it.name == name }
             } ?: d.dateScale,
+            stepRing = q["stepRing"]?.let { it == "true" || it == "1" } ?: d.stepRing,
+            hourFormat = q["hourFormat"]?.let { name ->
+                HourFormat.entries.firstOrNull { it.name == name }
+            } ?: d.hourFormat,
             lens = q["lens"]?.let { it == "true" || it == "1" } ?: d.lens,
             lensAmount = q.dbl("lensAmount", d.lensAmount),
             texture = q["texture"] ?: d.texture,
@@ -158,6 +163,7 @@ object FaceCodec {
         .joinToString(", ") { "\"${it.key.name}\": \"${it.value}\"" }}},
   "iconSlots": [${p.iconSlots.sortedBy { it.ordinal }.joinToString(", ") { "\"${it.name}\"" }}],
   "dateStyle": "${p.dateStyle}", "dateScale": "${p.dateScale}",
+  "stepRing": ${p.stepRing}, "hourFormat": "${p.hourFormat}",
   "lens": ${p.lens}, "lensAmount": ${p.lensAmount},
   "texture": "${p.texture}",
   "complications": [${Complications.format(p.complications, p.providers, p.launchers).split(",").joinToString(", ") { "\"$it\"" }}],
@@ -191,6 +197,8 @@ object FaceCodec {
                 .joinToString(",") { "${it.key.name}:${it.value}" },
             "dateStyle" to p.dateStyle.name,
             "dateScale" to p.dateScale.name,
+            "stepRing" to p.stepRing,
+            "hourFormat" to p.hourFormat.name,
             "lens" to p.lens, "lensAmount" to p.lensAmount, "texture" to p.texture,
             "complications" to Complications.format(p.complications, p.providers, p.launchers),
             "dateY" to l.dateY, "dateSize" to l.dateSize, "timeY" to l.timeY,

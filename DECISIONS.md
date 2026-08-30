@@ -121,6 +121,43 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — A step ring the watch keeps current, and a clock you can read
+
+**The ring costs no slot.** A goal is a proportion, and a proportion reads
+better as a shape than as "8,412 / 10,000" in a box four characters wide — so it
+goes round the rim rather than into one of five slots that are already fought
+over.
+
+`[STEP_PERCENT]` is a first-class WFF source and `<Transform target="endAngle">`
+binds an arithmetic expression to any attribute, so the sweep is
+`clamp([STEP_PERCENT], 0, 100) * 3.6` and the WATCH keeps it current. Nothing
+here recomputes it and nothing is re-sent as someone walks.
+
+The clamp is not decoration: an emulator reporting 107,520 steps against a
+10,000 goal asks for a sweep of 3,800 degrees. Clamped, exceeding the goal fills
+the ring exactly once.
+
+Verified in two steps, because the emulator could only ever show a finished
+goal: the live ring renders as a complete circle, and pinning the sweep to 40%
+by hand drew a bright arc from 12 o'clock to roughly five, over the faint track.
+Direction and start point are right.
+
+**12 or 24 hours, and no leading zero on 12.** WFF takes `hourFormat="12"` and a
+`format` of `h:mm` — a single `h` is what drops the zero, and "06:10" on a
+12-hour face reads as a mistake. `Match my watch` stays the default, because it
+is the only setting that is still right after someone travels.
+
+`ClockText` is shared, because the watch formats its own clock and a preview
+that formats it differently is a preview of a different face.
+
+**The top complication was not smaller — it was narrower.** Measured with the
+same provider in all five slots: identical, 105x66 at font 25. The difference
+only appears with a LONG value, because TOP and BOTTOM were held to a box built
+for three-across while being alone on their rows, so a provider returning "Sat,
+Aug 30" had its text shrunk to fit. They get 1.7x the width now. Capped rather
+than given the whole chord: a slot spanning the dial stops reading as one of a
+set.
+
 ## 2026-08-30 — A control has to change something a person can see
 
 "It should be noticeable to a user and logical for what they expect." That is a

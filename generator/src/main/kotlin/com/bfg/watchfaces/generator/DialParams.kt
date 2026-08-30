@@ -237,6 +237,22 @@ enum class SlotPosition {
  * proportion. A stored point size cannot do that — it was tried, and it was
  * right for one date style and wrong for the rest.
  */
+/**
+ * Whether the clock runs on 12 or 24 hours.
+ *
+ * [DEVICE] follows the watch's own setting, which is what a face should do
+ * unless someone says otherwise — it is the only option that stays right when
+ * a person travels or changes their mind in Settings.
+ *
+ * A 12-hour clock drops the leading zero. "06:10" is a 24-hour habit; on a
+ * 12-hour face it reads as a mistake.
+ */
+enum class HourFormat(val label: String, val wff: String, val pattern: String) {
+    DEVICE("Match my watch", "SYNC_TO_DEVICE", "hh:mm"),
+    TWELVE("12-hour", "12", "h:mm"),
+    TWENTY_FOUR("24-hour", "24", "hh:mm")
+}
+
 enum class DateScale(val label: String, val factor: Double) {
     SMALL("Small", 0.72),
     NORMAL("Normal", 1.0),
@@ -403,6 +419,19 @@ data class DialParams(
 
     /** How big the drawn date is, as a proportion of the fitted size. */
     val dateScale: DateScale = DateScale.NORMAL,
+
+    /**
+     * A ring around the rim showing progress toward the day's step goal.
+     *
+     * Not a slot. It costs none of the five, which is the point: a goal is a
+     * shape rather than a reading, and Watch Face Format can draw it without a
+     * complication at all — `[STEP_PERCENT]` against an `Arc` whose sweep is
+     * bound by a `Transform`.
+     */
+    val stepRing: Boolean = false,
+
+    /** 12 or 24 hours, or whatever the watch is set to. See [HourFormat]. */
+    val hourFormat: HourFormat = HourFormat.DEVICE,
 
     /** Draw the pattern OVER the numerals rather than behind them. */
     val lens: Boolean = true,

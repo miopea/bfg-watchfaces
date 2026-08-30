@@ -45,6 +45,38 @@ object WffEmitter {
         return " primaryProvider=\"$component\" primaryProviderType=\"SHORT_TEXT\""
     }
 
+    /**
+     * The step-goal ring: a faint full circle with a bright arc over it.
+     *
+     * The sweep is bound with `<Transform>` rather than baked in, so the WATCH
+     * keeps it current from `[STEP_PERCENT]`. Nothing here recomputes it and
+     * nothing has to be re-sent as someone walks.
+     *
+     * Angles run clockwise from 12 o'clock, so the ring fills the way a person
+     * reads a dial. Clamped at 100: someone who walks twice their goal gets a
+     * complete ring, not a sweep of 720 degrees. Seen on an emulator reporting
+     * 107,300 steps. Hidden in ambient: it is decoration, and ambient is a black
+     * screen with the time on it.
+     */
+    private fun stepRingElement(p: DialParams, ink: String): String {
+        if (!p.stepRing) return ""
+        val b = StepRing.box()
+        val track = argb(p.inkColor, StepRing.TRACK_ALPHA)
+        return """
+    <PartDraw x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="0"/>
+      <Arc centerX="${DIAL_CENTER}" centerY="${DIAL_CENTER}" width="${b.w}" height="${b.h}"
+           startAngle="0" endAngle="360">
+        <Stroke color="$track" thickness="${StepRing.THICKNESS}" cap="ROUND"/>
+      </Arc>
+      <Arc centerX="${DIAL_CENTER}" centerY="${DIAL_CENTER}" width="${b.w}" height="${b.h}"
+           startAngle="0" endAngle="0">
+        <Stroke color="$ink" thickness="${StepRing.THICKNESS}" cap="ROUND"/>
+        <Transform target="endAngle" value="clamp([STEP_PERCENT], 0, 100) * ${StepRing.DEGREES_PER_PERCENT}"/>
+      </Arc>
+    </PartDraw>"""
+    }
+
     private fun dateElement(p: DialParams): String {
         if (p.dateStyle == DateStyle.NONE) return ""
         val l = p.layout
@@ -104,6 +136,7 @@ object WffEmitter {
         // the beginning and nothing emitted them -- the date was always a
         // complication, whose wording belongs to the system provider.
         val dateLine = dateElement(p)
+        val stepRing = stepRingElement(p, ink)
 
         // Ambient is a black screen. From v3 the ambient ink is lifted to clear
         // a contrast floor while keeping its hue, so a dark ink chosen for a
@@ -266,14 +299,15 @@ object WffEmitter {
       <Image resource="dial_bg"/>
     </PartImage>
 
+$stepRing
 $dateLine
     <DigitalClock x="0" y="${l.timeY - l.timeSize / 2}" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}">
-      <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
+      <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
                 x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="255">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
         <Font family="${l.fontFamily}" size="$clockSize" weight="${l.fontWeight}" color="$ink"/>
       </TimeText>
-      <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
+      <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
                 x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="0">
         <Variant mode="AMBIENT" target="alpha" value="255"/>
         <Font family="${l.fontFamily}" size="${l.timeSize}" weight="THIN" color="$inkDim"/>
