@@ -162,15 +162,15 @@ Installed and driven on emulators (2026-08-29):
   Designs (styles gallery), Studio, My faces, About. Naming, local save in the
   catalog format, the Fine tune bottom sheet, complication size and spacing, and
   a Material 3 `ExposedDropdownMenuBox` for each slot. Seen on an SDK 36 phone
-  emulator; a face saved and came back on the list. Community, Share, Report and
-  imported images are deliberately absent — see `DECISIONS.md` 2026-08-29.
+  emulator; a face saved and came back on the list. The Community tab reads the
+  live catalog. Share, Report and imported images are still absent — Share and
+  Report because Turnstile is not configured yet.
 - `:wear` — installed on a Wear OS 6 emulator, and `addWatchFace` works from it.
   See below.
 
-Neither has run on real hardware. The phone CAN now build a face: `google/pack`
-runs on the device through `PackBridge`, `ApkSigning` signs it, and the validator
-issues the token — measured at 2.7s for a 520KB APK on an emulator. What is left
-is the transport: the APK reached the watch by `adb`, not over Bluetooth.
+The phone builds a face on the device: `google/pack` runs through `PackBridge`,
+`ApkSigning` signs it, and the validator issues the token — measured at 2.7s for
+a 520KB APK.
 
 Building the native library needs a toolchain, once:
 
@@ -219,20 +219,42 @@ On Google Play (2026-08-29):
   password in 1Password, read from the environment at build time. A release
   build fails loudly rather than emitting an unsigned bundle.
 
+On real hardware (2026-08-30):
+
+- **A face designed on a Pixel 11 Pro XL reached a Pixel Watch 5 over Bluetooth
+  and installed.** Built on the phone, sent over `ChannelClient`, installed by
+  `FaceInstaller`. That closes the transport, sending a face, and the activation
+  permission all at once — the three things this section listed as never tested.
+- Finding it cost three bugs no emulator could have shown: v1 signing was off
+  and Watch Face Push needs it; `sendFile(Uri.fromFile(...))` sends nothing and
+  reports success; `receiveFile` completes when the transfer is SET UP rather
+  than finished. See `DECISIONS.md` 2026-08-30.
+
+The community catalog is live (2026-08-30):
+
+- **The service runs at `https://bfg-catalog.bfg-solutions.workers.dev`** —
+  Cloudflare Workers, D1, on the BFG Solutions account. Anonymous submit,
+  anonymous report, pre-moderation, and an export endpoint so the catalog
+  survives the service. `catalog-service/` holds it; `docs/specs/catalog-service.md`
+  is the contract.
+- **It does not know what a face is.** `params-contract.json` is GENERATED from
+  `CatalogContract` in `:generator` by `./gradlew :workbench:contract`, and the
+  Worker reads it. Never write those ranges out again in TypeScript.
+- **The Community tab reads it**, verified on an SDK 36 phone emulator against
+  the deployed service. `CatalogService` in `:appcore` is the one seam, and a
+  test asserts the URL appears in exactly one file.
+- **Moderation is `./gradlew :workbench:moderate`.** It is the only place a face
+  meets Google's XSD — a Worker cannot run Xerces — so if it does not run before
+  publication, nothing does.
+
 Still never tested:
 
-- **An actual watch.** The above is an emulator, which is a smaller claim.
-- **The transport.** `CapabilityClient`, `ChannelClient` and the Bluetooth
-  crossing. Emulators run on this box now (`chmod 0666 /dev/kvm` — the node, not
-  the group; this namespace sets `setgroups=deny`), and two started from one
-  session share a single `netsimd`, so that half is solved. What remains is the
-  Wear OS companion app, which needs a Play sign-in on the phone. **A fresh Wear
-  AVD self-provisions and never runs a pairing wizard** — the earlier claim that
-  a factory reset would help was wrong, see `DECISIONS.md` 2026-08-29.
-- **Sending a face.** The phone has no APK to send until `pack` runs on the
-  device. `addWatchFace` was exercised by putting the APK on the watch directly.
-- **The activation permission has still never been requested, and cannot be from
-  where the design puts it.** `startActivity` from the install path is refused —
-  `Background activity launch blocked`. A `WearableListenerService` is a
-  background context by the same rule, so the shipped path is blocked too. This
-  needs a design decision; see `DECISIONS.md` 2026-08-29.
+- **Submitting or reporting, end to end.** `TURNSTILE_SECRET` is not set, so the
+  write endpoints fail closed with 403. That is the design working, and it is
+  also why nothing can be shared yet. A live test asserts submissions are off
+  and will FAIL when the widget lands.
+- **There is no submit or report UI**, deliberately — a share button that cannot
+  work is worse than no button.
+- **Imported images.** `Engine.TEXTURE` still has nowhere on the device to
+  resolve an image id from.
+- **`reskin.sh`** — written and read, not exercised since the workbench landed.
