@@ -126,6 +126,18 @@ enum class ComplicationSource(
     /** "Cloudy". The condition in words rather than a code. */
     WEATHER_CONDITION(null, "%s", "[WEATHER.CONDITION_NAME]"),
 
+    /**
+     * "72° Cloudy" — both, because a slot is wide enough for them.
+     *
+     * A slot box is around four characters of the value's own width, so a short
+     * temperature and a one-word condition fit side by side. Offering it saves
+     * spending two of five slots on the weather.
+     */
+    WEATHER_TEMP_CONDITION(
+        null, "%s° %s",
+        "[WEATHER.TEMPERATURE]", "[WEATHER.CONDITION_NAME]"
+    ),
+
     // Shortcuts: a glyph you press, with nothing to read. The targets are
     // Watch Face Format's own system shortcut list.
     SHORTCUT_MUSIC(null, "%s", launch = "MUSIC_PLAYER"),
@@ -152,6 +164,22 @@ enum class ComplicationSource(
 
     /** True when this is rendered by the face rather than filled by the watch. */
     val isDrawn: Boolean get() = drawn.isNotEmpty()
+
+    /**
+     * Roughly how many characters this source's value runs to.
+     *
+     * Only drawn sources need it, and only so the text can be shrunk to fit its
+     * box instead of being clipped. A complication's own text is the provider's
+     * problem; ours is ours. "72° Cloudy" is ten characters against a box about
+     * four and a bit wide, which is how "° Unknow" reached a watch.
+     */
+    val widestValue: Int
+        get() = when (this) {
+            WEATHER_TEMP_CONDITION -> 10
+            WEATHER_CONDITION -> 7
+            WEATHER_TEMPERATURE -> 4
+            else -> 0
+        }
 
     /** A glyph you press, with no value to read. */
     val isShortcut: Boolean

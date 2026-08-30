@@ -187,31 +187,20 @@ fun StudioScreen(
         // number the layout refused, and SlotGeometry silently clamped it. That
         // is why Large looked identical to Medium. Large now means as large as
         // this face allows; turn a slot or a glyph off and all three grow.
-        val maxComplication = SlotGeometry.maxSize(params)
+        val sizes = SlotGeometry.sizeOptions(params)
         ChoiceRow(
             label = "Size",
-            options = listOf(
-                "Small" to (maxComplication * 0.77).roundToInt(),
-                "Medium" to (maxComplication * 0.90).roundToInt(),
-                "Large" to maxComplication
-            ),
-            selected = listOf(
-                (maxComplication * 0.77).roundToInt(),
-                (maxComplication * 0.90).roundToInt(),
-                maxComplication
-            ).minByOrNull { kotlin.math.abs(it - params.layout.complicationSize) }
-                ?: params.layout.complicationSize
+            options = listOf("Small", "Medium", "Large").zip(sizes),
+            selected = sizes.minByOrNull {
+                kotlin.math.abs(it - params.layout.complicationSize)
+            } ?: params.layout.complicationSize
         ) { onParams(params.copy(layout = params.layout.copy(complicationSize = it))) }
         // Derived, like the size. Fixed numbers stopped meaning anything once
         // the boxes grew: at complication size 27, Tight 84, Normal 92 and Wide
         // 110 all came out as 115, because the layout's own minimum had passed
         // all three. Three controls, one result.
-        val spreads = SlotGeometry.spreadRange(params)
-        val spreadOptions = listOf(
-            "Tight" to spreads.first,
-            "Normal" to (spreads.first + spreads.last) / 2,
-            "Wide" to spreads.last
-        )
+        val spreadOptions = listOf("Tight", "Normal", "Wide")
+            .zip(SlotGeometry.spreadOptions(params))
         ChoiceRow(
             label = "Spacing",
             options = spreadOptions,

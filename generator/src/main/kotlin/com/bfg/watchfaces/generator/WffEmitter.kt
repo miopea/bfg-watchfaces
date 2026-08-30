@@ -195,7 +195,7 @@ object WffEmitter {
     <PartText x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <Text align="CENTER">
-        <Font family="${l.fontFamily}" size="$fontSize" color="$ink">$ambientColorVariant
+        <Font family="${l.fontFamily}" size="${SlotGeometry.drawnFontSize(source, box, fontSize)}" color="$ink">$ambientColorVariant
           <Template><![CDATA[${source.format}]]>${source.drawn.joinToString("") { """<Parameter expression="$it"/>""" }}</Template>
         </Font>
       </Text>

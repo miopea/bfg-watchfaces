@@ -95,6 +95,7 @@ object Presentation {
         ComplicationSource.FAVORITE_CONTACT -> "Favourite contact"
         ComplicationSource.WEATHER_TEMPERATURE -> "Weather"
         ComplicationSource.WEATHER_CONDITION -> "Conditions"
+        ComplicationSource.WEATHER_TEMP_CONDITION -> "Weather and conditions"
         ComplicationSource.SHORTCUT_MUSIC -> "Music"
         ComplicationSource.SHORTCUT_ALARM -> "Alarms"
         ComplicationSource.SHORTCUT_SETTINGS -> "Settings"
@@ -128,6 +129,7 @@ object Presentation {
         ComplicationSource.FAVORITE_CONTACT -> "Ann"
         ComplicationSource.WEATHER_TEMPERATURE -> "72°"
         ComplicationSource.WEATHER_CONDITION -> "Cloudy"
+        ComplicationSource.WEATHER_TEMP_CONDITION -> "72° Cloudy"
         // A shortcut shows only its glyph; there is nothing to read.
         ComplicationSource.SHORTCUT_MUSIC,
         ComplicationSource.SHORTCUT_ALARM,

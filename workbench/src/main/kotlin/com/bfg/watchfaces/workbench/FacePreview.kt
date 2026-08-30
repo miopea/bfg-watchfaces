@@ -93,7 +93,7 @@ object FacePreview {
             }
             val textY = SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)
             drawCenteredIn(g, Complications.sample(source), box.x, box.y + textY, box.w, textH,
-                fontSize, Font.PLAIN, c)
+                SlotGeometry.drawnFontSize(source, box, fontSize.toInt()).toDouble(), Font.PLAIN, c)
         }
 
         // The date the FACE draws, matching WffEmitter's PartText: centred at

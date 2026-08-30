@@ -179,6 +179,28 @@ object SlotGeometry {
 
     const val MIN_DATE_SIZE = 12
 
+    /**
+     * A drawn value's font, shrunk if the box cannot hold it.
+     *
+     * A complication's text belongs to its provider, which shortens its own
+     * value for a small slot. A DRAWN source has no provider to do that, so a
+     * long one is simply clipped — "72° Cloudy" reached a watch as "° Unknow".
+     *
+     * Never grows, only shrinks: matching the other slots is the point, and a
+     * short value should not be bigger than the number beside it.
+     */
+    fun drawnFontSize(source: ComplicationSource, box: Box, base: Int): Int {
+        val chars = source.widestValue
+        if (chars <= 0) return base
+        // FLOOR, not round: rounding up overflows the box by a fraction of a
+        // character, which is a clipped last letter rather than a tight fit.
+        val fits = (box.w / (TEXT_ADVANCE * chars)).toInt()
+        return minOf(base, fits).coerceAtLeast(MIN_DRAWN_FONT)
+    }
+
+    /** Below this a value is not worth drawing; it would be a smudge. */
+    const val MIN_DRAWN_FONT = 10
+
     fun dateBand(p: DialParams): Box? {
         if (p.dateStyle == DateStyle.NONE) return null
         val l = p.layout
@@ -313,7 +335,25 @@ object SlotGeometry {
             sizeClamped = size != l.complicationSize,
             spreadClamped = row.size > 1 && spread != l.complicationSpread,
             // Nothing to move is also a control that did nothing.
-            verticalClamped = air != 0 && (ends.isEmpty() || ends.any { it != air })
+            // LESS than the air asked for, not merely different from it.
+            // Spacing now pushes the row down as well as the ends out, so the
+            // bottom slot travels FURTHER than `air` -- it moves with the row
+            // and then again below it. Moving further is not a refusal, and
+            // reporting it as one told people a control had been ignored while
+            // it was working.
+            // "Fell SHORT in the direction asked for", which is direction
+            // dependent: positive air pushes the ends apart and negative air
+            // pulls them together, so a refusal is `less` in one case and
+            // `more` in the other.
+            //
+            // Not "different from air": spacing now pushes the row down as well
+            // as the ends out, so the bottom slot travels FURTHER than `air` --
+            // with the row, then again below it. Moving further is not a
+            // refusal, and calling it one told people a working control had
+            // been ignored.
+            verticalClamped = air != 0 && (
+                ends.isEmpty() || ends.any { if (air >= 0) it < air else it > air }
+            )
         )
     }
 
@@ -363,10 +403,51 @@ object SlotGeometry {
      * Derived options cannot drift like that: they are whatever this layout
      * will honour today.
      */
+    /**
+     * The three complication sizes to offer, smallest first.
+     *
+     * Here rather than in a UI so it can be TESTED, and so the workbench and
+     * the phone cannot drift. The steps are deliberately far apart: three
+     * controls that produce nearly the same face read as a broken control, and
+     * this project has shipped that twice — once when Large was clamped to
+     * within four points of Medium, once when all three spacings came out as
+     * the same number.
+     */
+    fun sizeOptions(p: DialParams): List<Int> {
+        val max = maxSize(p)
+        return listOf((max * 0.60).roundToInt(), (max * 0.79).roundToInt(), max)
+            .map { it.coerceAtLeast(MIN_SIZE) }
+    }
+
+    /** The three spacings to offer, narrowest first. See [sizeOptions]. */
+    fun spreadOptions(p: DialParams): List<Int> {
+        val r = spreadRange(p)
+        return listOf(r.first, (r.first + r.last) / 2, r.last)
+    }
+
     fun spreadRange(p: DialParams): IntRange {
         val lo = spreadAt(p, 0)
-        val hi = spreadAt(p, DIAL_SIZE)
-        return lo..maxOf(lo, hi)
+        // SCANNED, not probed at the extreme. Spacing also drives vertical air,
+        // so an enormous request pushes the row down until the complications
+        // have to shrink -- and a shrunk box allows a NARROWER spread than a
+        // moderate request did. Measured: asking for 456 produced 47px, while
+        // 160 produced 144.
+        //
+        // So walk up and keep the widest that still leaves the complications
+        // the size this face would otherwise have. Anything that shrinks them
+        // is not a wider layout, it is a different one.
+        val baseline = fittedSize(p)
+        var hi = lo
+        var request = lo
+        while (request <= DIAL_SIZE) {
+            val q = p.copy(layout = p.layout.copy(complicationSpread = request))
+            if (fittedSize(q) >= baseline) {
+                val actual = spreadAt(p, request)
+                if (actual > hi) hi = actual
+            }
+            request += 4
+        }
+        return lo..hi
     }
 
     /** What the layout settles on when asked for [requested]. */
@@ -437,7 +518,11 @@ object SlotGeometry {
         if (rowPositions.isNotEmpty()) {
             val h = rowPositions.maxOf { hFor(it) }
             var y = l.complicationY - anchor
-            y = max(y, timeBottom + GAP)           // below the clock
+            // Spacing pushes the row DOWN from the clock as well as pushing the
+            // slots apart. It only widened before, so "Wide" spread the row out
+            // and left it as close to the time as "Tight" did -- the gap that
+            // actually reads as crowding.
+            y = max(y, timeBottom + GAP + max(0, air))
             y = max(y, topBottom + GAP)            // and below the top slot
             y = min(y, lowestBottom - h)
 

@@ -95,7 +95,8 @@ object ComplicationGlyphs {
         // centred in its box instead.
         ComplicationSource.NONE,
         ComplicationSource.WEATHER_TEMPERATURE,
-        ComplicationSource.WEATHER_CONDITION -> emptyList()
+        ComplicationSource.WEATHER_CONDITION,
+        ComplicationSource.WEATHER_TEMP_CONDITION -> emptyList()
         ComplicationSource.STEP_COUNT -> steps()
         ComplicationSource.HEART_RATE -> heart()
         ComplicationSource.WATCH_BATTERY -> battery()

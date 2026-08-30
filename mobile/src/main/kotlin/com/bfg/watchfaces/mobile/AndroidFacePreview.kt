@@ -96,7 +96,8 @@ object AndroidFacePreview {
                 canvas, Presentation.sample(source),
                 box.x.toFloat(),
                 (box.y + SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)).toFloat(),
-                box.w.toFloat(), textH.toFloat(), fontSize, c, bold = false
+                box.w.toFloat(), textH.toFloat(),
+                SlotGeometry.drawnFontSize(source, box, fontSize.toInt()).toFloat(), c, bold = false
             )
         }
 

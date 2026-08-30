@@ -121,6 +121,47 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — A control has to change something a person can see
+
+"It should be noticeable to a user and logical for what they expect." That is a
+testable claim, and this project has failed it three times: "Large" clamped to
+within four points of "Medium"; Tight, Normal and Wide all resolving to the same
+number; and a date size that could not exceed the value already stored. Each
+time the code did what it said and the face did not move, and each time a person
+found it rather than a test.
+
+`ControlsAreNoticeableTest` now asserts the RENDERED result, not the numbers:
+each complication size is at least 3pt of text bigger than the one below it,
+each spacing moves the row slots at least 6px further apart, wider spacing also
+moves the row DOWN, and each date size differs by at least 4pt. Across four
+faces whose available room differs a lot.
+
+It failed immediately, which is the point.
+
+**Spacing did nothing on the default face** — 84, 84, 84. `spreadRange` probed
+the maximum by asking for `DIAL_SIZE`, and spacing also drives vertical air, so
+an enormous request pushes the row down until the complications must shrink, and
+a shrunk box permits a NARROWER spread than a moderate request did. Measured:
+456 produced 47px where 160 produced 144. It scans now and keeps the widest that
+still leaves the complications the size the face would otherwise have. The
+options are 84 / 115 / 147, and the sizes step 15 / 19 / 25pt.
+
+**Spacing pushes the row away from the clock**, not only the slots apart. The
+gap that reads as crowding is the one between the time and the complications,
+and spacing left it alone entirely.
+
+That broke `effective()`'s clamp reporting, which asked whether a slot travelled
+EXACTLY the air requested. The bottom slot now travels further — with the row,
+then again below it — and further is not a refusal. It asks whether the travel
+fell SHORT, which is direction-dependent because negative air pulls in.
+
+**Weather can be temperature, conditions, or both.** "Both" is where the
+assumption that there was room turned out to be wrong: "72° Cloudy" is ten
+characters against a box about four and a bit wide, and it reached a watch with the
+temperature gone and the condition cut off mid-word. A drawn value has no provider to shorten it, so it is now shrunk to
+fit its box — floored, not rounded, because rounding up overflows by a fraction
+of a character, which is a clipped last letter.
+
 ## 2026-08-30 — A slot that opens any app on the watch
 
 `launchTargetType` is a union with `xs:string`, so a ComponentName is a legal
