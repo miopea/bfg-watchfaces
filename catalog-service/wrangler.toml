@@ -6,12 +6,27 @@
 # no cold start, and Turnstile is on this same account.
 # docs/specs/catalog-service.md carries the full comparison.
 #
-# NOT DEPLOYED. No resource has been created on the account. The database id
-# below is a placeholder; `wrangler d1 create bfg-catalog` prints the real one.
+# The database id is an identifier, not a secret -- Cloudflare's own docs put it
+# in this committed file. The three SECRETS are set with `wrangler secret put`
+# and are listed at the bottom without their values.
 
 name = "bfg-catalog"
 main = "src/index.ts"
 compatibility_date = "2026-08-01"
+
+# Both stated rather than defaulted, because the deploy warns that it is
+# choosing them for you and the choice is not obvious.
+#
+# workers_dev is how the service is reachable at all today: there is no custom
+# domain on it yet.
+workers_dev = true
+
+# Preview URLs are OFF. Every version would otherwise get its own public
+# address bound to THIS SAME D1 database -- so a submission through a preview
+# URL lands in the real moderation queue, and a second public entry point
+# exists that nobody is thinking about. The abuse model here is pre-moderation
+# plus one bearer token; a spare front door is not worth the convenience.
+preview_urls = false
 
 # The published catalog changes only when a maintainer approves something, so
 # reads are served from the edge cache and the database is not touched at all on
@@ -22,7 +37,7 @@ enabled = true
 [[d1_databases]]
 binding = "DB"
 database_name = "bfg-catalog"
-database_id = "REPLACE_ME__wrangler_d1_create_bfg-catalog_prints_this"
+database_id = "9fa40371-9cfe-4fc8-a8f5-9592c447deb4"
 
 [vars]
 # Public. The private half is a secret: `wrangler secret put TURNSTILE_SECRET`.

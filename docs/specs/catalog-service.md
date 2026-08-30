@@ -599,10 +599,31 @@ takes a `SlugRule` rather than one rule guessing, and `PublishedSlug` in
 `:appcore` holds the published form — construct in the Worker, verify here, both
 downstream of the same two numbers in the generated contract.
 
+## Deployed 2026-08-30
+
+<https://bfg-catalog.bfg-solutions.workers.dev>, version `e8b13e72`, serving
+100% of traffic on the BFG Solutions account.
+
+Verified against the live service rather than the upload's own output: reads
+answer, `/admin/*` refuses a missing and a wrong token, and the moderator token
+round-trips from 1Password into a working `/admin/queue`. The D1 database is
+`bfg-catalog`; `schema.sql` created three tables.
+
+`wrangler login --device` is what made this possible from here. The default flow
+redirects to `localhost:8976` on the machine running wrangler, which is not the
+machine with the browser; the device grant prints a URL and a code instead.
+
+**Preview URLs are explicitly disabled.** Every version would otherwise get its
+own public address bound to the SAME database, so a submission through a preview
+URL would land in the real moderation queue and a second public entry point
+would exist that nobody was thinking about.
+
 ## Still open
 
-- **Deployment.** Nothing exists on the account. It needs an interactive
-  `wrangler login`, so it is the operator's action.
+- **Turnstile.** `TURNSTILE_SECRET` is unset, so submit and report answer 403.
+  That is the fail-closed path working as designed, and it is also the reason
+  the service cannot accept anything yet. It needs a widget created in the
+  dashboard.
 - **The app's submit and report paths.** The service has no client yet: the
   Community tab still reads a local directory and the report sheet still opens a
   GitHub issue. That is step 3 of the sequencing, and step 4 does not begin

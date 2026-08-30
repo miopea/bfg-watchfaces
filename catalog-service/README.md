@@ -3,8 +3,17 @@
 Anonymous submit, anonymous report, and a moderation queue for the BFG Watch
 Faces community catalog. Cloudflare Workers, D1 and Turnstile.
 
-**Not deployed.** Nothing has been created on any Cloudflare account. The
-database id in `wrangler.toml` is a placeholder.
+**Deployed** 2026-08-30 to the BFG Solutions account:
+<https://bfg-catalog.bfg-solutions.workers.dev>
+
+Verified against the live service, not the upload's own output: reads answer,
+`/admin/*` refuses a missing and a wrong token with 401, and the write
+endpoints return 403 because `TURNSTILE_SECRET` is not set yet — the
+fail-closed behaviour, working. Version `e8b13e72` is serving 100% of traffic.
+
+**Submit and report are switched off until Turnstile exists.** That is
+deliberate, not a gap: a missing bot-check secret must never quietly become an
+open submission endpoint.
 
 ## Why this exists rather than a GitHub repository
 
@@ -134,20 +143,29 @@ cannot be.
 
 ## Deploying
 
-Not done yet, and it needs an interactive login this repo's tooling cannot
-perform:
+Already done once. `wrangler login --device` is the flow that works from here —
+it prints a URL and a code instead of needing a browser on this machine, which
+the default localhost-callback flow cannot have.
 
 ```bash
-wrangler login
-wrangler d1 create bfg-catalog          # put the printed id in wrangler.toml
-npm run db:remote                       # apply schema.sql
-wrangler secret put TURNSTILE_SECRET
-wrangler secret put MODERATOR_TOKEN
-wrangler secret put IP_SALT
+npx wrangler login --device     # only if the stored credential has expired
 npm run deploy
 ```
 
-Then, and only then, the app can be pointed at it — behind one seam, per the
-spec's sequencing. **The GitHub report route stays live until the replacement is
-deployed and verified.** Removing it first would leave the app with no complaint
-path at all, which Play's UGC rules require before it can ship.
+`IP_SALT` and `MODERATOR_TOKEN` are set. The moderator token is in 1Password as
+**bfg-catalog-moderator-token** (BFG vault) — it is the only credential in the
+system and the only one a human needs to read back.
+
+### What is still switched off
+
+`TURNSTILE_SECRET` is not set, so submit and report answer 403. To turn them on:
+
+1. Create a Turnstile widget in the Cloudflare dashboard for this account.
+2. `npx wrangler secret put TURNSTILE_SECRET` and paste the secret key.
+3. Put the SITE key in `wrangler.toml` under `TURNSTILE_SITE_KEY` and redeploy.
+   It is public — the app fetches it from `/config`.
+
+Only then can the app be pointed at this service, behind one seam, per the
+spec's sequencing. **The GitHub report route stays live until that is done and
+verified.** Removing it first would leave the app with no complaint path at all,
+which Play's UGC rules require before it can ship.
