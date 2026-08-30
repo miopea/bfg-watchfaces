@@ -31,16 +31,18 @@ and is as fresh as the last send.
 This is what "Google Health isn't in the list" needs, and weather no longer
 depends on it.
 
-## 2. Tap actions
+## ~~2. Tap actions~~ — DONE 2026-08-30
 
-The Facer features worth having are all taps on an element:
+A slot can hold a SHORTCUT: a glyph you press, with no reading. Music, Alarms,
+Settings, Phone, Calendar and Messages, using Watch Face Format's own
+`<Launch>` targets. Verified on a watch: tapping the alarm glyph opened
+`com.google.android.deskclock/.AlarmGatewayActivity`.
 
-- media controls (play/pause, skip)
-- open an app on the watch — alarms, settings, timer
-- open the phone app from the watch
+The glyphs go over as `PartDraw` vectors rather than baked PNGs.
 
-WFF supports tap targets. None of it is implemented, and none of it needs a
-complication.
+**Not done:** launching an arbitrary app by ComponentName. `launchTargetType` is
+a union with `xs:string`, so the format allows it and the watch's provider
+catalog already knows what is installed — the picker just does not offer it yet.
 
 ## 3. More weather
 

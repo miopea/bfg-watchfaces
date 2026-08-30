@@ -121,6 +121,40 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — Tap actions, and the format could draw all along
+
+Backlog item 2. A slot can now hold a SHORTCUT: a glyph you press, with nothing
+to read. Music, Alarms, Settings, Phone, Calendar and Messages, using Watch Face
+Format's own `<Launch>` targets. Verified on a watch — tapping the alarm glyph
+opened `com.google.android.deskclock/.AlarmGatewayActivity`.
+
+`<Launch>` has been available on every part since the beginning of the format
+and this app never used it, which is why a face here could show a step count and
+not start a timer.
+
+**The glyphs are vectors, not PNGs.** `PartDraw` has Line, Ellipse, Rectangle,
+RoundRectangle and Arc, and every shape in `ComplicationGlyphs` except a cubic
+maps onto one. Baking a PNG per shortcut would have meant rasterising the same
+shapes in two more places — the workbench and the phone — and shipping bytes for
+something the watch can draw. Two shortcut glyphs were redrawn without curves
+for this: a shape a watch cannot draw is not a shape, and the converter dropping
+one silently would ship a glyph missing a stroke that validates perfectly.
+
+Three bugs, all caught by the schema test rather than by a watch:
+
+`Arc` takes a CENTRE and clockwise angles from 12 o'clock; the glyphs are
+authored with a bounding box and AWT's counter-clockwise from 3. That difference
+was already written down in `ComplicationGlyphs` for the renderers, and it
+caught this too.
+
+An empty `PartDraw` is invalid, which is what a shortcut with no glyph produces.
+
+And the worst: `launch` was added BEFORE the `vararg drawn`, so
+`WEATHER_TEMPERATURE(null, "%s°", "[WEATHER.TEMPERATURE]")` passed its data
+source as a LAUNCH TARGET. Weather quietly became a shortcut with no glyph. A
+parameter in front of a vararg swallows positional arguments, and every existing
+call site kept compiling.
+
 ## 2026-08-30 — Three spacings that were one number, and a date you can size
 
 **"Tight and Normal are the same."** They were, and so was Wide. Measured at

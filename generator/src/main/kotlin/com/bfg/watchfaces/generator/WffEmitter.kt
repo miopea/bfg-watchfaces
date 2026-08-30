@@ -168,6 +168,19 @@ object WffEmitter {
             // visible while everything else goes dark.
             val ambientAlpha = if (pos == SlotPosition.TOP) 140 else 0
 
+            // A SHORTCUT is a glyph you press: no provider, no value, and a
+            // <Launch> that opens the watch's own music, alarms or settings.
+            // Drawn as WFF primitives rather than a baked PNG -- see GlyphWff.
+            if (source.isShortcut) {
+                val g = (minOf(box.w, box.h) * 0.78).toInt()
+                return@map """
+    <PartDraw x="${box.x + (box.w - g) / 2}" y="${box.y + (box.h - g) / 2}" width="$g" height="$g" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
+      <Launch target="${source.launch}"/>
+          ${GlyphWff.elements(ComplicationGlyphs.shapes(source), g, ink)}
+    </PartDraw>"""
+            }
+
             // A DRAWN source is not a complication at all -- there is no
             // provider to fill it, so there is no ComplicationSlot and no
             // glyph. It is a PartText in the slot's own box, which is what puts

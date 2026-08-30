@@ -32,6 +32,12 @@ object Complications {
         ComplicationSource.FAVORITE_CONTACT -> "Favourite contact"
         ComplicationSource.WEATHER_TEMPERATURE -> "Weather"
         ComplicationSource.WEATHER_CONDITION -> "Conditions"
+        ComplicationSource.SHORTCUT_MUSIC -> "Music"
+        ComplicationSource.SHORTCUT_ALARM -> "Alarms"
+        ComplicationSource.SHORTCUT_SETTINGS -> "Settings"
+        ComplicationSource.SHORTCUT_PHONE -> "Phone"
+        ComplicationSource.SHORTCUT_CALENDAR -> "Calendar"
+        ComplicationSource.SHORTCUT_MESSAGES -> "Messages"
     }
 
     /**
@@ -60,6 +66,13 @@ object Complications {
         ComplicationSource.FAVORITE_CONTACT -> "Ann"
         ComplicationSource.WEATHER_TEMPERATURE -> "72°"
         ComplicationSource.WEATHER_CONDITION -> "Cloudy"
+        // A shortcut shows only its glyph; there is nothing to read.
+        ComplicationSource.SHORTCUT_MUSIC,
+        ComplicationSource.SHORTCUT_ALARM,
+        ComplicationSource.SHORTCUT_SETTINGS,
+        ComplicationSource.SHORTCUT_PHONE,
+        ComplicationSource.SHORTCUT_CALENDAR,
+        ComplicationSource.SHORTCUT_MESSAGES -> ""
     }
 
     /**

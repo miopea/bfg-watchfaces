@@ -433,6 +433,9 @@ private fun SlotPicker(
                     val fromWatch = ProviderCache.load(LocalContext.current)
                     for ((heading, group) in listOf(
                         null to Presentation.PICKER_COMMON,
+                        // Shortcuts open something when pressed rather than
+                        // showing a reading, so they read better apart.
+                        "Tap to open" to Presentation.PICKER_SHORTCUTS,
                         "More" to Presentation.PICKER_REST
                     )) {
                         if (heading != null) {

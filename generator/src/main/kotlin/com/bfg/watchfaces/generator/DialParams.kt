@@ -76,7 +76,17 @@ enum class ComplicationSource(
      * ended up after a step count.
      */
     val format: String = "%s",
-    vararg val drawn: String
+    vararg val drawn: String,
+    /**
+     * What tapping this slot opens, as a WFF `Launch` target.
+     *
+     * A SHORTCUT slot has this and nothing else: no provider to read and no
+     * source to draw, just a glyph you can press. Watch Face Format has had
+     * `<Launch>` on any part all along — ALARM, MUSIC_PLAYER, SETTINGS, PHONE,
+     * CALENDAR, MESSAGE and friends — and this app has never used it, which is
+     * why a face here could show a step count and not start the timer.
+     */
+    val launch: String? = null
 ) {
     NONE(null),
     STEP_COUNT("STEP_COUNT"),
@@ -114,12 +124,24 @@ enum class ComplicationSource(
     WEATHER_TEMPERATURE(null, "%s°", "[WEATHER.TEMPERATURE]"),
 
     /** "Cloudy". The condition in words rather than a code. */
-    WEATHER_CONDITION(null, "%s", "[WEATHER.CONDITION_NAME]");
+    WEATHER_CONDITION(null, "%s", "[WEATHER.CONDITION_NAME]"),
 
-    val enabled: Boolean get() = wff != null || drawn.isNotEmpty()
+    // Shortcuts: a glyph you press, with nothing to read. The targets are
+    // Watch Face Format's own system shortcut list.
+    SHORTCUT_MUSIC(null, "%s", launch = "MUSIC_PLAYER"),
+    SHORTCUT_ALARM(null, "%s", launch = "ALARM"),
+    SHORTCUT_SETTINGS(null, "%s", launch = "SETTINGS"),
+    SHORTCUT_PHONE(null, "%s", launch = "PHONE"),
+    SHORTCUT_CALENDAR(null, "%s", launch = "CALENDAR"),
+    SHORTCUT_MESSAGES(null, "%s", launch = "MESSAGE");
+
+    val enabled: Boolean get() = wff != null || drawn.isNotEmpty() || launch != null
 
     /** True when this is rendered by the face rather than filled by the watch. */
     val isDrawn: Boolean get() = drawn.isNotEmpty()
+
+    /** A glyph you press, with no value to read. */
+    val isShortcut: Boolean get() = launch != null && drawn.isEmpty() && wff == null
 }
 
 /**

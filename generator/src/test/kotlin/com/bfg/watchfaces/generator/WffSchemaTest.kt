@@ -302,6 +302,53 @@ class WffSchemaTest {
         assertTrue(!xml.contains("""isCustomizable="TRUE"""")) { "a slot is still customizable" }
     }
 
+    /**
+     * A shortcut slot is a tappable glyph, drawn by the format itself.
+     *
+     * `<Launch>` has been available on every part since the beginning and this
+     * app never used it, which is why a face here could show a step count and
+     * not start a timer. The glyph goes over as `PartDraw` primitives rather
+     * than a baked PNG: the format has Line, Ellipse, Rect, RoundRect and Arc,
+     * and shipping pixels for something it can draw would mean rasterising the
+     * same shapes in two more places.
+     */
+    @Test
+    fun `a shortcut slot launches and is schema-valid`() {
+        val p = DialParams(complications = listOf(
+            ComplicationSource.SHORTCUT_MUSIC, ComplicationSource.SHORTCUT_ALARM,
+            ComplicationSource.SHORTCUT_SETTINGS, ComplicationSource.SHORTCUT_PHONE,
+            ComplicationSource.SHORTCUT_MESSAGES
+        ))
+        val xml = WffEmitter.emit(p)
+        val errors = validate(xml)
+        assertTrue(errors.isEmpty()) { "a shortcut is not schema-valid:\n" + errors.joinToString("\n") }
+
+        for (target in listOf("MUSIC_PLAYER", "ALARM", "SETTINGS", "PHONE", "MESSAGE")) {
+            assertTrue(xml.contains("""<Launch target="$target"/>""")) { "no $target shortcut emitted" }
+        }
+        // No provider, so no complication slot and nothing to read.
+        assertTrue(!xml.contains("<ComplicationSlot ")) { "a shortcut was emitted as a complication" }
+    }
+
+    /**
+     * Every glyph the format has to draw is made of shapes it HAS.
+     *
+     * A cubic has no equivalent in `PartDraw`, and the converter drops what it
+     * cannot draw -- which would ship a glyph missing a stroke and validate
+     * perfectly. Two shortcut glyphs were redrawn because of this.
+     */
+    @Test
+    fun `every shortcut glyph can be drawn by the format`() {
+        for (source in ComplicationSource.entries) {
+            if (!source.isShortcut) continue
+            val shapes = ComplicationGlyphs.shapes(source)
+            assertTrue(shapes.isNotEmpty()) { "$source has no glyph, so it is an invisible button" }
+            assertTrue(GlyphWff.canDraw(shapes)) {
+                "$source uses a shape Watch Face Format cannot draw; it would be silently dropped"
+            }
+        }
+    }
+
     @Test
     fun `colors are emitted as 8 digit AARRGGBB`() {
         val xml = WffEmitter.emit(DialParams(inkColor = "#FCF9F1"))

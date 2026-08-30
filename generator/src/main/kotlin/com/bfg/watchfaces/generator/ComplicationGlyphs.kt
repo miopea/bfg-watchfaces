@@ -108,6 +108,12 @@ object ComplicationGlyphs {
         ComplicationSource.SUNRISE_SUNSET -> sunrise()
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> bell()
         ComplicationSource.APP_SHORTCUT -> apps()
+        ComplicationSource.SHORTCUT_MUSIC -> note()
+        ComplicationSource.SHORTCUT_ALARM -> alarm()
+        ComplicationSource.SHORTCUT_SETTINGS -> gear()
+        ComplicationSource.SHORTCUT_PHONE -> handset()
+        ComplicationSource.SHORTCUT_CALENDAR -> calendar(dot = false)
+        ComplicationSource.SHORTCUT_MESSAGES -> speechBubble()
         ComplicationSource.FAVORITE_CONTACT -> person()
     }
 
@@ -186,6 +192,52 @@ object ComplicationGlyphs {
             add(Shape.RoundRect(cx - 3.2, cy - 3.2, 6.4, 6.4, 1.8, 1.8, fill = false))
         }
     }
+
+    /** A quaver: a filled head and a stem with a flag. */
+    private fun note(): List<Shape> = listOf(
+        Shape.Oval(4.0, 15.0, 6.0, 5.0, fill = true),
+        Shape.Line(10.0, 17.5, 10.0, 5.0),
+        // Lines and arcs only: these glyphs are also emitted as WFF draw
+        // primitives, and the format has Line, Ellipse, Rect, RoundRect and
+        // Arc but no cubic. A shape a watch cannot draw is not a shape.
+        Shape.Line(10.0, 5.0, 18.0, 7.5),
+        Shape.Line(10.0, 9.0, 18.0, 11.5)
+    )
+
+    /** A clock face with the two bell feet an alarm has. */
+    private fun alarm(): List<Shape> = listOf(
+        Shape.Oval(4.5, 5.5, 15.0, 15.0, fill = false),
+        Shape.Line(12.0, 9.5, 12.0, 13.0),
+        Shape.Line(12.0, 13.0, 14.5, 14.5),
+        Shape.Line(3.0, 5.0, 6.5, 2.5),
+        Shape.Line(21.0, 5.0, 17.5, 2.5)
+    )
+
+    /** A cog: a ring, a hub, and four teeth on the axes. */
+    private fun gear(): List<Shape> = buildList {
+        add(Shape.Oval(6.0, 6.0, 12.0, 12.0, fill = false))
+        add(Shape.Oval(10.0, 10.0, 4.0, 4.0, fill = false))
+        add(Shape.Line(12.0, 2.5, 12.0, 5.5))
+        add(Shape.Line(12.0, 18.5, 12.0, 21.5))
+        add(Shape.Line(2.5, 12.0, 5.5, 12.0))
+        add(Shape.Line(18.5, 12.0, 21.5, 12.0))
+    }
+
+    /** A handset, drawn as the familiar diagonal. */
+    private fun handset(): List<Shape> = listOf(
+        Shape.Arc(2.0, 2.0, 20.0, 20.0, 180.0, -110.0),
+        Shape.Line(20.0, 15.0, 15.5, 14.0),
+        Shape.Line(15.5, 14.0, 13.5, 16.0),
+        Shape.Line(9.0, 5.0, 5.0, 4.0),
+        Shape.Line(9.0, 5.0, 10.0, 9.5)
+    )
+
+    /** A rounded rectangle with a tail: a message. */
+    private fun speechBubble(): List<Shape> = listOf(
+        Shape.RoundRect(3.5, 5.0, 17.0, 12.0, 3.0, 3.0, fill = false),
+        Shape.Line(8.0, 17.0, 8.0, 21.0),
+        Shape.Line(8.0, 21.0, 12.5, 17.0)
+    )
 
     private fun person(): List<Shape> = listOf(
         Shape.Oval(8.2, 4.0, 7.6, 7.6, fill = false),

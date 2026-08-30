@@ -95,6 +95,12 @@ object Presentation {
         ComplicationSource.FAVORITE_CONTACT -> "Favourite contact"
         ComplicationSource.WEATHER_TEMPERATURE -> "Weather"
         ComplicationSource.WEATHER_CONDITION -> "Conditions"
+        ComplicationSource.SHORTCUT_MUSIC -> "Music"
+        ComplicationSource.SHORTCUT_ALARM -> "Alarms"
+        ComplicationSource.SHORTCUT_SETTINGS -> "Settings"
+        ComplicationSource.SHORTCUT_PHONE -> "Phone"
+        ComplicationSource.SHORTCUT_CALENDAR -> "Calendar"
+        ComplicationSource.SHORTCUT_MESSAGES -> "Messages"
     }
 
     /**
@@ -121,6 +127,13 @@ object Presentation {
         ComplicationSource.FAVORITE_CONTACT -> "Ann"
         ComplicationSource.WEATHER_TEMPERATURE -> "72°"
         ComplicationSource.WEATHER_CONDITION -> "Cloudy"
+        // A shortcut shows only its glyph; there is nothing to read.
+        ComplicationSource.SHORTCUT_MUSIC,
+        ComplicationSource.SHORTCUT_ALARM,
+        ComplicationSource.SHORTCUT_SETTINGS,
+        ComplicationSource.SHORTCUT_PHONE,
+        ComplicationSource.SHORTCUT_CALENDAR,
+        ComplicationSource.SHORTCUT_MESSAGES -> ""
     }
 
     /**
@@ -143,8 +156,12 @@ object Presentation {
     )
 
     /** Everything else, in the enum's own order. */
+    /** The tappable shortcuts, grouped so they read as buttons not readings. */
+    val PICKER_SHORTCUTS: List<ComplicationSource> =
+        ComplicationSource.entries.filter { it.isShortcut }
+
     val PICKER_REST: List<ComplicationSource> =
-        ComplicationSource.entries.filter { it !in PICKER_COMMON }
+        ComplicationSource.entries.filter { it !in PICKER_COMMON && !it.isShortcut }
 
     fun label(pos: SlotPosition): String = when (pos) {
         SlotPosition.TOP -> "Top"
