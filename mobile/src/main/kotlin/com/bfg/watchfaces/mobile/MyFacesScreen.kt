@@ -29,6 +29,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -118,6 +119,9 @@ private fun FaceRow(
     onSend: () -> Unit,
     onDelete: () -> Unit
 ) {
+    // A face can name an app this watch does not have. It still renders, just
+    // differently from its preview, and nothing else would say so.
+    val missing = MissingApps.note(LocalContext.current, face.params)
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = face.slug) {
         value = withContext(Dispatchers.Default) {
             runCatching { AndroidFacePreview.render(face.params, ambient = false, size = ROW_PX) }.getOrNull()
@@ -156,6 +160,16 @@ private fun FaceRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // Quiet, not a warning: the face works, it just will not look the
+            // way its preview does.
+            missing?.let {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
         // Send is the point of having saved it. Putting it behind "open in the
         // studio, then send" made the list a staging area rather than a library.

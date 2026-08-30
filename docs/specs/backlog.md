@@ -74,18 +74,18 @@ The failure now names the only remedy — reinstall the watch app — because an
 operator had to work that out themselves after an evening of sends that all
 reported success. A real fix would need something from the platform.
 
-## 6. The one-time migration note
+## ~~6. The one-time migration note~~ — DONE 2026-08-30
 
-Decided in the interview and not built: the first send after the definition
-became authoritative should say once that complications are chosen in the app
-now, so anyone who customised on the watch understands why their picks changed.
+Appended to the result of the first send whose PREVIOUS face predates v8, then
+never again. Nobody whose first face is v8 or later is told anything: there is
+nothing to migrate and the note would warn about a world they never saw.
 
-## 7. Faces that name an app you do not have
+## ~~7. Faces that name an app you do not have~~ — DONE 2026-08-30
 
-The watch falls back to the slot's system provider on its own, so nothing looks
-broken. Decided: My faces should also show a quiet note naming the missing app,
-because a face that silently renders differently from its preview is the
-invisible-difference problem that made this week's bugs so hard to find.
+My faces shows "Uses ..., which isn't on your watch" under the face's name.
+Only when the watch has actually reported a catalog: an empty cache means "we do
+not know", and answering "everything is missing" would put a warning on every
+face someone owns.
 
 ## 8. Community catalog, Share, Report
 

@@ -121,6 +121,39 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — Two notes, each shown to exactly the people it is for
+
+**"Complications are chosen here now."** Said once, and only to someone whose
+PREVIOUS face predates v8 — until then the watch's own editor owned a slot once
+it had touched one, so anything picked there survived every send, and now it
+does not. Their choices changing with no explanation is indistinguishable from a
+bug.
+
+Nobody else hears it. To a person whose first face is v8 or later there is
+nothing to migrate, and the note would be a warning about a world they never
+saw. Appended to the send result rather than shown separately, because that is
+what they are already reading.
+
+**"Uses the app's name, which isn't on your watch."** A face can point a slot at a
+provider app or at an app to open. Without it the provider falls back to the
+slot's system source and a shortcut simply does nothing — so the face renders,
+and renders DIFFERENTLY from its preview, with nothing anywhere saying why.
+
+Only shown once the watch has actually reported a catalog. An empty cache means
+"we do not know", and treating it as "nothing is installed" would put a warning
+on every face someone owns. That distinction is the whole reason the note is
+trustworthy.
+
+Quiet rather than alarming: the face works, it just will not look the way its
+preview does.
+
+Verified by seeding a saved face naming an app the cached catalog does not
+contain — and by getting the fixture wrong first. `FaceLibrary` nests the dial
+under `"params"`, so a flat file parses as a face with default everything: the
+name and slug appeared, the providers did not, and the note correctly stayed
+away. The code was right and the test was wrong, which is worth knowing before
+concluding the opposite.
+
 ## 2026-08-30 — Sources that validate and render nothing, and a ring you choose
 
 **The ring shows what you pick.** Steps against the day's goal, the watch

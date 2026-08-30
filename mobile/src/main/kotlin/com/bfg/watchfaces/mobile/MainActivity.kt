@@ -402,6 +402,7 @@ class MainActivity : ComponentActivity() {
         //
         // The watch still understands the request, and the debug receiver can
         // still make it. Nothing in the normal path does.
+        val previouslySent = CurrentFace.load(context)?.params
         Log.i(TAG, "sending \u201C$name\u201D")
 
         return runCatching { FaceSender.send(context, target, built.apk, token) }
@@ -416,7 +417,18 @@ class MainActivity : ComponentActivity() {
                     // actually installed rather than only what this build knows.
                     WatchLink.Report.catalogIn(report)?.let { ProviderCache.save(context, it) }
                     WatchLink.Report.launchersIn(report)?.let { ProviderCache.saveLaunchers(context, it) }
-                    WatchLink.Report.describe(name, target.name, report)
+                    // Said ONCE, and only to someone who had a face from before
+                    // the definition became authoritative: their on-watch
+                    // complication picks have just been replaced by the design,
+                    // and that change with no explanation is indistinguishable
+                    // from a bug. Appended to the result rather than shown
+                    // separately, because that is what they are already reading.
+                    val moved = Onboarding.shouldExplainComplications(
+                        context, previouslySent?.generatorVersion
+                    )
+                    if (moved) Onboarding.markComplicationsExplained(context)
+                    WatchLink.Report.describe(name, target.name, report) +
+                        if (moved) " Complications are chosen here now, not on the watch." else ""
                 },
                 onFailure = {
                     Log.e(TAG, "transfer to ${target.name} failed", it)
