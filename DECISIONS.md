@@ -121,6 +121,35 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — "It says it sent okay" and the watch does not change
+
+Reported after 1.12: the watch shows a black background with a time, several
+sends in a row, the app reporting success every time.
+
+Reproduced the whole path rather than guessing. A face built by the PHONE's own
+`pack` — pulled straight out of the app's cache and pushed to a watch — renders
+correctly: dial, complications, date, time. So neither v8 nor the on-device build
+is broken, and updating the watch app over a live face does not break it either.
+
+What "black background with a time" actually is: Wear's OWN default face. The
+face is installed and simply not the one being worn.
+
+**"Sent" was overclaiming.** `FaceSender` resolves when the TRANSFER completes.
+Whether the watch then switched to the face is decided on the watch and never
+reported back — and it usually does not switch, because `setWatchFaceAsActive`
+succeeds once per app install and is refused afterwards. So from the second send
+onwards a face installs perfectly, the wrist does not change, and the phone says
+"Sent". That reads as "nothing happened", which is exactly how it was reported.
+
+The message now says what this side actually knows, and names the one action
+that works: long-press the face and pick it.
+
+**Still overclaiming, and worth naming:** "Sent" also does not mean INSTALLED.
+The phone reports success when the bytes are across; an `addWatchFace` failure
+on the other side is invisible to it. A face that fails to install and a face
+that installs without switching produce the same message. The fix is a reply
+over the same channel, which needs both apps again.
+
 ## 2026-08-30 — v8: the definition wins, weather is drawn, and two bugs only a watch found
 
 Built from `docs/specs/slot-content.md`. Everything below was watched on a Wear

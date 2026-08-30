@@ -395,7 +395,20 @@ class MainActivity : ComponentActivity() {
 
         return runCatching { FaceSender.send(context, target, built.apk, token, reset) }
             .fold(
-                onSuccess = { "Sent “$name” to ${target.name}." },
+                onSuccess = {
+                    // "Sent" is the honest limit of what this side knows. The
+                    // transfer succeeded; whether the watch SWITCHED to the
+                    // face is decided over there and never reported back.
+                    //
+                    // And it usually does not: setWatchFaceAsActive succeeds
+                    // ONCE per app install and is refused afterwards, so from
+                    // the second send onwards a face installs perfectly and the
+                    // wrist does not change. Saying only "Sent" made that look
+                    // like nothing had happened at all -- reported as "it says
+                    // it sent okay" against a watch showing its default face.
+                    "Sent “$name” to ${target.name}. If your watch does not " +
+                        "change, long-press its face and pick “$name”."
+                },
                 onFailure = {
                     Log.e(TAG, "transfer to ${target.name} failed", it)
                     "“$name” didn’t make it to ${target.name}. " +
