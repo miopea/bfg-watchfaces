@@ -144,9 +144,16 @@ object SlotGeometry {
      *
      * A single stored size cannot do this: at a 104pt clock, "Wed Sep 30" fits
      * at 49 and "Sep 30" at 85. So the size is DERIVED from how wide the
-     * style's longest form is, and [Layout.dateSize] becomes the ceiling —
-     * still a control, now meaning "no bigger than this" rather than a number
-     * that is right for one style and wrong for the rest.
+     * style's longest form is, and nothing stored constrains it.
+     *
+     * It was briefly clamped to [Layout.dateSize] as a ceiling, which looked
+     * like a way to keep the control meaningful and quietly undid the whole
+     * change: a face SAVED before this carries the old small value, so the fit
+     * was clamped straight back down to it and the date did not move. Raising
+     * the default only ever helped faces that did not exist yet.
+     *
+     * `dateSize` is therefore no longer read when drawing. It stays in [Layout]
+     * and in the file so faces written by any build still parse.
      *
      * Seconds are excluded from the target on purpose: they sit in the gutter
      * beside the clock, not on its line, so matching "HH:MM" is what makes the
@@ -158,8 +165,17 @@ object SlotGeometry {
         val clockWidth = l.timeSize * DIGIT_ADVANCE * "HH:MM".length
         val chars = p.dateStyle.widestSample().length.coerceAtLeast(1)
         val fitted = clockWidth / (TEXT_ADVANCE * chars)
-        return fitted.roundToInt().coerceIn(MIN_DATE_SIZE, l.dateSize)
+        return fitted.roundToInt().coerceIn(MIN_DATE_SIZE, MAX_DATE_SIZE)
     }
+
+    /**
+     * The date never grows past this, whatever the arithmetic says.
+     *
+     * "30" alone would fit at 96 against a 104pt clock, which is a date the
+     * size of the time. Matching the WIDTH is the ask; matching the height is
+     * not.
+     */
+    const val MAX_DATE_SIZE = 56
 
     const val MIN_DATE_SIZE = 12
 
@@ -305,9 +321,18 @@ object SlotGeometry {
     fun fittedSize(p: DialParams): Int {
         val requested = p.layout.complicationSize.coerceIn(MIN_SIZE, MAX_SIZE)
         var size = requested
+        // The drawn date is part of the budget. It sits against the clock and
+        // the top slot goes above it, so a big date leaves less room -- and
+        // since the date is sized to the CLOCK rather than to what is left,
+        // the complications are what give way. Without this the top slot was
+        // clamped to the rim and drawn straight through the date.
+        val band = dateBand(p)
         while (size > MIN_SIZE) {
             val boxes = layoutAt(p, size)
-            if (fits(boxes.values)) return size
+            val clearOfDate = band == null || boxes[SlotPosition.TOP]?.let {
+                it.y + it.h <= band.y
+            } ?: true
+            if (clearOfDate && fits(boxes.values)) return size
             size -= 1
         }
         return MIN_SIZE

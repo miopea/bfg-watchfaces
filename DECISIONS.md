@@ -121,6 +121,33 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — The ceiling quietly undid the fitted date
+
+"The date seems to be the same size, so no change there." It was: the fitted
+size was clamped to `Layout.dateSize` as a ceiling, and a face SAVED before the
+change carries the old small value. So the fit was computed and then clamped
+straight back down to what it was replacing. Raising the default only ever
+helped faces that did not exist yet — which is every face except the ones people
+have.
+
+Keeping the control "meaningful" is what caused it, and the control existed only
+because the date used to be too small. Auto-fitting removes the reason for it,
+so the control is gone and `dateSize` is no longer read when drawing. It stays
+in `Layout` and in the file so faces from any build still parse.
+
+Verified the way the report came in: a face baked with `--dateSize=30`, the old
+stored value, now emits `size="48"`.
+
+**The date is part of the size budget now.** It is sized against the CLOCK, not
+against what is left over, so something else has to give when it grows — and
+`fittedSize` did not know about it, so the top slot was clamped to the rim and
+drawn through the date. Complications now shrink instead: with a top slot and a
+weekday date, 28 becomes 27; with the short "30" form, which fits at 56, they
+drop to 23.
+
+Capped at 56 regardless. "30" alone would fit at 96 against a 104pt clock, which
+is a date the size of the time. Matching the WIDTH was the ask.
+
 ## 2026-08-30 — The watch's provider list, carried by the reply
 
 Backlog item 1, and it became cheap the moment the install report existed: the
