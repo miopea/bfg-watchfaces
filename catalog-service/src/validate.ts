@@ -22,9 +22,28 @@ import { CONTRACT, CONTROLS, FIELDS, pattern } from "./contract";
  *
  * What is caught here is what a stranger can get wrong or malicious cheaply: a
  * value outside its slider, an enum member that does not exist, a colour that
- * is not a colour, a field nobody has heard of, and — the one that is a
- * security bound rather than a taste one — a font family or ComponentName
- * carrying a quote, which closes the XML attribute the emitter writes it into.
+ * is not a colour, a field nobody has heard of, and a font family or
+ * ComponentName carrying a quote.
+ *
+ * ## The emitter no longer depends on this
+ *
+ * That last check used to be load-bearing: `WffEmitter` interpolated
+ * `fontFamily` and every ComponentName straight into XML attributes, so a quote
+ * getting past here closed the attribute. It does not any more — `XmlSafe` in
+ * `:generator` escapes at the point of writing, and `XmlSafeTest` fails if that
+ * is removed. See `DECISIONS.md` 2026-08-30.
+ *
+ * The patterns stay here anyway, and the distinction is worth keeping straight:
+ *
+ * - **This file answers "is this a legal value?"** — policy, one home, the
+ *   generated contract.
+ * - **The emitter answers "how do I write this into XML?"** — encoding, and it
+ *   is not this file's business.
+ *
+ * So a font family with a quote is refused here because it is not a font
+ * family, not because it would break the document. If this check were deleted
+ * tomorrow the emitted XML would still be well-formed; it would just carry a
+ * value nobody meant.
  */
 
 export interface Problem {

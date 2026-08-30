@@ -1,5 +1,84 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-30 — WffEmitter escapes, and a face called "Rock -- Roll" builds again
+
+The question raised was narrow: `WffEmitter` interpolates `fontFamily` and every
+ComponentName into XML attributes with no escaping. Now that strangers can
+submit a face, should the emitter escape, or is refusing bad values at the
+catalog boundary the right and sufficient place?
+
+**Both, because they are not the same job.** The objection to doing both was
+that this repo has been hurt four times by one rule living in two places —
+`SlotGeometry`, `ControlInventory`, `EngravedStroke` and `PublishedSlug` each
+exist to undo an instance of it. That objection does not apply here:
+
+- **Validation is policy.** "Is `Roboto Flex` a legal font family?" has one
+  right answer and must have one home, which is the generated contract.
+- **Escaping is encoding.** "How do I write an arbitrary string into an XML
+  attribute?" is not a question about watch faces at all. It belongs to whatever
+  writes the XML, and its answer does not change when the policy does.
+
+Those are different questions. Keeping both is the difference between knowing a
+value is acceptable and knowing the file is well-formed.
+
+### What actually settled it was a bug with nothing to do with the catalog
+
+A face named `Rock -- Roll` did not build:
+
+```text
+The string "--" is not permitted within comments.
+```
+
+The name goes into the header comment, and it never passes through
+`DialParams` — it is a separate argument to `emit` — so there was no upstream
+seam that could have caught it even in principle. "Validate at the boundary"
+would have left that in place, because the boundary is the catalog and this
+breaks for someone who never touches it.
+
+Two other things fell out of probing rather than reasoning:
+
+- **A quote in `fontFamily` produces perfectly well-formed XML.** It just
+  carries an attribute the emitter never wrote. So a test that only parses the
+  result PASSES on a successful injection — the tests check for the injected
+  content specifically.
+- **A face name containing `-->` closes the comment.** ComponentName was
+  already safe: `DialParams`' constructor refuses one that is not a
+  ComponentName, which the probe confirmed rather than assumed.
+
+### Comments cannot be escaped, only sanitized
+
+XML expands no entities inside a comment, so there is no escape for `--`; it is
+simply illegal, as is a trailing `-`. The only options are to change the text or
+leave it out. `XmlSafe.comment` collapses hyphen runs, so `Rock -- Roll` becomes
+`Rock - Roll` in the header — a comment is documentation, and a faithful-enough
+rendering beats refusing to build. It also strips control and format characters,
+because a bidirectional override makes the header render as something other than
+what it says.
+
+### Why this is safe for every face already saved
+
+Community faces are stored as parameters, so the emitter IS the renderer for the
+stored file format, and changing its output silently rewrites everything. It
+does not change: escaping only alters a string containing a character that had
+no business being there, and `escaping changes nothing about a value that was
+already legal` pins that. All 438 generator tests passed unchanged, including
+the schema validation and the v1-v2 geometry guard. No `generatorVersion` bump,
+because no output moved.
+
+### The ablation was run, not assumed
+
+Stripping every `XmlSafe` call from the emitter fails 5 of the 10 new tests. The
+5 that still pass are the helper's own unit tests and the "changes nothing
+legal" checks, which do not depend on the emitter calling it — which is correct,
+and worth stating so nobody later reads them as coverage they are not.
+
+### One thing deliberately left alone
+
+`Workbench.exportTo` hand-rolls its own escape for `strings.xml` — `&` and `<`
+only, which is correct for element text. It is a second hand-rolled escape and a
+candidate for `XmlSafe.text`, but it is not the emitter and it is not wrong, so
+it stays outside this change rather than widening it.
+
 ## 2026-08-30 — The catalog service runs on Cloudflare, and validation splits in two
 
 ### Cloudflare, decided on merit
