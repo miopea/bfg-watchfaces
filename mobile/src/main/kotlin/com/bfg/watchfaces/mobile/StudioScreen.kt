@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bfg.watchfaces.generator.ControlInventory
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.ComplicationSource
@@ -134,10 +135,25 @@ fun StudioScreen(
         ) { onParams(params.copy(showSeconds = it)) }
         OptionRow(
             label = "Date",
-            value = params.dateStyle.label,
+            value = if (params.dateStyle == DateStyle.NONE) params.dateStyle.label
+                    else "${params.dateStyle.label} · ${params.dateScale.label}",
             title = "Date",
             options = DateStyle.entries.map { it to it.label },
-            selected = params.dateStyle
+            selected = params.dateStyle,
+            header = {
+                // Size sits with the style, because it is the same decision:
+                // the date is sized to the clock, and this says how much of
+                // that to take. Useful smaller for a busy dial and larger for
+                // anyone who cannot read the fitted size.
+                if (params.dateStyle != DateStyle.NONE) {
+                    ChoiceRow(
+                        label = "Size",
+                        options = DateScale.entries.map { it.label to it },
+                        selected = params.dateScale
+                    ) { onParams(params.copy(dateScale = it)) }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                }
+            }
         ) { onParams(params.copy(dateStyle = it)) }
 
         Spacer(Modifier.height(20.dp))
@@ -179,12 +195,32 @@ fun StudioScreen(
                 "Medium" to (maxComplication * 0.90).roundToInt(),
                 "Large" to maxComplication
             ),
-            selected = params.layout.complicationSize
+            selected = listOf(
+                (maxComplication * 0.77).roundToInt(),
+                (maxComplication * 0.90).roundToInt(),
+                maxComplication
+            ).minByOrNull { kotlin.math.abs(it - params.layout.complicationSize) }
+                ?: params.layout.complicationSize
         ) { onParams(params.copy(layout = params.layout.copy(complicationSize = it))) }
+        // Derived, like the size. Fixed numbers stopped meaning anything once
+        // the boxes grew: at complication size 27, Tight 84, Normal 92 and Wide
+        // 110 all came out as 115, because the layout's own minimum had passed
+        // all three. Three controls, one result.
+        val spreads = SlotGeometry.spreadRange(params)
+        val spreadOptions = listOf(
+            "Tight" to spreads.first,
+            "Normal" to (spreads.first + spreads.last) / 2,
+            "Wide" to spreads.last
+        )
         ChoiceRow(
             label = "Spacing",
-            options = listOf("Tight" to 84, "Normal" to 92, "Wide" to 110),
-            selected = params.layout.complicationSpread
+            options = spreadOptions,
+            // The stored value is a REQUEST and rarely equals an option, so
+            // match the nearest -- otherwise nothing looks selected and the
+            // control reads as broken.
+            selected = spreadOptions.minByOrNull {
+                kotlin.math.abs(it.second - params.layout.complicationSpread)
+            }?.second ?: params.layout.complicationSpread
         ) { onParams(params.copy(layout = params.layout.copy(complicationSpread = it))) }
 
         Spacer(Modifier.height(8.dp))
@@ -515,6 +551,8 @@ private fun <T> OptionRow(
     title: String,
     options: List<Pair<T, String>>,
     selected: T,
+    /** Shown above the list, for a choice that belongs WITH this one. */
+    header: @Composable () -> Unit = {},
     onSelect: (T) -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
@@ -544,6 +582,7 @@ private fun <T> OptionRow(
             title = { Text(title) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
+                    header()
                     for ((option, text) in options) {
                         Row(
                             modifier = Modifier
@@ -568,11 +607,11 @@ private fun <T> OptionRow(
 }
 
 @Composable
-private fun ChoiceRow(
+private fun <T> ChoiceRow(
     label: String,
-    options: List<Pair<String, Int>>,
-    selected: Int,
-    onSelect: (Int) -> Unit
+    options: List<Pair<String, T>>,
+    selected: T,
+    onSelect: (T) -> Unit
 ) {
     Column(Modifier.padding(vertical = 6.dp)) {
         Text(

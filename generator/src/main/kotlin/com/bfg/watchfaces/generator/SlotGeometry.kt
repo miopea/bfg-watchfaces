@@ -164,7 +164,7 @@ object SlotGeometry {
         val l = p.layout
         val clockWidth = l.timeSize * DIGIT_ADVANCE * "HH:MM".length
         val chars = p.dateStyle.widestSample().length.coerceAtLeast(1)
-        val fitted = clockWidth / (TEXT_ADVANCE * chars)
+        val fitted = clockWidth / (TEXT_ADVANCE * chars) * p.dateScale.factor
         return fitted.roundToInt().coerceIn(MIN_DATE_SIZE, MAX_DATE_SIZE)
     }
 
@@ -350,6 +350,34 @@ object SlotGeometry {
      * Offer sizes derived from THIS, and Large always means as large as this
      * face allows.
      */
+    /**
+     * The spacings this face can actually take, narrowest to widest.
+     *
+     * Asked of the layout rather than assumed, because the stored value is only
+     * a REQUEST: `layoutAt` widens it so boxes cannot touch and narrows it so
+     * they cannot leave the rim. Fixed options stopped meaning anything once
+     * the boxes grew — measured at complication size 27, "Tight" 84, "Normal"
+     * 92 and "Wide" 110 all came out as 115, because the minimum had passed all
+     * three. Three controls, one result.
+     *
+     * Derived options cannot drift like that: they are whatever this layout
+     * will honour today.
+     */
+    fun spreadRange(p: DialParams): IntRange {
+        val lo = spreadAt(p, 0)
+        val hi = spreadAt(p, DIAL_SIZE)
+        return lo..maxOf(lo, hi)
+    }
+
+    /** What the layout settles on when asked for [requested]. */
+    private fun spreadAt(p: DialParams, requested: Int): Int {
+        val boxes = boxes(p.copy(layout = p.layout.copy(complicationSpread = requested)))
+        val left = boxes[SlotPosition.LEFT]
+        val middle = boxes[SlotPosition.MIDDLE] ?: boxes[SlotPosition.RIGHT]
+        return if (left != null && middle != null) middle.x - left.x
+        else p.layout.complicationSpread
+    }
+
     fun maxSize(p: DialParams): Int =
         fittedSize(p.copy(layout = p.layout.copy(complicationSize = MAX_SIZE)))
 

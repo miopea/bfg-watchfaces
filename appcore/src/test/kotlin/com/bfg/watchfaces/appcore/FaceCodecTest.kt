@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.appcore
 
 import com.bfg.watchfaces.generator.ComplicationSource
+import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
@@ -43,6 +44,7 @@ class FaceCodecTest {
             SlotPosition.LEFT to "com.example.health/.Steps"
         ),
         dateStyle = DateStyle.WEEKDAY_MONTH_DAY,
+        dateScale = DateScale.LARGE,
         lens = true, lensAmount = 33.0,
         complications = listOf(
             ComplicationSource.STEP_COUNT, ComplicationSource.HEART_RATE,

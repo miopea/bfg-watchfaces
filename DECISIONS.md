@@ -121,6 +121,35 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — Three spacings that were one number, and a date you can size
+
+**"Tight and Normal are the same."** They were, and so was Wide. Measured at
+complication size 27: 84, 92 and 110 all came out as 115, because `layoutAt`
+widens any request so boxes cannot touch, and the minimum had passed all three.
+Three controls, one result.
+
+Fixed numbers cannot survive a layout whose minimum moves, and it moved twice
+this week — v7 shrank the glyph and let complications grow, which grew the boxes
+they have to clear. The options are DERIVED now, by asking the layout what it
+would honour at its narrowest and widest and taking the ends and the middle.
+At size 19 that is 84 / 121 / 159; at 27 it is 115 / 125 / 135. The range
+narrows as the boxes grow, which is the truth rather than a control pretending
+otherwise.
+
+**The selected option is matched by nearest, not by equality.** The stored value
+is a request the layout may not honour, so it rarely equals any option — nothing
+looked selected, which reads as a broken control. The same was true of the size
+options, derived since v7 and compared by equality ever since.
+
+**The date has Small, Normal and Large**, in the dialog where the style is
+chosen, because it is the same decision. A SCALE of the fitted size rather than
+a point size: 0.72, 1.0 and 1.22 of whatever matches the clock, so it means the
+same thing at every style and clock size. 35, 48 and 56pt for a weekday date.
+
+A stored point size was tried for this and was wrong twice — right for one style
+and wrong for the rest, then clamping the fit back down to the old value. The
+lesson is the same as the spacing one: store the INTENT, derive the number.
+
 ## 2026-08-30 — The ceiling quietly undid the fitted date
 
 "The date seems to be the same size, so no change there." It was: the fitted

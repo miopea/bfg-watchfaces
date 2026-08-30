@@ -163,6 +163,22 @@ enum class SlotPosition {
  * It also frees the top complication slot for something else, and needs no icon
  * above it: a date reads as a date.
  */
+/**
+ * How large the drawn date is, relative to the size that matches the clock.
+ *
+ * The fitted size is what makes the date span the time's width, and that turned
+ * out to be too big for at least one person and useful to someone who cannot
+ * read the small one. So it is a SCALE of the fit, not a point size: whatever
+ * the style and the clock are, Small is smaller and Large is larger by the same
+ * proportion. A stored point size cannot do that — it was tried, and it was
+ * right for one date style and wrong for the rest.
+ */
+enum class DateScale(val label: String, val factor: Double) {
+    SMALL("Small", 0.72),
+    NORMAL("Normal", 1.0),
+    LARGE("Large", 1.22)
+}
+
 enum class DateStyle(val label: String) {
     /** No drawn date. Use a complication in a slot instead, or nothing. */
     NONE("Off"),
@@ -310,6 +326,9 @@ data class DialParams(
      * XML it always did — the top slot's date complication is untouched.
      */
     val dateStyle: DateStyle = DateStyle.NONE,
+
+    /** How big the drawn date is, as a proportion of the fitted size. */
+    val dateScale: DateScale = DateScale.NORMAL,
 
     /** Draw the pattern OVER the numerals rather than behind them. */
     val lens: Boolean = true,
