@@ -121,6 +121,62 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — v8: the definition wins, weather is drawn, and two bugs only a watch found
+
+Built from `docs/specs/slot-content.md`. Everything below was watched on a Wear
+OS 6 emulator before release, because the last round proved that neither the XSD
+nor any test here can see how a face actually renders.
+
+**`isCustomizable="FALSE"`, and it fixes the reported bug.** A face declaring
+`day+date / battery / heart / steps / day-of-week` rendered exactly that on the
+watch: left 99990, middle 66, right 64, bottom "Sun". The same face at TRUE had
+rendered the assignments of a build before it. The complication picker now does
+what it says.
+
+Deliberately NOT version-gated for rendering. Every other branch preserves how
+an old face looked; here the old behaviour IS the bug, and a face someone is
+wearing should stop ignoring them.
+
+**Weather is drawn, not a complication**, and it lives in the same list as Steps
+and Heart rate because that is where a person looks for it. A drawn slot emits a
+`PartText` in the slot's own box: no `ComplicationSlot`, no provider, no glyph.
+`SlotGeometry` needed no new geometry.
+
+**Two bugs that only running it could show.**
+
+`[WEATHER.TEMPERATURE][WEATHER.TEMPERATURE_UNIT]` in ONE `<Parameter>` is
+schema-valid and renders the whole face BLACK. WFF fills one `%s` per parameter;
+juxtaposing two sources is not concatenation. This is the same mistake as
+`[MONTH_DAY]` in the date, one day later, in a place the existing guard could not
+see: `each Template placeholder has one Parameter` PASSED, because one `%s` and
+one parameter holding `[A][B]` balance perfectly. The guard now also asserts that
+no single expression names two sources, and was confirmed to fail (7 failures)
+with the old form restored.
+
+A drawn slot skipped the glyph's height, so its value sat visibly higher than the
+numbers beside it. `hasIcon` now decides only whether the GLYPH IS DRAWN; the
+LAYOUT still asks `iconSlots`, so a row shares one baseline whatever fills it.
+
+**One namespaced string per slot**, as specified: a bare name is a system
+provider, `NAME+app:pkg/cls` names an installed provider app. The `+app:` half
+is not decoration — a slot has to carry BOTH the chosen app and what shows on a
+watch without it, because `defaultSystemProvider` is required by the schema.
+Dropping the fallback made round trips lossy, turning every app slot into the
+same arbitrary source; the round-trip test caught it.
+
+A provider for a slot that is off is now rejected rather than silently dropped:
+the slot's content is one value in the file, so there is nowhere to put one.
+
+**The dial preview is pinned.** Every control changes the dial, and judging a
+change meant scrolling up to look and back down to adjust. It is also smaller
+than it was: at full width the dial and one toggle filled the screen, which is
+what made the scrolling cost so much.
+
+**Not done, and worth naming.** The picker's "More" section lists what this
+build knows, not what the watch has: `ProviderCatalog` enumerates installed
+providers but nothing carries that list to the phone yet. Until it does, `app:`
+slots can be stored and rendered but not chosen in the UI.
+
 ## 2026-08-30 — The activation allowance is ONE per app install, and WFF has weather
 
 Gating the reset was built as decided: a separate channel path

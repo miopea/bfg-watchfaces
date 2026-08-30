@@ -46,7 +46,8 @@ class FaceCodecTest {
         lens = true, lensAmount = 33.0,
         complications = listOf(
             ComplicationSource.STEP_COUNT, ComplicationSource.HEART_RATE,
-            ComplicationSource.WATCH_BATTERY
+            ComplicationSource.WATCH_BATTERY, ComplicationSource.SUNRISE_SUNSET,
+            ComplicationSource.WEATHER_TEMPERATURE
         ),
         layout = Layout(
             dateY = 141, dateSize = 23, timeY = 211, timeSize = 97, tracking = 3.0,

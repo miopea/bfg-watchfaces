@@ -90,7 +90,12 @@ object ComplicationGlyphs {
 
     /** What to draw for a source. Empty when the slot shows nothing. */
     fun shapes(source: ComplicationSource): List<Shape> = when (source) {
-        ComplicationSource.NONE -> emptyList()
+        // A drawn source has no glyph: the icons come from the provider's
+        // MONOCHROMATIC_IMAGE and a drawn source has no provider. The value is
+        // centred in its box instead.
+        ComplicationSource.NONE,
+        ComplicationSource.WEATHER_TEMPERATURE,
+        ComplicationSource.WEATHER_CONDITION -> emptyList()
         ComplicationSource.STEP_COUNT -> steps()
         ComplicationSource.HEART_RATE -> heart()
         ComplicationSource.WATCH_BATTERY -> battery()

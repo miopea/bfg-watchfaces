@@ -93,6 +93,8 @@ object Presentation {
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> "Notifications"
         ComplicationSource.APP_SHORTCUT -> "App shortcut"
         ComplicationSource.FAVORITE_CONTACT -> "Favourite contact"
+        ComplicationSource.WEATHER_TEMPERATURE -> "Weather"
+        ComplicationSource.WEATHER_CONDITION -> "Conditions"
     }
 
     /**
@@ -117,7 +119,32 @@ object Presentation {
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> "3"
         ComplicationSource.APP_SHORTCUT -> "Maps"
         ComplicationSource.FAVORITE_CONTACT -> "Ann"
+        ComplicationSource.WEATHER_TEMPERATURE -> "72°"
+        ComplicationSource.WEATHER_CONDITION -> "Cloudy"
     }
+
+    /**
+     * The handful nearly everyone wants, in the order they want them.
+     *
+     * The full list is fourteen system sources plus what we draw, and will grow
+     * again once the watch reports its installed providers -- 37 of them on a
+     * bare emulator. Nine in ten people want one of these six, and a flat
+     * alphabetical list would put Battery a long scroll from Steps.
+     *
+     * Curation is presentation, so it lives here and not in :generator.
+     */
+    val PICKER_COMMON: List<ComplicationSource> = listOf(
+        ComplicationSource.NONE,
+        ComplicationSource.DAY_AND_DATE,
+        ComplicationSource.STEP_COUNT,
+        ComplicationSource.HEART_RATE,
+        ComplicationSource.WEATHER_TEMPERATURE,
+        ComplicationSource.WATCH_BATTERY
+    )
+
+    /** Everything else, in the enum's own order. */
+    val PICKER_REST: List<ComplicationSource> =
+        ComplicationSource.entries.filter { it !in PICKER_COMMON }
 
     fun label(pos: SlotPosition): String = when (pos) {
         SlotPosition.TOP -> "Top"

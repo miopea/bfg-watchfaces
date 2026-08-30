@@ -55,7 +55,11 @@ object FaceCodec {
             // "TOP:pkg/cls,RIGHT:pkg/cls". An entry naming a position this
             // build does not know is skipped rather than throwing, same as
             // every other forward-compatibility case here.
-            providers = q["providers"]?.let { list ->
+            // Providers now ride in the slot tokens ("app:pkg/cls"), one value
+            // per slot. The separate `providers` key is still read because
+            // faces were saved with it.
+            providers = Complications.providersIn(q["complications"]).takeIf { it.isNotEmpty() }
+                ?: q["providers"]?.let { list ->
                 list.split(",").mapNotNull { entry ->
                     val pos = SlotPosition.entries.firstOrNull {
                         it.name == entry.substringBefore(":").trim()
@@ -151,7 +155,7 @@ object FaceCodec {
   "dateStyle": "${p.dateStyle}",
   "lens": ${p.lens}, "lensAmount": ${p.lensAmount},
   "texture": "${p.texture}",
-  "complications": [${p.complications.joinToString(", ") { "\"${it.name}\"" }}],
+  "complications": [${Complications.format(p.complications, p.providers).split(",").joinToString(", ") { "\"$it\"" }}],
   "layout": {
     "dateY": ${l.dateY}, "dateSize": ${l.dateSize},
     "timeY": ${l.timeY}, "timeSize": ${l.timeSize}, "tracking": ${l.tracking},
@@ -182,7 +186,7 @@ object FaceCodec {
                 .joinToString(",") { "${it.key.name}:${it.value}" },
             "dateStyle" to p.dateStyle.name,
             "lens" to p.lens, "lensAmount" to p.lensAmount, "texture" to p.texture,
-            "complications" to Complications.format(p.complications),
+            "complications" to Complications.format(p.complications, p.providers),
             "dateY" to l.dateY, "dateSize" to l.dateSize, "timeY" to l.timeY,
             "timeSize" to l.timeSize, "tracking" to l.tracking,
             "complicationY" to l.complicationY, "complicationSpread" to l.complicationSpread,

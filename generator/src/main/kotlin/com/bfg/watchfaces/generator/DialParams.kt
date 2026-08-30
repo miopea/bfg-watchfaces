@@ -41,7 +41,27 @@ enum class Engine {
  * workbench, not here. :generator defines the stored format; what a slot looks
  * like on screen is a renderer's problem.
  */
-enum class ComplicationSource(val wff: String?) {
+/**
+ * What can fill a slot.
+ *
+ * Two kinds live in one enum on purpose, because the operator asked for exactly
+ * that: "anything custom we make gets put into the complications list". A
+ * person choosing what goes in the top slot should not have to know whether the
+ * watch supplies it or we draw it.
+ *
+ * - [wff] set: a Watch Face Format SYSTEM PROVIDER. The watch fills the slot.
+ * - [drawn] set: a WFF DATA SOURCE we render ourselves. No provider is
+ *   involved, and none exists -- weather is the case that forced this. Google's
+ *   system provider list has fourteen members and no weather in it, but the
+ *   format has `[WEATHER.TEMPERATURE]` as a first-class source, the same kind of
+ *   thing as `[DAY]`.
+ *
+ * A drawn slot has no glyph. The icons come from
+ * `[COMPLICATION.MONOCHROMATIC_IMAGE]`, which only exists inside a
+ * `<Complication>`, and a drawn source has none -- so the value is centred in
+ * its box instead, which [SlotGeometry.textOffset] already knows how to do.
+ */
+enum class ComplicationSource(val wff: String?, vararg val drawn: String) {
     NONE(null),
     STEP_COUNT("STEP_COUNT"),
     HEART_RATE("HEART_RATE"),
@@ -58,9 +78,23 @@ enum class ComplicationSource(val wff: String?) {
     SUNRISE_SUNSET("SUNRISE_SUNSET"),
     UNREAD_NOTIFICATION_COUNT("UNREAD_NOTIFICATION_COUNT"),
     APP_SHORTCUT("APP_SHORTCUT"),
-    FAVORITE_CONTACT("FAVORITE_CONTACT");
+    FAVORITE_CONTACT("FAVORITE_CONTACT"),
 
-    val enabled: Boolean get() = wff != null
+    /**
+     * Temperature and its unit, drawn by us.
+     *
+     * `[WEATHER.TEMPERATURE_UNIT]` is a separate source, so the two are
+     * concatenated -- the format has no "72 degrees" source that includes it.
+     */
+    WEATHER_TEMPERATURE(null, "[WEATHER.TEMPERATURE]", "[WEATHER.TEMPERATURE_UNIT]"),
+
+    /** "Cloudy". The condition in words rather than a code. */
+    WEATHER_CONDITION(null, "[WEATHER.CONDITION_NAME]");
+
+    val enabled: Boolean get() = wff != null || drawn.isNotEmpty()
+
+    /** True when this is rendered by the face rather than filled by the watch. */
+    val isDrawn: Boolean get() = drawn.isNotEmpty()
 }
 
 /**
@@ -269,6 +303,13 @@ data class DialParams(
         // than escaping it later: anything that is not a ComponentName is a bug
         // in discovery, not a face someone should be able to save.
         for ((pos, component) in providers) {
+            // A provider for a slot that is off cannot be stored: the slot's
+            // content is ONE value in the file, so there is nowhere to put a
+            // provider for a slot that has no entry. Rejecting it here beats
+            // dropping it silently on the next save.
+            require(slot(pos).enabled) {
+                "a provider is named for $pos, but that slot is off"
+            }
             require(COMPONENT.matches(component)) {
                 "provider for $pos is not a ComponentName: \"$component\" " +
                     "(expected package/class, e.g. com.example.app/.WeatherProvider)"
@@ -286,6 +327,17 @@ data class DialParams(
     val isLocalOnly: Boolean get() = engine == Engine.TEXTURE && texture.isNotBlank()
 
     /** The source at [pos], or NONE when the stored list is short/absent. */
+    /**
+     * Whether this slot draws a glyph above its value.
+     *
+     * A DRAWN source never does, whatever `iconSlots` says: the icons come from
+     * `[COMPLICATION.MONOCHROMATIC_IMAGE]`, which only exists inside a
+     * `<Complication>`, and a drawn source has none. Asking `pos in iconSlots`
+     * directly would reserve the glyph's height and push the value down inside
+     * a box with nothing above it.
+     */
+    fun hasIcon(pos: SlotPosition): Boolean = pos in iconSlots && !slot(pos).isDrawn
+
     fun slot(pos: SlotPosition): ComplicationSource =
         complications.getOrElse(pos.ordinal) { ComplicationSource.NONE }
 
@@ -343,6 +395,17 @@ data class Layout(
 /**
  * Bump ONLY when adding an engine or a parameter. Never when changing geometry.
  *
+ * v8 (2026-08-30) makes the FACE DEFINITION authoritative and adds drawn slot
+ * sources. `isCustomizable` goes FALSE, because TRUE lets the watch's editor
+ * assign a source to a slot and `DefaultProviderPolicy` is then never consulted
+ * again -- so nothing chosen in the app could change what the watch drew. And a
+ * slot may now hold a source this face DRAWS (weather) rather than one the
+ * watch fills. No dial geometry changed: PatternEngines.v8 delegates to v5.
+ *
+ * This one is deliberately NOT gated for rendering. Every other version branch
+ * preserves how an old face looked; here the old behaviour IS the bug, and a
+ * face someone is wearing should stop ignoring them.
+ *
  * v7 (2026-08-30) shrinks the complication GLYPH from 1.25x the slot size to
  * 0.85x, so the little symbol is smaller than the number it labels rather than
  * bigger, and the value moves up to meet it. That is a look, and it is also
@@ -385,7 +448,7 @@ data class Layout(
  */
 private val COMPONENT = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*/\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z0-9_$]+)*""")
 
-const val CURRENT_GENERATOR_VERSION = 7
+const val CURRENT_GENERATOR_VERSION = 8
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

@@ -186,21 +186,20 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.padding(inner)
                         )
 
-                        Tab.STUDIO -> Column(
-                            Modifier
-                                .fillMaxSize()
-                                .padding(inner)
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            StudioScreen(
-                                params = params,
-                                onParams = { params = it; engineName = it.engine.name },
-                                ambient = ambient,
-                                onAmbient = { ambient = it },
-                                onTune = { tuning = true },
-                                onCustomColor = { dial -> pickingDial = dial; picking = true }
-                            )
-                            Column(Modifier.padding(horizontal = 16.dp)) {
+                        // No outer scroll: StudioScreen pins the dial and
+                        // scrolls only the controls, so wrapping it in a second
+                        // scrolling container would both fight it and crash
+                        // (a scrollable measured with infinite height).
+                        Tab.STUDIO -> StudioScreen(
+                            params = params,
+                            onParams = { params = it; engineName = it.engine.name },
+                            ambient = ambient,
+                            onAmbient = { ambient = it },
+                            onTune = { tuning = true },
+                            onCustomColor = { dial -> pickingDial = dial; picking = true },
+                            modifier = Modifier.padding(inner),
+                            footer = {
+                            Column {
                                 val open = openSlug?.let { slug -> faces.firstOrNull { it.slug == slug } }
                                 Button(
                                     onClick = {
@@ -250,8 +249,8 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text("Open the watch app to pick complications") }
                             }
-                            Spacer(Modifier.height(24.dp))
-                        }
+                            }
+                        )
 
                         Tab.MINE -> MyFacesScreen(
                             faces = faces,

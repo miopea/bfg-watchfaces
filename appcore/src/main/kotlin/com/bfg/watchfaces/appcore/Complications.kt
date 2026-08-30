@@ -30,6 +30,8 @@ object Complications {
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> "Notifications"
         ComplicationSource.APP_SHORTCUT -> "App shortcut"
         ComplicationSource.FAVORITE_CONTACT -> "Favourite contact"
+        ComplicationSource.WEATHER_TEMPERATURE -> "Weather"
+        ComplicationSource.WEATHER_CONDITION -> "Conditions"
     }
 
     /**
@@ -56,6 +58,8 @@ object Complications {
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> "3"
         ComplicationSource.APP_SHORTCUT -> "Maps"
         ComplicationSource.FAVORITE_CONTACT -> "Ann"
+        ComplicationSource.WEATHER_TEMPERATURE -> "72°"
+        ComplicationSource.WEATHER_CONDITION -> "Cloudy"
     }
 
     /**
@@ -81,14 +85,69 @@ object Complications {
     /** Everything the UI offers, NONE first so "Off" reads as the neutral choice. */
     val all: List<ComplicationSource> = ComplicationSource.entries.toList()
 
+    /**
+     * The stored form of one slot.
+     *
+     * A bare enum name for anything this build understands, and `app:<component>`
+     * when a specific provider app was chosen for that position. One string per
+     * slot, so a slot's content is one value in the file rather than two fields
+     * that have to agree -- which is how `dateStyle` and `generatorVersion` each
+     * went missing from a saved face.
+     */
+    fun token(source: ComplicationSource, component: String?): String =
+        if (component.isNullOrBlank()) source.name else "${source.name}+app:$component"
+
+    /** The provider component in a token, or null when it names a system source. */
+    fun componentIn(token: String): String? =
+        token.trim().substringAfter(APP, "").takeIf { it.isNotBlank() }
+
+    /** The system source in a token, which is the fallback when an app is named. */
+    fun sourceIn(token: String): String = token.trim().substringBefore(APP)
+
+    /**
+     * Separates the chosen provider app from the source behind it.
+     *
+     * A slot's content is one value in the file, but it has to carry TWO
+     * things when an app is named: the app, and what shows on a watch that does
+     * not have it. `defaultSystemProvider` is required by the schema, so the
+     * fallback is not optional and cannot be inferred later -- dropping it made
+     * round trips lossy, turning every app slot into the same arbitrary source.
+     */
+    private const val APP = "+app:"
+
     fun parse(csv: String?): List<ComplicationSource>? {
         if (csv == null) return null
         val parts = csv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
         if (parts.isEmpty()) return emptyList()
-        return parts.mapNotNull { token ->
-            runCatching { ComplicationSource.valueOf(token.uppercase()) }.getOrNull()
+        return parts.map { token ->
+            // An `app:` slot still needs a SYSTEM source as its fallback -- the
+            // schema requires defaultSystemProvider, and a watch without that
+            // app has to show something. NONE would turn the slot off entirely,
+            // so the fallback is deliberately a neutral one.
+            // An unknown name becomes NONE rather than being DROPPED. Dropping
+            // shifted every later slot up a position, which silently rearranged
+            // a face saved by a newer build.
+            runCatching { ComplicationSource.valueOf(sourceIn(token).uppercase()) }
+                .getOrNull() ?: ComplicationSource.NONE
         }
     }
 
     fun format(list: List<ComplicationSource>): String = list.joinToString(",") { it.name }
+
+    /** The stored list, with any chosen provider apps folded into the tokens. */
+    fun format(
+        list: List<ComplicationSource>,
+        providers: Map<SlotPosition, String>
+    ): String = list.mapIndexed { i, source ->
+        token(source, providers[SlotPosition.entries.getOrNull(i)])
+    }.joinToString(",")
+
+    /** The provider components in a stored list, by position. */
+    fun providersIn(csv: String?): Map<SlotPosition, String> {
+        if (csv == null) return emptyMap()
+        return csv.split(",").mapIndexedNotNull { i, token ->
+            val pos = SlotPosition.entries.getOrNull(i) ?: return@mapIndexedNotNull null
+            componentIn(token)?.let { pos to it }
+        }.toMap()
+    }
 }

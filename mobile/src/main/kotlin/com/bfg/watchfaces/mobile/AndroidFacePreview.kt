@@ -83,7 +83,7 @@ object AndroidFacePreview {
             val c = withAlpha(if (ambient) ambientSlotInk else ink, a)
             // Honours iconSlots, or the toggles appear to do nothing in the one
             // view somebody uses to judge them.
-            if (pos in p.iconSlots) {
+            if (p.hasIcon(pos)) {
                 AndroidComplicationIcons.draw(
                     canvas, source,
                     x = box.x + (box.w - iconSize) / 2f,

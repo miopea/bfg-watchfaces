@@ -88,7 +88,7 @@ object FacePreview {
             val c = withAlpha(if (ambient) ambientSlotInk else ink, a)
             // Honours iconSlots, or the toggles appear to do nothing in the one
             // view somebody uses to judge them.
-            if (pos in p.iconSlots) {
+            if (p.hasIcon(pos)) {
                 ComplicationIcons.draw(g, source, box.x + (box.w - iconSize) / 2.0, box.y.toDouble(), iconSize, c)
             }
             val textY = SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)

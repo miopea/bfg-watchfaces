@@ -167,15 +167,30 @@ object WffEmitter {
             // position, and the ambient design deliberately keeps that one line
             // visible while everything else goes dark.
             val ambientAlpha = if (pos == SlotPosition.TOP) 140 else 0
+
+            // A DRAWN source is not a complication at all -- there is no
+            // provider to fill it, so there is no ComplicationSlot and no
+            // glyph. It is a PartText in the slot's own box, which is what puts
+            // weather in the same list as Steps without a second layout.
+            if (source.isDrawn) return@map """
+    <PartText x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
+      <Text align="CENTER">
+        <Font family="${l.fontFamily}" size="$fontSize" color="$ink">$ambientColorVariant
+          <Template><![CDATA[${source.drawn.joinToString("") { "%s" }}]]>${source.drawn.joinToString("") { """<Parameter expression="$it"/>""" }}</Template>
+        </Font>
+      </Text>
+    </PartText>"""
+
             """
     <ComplicationSlot slotId="$id" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"
                       displayName="@string/${pos.resource}"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255"
-                      isCustomizable="TRUE">
+                      isCustomizable="FALSE">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
       <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
-      <Complication type="SHORT_TEXT">${if (pos !in p.iconSlots) "" else """
+      <Complication type="SHORT_TEXT">${if (!p.hasIcon(pos)) "" else """
         <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>"""}

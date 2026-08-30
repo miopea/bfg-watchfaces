@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -93,14 +94,37 @@ fun StudioScreen(
     onTune: () -> Unit,
     /** true for the dial, false for the ink. */
     onCustomColor: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Save and Send, which scroll WITH the controls rather than sitting under
+     * the pinned dial. A slot rather than siblings in the caller, because this
+     * screen owns the scrolling now.
+     */
+    footer: @Composable () -> Unit = {}
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        DialPreview(params, ambient)
+    Column(modifier = modifier.fillMaxSize()) {
+        // PINNED. Every control below changes the dial, and judging a change
+        // meant scrolling up to look and back down to adjust -- on a phone
+        // that is most of the interaction. The preview stays put and only the
+        // controls move.
+        //
+        // Smaller than it was, deliberately: at full width the dial and one
+        // toggle filled the screen, which is what made the scrolling so
+        // costly in the first place.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(Modifier.fillMaxWidth(0.62f)) { DialPreview(params, ambient) }
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+        ) {
         AmbientToggle(ambient, onAmbient)
         SwitchRow(
             title = "Show seconds",
@@ -181,7 +205,10 @@ fun StudioScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 6.dp)
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
+            footer()
+            Spacer(Modifier.height(24.dp))
+        }
     }
 }
 
@@ -350,7 +377,20 @@ private fun SlotPicker(
                         )
                         HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     }
-                    for (source in ComplicationSource.entries) {
+                    for ((heading, group) in listOf(
+                        null to Presentation.PICKER_COMMON,
+                        "More" to Presentation.PICKER_REST
+                    )) {
+                        if (heading != null) {
+                            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                            Text(
+                                heading,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                        for (source in group) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -366,6 +406,7 @@ private fun SlotPicker(
                             Spacer(Modifier.size(12.dp))
                             Text(Presentation.label(source),
                                  style = MaterialTheme.typography.bodyLarge)
+                        }
                         }
                     }
                 }

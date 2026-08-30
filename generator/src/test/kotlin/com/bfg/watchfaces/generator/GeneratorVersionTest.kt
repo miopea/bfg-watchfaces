@@ -11,7 +11,7 @@ class GeneratorVersionTest {
 
     @Test
     fun `bumping CURRENT_GENERATOR_VERSION is deliberate`() {
-        assertEquals(7, CURRENT_GENERATOR_VERSION,
+        assertEquals(8, CURRENT_GENERATOR_VERSION,
             "You changed CURRENT_GENERATOR_VERSION. That is fine ONLY if you added a new " +
             "branch in PatternEngines.paths() and left every older branch untouched. " +
             "Existing community faces must keep rendering exactly as their authors saw them. " +
@@ -177,6 +177,19 @@ class GeneratorVersionCompatibilityTest {
         val v6 = SlotGeometry.maxSize(DialParams(generatorVersion = 6))
         val v7 = SlotGeometry.maxSize(DialParams(generatorVersion = 7))
         assertTrue(v7 > v6) { "v7 max $v7 is no better than v6's $v6" }
+    }
+
+
+    /** v8 changed emission, not the dial. */
+    @Test
+    fun `v8 renders every engine identically to v7`() {
+        for (engine in Engine.entries) {
+            if (engine == Engine.TEXTURE) continue
+            assertEquals(
+                PatternEngines.paths(DialParams(generatorVersion = 7, engine = engine)),
+                PatternEngines.paths(DialParams(generatorVersion = 8, engine = engine))
+            ) { "$engine changed between v7 and v8" }
+        }
     }
 
 }

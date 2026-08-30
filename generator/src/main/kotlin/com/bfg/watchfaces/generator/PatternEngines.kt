@@ -34,6 +34,8 @@ object PatternEngines {
         6 -> v4(p)
         // v7 shrank the complication glyph. No engine changed.
         7 -> v4(p)
+        // v8 made the definition authoritative and added drawn sources.
+        8 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

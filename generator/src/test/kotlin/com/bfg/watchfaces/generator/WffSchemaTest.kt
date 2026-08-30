@@ -126,7 +126,19 @@ class WffSchemaTest {
     @ParameterizedTest
     @EnumSource(DateStyle::class)
     fun `each Template placeholder has one Parameter`(style: DateStyle) {
-        val xml = WffEmitter.emit(DialParams(dateStyle = style))
+        // Every DRAWN source is in here too, not just the date. Weather shipped
+        // with "[WEATHER.TEMPERATURE][WEATHER.TEMPERATURE_UNIT]" in ONE
+        // parameter: schema-valid, and the whole face rendered BLACK on a
+        // watch. This test existed and did not catch it, because it only ever
+        // emitted the default complications.
+        val xml = WffEmitter.emit(DialParams(
+            dateStyle = style,
+            complications = listOf(
+                ComplicationSource.WEATHER_TEMPERATURE, ComplicationSource.WEATHER_CONDITION,
+                ComplicationSource.STEP_COUNT, ComplicationSource.HEART_RATE,
+                ComplicationSource.WATCH_BATTERY
+            )
+        ))
         val templates = Regex("<Template>(.*?)</Template>", RegexOption.DOT_MATCHES_ALL).findAll(xml)
         var seen = 0
         for (t in templates) {
@@ -138,6 +150,19 @@ class WffSchemaTest {
                 "$style: $placeholders placeholder(s) but $parameters parameter(s) in:\n$body"
             }
             assertTrue(parameters > 0) { "$style: a Template with no Parameter renders nothing" }
+
+            // And no single expression may name TWO sources. Counting
+            // placeholders against parameters does NOT catch this -- one "%s"
+            // with one Parameter holding "[A][B]" balances perfectly, and
+            // renders the whole face BLACK on a watch. That is exactly how
+            // weather shipped, past this very test.
+            for (p in Regex("""<Parameter expression="([^"]*)"""").findAll(body)) {
+                val sources = Regex("""\[[A-Z_0-9.]+\]""").findAll(p.groupValues[1]).count()
+                assertTrue(sources <= 1) {
+                    "$style: one Parameter names $sources sources: \"${p.groupValues[1]}\" " +
+                        "-- WFF fills one %s per Parameter, so this renders nothing at all"
+                }
+            }
         }
         if (style != DateStyle.NONE) {
             assertTrue(seen > 0) { "$style emitted no Template at all, so no date is drawn" }
@@ -229,6 +254,52 @@ class WffSchemaTest {
         assertTrue(!xml.contains("primaryProvider")) {
             "a face with no chosen providers gained an attribute it does not need"
         }
+    }
+
+    /**
+     * Weather in a slot is schema-valid, and is NOT a complication.
+     *
+     * WFF's system provider list has fourteen members and no weather. The
+     * format does have `[WEATHER.TEMPERATURE]` as a first-class source, so a
+     * weather slot is drawn by the face: no ComplicationSlot, no provider, no
+     * glyph. This is the check that the arrangement is legal.
+     */
+    @Test
+    fun `a weather slot is drawn, not a complication, and validates`() {
+        val p = DialParams(complications = listOf(
+            ComplicationSource.WEATHER_TEMPERATURE, ComplicationSource.STEP_COUNT,
+            ComplicationSource.WEATHER_CONDITION, ComplicationSource.HEART_RATE,
+            ComplicationSource.WATCH_BATTERY
+        ))
+        val xml = WffEmitter.emit(p)
+        val errors = validate(xml)
+        assertTrue(errors.isEmpty()) { "a weather slot is not schema-valid:\n" + errors.joinToString("\n") }
+
+        assertTrue(xml.contains("[WEATHER.TEMPERATURE]")) { "no temperature source emitted" }
+        assertTrue(xml.contains("[WEATHER.CONDITION_NAME]")) { "no condition source emitted" }
+
+        // Three complication slots, not five: the two weather slots are drawn.
+        val slots = Regex("""<ComplicationSlot """).findAll(xml).count()
+        assertEquals(3, slots) { "weather was emitted as a complication slot" }
+    }
+
+    /**
+     * The face definition wins, always.
+     *
+     * `isCustomizable="TRUE"` lets the watch's editor assign a source to a slot,
+     * and once it has, `DefaultProviderPolicy` is never consulted again -- so
+     * nothing chosen in the app could change what the watch drew. Measured on a
+     * watch: a face declaring battery/heart/steps/day-of-week rendered the
+     * assignments of a build before it, unchanged across three faces.
+     */
+    @Test
+    fun `slots are not customizable on the watch`() {
+        val xml = WffEmitter.emit(DialParams())
+        assertTrue(xml.contains("""isCustomizable="FALSE"""")) {
+            "a customizable slot ignores DefaultProviderPolicy forever once the " +
+                "watch's editor has touched it"
+        }
+        assertTrue(!xml.contains("""isCustomizable="TRUE"""")) { "a slot is still customizable" }
     }
 
     @Test
