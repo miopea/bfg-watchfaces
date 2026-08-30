@@ -20,6 +20,22 @@ package com.bfg.watchfaces.generator
  */
 object WffEmitter {
 
+    /** Seconds are just under half the clock, which reads as a secondary value. */
+    private const val SECONDS_SCALE = 0.45
+
+    /**
+     * How much the clock shrinks to make room for seconds.
+     *
+     * At the default size the time already spans nearly the whole dial, so there
+     * is no gutter to put seconds in -- rendered beside it they land on top of
+     * the last digit. Giving the clock 82% of its size opens the space, which is
+     * what a mechanical face does too: adding a subdial shrinks the main one.
+     */
+    private const val CLOCK_SCALE_WITH_SECONDS = 0.82
+
+    /** How far in from the rim the seconds sit, so they clear a round bezel. */
+    private const val SECONDS_INSET = 48
+
     private fun argb(rgb: String, alpha: Int = 255): String =
         "#%02x%s".format(alpha, rgb.removePrefix("#").lowercase())
 
@@ -28,6 +44,10 @@ object WffEmitter {
         // becomes the carousel label; "Untitled" is a placeholder for callers
         // that have not been given one, not a product name.
         val l = p.layout
+        // The clock gives up room when seconds are shown; see
+        // CLOCK_SCALE_WITH_SECONDS.
+        val clockSize =
+            if (p.showSeconds) (l.timeSize * CLOCK_SCALE_WITH_SECONDS).toInt() else l.timeSize
         val ink = argb(p.inkColor)
 
         // Ambient is a black screen. From v3 the ambient ink is lifted to clear
@@ -130,16 +150,34 @@ object WffEmitter {
     </PartImage>
 
     <DigitalClock x="0" y="${l.timeY - l.timeSize / 2}" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}">
-      <TimeText format="${if (p.showSeconds) "hh:mm:ss" else "hh:mm"}" hourFormat="SYNC_TO_DEVICE" align="CENTER"
+      <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
                 x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="255">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
-        <Font family="${l.fontFamily}" size="${l.timeSize}" weight="${l.fontWeight}" color="$ink"/>
+        <Font family="${l.fontFamily}" size="$clockSize" weight="${l.fontWeight}" color="$ink"/>
       </TimeText>
       <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
                 x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="0">
         <Variant mode="AMBIENT" target="alpha" value="255"/>
         <Font family="${l.fontFamily}" size="${l.timeSize}" weight="THIN" color="$inkDim"/>
-      </TimeText>
+      </TimeText>${if (!p.showSeconds) "" else """
+      <!--
+        Seconds sit in the right gutter beside the time, at just under half its
+        size and in the lightest weight available.
+
+        Not "hh:mm:ss" on the clock itself: that makes every digit the same size,
+        so the seconds shout as loudly as the hour and the whole line grows wide
+        enough to crowd the rim. The clock is centred, which leaves roughly a
+        hundred points of empty dial on each side -- this uses the right one.
+
+        Awake only. The ambient TimeText above deliberately has no seconds:
+        ambient updates once a minute, so a second digit there would be wrong
+        for most of the minute it was shown.
+      -->
+      <TimeText format="ss" align="END" alpha="255"
+                x="0" y="${(l.timeSize * 0.72).toInt()}" width="${DIAL_SIZE - SECONDS_INSET}" height="${(l.timeSize * 0.6).toInt()}">
+        <Variant mode="AMBIENT" target="alpha" value="0"/>
+        <Font family="${l.fontFamily}" size="${(l.timeSize * SECONDS_SCALE).toInt()}" weight="THIN" color="$inkDim"/>
+      </TimeText>"""}
     </DigitalClock>
 $slots
 

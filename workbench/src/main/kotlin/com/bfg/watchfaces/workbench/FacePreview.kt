@@ -35,6 +35,11 @@ import com.bfg.watchfaces.appcore.Complications
  */
 object FacePreview {
 
+    /** Both kept identical to WffEmitter's, so the preview and the face agree. */
+    private const val SECONDS_SCALE = 0.45
+    private const val SECONDS_INSET = 48
+    private const val CLOCK_SCALE_WITH_SECONDS = 0.82
+
     /** Mirrors the emitter's ambient rules so the preview tells the truth about ambient. */
     fun render(
         p: DialParams, ambient: Boolean = false, size: Int = DIAL_SIZE,
@@ -95,9 +100,7 @@ object FacePreview {
         // THIN weight, dimmed ink). Reproduce that split rather than dimming one.
         val hh = now.hour % 12
         // Awake only, matching the emitter and the Android preview.
-        val timeText =
-            if (p.showSeconds && !ambient) "%02d:%02d:%02d".format(if (hh == 0) 12 else hh, now.minute, now.second)
-            else "%02d:%02d".format(if (hh == 0) 12 else hh, now.minute)
+        val timeText = "%02d:%02d".format(if (hh == 0) 12 else hh, now.minute)
         if (ambient) {
             // Mirror the emitter's version branch exactly. From v3 the ambient
             // ink clears a contrast floor against black; before that it is the
@@ -108,8 +111,23 @@ object FacePreview {
             drawCentered(g, timeText, l.timeY - l.timeSize / 2, (l.timeSize * 1.4).toInt(),
                 l.timeSize.toDouble(), Font.PLAIN, ambientInk, thin = true)
         } else {
+            val clockSize =
+                if (p.showSeconds) l.timeSize * CLOCK_SCALE_WITH_SECONDS else l.timeSize.toDouble()
             drawCentered(g, timeText, l.timeY - l.timeSize / 2, (l.timeSize * 1.4).toInt(),
-                l.timeSize.toDouble(), awtStyle(l.fontWeight), ink)
+                clockSize, awtStyle(l.fontWeight), ink)
+        }
+
+        // Seconds in the right gutter, matching WffEmitter: just under half the
+        // clock, lightest weight, awake only. The clock is centred, so this uses
+        // the empty dial it leaves rather than widening the time itself.
+        if (p.showSeconds && !ambient) {
+            val secs = "%02d".format(now.second)
+            val size = l.timeSize * SECONDS_SCALE
+            g.font = Font(Font.SANS_SERIF, Font.PLAIN, size.toInt())
+            g.color = withAlpha(ink, 190)
+            val w = g.fontMetrics.stringWidth(secs)
+            val baseline = l.timeY - l.timeSize / 2 + (l.timeSize * 0.72) + g.fontMetrics.ascent
+            g.drawString(secs, (DIAL_SIZE - SECONDS_INSET - w), baseline.toInt())
         }
 
         g.dispose()

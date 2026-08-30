@@ -37,6 +37,11 @@ object AndroidFacePreview {
     private const val SAMPLE_MINUTE = 10
     private const val SAMPLE_SECOND = 30
 
+    /** Kept the same as WffEmitter's, so the preview and the face agree. */
+    private const val SECONDS_SCALE = 0.45f
+    private const val SECONDS_INSET = 48
+    private const val CLOCK_SCALE_WITH_SECONDS = 0.82f
+
     fun render(p: DialParams, ambient: Boolean = false, size: Int = DIAL_SIZE): Bitmap {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -101,9 +106,7 @@ object AndroidFacePreview {
         // Seconds are an AWAKE-only affordance, so the ambient preview must not
         // show them -- otherwise the toggle appears to do nothing in the one
         // view where it is deliberately absent.
-        val timeText =
-            if (p.showSeconds && !ambient) "%02d:%02d:%02d".format(if (hh == 0) 12 else hh, SAMPLE_MINUTE, SAMPLE_SECOND)
-            else "%02d:%02d".format(if (hh == 0) 12 else hh, SAMPLE_MINUTE)
+        val timeText = "%02d:%02d".format(if (hh == 0) 12 else hh, SAMPLE_MINUTE)
         val timeColor = if (ambient) {
             // Mirror the emitter's version branch exactly. From v3 the ambient
             // ink clears a contrast floor against black; before that it is the
@@ -118,13 +121,28 @@ object AndroidFacePreview {
             canvas, timeText,
             0f, (l.timeY - l.timeSize / 2).toFloat(),
             DIAL_SIZE.toFloat(), (l.timeSize * 1.4).toFloat(),
-            l.timeSize.toFloat(), timeColor,
+            if (p.showSeconds && !ambient) l.timeSize * CLOCK_SCALE_WITH_SECONDS else l.timeSize.toFloat(),
+            timeColor,
             // AWT only has PLAIN and BOLD, and the workbench renders MEDIUM as
             // PLAIN rather than overstate the weight. Match that here, so the
             // two previews agree about the one thing that matters most --
             // legibility of the time.
             bold = !ambient && l.fontWeight.uppercase() == "BOLD"
         )
+
+        // Seconds in the right gutter, matching WffEmitter: just under half the
+        // clock, lightest weight, awake only. Right-aligned rather than centred,
+        // because the clock is centred and this sits in the space it leaves.
+        if (p.showSeconds && !ambient) {
+            val secSize = l.timeSize * SECONDS_SCALE
+            drawCenteredIn(
+                canvas, "%02d".format(SAMPLE_SECOND),
+                0f, (l.timeY - l.timeSize / 2 + l.timeSize * 0.72f),
+                (DIAL_SIZE - SECONDS_INSET).toFloat(), l.timeSize * 0.6f,
+                secSize, withAlpha(timeColor, 190), bold = false,
+                alignEnd = true
+            )
+        }
         return bitmap
     }
 
@@ -134,7 +152,9 @@ object AndroidFacePreview {
     private fun drawCenteredIn(
         canvas: Canvas, text: String,
         x: Float, y: Float, w: Float, h: Float,
-        size: Float, color: Int, bold: Boolean
+        size: Float, color: Int, bold: Boolean,
+        /** Right-align inside the box instead of centring. Used by the seconds. */
+        alignEnd: Boolean = false
     ) {
         if (text.isEmpty()) return
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -143,7 +163,8 @@ object AndroidFacePreview {
             typeface = Typeface.create(Typeface.SANS_SERIF, if (bold) Typeface.BOLD else Typeface.NORMAL)
         }
         val fm = paint.fontMetrics
-        val tx = x + (w - paint.measureText(text)) / 2f
+        val tx = if (alignEnd) x + w - paint.measureText(text)
+                 else x + (w - paint.measureText(text)) / 2f
         // WFF centres text vertically within the element box.
         val ty = y + (h - (fm.descent - fm.ascent)) / 2f - fm.ascent
         canvas.drawText(text, tx, ty, paint)
