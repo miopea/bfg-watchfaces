@@ -116,7 +116,7 @@ object AndroidFacePreview {
                 canvas, p.dateStyle.sample(),
                 band.x.toFloat(), band.y.toFloat(),
                 band.w.toFloat(), band.h.toFloat(),
-                l.dateSize.toFloat(),
+                SlotGeometry.fittedDateSize(p).toFloat(),
                 if (ambient) withAlpha(ambientSlotInk, 140) else ink,
                 bold = false
             )

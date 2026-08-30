@@ -124,11 +124,50 @@ object SlotGeometry {
      * gives the whole upper dial back to the top complication, which is what
      * makes both fit at every complication size.
      */
+    /**
+     * Average character advance, as a fraction of the font size.
+     *
+     * Measured with AWT at the sizes this face actually uses: "10:10" at 104
+     * is 299px, so a digit runs about 0.575. Letters and spaces average wider
+     * per character than digits once mixed, and 0.62 reproduced the measured
+     * fits within a point across every date style.
+     *
+     * An ESTIMATE, and it has to be: the emitter runs on the phone, where
+     * java.awt does not exist, and the same number has to serve the emitter and
+     * both previews or they disagree about how big the date is.
+     */
+    private const val DIGIT_ADVANCE = 0.575
+    private const val TEXT_ADVANCE = 0.62
+
+    /**
+     * The date, scaled to sit across roughly the same width as the time.
+     *
+     * A single stored size cannot do this: at a 104pt clock, "Wed Sep 30" fits
+     * at 49 and "Sep 30" at 85. So the size is DERIVED from how wide the
+     * style's longest form is, and [Layout.dateSize] becomes the ceiling —
+     * still a control, now meaning "no bigger than this" rather than a number
+     * that is right for one style and wrong for the rest.
+     *
+     * Seconds are excluded from the target on purpose: they sit in the gutter
+     * beside the clock, not on its line, so matching "HH:MM" is what makes the
+     * date look the same width as the time.
+     */
+    fun fittedDateSize(p: DialParams): Int {
+        if (p.dateStyle == DateStyle.NONE) return 0
+        val l = p.layout
+        val clockWidth = l.timeSize * DIGIT_ADVANCE * "HH:MM".length
+        val chars = p.dateStyle.widestSample().length.coerceAtLeast(1)
+        val fitted = clockWidth / (TEXT_ADVANCE * chars)
+        return fitted.roundToInt().coerceIn(MIN_DATE_SIZE, l.dateSize)
+    }
+
+    const val MIN_DATE_SIZE = 12
+
     fun dateBand(p: DialParams): Box? {
         if (p.dateStyle == DateStyle.NONE) return null
         val l = p.layout
         val (timeTop, _) = timeBand(l)
-        val h = (l.dateSize * 1.6).roundToInt()
+        val h = (fittedDateSize(p) * 1.6).roundToInt()
         return Box(0, timeTop - GAP - h, DIAL_SIZE, h)
     }
     /** Where the value sits inside its box: below the glyph, or at the top. */

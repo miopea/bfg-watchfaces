@@ -112,7 +112,7 @@ object ControlInventory {
         // There was no size control for the drawn date at all -- only where to
         // put it. So the one complaint anyone could have about it ("pretty
         // tiny") had no answer in the UI.
-        Control("dateSize", 14.0, 48.0, 1.0, Target.LAYOUT, integral = true),
+        Control("dateSize", 20.0, 96.0, 1.0, Target.LAYOUT, integral = true),
         Control("batteryY", 250.0, 430.0, 1.0, Target.LAYOUT, integral = true)
     )
 

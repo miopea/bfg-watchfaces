@@ -73,7 +73,7 @@ object WffEmitter {
     <PartText x="${band.x}" y="${band.y}" width="${band.w}" height="${band.h}" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="140"/>
       <Text align="CENTER">
-        <Font family="${l.fontFamily}" size="${l.dateSize}" weight="NORMAL" color="${argb(p.inkColor)}">
+        <Font family="${l.fontFamily}" size="${SlotGeometry.fittedDateSize(p)}" weight="NORMAL" color="${argb(p.inkColor)}">
           <Template><![CDATA[$placeholders]]>$parameters</Template>
         </Font>
       </Text>

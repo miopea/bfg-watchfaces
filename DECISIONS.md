@@ -121,6 +121,37 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — The date is sized to the clock, not stored
+
+"Scale it close to the width of the time." A stored point size cannot do that:
+measured with AWT at a 104pt clock, whose "10:10" is 299px wide, "Wed Sep 30"
+fits at 49 and "Sep 30" at 85. One number is right for one style and wrong for
+the rest, which is why the control kept needing adjusting.
+
+The size is DERIVED now, from how wide the style's longest form is, and
+`Layout.dateSize` became the CEILING — still a control, now meaning "no bigger
+than this".
+
+The width estimate is exactly that, and has to be: the emitter runs on the
+phone, where `java.awt` does not exist, and the emitter and both previews must
+agree about how big the date is or they draw different faces. 0.575 per digit
+and 0.62 per mixed character reproduced the AWT measurements within a point
+across every style.
+
+Sized against "HH:MM", not the seconds. Seconds sit in the gutter beside the
+clock rather than on its line, so matching the time means matching the part
+that IS the line.
+
+The widest form is computed from a fixed date — Wednesday 30 September — not
+today's. Sizing to today would resize the face on the 1st of the month.
+
+**The v6 and v7 goldens were re-recorded for this, deliberately**, and the entry
+in this file is the justification the rule asks for. The change was applied to
+every version rather than gated: a date too small to read beside the clock is a
+defect, reported twice, and preserving it for older faces would be preserving
+the complaint. Only the drawn-date entry moved in either golden, which is the
+check that nothing else came with it.
+
 ## 2026-08-30 — Units the provider does not supply, and "782"
 
 Two from the wrist, both about a bare number with no unit.

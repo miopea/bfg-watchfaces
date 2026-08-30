@@ -218,6 +218,19 @@ class RenderPipelineTest {
      * drawn date or the seconds moving onto the clock's line.
      */
     /**
+     * The drawn-date entry in the v6 and v7 goldens was re-recorded on
+     * 2026-08-30, deliberately and against the usual rule.
+     *
+     * The date is now SIZED to sit across roughly the width of the clock
+     * instead of using a stored point size, and that was applied to every
+     * version rather than gated. A date too small to read beside a 104pt clock
+     * is a defect, not a look someone chose -- it was reported twice -- so
+     * preserving it for older faces would be preserving the complaint.
+     *
+     * Every other entry in both goldens is untouched, which is the check that
+     * only the intended thing changed.
+     */
+    /**
      * The CURRENT version's golden.
      *
      * Every version now has its own pinned fixture, because twice in a row a
@@ -249,7 +262,7 @@ class RenderPipelineTest {
         }
         assertEquals(
             listOf("80afb3ad447a5859", "308db7e8ad0700db", "4119f771e59ac813",
-                   "653e267cb29671f0", "c2cb72bec215f481"),
+                   "653e267cb29671f0", "8c5588d3a42e632a"),
             actual
         ) { "the v7 preview changed; every face saved at v7 renders differently" }
     }
@@ -281,7 +294,7 @@ class RenderPipelineTest {
         }
         assertEquals(
             listOf("f23d4b152ec5f454", "7aa269aa5965891c", "4119f771e59ac813",
-                   "52231f488a043c73", "fe89ce39dfab3279"),
+                   "52231f488a043c73", "1a1873a10255adf2"),
             actual
         ) { "the v6 preview changed; every face saved at v6 renders differently" }
     }

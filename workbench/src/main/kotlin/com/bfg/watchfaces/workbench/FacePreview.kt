@@ -102,7 +102,7 @@ object FacePreview {
         SlotGeometry.dateBand(p)?.let { band ->
             val dateInk = if (ambient) withAlpha(ambientSlotInk, 140) else ink
             drawCentered(g, p.dateStyle.sample(), band.y, band.h,
-                l.dateSize.toDouble(), Font.PLAIN, dateInk)
+                SlotGeometry.fittedDateSize(p).toDouble(), Font.PLAIN, dateInk)
         }
 
         // Time: the emitter ships TWO TimeText elements, one interactive

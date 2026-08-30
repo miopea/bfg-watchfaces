@@ -191,6 +191,16 @@ enum class DateStyle(val label: String) {
      * drew "Sun Aug 30" from its own date sources -- a preview that disagrees
      * with the thing it is previewing. Seen side by side on an emulator.
      */
+    /**
+     * The WIDEST this style ever gets, for sizing.
+     *
+     * Wednesday, 30 September: the longest weekday and a long month with a
+     * two-digit day. Sizing to today's date would make the face resize itself
+     * on the 1st of the month, which nobody asked for and everybody would
+     * notice.
+     */
+    fun widestSample(): String = sample(java.time.LocalDate.of(2026, 9, 30))
+
     fun sample(today: java.time.LocalDate = java.time.LocalDate.now()): String {
         val loc = java.util.Locale.getDefault()
         fun weekdayShort() = today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, loc)
@@ -404,7 +414,7 @@ data class Layout(
      * Changing the default does not touch a saved face: dateSize is stored per
      * face, so anything already designed keeps the size it was designed at.
      */
-    val dateSize: Int = 40,
+    val dateSize: Int = 64,
     val timeY: Int = 196,
     val timeSize: Int = 104,
     val tracking: Double = 0.0,
