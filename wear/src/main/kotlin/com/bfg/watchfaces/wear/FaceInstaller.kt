@@ -34,7 +34,19 @@ object FaceInstaller {
      * Put [apk] on the watch under [token], and ask about activation if this is
      * the first face to land.
      */
-    suspend fun install(caller: Context, apk: File, token: String): Result {
+    /**
+     * @param resetComplications remove and re-add rather than updating in
+     *   place, so `DefaultProviderPolicy` applies and the design's complications
+     *   are what appear. Costs one `setWatchFaceAsActive` call, which is a
+     *   finite resource, so the SENDER decides -- it is the only side that knows
+     *   whether the complications actually changed.
+     */
+    suspend fun install(
+        caller: Context,
+        apk: File,
+        token: String,
+        resetComplications: Boolean = false
+    ): Result {
         // The application context, never the caller's own. WatchFacePushManager
         // binds to a system service to do anything at all -- listWatchFaces is
         // already an IPC -- and a BroadcastReceiver's context throws
@@ -77,7 +89,15 @@ object FaceInstaller {
                 // the watch is reset by the next send, and this spends an
                 // addWatchFace call every time.
                 val ours = existing.installedWatchFaceDetails.firstOrNull()
-                if (ours != null) {
+                if (ours != null && !resetComplications) {
+                    // Nothing about the complications changed, so keep the slot.
+                    // This preserves anything the wearer picked on the watch
+                    // AND costs no activation call, because the face is never
+                    // deactivated.
+                    val details = manager.updateWatchFace(ours.slotId, fd, token)
+                    Log.i(TAG, "updated slot ${ours.slotId} in place")
+                    Result.Installed(details.slotId, replaced = true)
+                } else if (ours != null) {
                     // Whether OUR face is the one on the wrist decides if the
                     // new one has to be activated. Ask BEFORE removing it,
                     // because afterwards there is nothing left to ask about.

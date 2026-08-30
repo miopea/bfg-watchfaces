@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.bfg.watchfaces.appcore.ActivationConsent
+import com.bfg.watchfaces.appcore.ComplicationChange
 import com.bfg.watchfaces.appcore.FaceLibrary
 import com.bfg.watchfaces.appcore.Presets
 import com.bfg.watchfaces.generator.DialParams
@@ -387,7 +388,13 @@ class MainActivity : ComponentActivity() {
             }
         if (target !is FaceSender.Target.Ready) return describe(target)
 
-        return runCatching { FaceSender.send(context, target, built.apk, token) }
+        // Rebuild the slots only when the complications actually changed. See
+        // ComplicationChange: the reset is what makes the app's choices apply,
+        // and it costs one of a finite number of activation calls.
+        val reset = ComplicationChange.needsReset(CurrentFace.load(context)?.params, params)
+        Log.i(TAG, "sending \u201C$name\u201D (reset complications: $reset)")
+
+        return runCatching { FaceSender.send(context, target, built.apk, token, reset) }
             .fold(
                 onSuccess = { "Sent “$name” to ${target.name}." },
                 onFailure = {

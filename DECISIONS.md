@@ -121,6 +121,55 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — The activation allowance is ONE per app install, and WFF has weather
+
+Gating the reset was built as decided: a separate channel path
+(`/bfg-watchfaces/face-reset/`), the watch honouring it, and `ComplicationChange`
+on the phone deciding when the complications actually changed. All of it works
+and was watched working on an emulator: `updated slot ... in place` when nothing
+changed, `replacing slot ... (active=true)` when it did.
+
+**And then measuring killed the design.** After a clean reinstall of the watch
+app the first activation succeeded, and the very next one was refused:
+
+```text
+switched to the new face (slot 55c1e952)      <- install
+installed, but could not switch to it         <- next reset
+SetWatchFaceAsActiveException: The maximum number of attempts
+```
+
+One successful `setWatchFaceAsActive` per app install. Not a large budget, not a
+daily budget — one. So "remove and re-add whenever the complications change"
+buys the wearer exactly ONE complication change per reinstall, and every change
+after that leaves them on a default face with their design uninstalled. That is
+worse than the bug. The gate is worth having and is kept, but it cannot be the
+answer on its own.
+
+**The answer is that the face definition should be authoritative.** Proven
+earlier the same way: the identical face with `isCustomizable="FALSE"` and a
+plain `updateWatchFace` rendered exactly what the XML declared, with no reset,
+no deactivation and no activation spent.
+
+The reason that looked unacceptable was that the watch's editor is the only
+place a wearer can reach a third-party provider. That reason is now gone:
+`primaryProvider` names any provider by ComponentName from inside the face, and
+`ProviderCatalog` enumerates what is installed on the watch. The app can offer
+weather and Google Health directly, in the app, where the design is being made.
+
+**WFF has first-class weather sources.** `[WEATHER.TEMPERATURE]`,
+`TEMPERATURE_UNIT`, `TEMPERATURE_HIGH`, `TEMPERATURE_LOW`, `CONDITION`,
+`CONDITION_NAME`, `CHANCE_OF_PRECIPITATION`, `UV_INDEX`, `IS_DAY`,
+`IS_AVAILABLE`, `IS_ERROR`. Confirmed schema-valid in an emitted face. Weather
+needs no complication slot and no provider at all — it is drawn like `[DAY]` is.
+The earlier note that "there is no weather in WFF" was about the SYSTEM
+COMPLICATION PROVIDER list, and stands, but it was not the whole picture and
+read as though it were.
+
+Also in the schema and unused here: `STEP_GOAL` and `STEP_PERCENT` (so a goal
+ring needs no complication), `HEART_RATE_Z`, and the whole accelerometer family
+`ACCELEROMETER_ANGLE_X/Y/Z/XY` with `ACCELEROMETER_IS_SUPPORTED`, which is what
+tilt-reactive faces are built from.
+
 ## 2026-08-30 — Remove and re-add, and the activation budget it spends
 
 Operator decision on the `isCustomizable` trade-off: the APP's design wins.

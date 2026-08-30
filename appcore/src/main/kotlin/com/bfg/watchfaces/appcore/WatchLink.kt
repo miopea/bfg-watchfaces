@@ -38,6 +38,27 @@ object WatchLink {
     const val FACE_CHANNEL_PREFIX = "/bfg-watchfaces/face/"
 
     /**
+     * The same thing, but asking the watch to RESET the complication slots.
+     *
+     * `updateWatchFace` keeps the slot, and the watch keeps the data sources
+     * assigned to that slot -- `DefaultProviderPolicy` only fills a slot nothing
+     * has been assigned to. So a face re-sent with different complications
+     * installed and showed the OLD ones. Removing and re-adding gives a fresh
+     * slot, and the design wins.
+     *
+     * It is a separate PATH rather than a flag inside the old one for a reason
+     * that matters more than tidiness: a watch running the previous build parses
+     * [FACE_CHANNEL_PREFIX] and nothing else. Sending the ordinary path when
+     * nothing changed keeps that watch working, and only a send that genuinely
+     * needs a reset depends on the newer app.
+     *
+     * The cost of a reset is real -- it deactivates the face, so it spends one
+     * of a finite number of `setWatchFaceAsActive` calls -- which is the whole
+     * reason this is a choice per send rather than what every send does.
+     */
+    const val FACE_RESET_CHANNEL_PREFIX = "/bfg-watchfaces/face-reset/"
+
+    /**
      * The token from a channel path, or null when the path is not one of ours.
      *
      * Undoes [channelPathFor]'s encoding. A segment that is not valid URL-safe
@@ -46,8 +67,12 @@ object WatchLink {
      * like a transfer bug and is not.
      */
     fun tokenFromChannelPath(path: String): String? {
-        if (!path.startsWith(FACE_CHANNEL_PREFIX)) return null
-        val segment = path.removePrefix(FACE_CHANNEL_PREFIX).takeIf { it.isNotBlank() } ?: return null
+        val prefix = when {
+            path.startsWith(FACE_RESET_CHANNEL_PREFIX) -> FACE_RESET_CHANNEL_PREFIX
+            path.startsWith(FACE_CHANNEL_PREFIX) -> FACE_CHANNEL_PREFIX
+            else -> return null
+        }
+        val segment = path.removePrefix(prefix).takeIf { it.isNotBlank() } ?: return null
         return runCatching {
             String(java.util.Base64.getUrlDecoder().decode(segment), Charsets.UTF_8)
         }.getOrNull()?.takeIf { it.isNotBlank() }
@@ -73,12 +98,21 @@ object WatchLink {
      * a device corrected. Nothing has ever crossed this link, so there is no
      * wire compatibility to keep.
      */
-    fun channelPathFor(validationToken: String): String {
+    fun channelPathFor(validationToken: String, resetComplications: Boolean = false): String {
         require(validationToken.isNotBlank()) {
             "a face cannot be sent without a validation token"
         }
         val segment = java.util.Base64.getUrlEncoder().withoutPadding()
             .encodeToString(validationToken.toByteArray(Charsets.UTF_8))
-        return FACE_CHANNEL_PREFIX + segment
+        return (if (resetComplications) FACE_RESET_CHANNEL_PREFIX else FACE_CHANNEL_PREFIX) + segment
     }
+
+    /**
+     * Whether this path asks for the complication slots to be reset.
+     *
+     * False for anything unrecognised, so an unexpected path can never cost a
+     * `setWatchFaceAsActive` call by accident.
+     */
+    fun resetsComplications(path: String): Boolean =
+        path.startsWith(FACE_RESET_CHANNEL_PREFIX)
 }

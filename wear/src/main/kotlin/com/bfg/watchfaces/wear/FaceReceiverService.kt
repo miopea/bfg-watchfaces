@@ -91,7 +91,12 @@ class FaceReceiverService : WearableListenerService() {
                     staged.outputStream().use { out -> stream.copyTo(out) }
                 }
                 Log.i(TAG, "received $received bytes")
-                report(FaceInstaller.install(this@FaceReceiverService, staged, token))
+                report(
+                    FaceInstaller.install(
+                        this@FaceReceiverService, staged, token,
+                        resetComplications = WatchLink.resetsComplications(channel.path)
+                    )
+                )
             }.onFailure {
                 Log.e(TAG, "face did not arrive or would not install", it)
             }

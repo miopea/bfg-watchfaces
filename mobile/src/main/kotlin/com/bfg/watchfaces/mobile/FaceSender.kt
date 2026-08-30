@@ -82,10 +82,24 @@ object FaceSender {
      * holds a Bluetooth resource, and the next send would then queue behind a
      * transfer nobody is waiting for.
      */
-    fun send(context: Context, target: Target.Ready, apk: File, validationToken: String) {
+    fun send(
+        context: Context,
+        target: Target.Ready,
+        apk: File,
+        validationToken: String,
+        /**
+         * Ask the watch to rebuild the complication slots.
+         *
+         * Only the phone can decide this: the watch has no memory of what the
+         * previous face declared. A reset deactivates the face and so spends
+         * one of a finite number of `setWatchFaceAsActive` calls, which is why
+         * it is not simply what every send does.
+         */
+        resetComplications: Boolean = false
+    ) {
         val channelClient = Wearable.getChannelClient(context)
         // Throws on a blank token, at the sending end. See WatchLink.
-        val path = WatchLink.channelPathFor(validationToken)
+        val path = WatchLink.channelPathFor(validationToken, resetComplications)
         // Logged because "it said sent and nothing happened" is otherwise
         // undebuggable from this side: openChannel and sendFile both resolve
         // successfully whether or not anything on the watch ever wakes up.

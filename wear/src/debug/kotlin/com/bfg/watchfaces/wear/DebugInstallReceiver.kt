@@ -70,7 +70,10 @@ class DebugInstallReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                when (val result = FaceInstaller.install(context, apk, token)) {
+                when (val result = FaceInstaller.install(
+                    context, apk, token,
+                    resetComplications = intent.getBooleanExtra("reset", false)
+                )) {
                     is FaceInstaller.Result.Installed ->
                         Log.i(TAG, "OK slot=${result.slotId} replaced=${result.replaced}")
                     is FaceInstaller.Result.Unsupported ->

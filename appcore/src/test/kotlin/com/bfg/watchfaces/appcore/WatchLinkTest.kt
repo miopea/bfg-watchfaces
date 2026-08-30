@@ -116,4 +116,37 @@ class WatchLinkTest {
             "the device looks for '${WatchLink.CAPABILITY}' but the watch advertises $declared"
         }
     }
+
+    @Test
+    fun `the reset path carries the token and says so`() {
+        val token = "EsHCFGgf0GIQjD5UfB61BgMka8Shjdyk/MmU=:MS4wLjA="
+        val plain = WatchLink.channelPathFor(token)
+        val reset = WatchLink.channelPathFor(token, resetComplications = true)
+
+        assertEquals(token, WatchLink.tokenFromChannelPath(plain))
+        assertEquals(token, WatchLink.tokenFromChannelPath(reset))
+        assertFalse(WatchLink.resetsComplications(plain))
+        assertTrue(WatchLink.resetsComplications(reset))
+    }
+
+    @Test
+    fun `the ordinary path is unchanged, so an older watch still accepts it`() {
+        // The whole point of a separate prefix: a watch running the previous
+        // build parses FACE_CHANNEL_PREFIX and nothing else, and a send that
+        // does not need a reset must keep working on it.
+        val token = "abc123=:MS4wLjA="
+        assertTrue(WatchLink.channelPathFor(token).startsWith("/bfg-watchfaces/face/"))
+        assertFalse(WatchLink.channelPathFor(token).startsWith("/bfg-watchfaces/face-reset/"))
+    }
+
+    @Test
+    fun `an unknown path never asks for a reset`() {
+        // A reset costs one of a finite number of setWatchFaceAsActive calls.
+        // Nothing unrecognised may spend one.
+        assertFalse(WatchLink.resetsComplications("/bfg-watchfaces/face/xyz"))
+        assertFalse(WatchLink.resetsComplications("/something/else"))
+        assertFalse(WatchLink.resetsComplications(""))
+        assertNull(WatchLink.tokenFromChannelPath("/bfg-watchfaces/face-reset/"))
+    }
+
 }
