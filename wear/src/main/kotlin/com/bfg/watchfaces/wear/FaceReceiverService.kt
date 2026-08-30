@@ -104,10 +104,17 @@ class FaceReceiverService : WearableListenerService() {
                 // the channel is already open and the watch was reachable by
                 // definition -- no second connection, no background job, and
                 // the picker still works with the watch out of range.
-                val catalog = ProviderCatalog.toJson(
+                val providers = ProviderCatalog.toJson(
                     ProviderCatalog.installed(this@FaceReceiverService)
                 )
-                reply(client, channel, lineFor(result) + WatchLink.Report.SEPARATOR + catalog)
+                val launchable = ProviderCatalog.toJson(
+                    ProviderCatalog.launchable(this@FaceReceiverService)
+                )
+                reply(
+                    client, channel,
+                    lineFor(result) + WatchLink.Report.SEPARATOR + providers +
+                        WatchLink.Report.SEPARATOR + launchable
+                )
             }.onFailure {
                 Log.e(TAG, "face did not arrive or would not install", it)
                 reply(client, channel, WatchLink.Report.failed(it.message ?: it.javaClass.simpleName))

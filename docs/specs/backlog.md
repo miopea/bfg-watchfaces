@@ -40,9 +40,10 @@ Settings, Phone, Calendar and Messages, using Watch Face Format's own
 
 The glyphs go over as `PartDraw` vectors rather than baked PNGs.
 
-**Not done:** launching an arbitrary app by ComponentName. `launchTargetType` is
-a union with `xs:string`, so the format allows it and the watch's provider
-catalog already knows what is installed — the picker just does not offer it yet.
+Launching an arbitrary app by ComponentName is done too. The watch enumerates
+what can be opened, the list rides back on the same reply, and a slot set to
+"Open an app" names one. Verified on a watch: tapping the slot opened
+`com.google.android.contacts/…ContactsActivity`.
 
 ## 3. More weather
 

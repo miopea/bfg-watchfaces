@@ -415,6 +415,7 @@ class MainActivity : ComponentActivity() {
                     // verdict. Keeping it is what lets the picker offer what is
                     // actually installed rather than only what this build knows.
                     WatchLink.Report.catalogIn(report)?.let { ProviderCache.save(context, it) }
+                    WatchLink.Report.launchersIn(report)?.let { ProviderCache.saveLaunchers(context, it) }
                     WatchLink.Report.describe(name, target.name, report)
                 },
                 onFailure = {

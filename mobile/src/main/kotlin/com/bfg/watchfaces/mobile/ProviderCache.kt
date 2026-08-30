@@ -24,6 +24,9 @@ object ProviderCache {
 
     private const val FILE = "watch-providers.json"
 
+    /** Apps that can be OPENED, as opposed to ones that fill a slot. */
+    private const val LAUNCHERS = "watch-launchers.json"
+
     /** One provider, in the terms the picker needs. */
     data class Provider(val component: String, val label: String, val app: String)
 
@@ -31,9 +34,18 @@ object ProviderCache {
         runCatching { File(context.filesDir, FILE).writeText(json) }
     }
 
+    fun saveLaunchers(context: Context, json: String) {
+        runCatching { File(context.filesDir, LAUNCHERS).writeText(json) }
+    }
+
+    /** Apps a shortcut slot can open, as last reported. */
+    fun launchers(context: Context): List<Provider> = read(context, LAUNCHERS)
+
     /** What the watch last reported, or empty when it has never said. */
-    fun load(context: Context): List<Provider> = runCatching {
-        val f = File(context.filesDir, FILE)
+    fun load(context: Context): List<Provider> = read(context, FILE)
+
+    private fun read(context: Context, name: String): List<Provider> = runCatching {
+        val f = File(context.filesDir, name)
         if (!f.isFile) return emptyList()
         Json.arr(Json.parse(f.readText())).mapNotNull { entry ->
             val o = Json.obj(entry)

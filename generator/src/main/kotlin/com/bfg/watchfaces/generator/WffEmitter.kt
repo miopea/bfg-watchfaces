@@ -172,11 +172,17 @@ object WffEmitter {
             // <Launch> that opens the watch's own music, alarms or settings.
             // Drawn as WFF primitives rather than a baked PNG -- see GlyphWff.
             if (source.isShortcut) {
+                // A fixed system target, or the app this SLOT was pointed at.
+                val target = source.launch ?: p.launchers[pos]
+                // A slot set to "open an app" with no app chosen yet would emit
+                // Launch with no target, which the schema requires. Draw
+                // nothing rather than refuse to build the face.
+                if (target.isNullOrBlank()) return@map ""
                 val g = (minOf(box.w, box.h) * 0.78).toInt()
                 return@map """
     <PartDraw x="${box.x + (box.w - g) / 2}" y="${box.y + (box.h - g) / 2}" width="$g" height="$g" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
-      <Launch target="${source.launch}"/>
+      <Launch target="$target"/>
           ${GlyphWff.elements(ComplicationGlyphs.shapes(source), g, ink)}
     </PartDraw>"""
             }

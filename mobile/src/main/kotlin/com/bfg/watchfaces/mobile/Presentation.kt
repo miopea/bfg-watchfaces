@@ -101,6 +101,7 @@ object Presentation {
         ComplicationSource.SHORTCUT_PHONE -> "Phone"
         ComplicationSource.SHORTCUT_CALENDAR -> "Calendar"
         ComplicationSource.SHORTCUT_MESSAGES -> "Messages"
+        ComplicationSource.SHORTCUT_APP -> "Open an app"
     }
 
     /**
@@ -133,7 +134,8 @@ object Presentation {
         ComplicationSource.SHORTCUT_SETTINGS,
         ComplicationSource.SHORTCUT_PHONE,
         ComplicationSource.SHORTCUT_CALENDAR,
-        ComplicationSource.SHORTCUT_MESSAGES -> ""
+        ComplicationSource.SHORTCUT_MESSAGES,
+        ComplicationSource.SHORTCUT_APP -> ""
     }
 
     /**

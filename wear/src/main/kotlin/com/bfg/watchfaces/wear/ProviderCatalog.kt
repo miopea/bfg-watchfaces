@@ -95,6 +95,35 @@ object ProviderCatalog {
         return declared.split(",").any { it.trim().equals("SHORT_TEXT", ignoreCase = true) }
     }
 
+    /**
+     * Every app on the watch that can be opened, for a shortcut slot.
+     *
+     * A different question from [installed]: that one asks who can FILL a slot
+     * with a reading, this asks what pressing one could OPEN. An app can be
+     * either, both or neither, so they are two queries rather than one list
+     * with a flag.
+     *
+     * Watch Face Format takes a ComponentName as a `Launch` target, so anything
+     * here is a legal target — which is what makes this worth sending.
+     */
+    fun launchable(context: Context): List<Provider> {
+        val pm = context.packageManager
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val activities = runCatching { pm.queryIntentActivities(intent, 0) }
+            .getOrElse { return emptyList() }
+
+        return activities.mapNotNull { info ->
+            val a = info.activityInfo ?: return@mapNotNull null
+            val label = runCatching { a.loadLabel(pm).toString() }.getOrNull().orEmpty()
+            if (label.isBlank()) return@mapNotNull null
+            Provider(
+                component = "${a.packageName}/${a.name}",
+                label = label,
+                app = label
+            )
+        }.distinctBy { it.component }.sortedBy { it.label.lowercase() }
+    }
+
     /** The catalog as JSON, for the message the phone asks for. */
     fun toJson(providers: List<Provider>): String =
         providers.joinToString(",", prefix = "[", postfix = "]") {

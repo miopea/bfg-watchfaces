@@ -121,6 +121,37 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — A slot that opens any app on the watch
+
+`launchTargetType` is a union with `xs:string`, so a ComponentName is a legal
+`Launch` target. A slot set to "Open an app" names one. Verified on a watch:
+tapping it opened `com.google.android.contacts/…ContactsActivity`.
+
+The app is per SLOT, not per source — one enum member for "some app" rather than
+one per app — so it lives in `launchers`, the same shape as `providers`. They
+are separate maps because they are different jobs: a provider FILLS a slot with
+a reading, a launcher is what pressing it OPENS. A slot could sensibly have both
+one day, and conflating them would make that impossible.
+
+The token carries both, with different markers: `STEP_COUNT+app:pkg/cls` fills,
+`SHORTCUT_APP+open:pkg/cls` opens. One string per slot still, and it has to be
+able to say which it meant.
+
+**What the watch reports is now two lists.** Which apps can FILL a slot and
+which can be OPENED are different questions — an app can be either, both or
+neither — so `launchable()` is a second query, for activities answering
+MAIN/LAUNCHER, and it rides back as a second line of the same reply. A watch
+that sends only the first line is not broken; the second is simply absent.
+
+**An invalid ComponentName fails silently.** A first attempt used an invented
+class name and tapping did nothing at all — no error anywhere. That is why the
+picker only ever offers components the WATCH enumerated, rather than letting one
+be typed.
+
+`enabled` had to stop testing `launch != null`. SHORTCUT_APP has no fixed
+target, so the field is null and the slot was dropped from the layout entirely —
+it simply did not appear, and nothing failed.
+
 ## 2026-08-30 — Tap actions, and the format could draw all along
 
 Backlog item 2. A slot can now hold a SHORTCUT: a glyph you press, with nothing

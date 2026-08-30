@@ -133,15 +133,29 @@ enum class ComplicationSource(
     SHORTCUT_SETTINGS(null, "%s", launch = "SETTINGS"),
     SHORTCUT_PHONE(null, "%s", launch = "PHONE"),
     SHORTCUT_CALENDAR(null, "%s", launch = "CALENDAR"),
-    SHORTCUT_MESSAGES(null, "%s", launch = "MESSAGE");
+    SHORTCUT_MESSAGES(null, "%s", launch = "MESSAGE"),
 
-    val enabled: Boolean get() = wff != null || drawn.isNotEmpty() || launch != null
+    /**
+     * A shortcut to a specific app on the watch.
+     *
+     * The target is per SLOT rather than per source -- `launchTargetType` is a
+     * union with `xs:string`, so a ComponentName is a legal target and there is
+     * one enum member for "some app" rather than one per app. Which app lives
+     * in [DialParams.launchers], the same shape as [DialParams.providers].
+     */
+    SHORTCUT_APP(null, "%s");
+
+    // isShortcut rather than `launch != null`: SHORTCUT_APP has no fixed
+    // target -- the app is per slot -- so testing the field dropped it from
+    // the layout entirely and the slot silently vanished.
+    val enabled: Boolean get() = wff != null || drawn.isNotEmpty() || isShortcut
 
     /** True when this is rendered by the face rather than filled by the watch. */
     val isDrawn: Boolean get() = drawn.isNotEmpty()
 
     /** A glyph you press, with no value to read. */
-    val isShortcut: Boolean get() = launch != null && drawn.isEmpty() && wff == null
+    val isShortcut: Boolean
+        get() = (launch != null || this == SHORTCUT_APP) && drawn.isEmpty() && wff == null
 }
 
 /**
@@ -342,6 +356,16 @@ data class DialParams(
     val providers: Map<SlotPosition, String> = emptyMap(),
 
     /**
+     * The app a [ComplicationSource.SHORTCUT_APP] slot opens, by ComponentName.
+     *
+     * Separate from [providers] because they are different jobs: a provider
+     * FILLS a slot with a reading, a launcher is what pressing it OPENS. A slot
+     * could sensibly have both one day; conflating them would make that
+     * impossible and would let a face name an app as a data source by accident.
+     */
+    val launchers: Map<SlotPosition, String> = emptyMap(),
+
+    /**
      * A date drawn by the face itself. See [DateStyle].
      *
      * Defaults to NONE so every face saved before this existed emits exactly the
@@ -378,6 +402,11 @@ data class DialParams(
         // from whatever a watch reported. Validate it at the boundary rather
         // than escaping it later: anything that is not a ComponentName is a bug
         // in discovery, not a face someone should be able to save.
+        for ((pos, component) in launchers) {
+            require(COMPONENT.matches(component)) {
+                "the launcher for $pos is not a ComponentName: \"$component\""
+            }
+        }
         for ((pos, component) in providers) {
             // A provider for a slot that is off cannot be stored: the slot's
             // content is ONE value in the file, so there is nowhere to put a

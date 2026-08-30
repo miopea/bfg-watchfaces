@@ -82,6 +82,7 @@ object FaceCodec {
             lensAmount = q.dbl("lensAmount", d.lensAmount),
             texture = q["texture"] ?: d.texture,
             complications = Complications.parse(q["complications"]) ?: d.complications,
+            launchers = Complications.launchersIn(q["complications"]),
             layout = Layout(
                 dateY = q.int("dateY", l.dateY),
                 dateSize = q.int("dateSize", l.dateSize),
@@ -159,7 +160,7 @@ object FaceCodec {
   "dateStyle": "${p.dateStyle}", "dateScale": "${p.dateScale}",
   "lens": ${p.lens}, "lensAmount": ${p.lensAmount},
   "texture": "${p.texture}",
-  "complications": [${Complications.format(p.complications, p.providers).split(",").joinToString(", ") { "\"$it\"" }}],
+  "complications": [${Complications.format(p.complications, p.providers, p.launchers).split(",").joinToString(", ") { "\"$it\"" }}],
   "layout": {
     "dateY": ${l.dateY}, "dateSize": ${l.dateSize},
     "timeY": ${l.timeY}, "timeSize": ${l.timeSize}, "tracking": ${l.tracking},
@@ -191,7 +192,7 @@ object FaceCodec {
             "dateStyle" to p.dateStyle.name,
             "dateScale" to p.dateScale.name,
             "lens" to p.lens, "lensAmount" to p.lensAmount, "texture" to p.texture,
-            "complications" to Complications.format(p.complications, p.providers),
+            "complications" to Complications.format(p.complications, p.providers, p.launchers),
             "dateY" to l.dateY, "dateSize" to l.dateSize, "timeY" to l.timeY,
             "timeSize" to l.timeSize, "tracking" to l.tracking,
             "complicationY" to l.complicationY, "complicationSpread" to l.complicationSpread,

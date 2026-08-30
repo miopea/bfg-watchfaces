@@ -43,12 +43,13 @@ class FaceCodecTest {
             SlotPosition.RIGHT to "com.example.weather/.WeatherProvider",
             SlotPosition.LEFT to "com.example.health/.Steps"
         ),
+        launchers = mapOf(SlotPosition.MIDDLE to "com.example.player/.Main"),
         dateStyle = DateStyle.WEEKDAY_MONTH_DAY,
         dateScale = DateScale.LARGE,
         lens = true, lensAmount = 33.0,
         complications = listOf(
             ComplicationSource.STEP_COUNT, ComplicationSource.HEART_RATE,
-            ComplicationSource.WATCH_BATTERY, ComplicationSource.SUNRISE_SUNSET,
+            ComplicationSource.SHORTCUT_APP, ComplicationSource.SUNRISE_SUNSET,
             ComplicationSource.WEATHER_TEMPERATURE
         ),
         layout = Layout(
@@ -71,9 +72,16 @@ class FaceCodecTest {
     @Test
     fun `every field of DialParams is carried by the query form`() {
         val query = FaceCodec.toQuery(loaded())
+        // Fields that are NOT their own key, and why.
+        //
+        // `layout` is flattened into its own keys. `launchers` rides inside the
+        // per-slot token ("SHORTCUT_APP+open:pkg/cls"), which is the whole
+        // point of one namespaced string per slot. Both are covered by the
+        // round-trip tests below, which is the stronger check -- this one only
+        // catches a field nobody wired anywhere at all.
+        val folded = setOf("layout", "launchers")
         val missing = fieldNames().filter { name ->
-            // `layout` is flattened into its own keys rather than carried whole.
-            name != "layout" && !query.contains("$name=")
+            name !in folded && !query.contains("$name=")
         }
         assertTrue(missing.isEmpty()) {
             "FaceCodec.toQuery drops ${missing.joinToString(", ")} -- every face " +
@@ -139,6 +147,22 @@ class FaceCodecTest {
     fun `a face with no chosen providers round trips as empty`() {
         val back = FaceCodec.fromQuery(parse(FaceCodec.toQuery(DialParams())))
         assertTrue(back.providers.isEmpty())
+    }
+
+
+    @Test
+    fun `a shortcut's app and a provider's app do not collide in one token`() {
+        // Filling a slot with a reading and opening something when it is
+        // pressed are different jobs, and one string per slot has to say which
+        // it meant. "+app:" and "+open:" are how.
+        val token = Complications.token(
+            ComplicationSource.STEP_COUNT,
+            component = "com.example.fit/.Provider",
+            launcher = "com.example.player/.Main"
+        )
+        assertEquals("STEP_COUNT", Complications.sourceIn(token))
+        assertEquals("com.example.fit/.Provider", Complications.componentIn(token))
+        assertEquals("com.example.player/.Main", Complications.launcherIn(token))
     }
 
     /** Top-level property names, read off the data class rather than listed. */

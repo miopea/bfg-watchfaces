@@ -230,10 +230,17 @@ fun StudioScreen(
                 selected = params.slot(pos),
                 iconOn = pos in params.iconSlots,
                 component = params.providers[pos],
+                launcher = params.launchers[pos],
                 onSelect = {
                     // Choosing a system or drawn source clears any provider
                     // app: a slot holds ONE thing.
                     onParams(params.withSlot(pos, it).copy(providers = params.providers - pos))
+                },
+                onOpenApp = { component ->
+                    onParams(
+                        params.withSlot(pos, ComplicationSource.SHORTCUT_APP)
+                            .copy(launchers = params.launchers + (pos to component))
+                    )
                 },
                 onApp = { component ->
                     // The system source stays as the fallback for a watch that
@@ -383,8 +390,11 @@ private fun SlotPicker(
     iconOn: Boolean,
     /** The provider app chosen for this slot, if any. */
     component: String?,
+    /** The app this slot opens, when it is a shortcut to one. */
+    launcher: String?,
     onSelect: (ComplicationSource) -> Unit,
     onApp: (String) -> Unit,
+    onOpenApp: (String) -> Unit,
     onIcon: (Boolean) -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
@@ -430,7 +440,9 @@ private fun SlotPicker(
                         )
                         HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     }
-                    val fromWatch = ProviderCache.load(LocalContext.current)
+                    val ctx = LocalContext.current
+                    val fromWatch = ProviderCache.load(ctx)
+                    val openable = ProviderCache.launchers(ctx)
                     for ((heading, group) in listOf(
                         null to Presentation.PICKER_COMMON,
                         // Shortcuts open something when pressed rather than
@@ -464,6 +476,33 @@ private fun SlotPicker(
                             Text(Presentation.label(source),
                                  style = MaterialTheme.typography.bodyLarge)
                         }
+                        }
+                    }
+
+                    // Apps this slot could OPEN, when it is set to do that.
+                    if (selected == ComplicationSource.SHORTCUT_APP && openable.isNotEmpty()) {
+                        HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                        Text(
+                            "Open which app",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        for (a in openable) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenApp(a.component); open = false }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = launcher == a.component,
+                                    onClick = { onOpenApp(a.component); open = false }
+                                )
+                                Spacer(Modifier.size(4.dp))
+                                Text(a.label, style = MaterialTheme.typography.bodyLarge)
+                            }
                         }
                     }
 

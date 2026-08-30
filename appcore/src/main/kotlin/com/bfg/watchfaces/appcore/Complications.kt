@@ -38,6 +38,7 @@ object Complications {
         ComplicationSource.SHORTCUT_PHONE -> "Phone"
         ComplicationSource.SHORTCUT_CALENDAR -> "Calendar"
         ComplicationSource.SHORTCUT_MESSAGES -> "Messages"
+        ComplicationSource.SHORTCUT_APP -> "Open an app"
     }
 
     /**
@@ -72,7 +73,8 @@ object Complications {
         ComplicationSource.SHORTCUT_SETTINGS,
         ComplicationSource.SHORTCUT_PHONE,
         ComplicationSource.SHORTCUT_CALENDAR,
-        ComplicationSource.SHORTCUT_MESSAGES -> ""
+        ComplicationSource.SHORTCUT_MESSAGES,
+        ComplicationSource.SHORTCUT_APP -> ""
     }
 
     /**
@@ -107,15 +109,23 @@ object Complications {
      * that have to agree -- which is how `dateStyle` and `generatorVersion` each
      * went missing from a saved face.
      */
-    fun token(source: ComplicationSource, component: String?): String =
-        if (component.isNullOrBlank()) source.name else "${source.name}+app:$component"
+    fun token(source: ComplicationSource, component: String?, launcher: String? = null): String =
+        buildString {
+            append(source.name)
+            if (!component.isNullOrBlank()) append(APP).append(component)
+            if (!launcher.isNullOrBlank()) append(OPEN).append(launcher)
+        }
 
     /** The provider component in a token, or null when it names a system source. */
     fun componentIn(token: String): String? =
-        token.trim().substringAfter(APP, "").takeIf { it.isNotBlank() }
+        token.trim().substringAfter(APP, "").substringBefore(OPEN).takeIf { it.isNotBlank() }
+
+    /** The app a shortcut slot opens, or null when it names none. */
+    fun launcherIn(token: String): String? =
+        token.trim().substringAfter(OPEN, "").takeIf { it.isNotBlank() }
 
     /** The system source in a token, which is the fallback when an app is named. */
-    fun sourceIn(token: String): String = token.trim().substringBefore(APP)
+    fun sourceIn(token: String): String = token.trim().substringBefore(APP).substringBefore(OPEN)
 
     /**
      * Separates the chosen provider app from the source behind it.
@@ -127,6 +137,15 @@ object Complications {
      * round trips lossy, turning every app slot into the same arbitrary source.
      */
     private const val APP = "+app:"
+
+    /**
+     * Separates the app a shortcut OPENS from the source.
+     *
+     * A different marker from [APP] on purpose: filling a slot with a reading
+     * and opening something when it is pressed are different jobs, and one
+     * token has to be able to say which it meant.
+     */
+    private const val OPEN = "+open:"
 
     fun parse(csv: String?): List<ComplicationSource>? {
         if (csv == null) return null
@@ -150,10 +169,21 @@ object Complications {
     /** The stored list, with any chosen provider apps folded into the tokens. */
     fun format(
         list: List<ComplicationSource>,
-        providers: Map<SlotPosition, String>
+        providers: Map<SlotPosition, String>,
+        launchers: Map<SlotPosition, String> = emptyMap()
     ): String = list.mapIndexed { i, source ->
-        token(source, providers[SlotPosition.entries.getOrNull(i)])
+        val pos = SlotPosition.entries.getOrNull(i)
+        token(source, providers[pos], launchers[pos])
     }.joinToString(",")
+
+    /** The apps shortcut slots open, by position. */
+    fun launchersIn(csv: String?): Map<SlotPosition, String> {
+        if (csv == null) return emptyMap()
+        return csv.split(",").mapIndexedNotNull { i, token ->
+            val pos = SlotPosition.entries.getOrNull(i) ?: return@mapIndexedNotNull null
+            launcherIn(token)?.let { pos to it }
+        }.toMap()
+    }
 
     /** The provider components in a stored list, by position. */
     fun providersIn(csv: String?): Map<SlotPosition, String> {

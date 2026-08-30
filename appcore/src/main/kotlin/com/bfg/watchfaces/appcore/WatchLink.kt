@@ -154,9 +154,27 @@ object WatchLink {
         fun verdictIn(raw: String?): String? =
             raw?.substringBefore(SEPARATOR)?.trim()?.takeIf { it.isNotEmpty() }
 
-        /** The catalog JSON after the verdict, or null when the watch sent none. */
-        fun catalogIn(raw: String?): String? =
-            raw?.substringAfter(SEPARATOR, "")?.trim()?.takeIf { it.startsWith("[") }
+        /**
+         * The catalogs after the verdict: providers first, then launchable apps.
+         *
+         * Two lines rather than one merged list, because they answer different
+         * questions -- who can FILL a slot, and what pressing one can OPEN. An
+         * app can be either, both or neither.
+         *
+         * A watch that only sends the first line is not broken; the second is
+         * simply absent, and the phone keeps whatever it had.
+         */
+        fun catalogIn(raw: String?): String? = lineAfterVerdict(raw, 0)
+
+        /** The launchable-app catalog, or null when the watch sent none. */
+        fun launchersIn(raw: String?): String? = lineAfterVerdict(raw, 1)
+
+        private fun lineAfterVerdict(raw: String?, index: Int): String? =
+            raw?.substringAfter(SEPARATOR, "")
+                ?.split(SEPARATOR)
+                ?.getOrNull(index)
+                ?.trim()
+                ?.takeIf { it.startsWith("[") }
 
         fun installed(active: Boolean): String = if (active) OK else OK_NOT_ACTIVE
 

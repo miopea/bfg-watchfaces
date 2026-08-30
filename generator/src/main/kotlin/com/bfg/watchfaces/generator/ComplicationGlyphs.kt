@@ -107,7 +107,8 @@ object ComplicationGlyphs {
         ComplicationSource.TIME_AND_DATE -> clock()
         ComplicationSource.SUNRISE_SUNSET -> sunrise()
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> bell()
-        ComplicationSource.APP_SHORTCUT -> apps()
+        ComplicationSource.APP_SHORTCUT,
+        ComplicationSource.SHORTCUT_APP -> apps()
         ComplicationSource.SHORTCUT_MUSIC -> note()
         ComplicationSource.SHORTCUT_ALARM -> alarm()
         ComplicationSource.SHORTCUT_SETTINGS -> gear()
