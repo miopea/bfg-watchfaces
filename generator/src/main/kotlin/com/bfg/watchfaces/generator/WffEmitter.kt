@@ -20,6 +20,46 @@ package com.bfg.watchfaces.generator
  */
 object WffEmitter {
 
+    /**
+     * `[DAY_OF_WEEK_S] [MONTH_S] [MONTH_DAY]` and friends.
+     *
+     * These are Watch Face Format's own date sources, so the face decides the
+     * shape rather than inheriting whatever a complication provider happens to
+     * produce. Uppercased by the template, matching how the complication row
+     * reads.
+     *
+     * Dimmed rather than hidden in ambient: a date does not change in the minute
+     * ambient might be wrong about, so unlike the seconds it is safe to show.
+     */
+    private fun dateElement(p: DialParams): String {
+        if (p.dateStyle == DateStyle.NONE) return ""
+        val l = p.layout
+        // One <Parameter> per %s, which is how WFF fills a Template. A single
+        // parameter carrying "[DAY_OF_WEEK_S] [MONTH_S] [MONTH_DAY]" is not the
+        // same thing and does not read as three sources -- the schema cannot
+        // tell the difference, so this is a correctness rule the tests below
+        // have to carry rather than the XSD.
+        val sources = when (p.dateStyle) {
+            DateStyle.NONE -> return ""
+            DateStyle.DAY -> listOf("MONTH_DAY")
+            DateStyle.MONTH_DAY -> listOf("MONTH_S", "MONTH_DAY")
+            DateStyle.WEEKDAY_MONTH_DAY -> listOf("DAY_OF_WEEK_S", "MONTH_S", "MONTH_DAY")
+            DateStyle.WEEKDAY -> listOf("DAY_OF_WEEK_F")
+        }
+        val placeholders = sources.joinToString(" ") { "%s" }
+        val parameters = sources.joinToString("") { """<Parameter expression="[$it]"/>""" }
+        val h = (l.dateSize * 1.6).toInt()
+        return """
+    <PartText x="0" y="${l.dateY - l.dateSize / 2}" width="$DIAL_SIZE" height="$h" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="140"/>
+      <Text align="CENTER">
+        <Font family="${l.fontFamily}" size="${l.dateSize}" weight="NORMAL" color="${argb(p.inkColor)}">
+          <Template><![CDATA[$placeholders]]>$parameters</Template>
+        </Font>
+      </Text>
+    </PartText>"""
+    }
+
     /** Seconds are just under half the clock, which reads as a secondary value. */
     private const val SECONDS_SCALE = 0.45
 
@@ -49,6 +89,11 @@ object WffEmitter {
         val clockSize =
             if (p.showSeconds) (l.timeSize * CLOCK_SCALE_WITH_SECONDS).toInt() else l.timeSize
         val ink = argb(p.inkColor)
+
+        // The date the FACE draws. dateY and dateSize have been in Layout since
+        // the beginning and nothing emitted them -- the date was always a
+        // complication, whose wording belongs to the system provider.
+        val dateLine = dateElement(p)
 
         // Ambient is a black screen. From v3 the ambient ink is lifted to clear
         // a contrast floor while keeping its hue, so a dark ink chosen for a
@@ -149,6 +194,7 @@ object WffEmitter {
       <Image resource="dial_bg"/>
     </PartImage>
 
+$dateLine
     <DigitalClock x="0" y="${l.timeY - l.timeSize / 2}" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}">
       <TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER"
                 x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="255">
@@ -167,7 +213,7 @@ object WffEmitter {
         Not "hh:mm:ss" on the clock itself: that makes every digit the same size,
         so the seconds shout as loudly as the hour and the whole line grows wide
         enough to crowd the rim. The clock is centred, which leaves roughly a
-        hundred points of empty dial on each side -- this uses the right one.
+        hundred points of empty dial on each side, and this uses the right one.
 
         Awake only. The ambient TimeText above deliberately has no seconds:
         ambient updates once a minute, so a second digit there would be wrong

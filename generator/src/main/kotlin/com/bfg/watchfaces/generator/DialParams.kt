@@ -74,6 +74,35 @@ enum class ComplicationSource(val wff: String?) {
 enum class SlotPosition { TOP, LEFT, MIDDLE, RIGHT, BOTTOM }
 
 /**
+ * The date line the FACE draws, as opposed to a date complication.
+ *
+ * A complication's wording belongs to whichever system provider fills it — pick
+ * `DAY_AND_DATE` and the watch decides whether you get "Aug 29" or "Sat, 29
+ * August", and no provider in the schema's list promises a particular shape.
+ * Drawing it from Watch Face Format's own date sources is the only way to say
+ * exactly what appears.
+ *
+ * It also frees the top complication slot for something else, and needs no icon
+ * above it: a date reads as a date.
+ */
+enum class DateStyle(val label: String) {
+    /** No drawn date. Use a complication in a slot instead, or nothing. */
+    NONE("Off"),
+
+    /** `29` */
+    DAY("Day"),
+
+    /** `AUG 29` */
+    MONTH_DAY("Month and day"),
+
+    /** `SAT AUG 29` */
+    WEEKDAY_MONTH_DAY("Weekday, month and day"),
+
+    /** `SATURDAY` */
+    WEEKDAY("Weekday");
+}
+
+/**
  * Everything needed to reproduce a dial.
  *
  * IMPORTANT - [generatorVersion] is load-bearing.
@@ -135,6 +164,14 @@ data class DialParams(
      * above it.
      */
     val showComplicationIcons: Boolean = true,
+
+    /**
+     * A date drawn by the face itself. See [DateStyle].
+     *
+     * Defaults to NONE so every face saved before this existed emits exactly the
+     * XML it always did — the top slot's date complication is untouched.
+     */
+    val dateStyle: DateStyle = DateStyle.NONE,
 
     /** Draw the pattern OVER the numerals rather than behind them. */
     val lens: Boolean = true,

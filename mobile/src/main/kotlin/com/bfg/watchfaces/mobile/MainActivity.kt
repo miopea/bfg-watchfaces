@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.mobile
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -47,6 +48,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarDuration
+
+/** Logcat tag for the Studio’s send path. `adb logcat -s BfgStudio`. */
+private const val TAG = "BfgStudio"
 
 /**
  * The design app.
@@ -295,26 +299,55 @@ class MainActivity : ComponentActivity() {
         if (!PackBridge.isAvailable) return PackBridge.UNAVAILABLE
 
         val built = runCatching { FaceBuilder.build(context, name, params) }
-            .getOrElse { return "Could not build the face: ${it.message}" }
-        val kb = built.apk.length() / 1024
+            .getOrElse {
+                Log.e(TAG, "build failed for “$name”", it)
+                return ours(name)
+            }
 
         // Validate BEFORE looking for a watch. A schema-invalid face installs
         // and then never appears in the carousel with no error anywhere, so
         // finding out here costs a second and finding out later costs the whole
         // transfer plus one of the watch's addWatchFace calls.
         val token = runCatching { FaceBuilder.validate(context, built.apk) }
-            .getOrElse { return "Built ${built.slug}, but it is not a valid face: ${it.message}" }
+            .getOrElse {
+                Log.e(TAG, "validation failed for “$name”", it)
+                return ours(name)
+            }
 
         val target = runCatching { FaceSender.findTarget(context) }
-            .getOrElse { return "Built ${built.slug} (${kb}KB), but could not reach your watch." }
-        if (target !is FaceSender.Target.Ready) return "Built ${built.slug} (${kb}KB). " + describe(target)
+            .getOrElse {
+                Log.e(TAG, "could not look for a watch", it)
+                return "Couldn’t reach your watch. Check it’s nearby and connected, then try again."
+            }
+        if (target !is FaceSender.Target.Ready) return describe(target)
 
         return runCatching { FaceSender.send(context, target, built.apk, token) }
             .fold(
-                onSuccess = { "Sent “$name” (${kb}KB) to ${target.name}." },
-                onFailure = { "Built ${built.slug} (${kb}KB), but the transfer to ${target.name} failed: ${it.message}" }
+                onSuccess = { "Sent “$name” to ${target.name}." },
+                onFailure = {
+                    Log.e(TAG, "transfer to ${target.name} failed", it)
+                    "“$name” didn’t make it to ${target.name}. " +
+                        "Check the watch is nearby, then try again."
+                }
             )
     }
+
+    /**
+     * What we say when the failure is the app's fault, not the person's.
+     *
+     * A packing or validation failure has no user-facing cause and no user
+     * action: the design is fine, our emitter or our build is not. Before this
+     * existed the person saw the validator's own dump, opening with
+     * `CheckFailure(name=Watch Face Format, category=WATCH_FACE_FORMAT ...)`
+     * and running to a SAXParseException. That tells them nothing they can act
+     * on and reads like they broke something.
+     *
+     * The detail goes to the log, where it is useful to us. They get a sentence
+     * that says whose problem it is and that their work is safe.
+     */
+    private fun ours(name: String): String =
+        "“$name” couldn’t be sent — something went wrong on our end. " +
+            "Your design is saved, so nothing is lost. Please try again."
 
     private fun describe(target: FaceSender.Target): String = when (target) {
         is FaceSender.Target.Ready ->

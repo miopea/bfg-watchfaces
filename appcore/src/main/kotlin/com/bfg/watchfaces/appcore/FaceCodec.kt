@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.appcore
 
 import com.bfg.watchfaces.generator.CURRENT_GENERATOR_VERSION
+import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.Layout
@@ -41,6 +42,12 @@ object FaceCodec {
             showSeconds = q["showSeconds"]?.let { it == "true" || it == "1" } ?: d.showSeconds,
             showComplicationIcons = q["showComplicationIcons"]?.let { it == "true" || it == "1" }
                 ?: d.showComplicationIcons,
+            // An unknown name falls back to the default rather than throwing: a
+            // face saved by a newer build must still open here, minus whatever
+            // this build does not understand.
+            dateStyle = q["dateStyle"]?.let { name ->
+                DateStyle.entries.firstOrNull { it.name == name }
+            } ?: d.dateStyle,
             lens = q["lens"]?.let { it == "true" || it == "1" } ?: d.lens,
             lensAmount = q.dbl("lensAmount", d.lensAmount),
             texture = q["texture"] ?: d.texture,
@@ -110,6 +117,7 @@ object FaceCodec {
   "rotate": ${p.rotate}, "vignette": ${p.vignette}, "sheen": ${p.sheen},
   "dialColor": "${p.dialColor}", "inkColor": "${p.inkColor}",
   "showSeconds": ${p.showSeconds}, "showComplicationIcons": ${p.showComplicationIcons},
+  "dateStyle": "${p.dateStyle}",
   "lens": ${p.lens}, "lensAmount": ${p.lensAmount},
   "texture": "${p.texture}",
   "complications": [${p.complications.joinToString(", ") { "\"${it.name}\"" }}],
@@ -126,12 +134,20 @@ object FaceCodec {
     fun toQuery(p: DialParams): String {
         val l = p.layout
         val kv = linkedMapOf(
+            // FIRST, and not optional. fromQuery defaults a missing
+            // generatorVersion to CURRENT_GENERATOR_VERSION, so a query form
+            // that omits it silently upgrades an old face to today's geometry
+            // -- which is the one thing DECISIONS.md says must never happen
+            // implicitly. The workbench round-trips saved faces through this
+            // form to list them, and `bake --preset` merges through it.
+            "generatorVersion" to p.generatorVersion,
             "engine" to p.engine.name, "scale" to p.scale, "depth" to p.depth, "freq" to p.freq,
             "stroke" to p.stroke, "relief" to p.relief, "contrast" to p.contrast,
             "rotate" to p.rotate, "vignette" to p.vignette, "sheen" to p.sheen,
             "dialColor" to p.dialColor, "inkColor" to p.inkColor,
             "showSeconds" to p.showSeconds,
             "showComplicationIcons" to p.showComplicationIcons,
+            "dateStyle" to p.dateStyle.name,
             "lens" to p.lens, "lensAmount" to p.lensAmount, "texture" to p.texture,
             "complications" to Complications.format(p.complications),
             "dateY" to l.dateY, "dateSize" to l.dateSize, "timeY" to l.timeY,

@@ -121,6 +121,65 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — A schema test that only tests defaults is not a schema test
+
+`showSeconds` and `dateStyle` shipped to a real phone emitting an XML comment
+containing `--`, which XML forbids. The face built, signed and validated locally
+in every test we had, and the validator on the device rejected it with a
+`SAXParseException` the person saw raw.
+
+`WffSchemaTest` is described in `CLAUDE.md` as the only signal between a refactor
+and a face that silently never appears. It has 20 tests. Every one of them
+emitted `DialParams()` with the new features **off**, so the elements under test
+were never in the document being validated. The test was not weak; it was
+looking somewhere else.
+
+Fixed by validating the feature matrix — every `DateStyle` crossed with seconds
+and complication icons on and off — plus a direct check that no emitted comment
+contains `--`. Both were confirmed to FAIL with the bug reintroduced (8 failures)
+and pass with it fixed, rather than merely added and observed green.
+
+Rejected: escaping `--` in a comment helper. That fixes one occurrence and
+leaves the next author to rediscover the rule. The test makes the rule
+enforceable, and the comment can stay prose.
+
+## 2026-08-30 — The query form silently upgraded every stored face
+
+`FaceCodec.fromQuery` reads `generatorVersion`, defaulting to
+`CURRENT_GENERATOR_VERSION`. `FaceCodec.toQuery` never wrote it. So any face
+round-tripped through the query form came back claiming to be current, and
+`PatternEngines` — which IS the renderer for the stored file format — drew it
+with today's geometry.
+
+That is exactly the silent rewrite the "never change engine geometry in place"
+rule exists to prevent, arriving through the codec instead of through an engine.
+It reached the workbench's saved-face list (`Workbench.kt:361,491`) and
+`bake --preset` (`Bake.kt:57`).
+
+Found by a completeness test, not by reading the code: `FaceCodec` had **no test
+at all** despite being what a saved face IS. The new test derives its field list
+from `DialParams`'s own `toString`, so a field added to the params and forgotten
+in the codec fails without anyone remembering to update the test. That is why it
+found `generatorVersion` while looking for `dateStyle`.
+
+Rejected: asserting a hand-maintained list of field names. That is the same
+failure one level up — it passes until someone updates it, which is precisely
+what does not happen.
+
+## 2026-08-30 — The app does not show people the validator's stack trace
+
+A build or validation failure had no user-facing cause and no user action, and
+the app printed the validator's own output: `CheckFailure(name=Watch Face Format,
+category=WATCH_FACE_FORMAT, failureMessage=... org.xml.sax.SAXParseException ...)`.
+
+That names our bug in our vocabulary and reads, to the person holding the phone,
+like they broke something. They cannot act on any of it.
+
+The detail now goes to logcat under `BfgStudio`, where it is useful, and the
+person gets a sentence saying it is our fault and their design is safe. The
+APK size in kilobytes and the internal slug came out of the success and failure
+messages for the same reason: they are ours, not theirs.
+
 ## 2026-08-29 — The Wear OS track has its own tester list
 
 The opt-in link returned "Your account hasn't yet been invited to participate in

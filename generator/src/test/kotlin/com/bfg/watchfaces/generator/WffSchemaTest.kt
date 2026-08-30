@@ -63,6 +63,91 @@ class WffSchemaTest {
         assertTrue(errors.isEmpty()) { "$engine schema errors:\n" + errors.joinToString("\n") }
     }
 
+    /**
+     * Every optional feature, validated -- not just the defaults.
+     *
+     * `showSeconds` and `dateStyle` shipped to a real phone emitting an XML
+     * comment containing "--", which XML forbids. Nothing here caught it,
+     * because every other test in this file emits DialParams() with both
+     * features off, so the elements under test were never in the document.
+     *
+     * A default-only schema test only ever proves the default face is valid. An
+     * optional feature is exactly the code a person turns on later, alone, with
+     * no way to tell a schema rejection from a bug in their design.
+     */
+    @ParameterizedTest
+    @EnumSource(DateStyle::class)
+    fun `every date style emits schema-valid WFF`(style: DateStyle) {
+        for (seconds in listOf(false, true)) {
+            for (icons in listOf(false, true)) {
+                val p = DialParams(showSeconds = seconds, dateStyle = style, showComplicationIcons = icons)
+                val errors = validate(WffEmitter.emit(p))
+                assertTrue(errors.isEmpty()) {
+                    "date=$style seconds=$seconds icons=$icons is schema-invalid:\n" +
+                        errors.joinToString("\n")
+                }
+            }
+        }
+    }
+
+    /**
+     * XML comments may not contain "--", and the emitter writes prose comments.
+     *
+     * The schema test above catches this only where a comment sits inside an
+     * element some parameter combination emits. This catches it everywhere, in
+     * one cheap string check, because the failure is silent on a watch: the
+     * face installs and never appears.
+     */
+    @Test
+    fun `no emitted XML comment contains a double dash`() {
+        for (style in DateStyle.entries) {
+            val xml = WffEmitter.emit(DialParams(showSeconds = true, dateStyle = style))
+            Regex("<!--(.*?)-->", RegexOption.DOT_MATCHES_ALL).findAll(xml).forEach { m ->
+                assertTrue(!m.groupValues[1].contains("--")) {
+                    "an emitted comment contains \"--\", which XML forbids:\n${m.value}"
+                }
+            }
+        }
+    }
+
+    /**
+     * Every %s in a Template has exactly one <Parameter> to fill it.
+     *
+     * The XSD does not check this -- it counts neither, so a Template with one
+     * "%s" and three sources crammed into a single expression validates
+     * cleanly and then renders wrong on the watch. This is the correctness
+     * rule the schema cannot carry.
+     */
+    @ParameterizedTest
+    @EnumSource(DateStyle::class)
+    fun `each Template placeholder has one Parameter`(style: DateStyle) {
+        val xml = WffEmitter.emit(DialParams(dateStyle = style))
+        val templates = Regex("<Template>(.*?)</Template>", RegexOption.DOT_MATCHES_ALL).findAll(xml)
+        var seen = 0
+        for (t in templates) {
+            seen++
+            val body = t.groupValues[1]
+            val placeholders = Regex("%s").findAll(body).count()
+            val parameters = Regex("<Parameter\\b").findAll(body).count()
+            assertEquals(placeholders, parameters) {
+                "$style: $placeholders placeholder(s) but $parameters parameter(s) in:\n$body"
+            }
+            assertTrue(parameters > 0) { "$style: a Template with no Parameter renders nothing" }
+        }
+        if (style != DateStyle.NONE) {
+            assertTrue(seen > 0) { "$style emitted no Template at all, so no date is drawn" }
+        }
+    }
+
+    /** The drawn date is absent entirely when it is off, not an empty element. */
+    @Test
+    fun `no date style emits no date element`() {
+        val xml = WffEmitter.emit(DialParams(dateStyle = DateStyle.NONE))
+        assertTrue(!xml.contains("DAY_OF_WEEK") && !xml.contains("MONTH_S")) {
+            "a date source was emitted with the date switched off"
+        }
+    }
+
     @Test
     fun `colors are emitted as 8 digit AARRGGBB`() {
         val xml = WffEmitter.emit(DialParams(inkColor = "#FCF9F1"))
