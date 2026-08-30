@@ -180,6 +180,57 @@ class WffSchemaTest {
         assertEquals(SecondsBand.ALPHA, color.substring(0, 2).toInt(16))
     }
 
+
+    /**
+     * A slot can name a specific provider APP, which is how weather gets on a
+     * face at all.
+     *
+     * WFF's system provider list has fourteen members and no weather in it.
+     * Third-party sources — weather, Google Health, anything installed — are
+     * named by ComponentName through `primaryProvider`, with the required
+     * `defaultSystemProvider` left as the fallback for a watch that does not
+     * have that app. This is the check that the arrangement is legal, which is
+     * the part that cannot be assumed.
+     */
+    @Test
+    fun `a named provider app is schema-valid and keeps a system fallback`() {
+        val p = DialParams(
+            complications = listOf(
+                ComplicationSource.DAY_AND_DATE, ComplicationSource.STEP_COUNT,
+                ComplicationSource.HEART_RATE, ComplicationSource.DATE,
+                ComplicationSource.WATCH_BATTERY
+            ),
+            providers = mapOf(
+                SlotPosition.RIGHT to "com.google.android.apps.weather/.complications.WeatherProvider",
+                SlotPosition.LEFT to "com.google.android.apps.fitness/.ComplicationProviderService"
+            )
+        )
+        val xml = WffEmitter.emit(p)
+        val errors = validate(xml)
+        assertTrue(errors.isEmpty()) { "a named provider is not schema-valid:\n" + errors.joinToString("\n") }
+
+        // The chosen app is tried first; the system provider is still there.
+        val right = Regex("""<ComplicationSlot slotId="3"[\s\S]*?</ComplicationSlot>""").find(xml)!!.value
+        assertTrue(right.contains("""primaryProvider="com.google.android.apps.weather/.complications.WeatherProvider"""")) {
+            "the chosen provider is missing:\n$right"
+        }
+        assertTrue(right.contains("""primaryProviderType="SHORT_TEXT"""")) {
+            "primaryProviderType defaults to EMPTY, which supplies no data"
+        }
+        assertTrue(right.contains("""defaultSystemProvider="DATE"""")) {
+            "the system fallback was dropped; the slot is empty on a watch without that app"
+        }
+    }
+
+    /** A slot with no chosen app emits exactly what it always did. */
+    @Test
+    fun `no named provider means no primaryProvider attribute`() {
+        val xml = WffEmitter.emit(DialParams())
+        assertTrue(!xml.contains("primaryProvider")) {
+            "a face with no chosen providers gained an attribute it does not need"
+        }
+    }
+
     @Test
     fun `colors are emitted as 8 digit AARRGGBB`() {
         val xml = WffEmitter.emit(DialParams(inkColor = "#FCF9F1"))

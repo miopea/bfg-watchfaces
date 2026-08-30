@@ -249,7 +249,7 @@ class RenderPipelineTest {
         }
         assertEquals(
             listOf("80afb3ad447a5859", "308db7e8ad0700db", "4119f771e59ac813",
-                   "653e267cb29671f0", "8f7b19448b588a88"),
+                   "653e267cb29671f0", "c2cb72bec215f481"),
             actual
         ) { "the v7 preview changed; every face saved at v7 renders differently" }
     }
@@ -281,7 +281,7 @@ class RenderPipelineTest {
         }
         assertEquals(
             listOf("f23d4b152ec5f454", "7aa269aa5965891c", "4119f771e59ac813",
-                   "52231f488a043c73", "e32440e60833fc31"),
+                   "52231f488a043c73", "fe89ce39dfab3279"),
             actual
         ) { "the v6 preview changed; every face saved at v6 renders differently" }
     }

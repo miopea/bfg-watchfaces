@@ -31,6 +31,20 @@ object WffEmitter {
      * Dimmed rather than hidden in ambient: a date does not change in the minute
      * ambient might be wrong about, so unlike the seconds it is safe to show.
      */
+    /**
+     * The wearer's chosen provider app for a slot, if any.
+     *
+     * `primaryProvider` is tried first and `defaultSystemProvider` — which the
+     * schema requires — is what the watch falls back to when that app is not
+     * installed. That ordering is the whole reason a face can name a weather
+     * app and still render something sensible on a watch that lacks it.
+     */
+    private fun providerAttrs(p: DialParams, pos: SlotPosition): String {
+        val component = p.providers[pos]?.trim().orEmpty()
+        if (component.isEmpty()) return ""
+        return " primaryProvider=\"$component\" primaryProviderType=\"SHORT_TEXT\""
+    }
+
     private fun dateElement(p: DialParams): String {
         if (p.dateStyle == DateStyle.NONE) return ""
         val l = p.layout
@@ -41,9 +55,14 @@ object WffEmitter {
         // have to carry rather than the XSD.
         val sources = when (p.dateStyle) {
             DateStyle.NONE -> return ""
-            DateStyle.DAY -> listOf("MONTH_DAY")
-            DateStyle.MONTH_DAY -> listOf("MONTH_S", "MONTH_DAY")
-            DateStyle.WEEKDAY_MONTH_DAY -> listOf("DAY_OF_WEEK_S", "MONTH_S", "MONTH_DAY")
+            // DAY, not MONTH_DAY. MONTH_DAY is in WFF's CONTINUOUS source
+            // group, next to MINUTE_SECOND and HOUR_1_12_MINUTE -- fractional
+            // composites for smooth hand movement. On a watch it rendered
+            // "Sun Aug 8.935" on 30 August: month 8 plus 29/31 of the way
+            // through it. The schema cannot catch this; only running it does.
+            DateStyle.DAY -> listOf("DAY")
+            DateStyle.MONTH_DAY -> listOf("MONTH_S", "DAY")
+            DateStyle.WEEKDAY_MONTH_DAY -> listOf("DAY_OF_WEEK_S", "MONTH_S", "DAY")
             DateStyle.WEEKDAY -> listOf("DAY_OF_WEEK_F")
         }
         val placeholders = sources.joinToString(" ") { "%s" }
@@ -154,7 +173,7 @@ object WffEmitter {
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255"
                       isCustomizable="TRUE">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
-      <DefaultProviderPolicy defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
+      <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
       <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">${if (pos !in p.iconSlots) "" else """
         <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
@@ -163,6 +182,15 @@ object WffEmitter {
         <PartText x="0" y="${SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)}" width="${box.w}" height="$textH">$ambientColorVariant
           <Text align="CENTER">
             <Font family="${l.fontFamily}" size="$fontSize" color="$ink">
+              <!--
+                TEXT only, and not TEXT + TITLE.
+                Tried on a watch: appending TITLE renders "Aug 30Sun",
+                "0180Step" and "70BPM", run together, because the provider
+                never meant them to be one string. And it does not buy the one
+                thing it was tried for: the battery provider supplies "100"
+                with no TITLE at all, so there is still no per cent sign.
+                SHORT_TEXT is what the provider chose to show in a small slot.
+              -->
               <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>

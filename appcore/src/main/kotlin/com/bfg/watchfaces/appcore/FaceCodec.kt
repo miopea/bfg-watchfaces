@@ -52,6 +52,18 @@ object FaceCodec {
             } ?: q["showComplicationIcons"]?.let { legacy ->
                 if (legacy == "true" || legacy == "1") SlotPosition.entries.toSet() else emptySet()
             } ?: d.iconSlots,
+            // "TOP:pkg/cls,RIGHT:pkg/cls". An entry naming a position this
+            // build does not know is skipped rather than throwing, same as
+            // every other forward-compatibility case here.
+            providers = q["providers"]?.let { list ->
+                list.split(",").mapNotNull { entry ->
+                    val pos = SlotPosition.entries.firstOrNull {
+                        it.name == entry.substringBefore(":").trim()
+                    } ?: return@mapNotNull null
+                    val component = entry.substringAfter(":", "").trim()
+                    if (component.isEmpty()) null else pos to component
+                }.toMap()
+            } ?: d.providers,
             // An unknown name falls back to the default rather than throwing: a
             // face saved by a newer build must still open here, minus whatever
             // this build does not understand.
@@ -97,6 +109,10 @@ object FaceCodec {
         }
         for ((k, v) in o) when {
             k == "layout" -> {}
+            // A nested object, flattened to the query form's "POS:component"
+            // list so there is one parser rather than two that can disagree.
+            k == "providers" && v is Map<*, *> ->
+                flat[k] = v.entries.joinToString(",") { "${it.key}:${it.value}" }
             // The catalog stores lists as arrays -- complications, iconSlots --
             // and the query form uses a comma-separated string. Flatten ANY
             // list here so there is exactly one parser, in fromQuery, rather
@@ -129,6 +145,8 @@ object FaceCodec {
   "rotate": ${p.rotate}, "vignette": ${p.vignette}, "sheen": ${p.sheen},
   "dialColor": "${p.dialColor}", "inkColor": "${p.inkColor}",
   "showSeconds": ${p.showSeconds},
+  "providers": {${p.providers.entries.sortedBy { it.key.ordinal }
+        .joinToString(", ") { "\"${it.key.name}\": \"${it.value}\"" }}},
   "iconSlots": [${p.iconSlots.sortedBy { it.ordinal }.joinToString(", ") { "\"${it.name}\"" }}],
   "dateStyle": "${p.dateStyle}",
   "lens": ${p.lens}, "lensAmount": ${p.lensAmount},
@@ -160,6 +178,8 @@ object FaceCodec {
             "dialColor" to p.dialColor, "inkColor" to p.inkColor,
             "showSeconds" to p.showSeconds,
             "iconSlots" to p.iconSlots.sortedBy { it.ordinal }.joinToString(",") { it.name },
+            "providers" to p.providers.entries.sortedBy { it.key.ordinal }
+                .joinToString(",") { "${it.key.name}:${it.value}" },
             "dateStyle" to p.dateStyle.name,
             "lens" to p.lens, "lensAmount" to p.lensAmount, "texture" to p.texture,
             "complications" to Complications.format(p.complications),

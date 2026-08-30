@@ -38,6 +38,10 @@ class FaceCodecTest {
         dialColor = "#123456", inkColor = "#FEDCBA",
         showSeconds = true,
         iconSlots = setOf(SlotPosition.TOP, SlotPosition.RIGHT),
+        providers = mapOf(
+            SlotPosition.RIGHT to "com.example.weather/.WeatherProvider",
+            SlotPosition.LEFT to "com.example.health/.Steps"
+        ),
         dateStyle = DateStyle.WEEKDAY_MONTH_DAY,
         lens = true, lensAmount = 33.0,
         complications = listOf(
@@ -119,6 +123,19 @@ class FaceCodecTest {
             mapOf("showComplicationIcons" to "false", "iconSlots" to "TOP,BOTTOM")
         )
         assertEquals(setOf(SlotPosition.TOP, SlotPosition.BOTTOM), p.iconSlots)
+    }
+
+
+    @Test
+    fun `a provider naming an unknown slot is skipped, not fatal`() {
+        val p = FaceCodec.fromQuery(mapOf("providers" to "ELBOW:com.example/.X,RIGHT:com.example/.Y"))
+        assertEquals(mapOf(SlotPosition.RIGHT to "com.example/.Y"), p.providers)
+    }
+
+    @Test
+    fun `a face with no chosen providers round trips as empty`() {
+        val back = FaceCodec.fromQuery(parse(FaceCodec.toQuery(DialParams())))
+        assertTrue(back.providers.isEmpty())
     }
 
     /** Top-level property names, read off the data class rather than listed. */

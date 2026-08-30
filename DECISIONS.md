@@ -121,6 +121,54 @@ The pattern across today: every wrong answer came from reasoning about a system
 instead of reading what it said. Every right answer came from running the real
 thing and looking at the output.
 
+## 2026-08-30 — isCustomizable is why the app's complication choices never applied
+
+The operator said to check on the emulator before releasing. Doing it found two
+bugs no test in this repo could have caught, and disproved a fix that had
+already shipped.
+
+**`[MONTH_DAY]` is not the day of the month.** The drawn date rendered
+"Sun Aug 8.935" on a watch. `MONTH_DAY` sits in WFF's CONTINUOUS source group,
+next to `MINUTE_SECOND` and `HOUR_1_12_MINUTE` — fractional composites for
+smooth hand movement. 8.935 is month 8 plus 29/31 of the way through it. The
+day of the month is `[DAY]`. The XSD validates both, so only running it on a
+watch could show this.
+
+**`isCustomizable="TRUE"` makes the watch ignore `DefaultProviderPolicy`
+forever.** This is the real cause of "the right complication is always the same
+as the bottom one, no matter what I check".
+
+Established by experiment, not reasoning. A face was built with slot 1=battery,
+2=heart rate, 3=steps, 4=day of week, and the watch rendered left=steps,
+right=battery — assignments from an EARLIER build, unchanged across three
+different faces. Rebuilding the same face with `isCustomizable="FALSE"` rendered
+exactly what the XML said. The policy only supplies a default for a slot nothing
+has been assigned to, and once the wearer's editor owns a slot it owns it
+permanently.
+
+The earlier fix — position-keyed slot ids and display names — was correct and
+necessary, and it was NOT this bug. Both were shipped as the cure for the same
+symptom; only one of them was. Recording that plainly because the release notes
+for 1.11 claim more than they delivered.
+
+The trade-off is genuine and unresolved: `TRUE` is what lets a wearer pick
+weather or Google Health on the watch, which is the only way to get them at all
+— there is no weather in WFF's fourteen system providers. `FALSE` makes the
+app's choices authoritative and removes on-watch editing entirely.
+`removeWatchFace` exists in the Push API, so a third path is possible: remove
+and re-add so the app wins, at the cost of the wearer's own edits and an
+`addWatchFace` call each send. That last one is not free — `setWatchFaceAsActive`
+has an undocumented attempt limit this project has already hit.
+
+Left for the operator to decide rather than picked silently.
+
+**Also found on the watch:** appending `[COMPLICATION.TITLE]` to `TEXT` renders
+"Aug 30Sun", "0180Step" and "70BPM" run together, and does not produce the per
+cent sign it was tried for — the battery provider supplies "100" with no title.
+Reverted to `TEXT` alone. And `DateStyle.sample()` was uppercasing in both
+previews while the watch draws "Sun Aug 30" from its own sources, so the preview
+was shouting a word the face never renders.
+
 ## 2026-08-30 — The slot name was the bug, and generator v7
 
 More wrist reports. The important one: "whatever's in the right position is

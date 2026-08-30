@@ -128,9 +128,9 @@ enum class DateStyle(val label: String) {
      * is a preview of a different watch face -- and the first version of this
      * feature shipped with no preview at all, so the control looked broken.
      *
-     * Uppercase short forms, matching what the complication samples beside it
-     * already draw. The watch supplies the real strings from WFF's own date
-     * sources; this only has to agree about SHAPE.
+     * NOT uppercased. The preview used to shout "SUN AUG 30" while the watch
+     * drew "Sun Aug 30" from its own date sources -- a preview that disagrees
+     * with the thing it is previewing. Seen side by side on an emulator.
      */
     fun sample(today: java.time.LocalDate = java.time.LocalDate.now()): String {
         val loc = java.util.Locale.getDefault()
@@ -143,7 +143,7 @@ enum class DateStyle(val label: String) {
             MONTH_DAY -> "${monthShort()} ${today.dayOfMonth}"
             WEEKDAY_MONTH_DAY -> "${weekdayShort()} ${monthShort()} ${today.dayOfMonth}"
             WEEKDAY -> weekdayFull()
-        }.uppercase(loc)
+        }
     }
 }
 
@@ -215,6 +215,26 @@ data class DialParams(
     val iconSlots: Set<SlotPosition> = SlotPosition.entries.toSet(),
 
     /**
+     * A specific provider APP for a slot, by `package/class` ComponentName.
+     *
+     * Watch Face Format's system provider list has fourteen members and there
+     * is NO WEATHER in it. Weather, Google Health, and everything else a person
+     * has installed are third-party complication data sources, and the format
+     * names those a different way: `DefaultProviderPolicy` carries a
+     * `primaryProvider` of type `xs:string`, which is a ComponentName, with
+     * `defaultSystemProvider` staying as the required fallback.
+     *
+     * So a slot has both. The provider here is what the wearer asked for; the
+     * [ComplicationSource] in [complications] is what shows if that app is not
+     * on this particular watch — which matters for a shared face, because the
+     * person opening it may not have the app the author used.
+     *
+     * Empty means "just use the system provider", which is every face made
+     * before this existed.
+     */
+    val providers: Map<SlotPosition, String> = emptyMap(),
+
+    /**
      * A date drawn by the face itself. See [DateStyle].
      *
      * Defaults to NONE so every face saved before this existed emits exactly the
@@ -244,6 +264,16 @@ data class DialParams(
     )
 ) {
     init {
+        // A ComponentName goes straight into an XML attribute, and it comes
+        // from whatever a watch reported. Validate it at the boundary rather
+        // than escaping it later: anything that is not a ComponentName is a bug
+        // in discovery, not a face someone should be able to save.
+        for ((pos, component) in providers) {
+            require(COMPONENT.matches(component)) {
+                "provider for $pos is not a ComponentName: \"$component\" " +
+                    "(expected package/class, e.g. com.example.app/.WeatherProvider)"
+            }
+        }
         require(generatorVersion in 1..CURRENT_GENERATOR_VERSION) {
             "unknown generatorVersion=$generatorVersion (this build supports up to $CURRENT_GENERATOR_VERSION)"
         }
@@ -346,6 +376,15 @@ data class Layout(
  * they cannot drift. A face stored with generatorVersion=1 still renders through
  * the v1 branch, byte for byte.
  */
+/**
+ * `package/class`, the shape Android writes a ComponentName in.
+ *
+ * The class half may be relative (`.WeatherProvider`) or fully qualified, and
+ * may contain `$` for a nested class. Nothing else is accepted, because this
+ * string is written verbatim into a WFF attribute.
+ */
+private val COMPONENT = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*/\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z0-9_$]+)*""")
+
 const val CURRENT_GENERATOR_VERSION = 7
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
