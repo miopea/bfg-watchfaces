@@ -272,10 +272,147 @@ which Play's UGC rules require before it can ship at all.
 So the instruction is authorised and queued, not ignored. It happens at step 4
 of the sequencing above, after the service is deployed and the app points at it.
 
+## Settled by interview, 2026-08-30
+
+### A published slug carries an id, because a slug is a package name
+
+`watchfacepush.<slug>` is the Watch Face Push package. Two community faces both
+called "Midnight" produce the SAME package, and installing the second silently
+replaces the first on the watch — the kind of invisible difference that has cost
+the most this week.
+
+A published face's slug is therefore `name_<short id>`:
+
+```text
+watchfacepush.midnight_7f3a
+watchfacepush.midnight_c214
+```
+
+Collisions become impossible by construction rather than by policy, and nobody
+has to be told their name is taken. The package name is slightly uglier and is
+visible in Settings on the watch; that is the price.
+
+Locally saved faces keep their plain slug. This applies when a face is
+PUBLISHED, which is the only moment two strangers' names can meet.
+
+### Bot check: Cloudflare Turnstile
+
+The operator already has a Cloudflare account, so the "second cloud" objection
+that shaped the hosting decision does not apply. Free, needs no account from the
+person submitting, and tracks nobody. A script tag and one secret is a far
+smaller commitment than a second runtime, which is what the hosting argument was
+actually about.
+
+### The queue grows; oldest first
+
+Submissions are always accepted and worked through in order. Nothing is lost and
+nobody is turned away because strangers arrived first. "Awaiting review" can
+therefore mean weeks, and that is said in the app rather than implied — the
+response promises in `MODERATION.md` are about REPORTS, not submissions, and
+that distinction now needs to be explicit there too.
+
+A cap was rejected: it turns real submissions away and hands an attacker a way
+to hold the queue full. Auto-publishing after a timeout was rejected outright —
+it defeats R3, since an attacker need only wait.
+
+### Withdrawal: a random per-install id
+
+A random value made on first run and stored on the device. Sent ONLY when
+submitting or reporting, never on reads, so browsing stays anonymous. It lets
+someone withdraw their own face and lets the app show what they have submitted.
+
+It is deliberately weak: reinstalling makes a new one, and the old face can then
+only be withdrawn by reporting it. That is stated at submit rather than
+discovered.
+
+**It is NOT used for moderation.** Blocking by install id would make it a real
+identity with consequences, while still being defeated by a reinstall — the
+worst of both. It exists to give an author their own face back.
+
+**R1's wording changes.** "No identity of any kind" was true and is no longer.
+It becomes: no account, and nothing that identifies a person. About says so in
+the promise itself rather than in a privacy page nobody reads.
+
+### Reports queue for a human and never auto-hide
+
+A report is a message, not an action. Mass-reporting achieves nothing but a
+longer queue. Auto-hiding on N reports was rejected because with no accounts "N
+people" is one person and a loop — it hands anyone a takedown button.
+
+The cost is accepted and already written into `MODERATION.md`: a harmful face
+stays up until a person sees it, which is what the 72-hour promise means.
+
+### Pending faces live in My faces
+
+Marked "Waiting to be reviewed", with a withdraw option, where the person's
+faces already are. No new screen, and it sets the expectation that review takes
+time. A confirmation-and-nothing-else was rejected: it cannot distinguish "still
+waiting" from "quietly rejected", which is the state people actually ask about.
+
+### Byte-identical submissions are rejected; near-duplicates are not
+
+An exact parameter match adds nothing. Anything else is somebody's judgement
+about colour and scale, and refereeing that needs a threshold nobody can defend
+and would land in the appeals path.
+
+### The gallery is ordered by popularity, and that costs something
+
+Chosen over newest-first with the cost named: ranking by installs means the app
+REPORTS installs, and the app has promised that browsing sends nothing.
+
+The reporting is made as small as it can be:
+
+```text
+POST /faces/<slug>/installed
+(empty body)
+
+stored:  midnight_7f3a -> 1,412
+```
+
+No install id, no device details, nothing correlatable, one number per face. A
+per-person history is exactly what this must not become, which is why the
+install id is not attached even though it exists.
+
+The count is inflatable by anyone posting in a loop, so the ranking is a hint
+rather than a truth. That is acceptable for ordering a gallery and would not be
+for anything else.
+
+**About states it in the promise**, not in a footnote:
+
+```text
+No account. No ads. No cost.
+
+When you install a community face, the app adds one to that face's counter so
+the gallery can show popular designs. Nothing about you is sent — not a name,
+not a number, not your other faces.
+```
+
+### Offline: the cached index, marked as possibly stale
+
+The index is a few MB and changes rarely, so caching it is nearly free, and a
+face is parameters — anything cached still previews and still sends to a watch.
+Someone can therefore browse and install a face that has since been removed,
+which `MODERATION.md` already admits it cannot prevent on a wrist.
+
 ## Still open
 
-- Whether authors can withdraw a face they submitted. With no account there is
-  no way to prove they wrote it, so this may simply not be possible — worth
-  deciding rather than discovering.
-- Whether the Cosmos DB free tier is still available on the subscription, which
-  only the account holder can see.
+- **Whether the Cosmos DB free tier is still available on the subscription**,
+  which only the account holder can see. If it is taken, Table Storage is cents
+  per month — and cents is not zero, which is what About promises.
+
+## Release gates, not tasks
+
+Raised in the interview and answered "this isn't released, there isn't anyone to
+notify" — correct today, and both become blocking before the app goes public.
+
+- **A route for rights-holders that is not the app.** `MODERATION.md` promises
+  to act on IP claims within 72 hours, and a rights-holder is usually not a
+  user. When the GitHub repo retires, its issue form goes with it. A published
+  email address is the minimum.
+- **A working in-app complaint path.** Play's UGC rules require one before an
+  app showing user content can ship. The GitHub route covers this today and must
+  not be removed before the replacement is live — which is what the sequencing
+  above already says.
+
+Neither is needed while the app is on internal testing with one tester. Both are
+needed before the Community tab is visible to anyone else.

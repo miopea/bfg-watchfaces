@@ -89,7 +89,14 @@ face someone owns.
 
 ## 8. Community catalog, Share, Report
 
-Still blocked on the operator interview. `catalog-service.md` has the shape.
+**No longer blocked.** The interview of 2026-08-30 settled every open design
+question; `catalog-service.md` carries them. What is left is building it.
+
+Two things are release gates rather than build tasks, and both come due before
+the Community tab is visible to anyone but the operator: a route for
+rights-holders that is not the app, and a working in-app complaint path (Play
+requires one for user content). The GitHub route covers the second today and
+must not be retired before the replacement is live.
 
 ## 9. Imported images
 
