@@ -1,5 +1,58 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — Sharing has a client id, in a project of its own
+
+The last blocker on the community catalog was an OAuth client, which is not
+something a repository can create. It exists now.
+
+### A separate Google Cloud project, and the reason is the consent screen
+
+The obvious home was `budgetbug-495002`, where `play-publisher` already lives.
+Rejected: **the consent screen is user-facing branding.** A wearer signing in to
+share a watch face would have read "BudgetBug wants access to your Google
+Account", which is the kind of thing that makes a person cancel and never come
+back. Sculpt Studio already has its own project, so this follows the shape the
+account was already using rather than inventing one.
+
+`bfg-watch-faces`, audience External, app name "BFG Watch Faces". External is
+required rather than chosen: Internal restricts sign-in to the organisation,
+and the whole point is that anyone with a Google account can share a face.
+
+### Four clients, because Google matches on signing key
+
+An Android OAuth client is one package name and ONE SHA-1, so the same app needs
+one per key it can be signed with: the debug key for a local build, the upload
+key, and Play App Signing's key for anything a tester installs from Play. Miss
+the last one and sign-in works on the developer's own build and fails for every
+tester — the worst shape of bug, because the person who could debug it is the
+one person who cannot reproduce it.
+
+Three are registered. The Play App Signing fingerprint is not: the Play Console
+only offers it through a copy-to-clipboard chip, and reading a clipboard from
+automation kept hanging. Left for the operator rather than fought.
+
+### No client secret was kept
+
+The Web client came with one and it was discarded unread. This flow never uses
+it: an ID token is verified by checking its signature against Google's JWKS and
+its `aud` against the client id, and no secret is exchanged. Storing a
+credential the system has no use for is a liability with no upside. If one is
+ever needed it can be reset.
+
+The client id itself is NOT a secret and lives in `wrangler.toml` rather than
+1Password — it ships inside every APK, so hiding it would be theatre.
+
+### A test that was written to fail, and did
+
+`CatalogLiveTest` asserted that submissions were switched off. That was
+deliberate: it was the tripwire for this day. It failed on deploy and now
+guards the other direction — if `acceptsSubmissions` ever goes false again, the
+app would offer a Share button that cannot work.
+
+Verified against the deployed service rather than assumed: a request with a
+bogus token now returns "that sign-in could not be read", which is JWT
+verification failing. Before today it could not have got that far.
+
 ## 2026-08-31 — v10: the numbers got bigger without the boxes moving
 
 "It's almost impossible to read the numbers, they're so small. Perhaps they can

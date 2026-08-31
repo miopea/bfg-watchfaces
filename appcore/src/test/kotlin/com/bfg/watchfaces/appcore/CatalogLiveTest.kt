@@ -78,19 +78,24 @@ class CatalogLiveTest {
     /**
      * THE STATE OF PLAY, ASSERTED RATHER THAN ASSUMED.
      *
-     * Sign-in is not configured — no OAuth client id — so the service cannot
-     * accept submissions and says so through `/config`. When the client id
-     * lands this test FAILS, which is exactly what should happen: it is the
-     * signal that the app may now offer sharing, and a reminder that this
-     * file's claim about the write path has gone out of date.
+     * This test used to assert the OPPOSITE — that no OAuth client id existed
+     * and the service therefore refused every submission — and it was written
+     * to fail the day one landed. It did, on 2026-08-31, which is the test
+     * doing its job rather than breaking.
+     *
+     * It now guards the other direction: sign-in is configured, and if that
+     * quietly stops being true the app would offer a Share button that cannot
+     * work. `acceptsSubmissions` is what the app reads to decide whether to
+     * show one.
      */
     @Test
-    fun `submissions are switched off, and the app can tell`() {
+    fun `submissions are switched on, and the app can tell`() {
         assumeTrue(url != null)
         val config = (service().config() as CatalogService.Result.Ok).value
-        assertFalse(config.acceptsSubmissions) {
-            "sign-in is now configured -- submissions are live. Update this test, and the " +
-                "handoff that says submit and report have never run end to end."
+        assertTrue(config.acceptsSubmissions) {
+            "the service is not advertising an OAuth client id, so publishing is off. " +
+                "Either GOOGLE_CLIENT_ID was lost from wrangler.toml, or the Worker was " +
+                "deployed without it."
         }
         assertEquals(1, config.contractVersion)
     }
