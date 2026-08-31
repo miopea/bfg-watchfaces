@@ -117,7 +117,13 @@ class MainActivity : ComponentActivity() {
                 // A face gets its identity when somebody names it. Sending an
                 // unnamed design would put "Untitled" in the carousel and in the
                 // package name, so the send path reuses the last name given.
-                var sendingName by rememberSaveable { mutableStateOf(onWatch?.name ?: "My Face") }
+                // Whether the naming sheet was opened by Save or by Send.
+                //
+                // Replaces `sendingName`, which was ambient state nothing tied
+                // to the screen. Naming is now the only way an unsaved design
+                // acquires an identity, and this remembers what the person was
+                // trying to do when they were asked for one.
+                var nameThenSend by remember { mutableStateOf(false) }
                 var status by remember { mutableStateOf<String?>(null) }
                 var faces by remember { mutableStateOf(FaceStorage.list(context)) }
                 // What has been shared, and whether sharing is possible at all.
@@ -272,7 +278,33 @@ class MainActivity : ComponentActivity() {
                                 }
                                 Spacer(Modifier.height(8.dp))
                                 Button(
-                                    onClick = { requestSend(sendingName, params) },
+                                    // The name comes from the face that is
+                                    // OPEN, or is asked for. Never `sendingName`.
+                                    //
+                                    // `sendingName` was ambient state: set when
+                                    // a face was opened, when one was saved, or
+                                    // defaulted to whatever was last on the
+                                    // watch. Nothing tied it to what is on the
+                                    // screen. So editing an open face and
+                                    // sending sent the NEW design under the OLD
+                                    // face's name — same package, so it
+                                    // replaced a face on the watch that the
+                                    // wearer had not touched. Reported as
+                                    // "sending from My faces is different from
+                                    // sending from the Studio", and it was:
+                                    // My faces sends a face, the Studio sent a
+                                    // name that had drifted away from one.
+                                    //
+                                    // A design with no name is not a face yet —
+                                    // CLAUDE.md is explicit that a face gets its
+                                    // identity when somebody names it — so an
+                                    // unsaved one goes through the same naming
+                                    // sheet Save uses rather than borrowing an
+                                    // identity that belongs to something else.
+                                    onClick = {
+                                        if (open != null) requestSend(open.name, params)
+                                        else { nameThenSend = true; naming = true }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text("Send to watch") }
                                 Spacer(Modifier.height(8.dp))
@@ -303,7 +335,6 @@ class MainActivity : ComponentActivity() {
                                 params = it.params
                                 engineName = it.params.engine.name
                                 openSlug = it.slug
-                                sendingName = it.name
                                 tab = Tab.STUDIO
                             },
                             onSend = { requestSend(it.name, it.params) },
@@ -362,13 +393,21 @@ class MainActivity : ComponentActivity() {
                     NameSheet(
                         existing = { FaceStorage.existing(context, it) },
                         sheetState = nameState,
-                        onDismiss = { naming = false },
+                        onDismiss = { naming = false; nameThenSend = false },
                         onSave = { name ->
                             FaceStorage.save(context, name, params)
-                            sendingName = name
                             faces = FaceStorage.list(context)
                             naming = false
-                            scope.launch { snackbar.showSnackbar("Saved “$name”") }
+                            // Naming was the price of sending, so sending is
+                            // what happens next. Saving and then stopping would
+                            // leave the button that was pressed unfulfilled.
+                            if (nameThenSend) {
+                                nameThenSend = false
+                                openSlug = FaceLibrary.slugify(name)
+                                requestSend(name, params)
+                            } else {
+                                scope.launch { snackbar.showSnackbar("Saved “$name”") }
+                            }
                         }
                     )
                 }

@@ -78,35 +78,12 @@ object Presentation {
         else -> controlId
     }
 
-    fun label(source: ComplicationSource): String = when (source) {
-        ComplicationSource.NONE -> "Off"
-        ComplicationSource.STEP_COUNT -> "Steps"
-        ComplicationSource.HEART_RATE -> "Heart rate"
-        ComplicationSource.DAY_AND_DATE -> "Day and date"
-        ComplicationSource.TIME_AND_DATE -> "Time and date"
-        ComplicationSource.DATE -> "Date"
-        ComplicationSource.DAY_OF_WEEK -> "Day of week"
-        ComplicationSource.WATCH_BATTERY -> "Battery"
-        ComplicationSource.WORLD_CLOCK -> "World clock"
-        ComplicationSource.NEXT_EVENT -> "Next event"
-        ComplicationSource.SUNRISE_SUNSET -> "Sunrise and sunset"
-        ComplicationSource.UNREAD_NOTIFICATION_COUNT -> "Notifications"
-        ComplicationSource.APP_SHORTCUT -> "App shortcut"
-        ComplicationSource.FAVORITE_CONTACT -> "Favourite contact"
-        ComplicationSource.WEATHER_TEMPERATURE -> "Weather"
-        ComplicationSource.WEATHER_CONDITION -> "Conditions"
-        ComplicationSource.WEATHER_TEMP_CONDITION -> "Weather and conditions"
-        ComplicationSource.WEATHER_HIGH_LOW -> "High and low"
-        ComplicationSource.WEATHER_RAIN -> "Chance of rain"
-        ComplicationSource.WEATHER_UV -> "UV index"
-        ComplicationSource.SHORTCUT_MUSIC -> "Music"
-        ComplicationSource.SHORTCUT_ALARM -> "Alarms"
-        ComplicationSource.SHORTCUT_SETTINGS -> "Settings"
-        ComplicationSource.SHORTCUT_PHONE -> "Phone"
-        ComplicationSource.SHORTCUT_CALENDAR -> "Calendar"
-        ComplicationSource.SHORTCUT_MESSAGES -> "Messages"
-        ComplicationSource.SHORTCUT_APP -> "Open an app"
-    }
+    /**
+     * Source labels are NOT here either, for the same reason: they are
+     * [Complications.label], which is also what gets written into the built
+     * face's `strings.xml` as each slot's `displayName`. A second table here
+     * would let the app call a slot one thing and the WATCH call it another.
+     */
 
     /**
      * What a slot shows in the preview.
@@ -115,36 +92,19 @@ object Presentation {
      * survive a number of about this width" — a five-digit step count is the
      * case that breaks a narrow slot, so the sample is five digits.
      */
-    fun sample(source: ComplicationSource): String = when (source) {
-        ComplicationSource.NONE -> ""
-        ComplicationSource.STEP_COUNT -> "8,412"
-        ComplicationSource.HEART_RATE -> "62"
-        ComplicationSource.DAY_AND_DATE -> "TUE MAR 10"
-        ComplicationSource.TIME_AND_DATE -> "10:10 TUE"
-        ComplicationSource.DATE -> "10"
-        ComplicationSource.DAY_OF_WEEK -> "TUE"
-        ComplicationSource.WATCH_BATTERY -> "78%"
-        ComplicationSource.WORLD_CLOCK -> "14:10"
-        ComplicationSource.NEXT_EVENT -> "Standup"
-        ComplicationSource.SUNRISE_SUNSET -> "6:42"
-        ComplicationSource.UNREAD_NOTIFICATION_COUNT -> "3"
-        ComplicationSource.APP_SHORTCUT -> "Maps"
-        ComplicationSource.FAVORITE_CONTACT -> "Ann"
-        ComplicationSource.WEATHER_TEMPERATURE -> "72°"
-        ComplicationSource.WEATHER_CONDITION -> "Cloudy"
-        ComplicationSource.WEATHER_TEMP_CONDITION -> "72° Cloudy"
-        ComplicationSource.WEATHER_HIGH_LOW -> "78° / 61°"
-        ComplicationSource.WEATHER_RAIN -> "30%"
-        ComplicationSource.WEATHER_UV -> "UV 6"
-        // A shortcut shows only its glyph; there is nothing to read.
-        ComplicationSource.SHORTCUT_MUSIC,
-        ComplicationSource.SHORTCUT_ALARM,
-        ComplicationSource.SHORTCUT_SETTINGS,
-        ComplicationSource.SHORTCUT_PHONE,
-        ComplicationSource.SHORTCUT_CALENDAR,
-        ComplicationSource.SHORTCUT_MESSAGES,
-        ComplicationSource.SHORTCUT_APP -> ""
-    }
+    /**
+     * Sample values are NOT here. They are [Complications.sample], in :appcore.
+     *
+     * There used to be a second copy in this file, and it had already drifted:
+     * `DAY_AND_DATE` was "TUE MAR 10" here and "MAR 10" there, `TIME_AND_DATE`
+     * "10:10 TUE" against "10:10". So the phone's preview and the workbench's
+     * drew DIFFERENT WIDTHS for the same slot -- which is the exact class of bug
+     * `SlotGeometry` was created to end, reappearing one layer up in the words
+     * rather than the boxes.
+     *
+     * Sample strings decide whether a value fits its box. Two answers to that is
+     * two previews, and only one of them can match the watch.
+     */
 
     /**
      * The handful nearly everyone wants, in the order they want them.

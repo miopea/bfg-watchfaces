@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import com.bfg.watchfaces.appcore.Complications
 import com.bfg.watchfaces.generator.AmbientPalette
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.ClockText
@@ -100,7 +101,7 @@ object AndroidFacePreview {
             // same call the emitter makes. It shortens before it shrinks.
             val drawn = SlotGeometry.drawnText(source, box, fontSize.toInt())
             drawCenteredIn(
-                canvas, drawn.sample ?: Presentation.sample(source),
+                canvas, drawn.sample ?: Complications.sample(source),
                 box.x.toFloat(),
                 (box.y + SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)).toFloat(),
                 box.w.toFloat(), textH.toFloat(),

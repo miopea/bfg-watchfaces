@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.bfg.watchfaces.appcore.Complications
 import com.bfg.watchfaces.generator.ControlInventory
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DateScale
@@ -419,7 +420,7 @@ private fun SlotPicker(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(Presentation.label(selected), style = MaterialTheme.typography.bodyLarge)
+            Text(Complications.label(selected), style = MaterialTheme.typography.bodyLarge)
         }
         Text("›", style = MaterialTheme.typography.titleMedium,
              color = MaterialTheme.colorScheme.outline)
@@ -476,7 +477,7 @@ private fun SlotPicker(
                             )
                             SourceGlyph(source)
                             Spacer(Modifier.size(12.dp))
-                            Text(Presentation.label(source),
+                            Text(Complications.label(source),
                                  style = MaterialTheme.typography.bodyLarge)
                         }
                         }

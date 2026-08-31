@@ -1,5 +1,76 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — "Where else are we not following basic principles?"
+
+Asked after noticing that sending from My faces behaved differently from
+sending from the Studio. It was a fair question and the answer was: in two
+places, both found by looking rather than by arguing.
+
+### The send path was shared; the IDENTITY was not
+
+All three callers already went through one `requestSend`. What differed was
+what they passed. My faces passed the stored face's own name. The Studio passed
+`sendingName` — ambient state, set when a face was opened, when one was saved,
+or defaulted to whatever was last on the watch, and **tied to nothing on the
+screen**.
+
+So editing an open face and pressing Send sent the NEW design under the OLD
+face's name. Same name, same slug, same `watchfacepush.<slug>` package — which
+means it replaced a face on the watch the wearer had not touched. Two buttons
+labelled the same, doing different things, exactly as reported.
+
+`sendingName` is gone. The Studio sends the OPEN face's name, and an unsaved
+design goes through the same naming sheet Save uses — because a design with no
+name is not a face yet, which `CLAUDE.md` already said. Naming then sends,
+rather than saving and stopping, so the button that was pressed is the button
+that happens.
+
+### Two vocabularies for one thing, already drifted
+
+`:mobile` carried its own `sample()` and `label()` over `ComplicationSource`,
+duplicating `Complications` in `:appcore`. They had already diverged:
+
+| | `:appcore` | `:mobile` |
+| --- | --- | --- |
+| `DAY_AND_DATE` | `MAR 10` | `TUE MAR 10` |
+| `TIME_AND_DATE` | `10:10` | `10:10 TUE` |
+
+Not cosmetic. `SlotGeometry` decides whether a value fits its box from how many
+characters it runs to, so two samples are two answers to "does this fit" — the
+phone preview and the workbench preview drawing different faces from identical
+parameters. That is the precise bug `SlotGeometry` exists to prevent,
+reappearing one layer up: in the words rather than the boxes.
+
+`label()` is worse in kind: it is written into the built face's `strings.xml`
+as each slot's `displayName`, so a second table lets the app call a slot one
+thing and the WATCH call it another.
+
+Both deleted. `OneVocabularyTest` scans the other modules for a second table of
+either, and **its red path was executed**: a duplicate was reintroduced, the
+test failed, the duplicate was removed, the test passed. It also carries a
+positive control, because a scan that silently finds no files passes every
+assertion while measuring nothing.
+
+### One sign-in flow, not two
+
+The two-flow design from earlier today — sheet, then button on
+`NoCredentialException` — produced a loop on a real phone: pick an account,
+land back on the share sheet unchanged, tap Share, get asked again.
+
+It deserved to fail. Two sign-in UIs behind one button is two chances to end
+somewhere nobody asked for, and the sheet was buying nothing: this is an
+EXPLICIT action. Somebody has read what sharing does and pressed Share. Nobody
+needs a tap saved there; they need a picker that appears and works.
+
+`GetSignInWithGoogleOption` alone. On an emulator it renders "Choose an
+account — to continue to BFG Watch Faces" and offers **Add another account**,
+which the sheet could not do and which is the whole reason the first version
+told a phone with an account that it had none.
+
+**Not verified end to end.** The emulator's Play services wedged on the account
+selection and stayed wedged. The picker was reached and was correct; the token
+was not observed coming back. Said plainly rather than implied.
+
 ## 2026-08-31 — Three things a wrist found that no test could
 
 All three came back from a real phone and watch within an hour of 1.37, and

@@ -6,7 +6,6 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 
@@ -49,42 +48,32 @@ object GoogleSignIn {
     sealed interface Outcome {
         data class Ok(val idToken: String, val displayName: String?) : Outcome
         data object Cancelled : Outcome
-        /**
-         * [retryWithButton] marks the one failure that is not final: the sheet
-         * had nothing to show, which is the documented signal to try the button
-         * flow instead. It never reaches a person — the caller either retries or
-         * replaces the message.
-         */
-        data class Failed(val message: String, val retryWithButton: Boolean = false) : Outcome
+        data class Failed(val message: String) : Outcome
     }
 
     /**
-     * Ask for an ID token, trying both of Google's flows.
+     * Ask for an ID token, using the BUTTON flow and only the button flow.
      *
-     * ## Why there are two, and why the first one is not enough
+     * ## Why not the bottom sheet
      *
-     * `GetGoogleIdOption` is the BOTTOM SHEET. It is the nicer of the two and
-     * it is also, by Google's own description, incomplete:
+     * `GetGoogleIdOption` is the sheet, and it exists for a different job:
+     * signing somebody in QUIETLY, on app launch, when they already have an
+     * authorised account. Google's own description says what it cannot do — it
+     * "excludes accounts that require re-authentication", and "if no Google
+     * Accounts exist on the device, the bottom sheet UI does not appear".
      *
-     * > The bottom sheet excludes accounts that require re-authentication…
-     * > If no Google Accounts exist on the device, the bottom sheet UI does not
-     * > appear.
+     * The first version of this file used the sheet alone and told a phone with
+     * an account on it that it had none. The second tried the sheet and fell
+     * through to the button on `NoCredentialException`, and produced a loop
+     * from a real device: pick an account, land back on the share sheet
+     * unchanged, tap Share, get asked again.
      *
-     * In both of those cases it throws `NoCredentialException`, and the first
-     * version of this file reported that as "there is no Google account on this
-     * device". Reported from a real phone that had one: the account simply
-     * needed re-authentication, and the app told its owner something they could
-     * see was untrue and offered no way forward.
-     *
-     * `GetSignInWithGoogleOption` is the BUTTON flow, and it is the one that can
-     * reach a re-auth account and add a new one. So the sheet is an
-     * optimisation and the button is the actual answer: try the sheet, and on
-     * `NoCredentialException` — the documented signal that it had nothing to
-     * show — fall through to the button rather than giving up.
-     *
-     * Cancelling is NOT retried. Dismissing the sheet is a decision, and
-     * answering it by immediately opening a second sign-in UI is the app
-     * arguing with somebody who just said no.
+     * That second design deserved to fail. Two sign-in UIs behind one button is
+     * two chances to end in a state nobody asked for, and the sheet was buying
+     * nothing here: this is an EXPLICIT action. Somebody has already read what
+     * sharing does and pressed Share. Nobody needs one tap saved at that point;
+     * they need the picker to appear and work, which is exactly and only what
+     * `GetSignInWithGoogleOption` promises.
      *
      * Must be called from a coroutine on an Activity context — Credential
      * Manager needs a context that can show UI, the same constraint that bit
@@ -97,30 +86,8 @@ object GoogleSignIn {
             return Outcome.Failed("sharing is switched off on the catalog service")
         }
         val manager = CredentialManager.create(context)
-
-        // The sheet. Filter off, so somebody who has never used this app still
-        // sees their accounts; on, it would show an empty sheet on a first run.
-        val sheet = GetGoogleIdOption.Builder()
-            .setServerClientId(serverClientId)
-            .setFilterByAuthorizedAccounts(false)
-            .setAutoSelectEnabled(false)
-            .build()
-        when (val first = attempt(manager, context, sheet)) {
-            is Outcome.Ok, Outcome.Cancelled -> return first
-            is Outcome.Failed -> if (!first.retryWithButton) return first
-        }
-
-        // The button. Reaches accounts the sheet excluded, and can add one.
         val button = GetSignInWithGoogleOption.Builder(serverClientId).build()
-        return when (val second = attempt(manager, context, button)) {
-            is Outcome.Failed ->
-                // Both flows are out of ideas. Now the honest reading really is
-                // that there is no account this phone can sign in with.
-                if (second.retryWithButton)
-                    Outcome.Failed("no Google account on this phone could be used to sign in")
-                else second
-            else -> second
-        }
+        return attempt(manager, context, button)
     }
 
     private suspend fun attempt(
@@ -139,7 +106,10 @@ object GoogleSignIn {
         } catch (_: GetCredentialCancellationException) {
             Outcome.Cancelled
         } catch (_: NoCredentialException) {
-            Outcome.Failed("nothing to show", retryWithButton = true)
+            // The button flow can ADD an account, so reaching here really does
+            // mean there was nothing to sign in with -- unlike the sheet, where
+            // this exception meant far less than it appeared to.
+            Outcome.Failed("no Google account on this phone could be used to sign in")
         } catch (e: GetCredentialException) {
             Outcome.Failed(e.message ?: "that sign-in did not complete")
         }
