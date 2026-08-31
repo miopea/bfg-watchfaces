@@ -1,5 +1,82 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — Sign in to publish, anonymous to complain
+
+Proposed by the operator: a Google sign-in, required only to POST to the
+community and never to view it. Written up in full in
+`docs/specs/catalog-service.md`; this records why it is right and what it costs.
+
+### It is not really about the bot check
+
+Every awkward part of the catalog descends from one sentence in R7: **no account
+means no ban.** That is what makes pre-moderation mandatory rather than chosen,
+why a bot check is needed at all, and why withdrawing your own face rests on a
+random per-install id the spec has to apologise for in place. An account gives
+that handle back. Turnstile falling out is a side effect, not the point.
+
+### The mistake that triggered it, recorded as a mistake
+
+Turnstile was chosen in the interview because it is "a script tag and one
+secret". **There is no script tag in a native Android app.** Turnstile has no
+native mobile SDK; the documented pattern is a WebView loading a page you host.
+The reasoning was web-shaped while the submission path is app-only, and nobody
+noticed until the app came to use it.
+
+Worth separating from the hosting decision, because the operator reasonably
+asked whether Azure would have avoided it: no. Turnstile was chosen separately
+and earlier, and the same WebView would have been needed either way.
+
+### The asymmetry is the design, not a compromise
+
+**Publishing needs an account. Complaining never does.** R2 exists because
+requiring an account to report became intolerable the moment submitting did not
+— "anyone could publish and only developers could complain" is what moved this
+catalog off GitHub in the first place. Putting a sign-in in front of the
+complaint path would reintroduce exactly that, and Play's UGC rules want a
+reachable complaint path.
+
+Reports are safe to leave open because a report is a MESSAGE, not an action.
+Nothing auto-hides, so flooding buys an attacker a longer queue and nothing else.
+
+### What is promised, and the part that cannot be
+
+The service stores `sha256(salt + sub)` — Google's per-application subject id,
+hashed — and nothing else about the person. The display `author` stays an
+optional string somebody types, deliberately NOT taken from the Google profile:
+a display name and an identity are different things, and conflating them would
+put someone's real name on a gallery by default.
+
+What must not be claimed: Google's ID token carries the person's email and name
+whether the app asks or not. The true statement is that the service reads `sub`,
+ignores the rest, and never stores or logs it — not that it never sees it. About
+has to say the true one.
+
+### Rejected: relaxing pre-moderation at the same time
+
+Accounts make pre-moderation optional, and publishing immediately with removal
+on report is how most communities work. Rejected for now: `MODERATION.md`'s
+published promises assume review; harmful content would be visible until
+reported, which buys nothing at zero volume; and it can be relaxed later, where
+tightening afterwards is far worse.
+
+### Accepted costs, none of them free
+
+- **About changes**, and it is the app's only promotion. "No account" becomes
+  "no account to browse, an account to share".
+- **A deletion obligation.** Play requires an app with accounts to offer data
+  deletion in the app and from the web. `DELETE /me` has to exist, and what it
+  does to an already-PUBLISHED face is not decided — removing it takes something
+  off other people's wrists, keeping it means "delete my data" does not delete
+  the face, which has to be said rather than discovered.
+- **Burner accounts still work.** This raises the cost of abuse a lot and is not
+  a wall, so pre-moderation is still doing real work.
+
+### Why now rather than later
+
+The catalog is empty and nothing has ever been submitted, so there is no
+migration. Adding accounts after real faces exist would mean reconciling install
+ids with subject ids for faces owned by real people.
+
 ## 2026-08-30 — WffEmitter escapes, and a face called "Rock -- Roll" builds again
 
 The question raised was narrow: `WffEmitter` interpolates `fontFamily` and every

@@ -681,13 +681,201 @@ parameters and renders them through the one rasterizer; a `LazyVerticalGrid`
 only composes what is visible, so that is a handful of requests and they come
 from the edge cache.
 
+## Sign in to publish, anonymous to complain (proposed 2026-08-31)
+
+Proposed by the operator, and it is a bigger change than the bot check it
+replaces. Written up before building, and it revises interview outcomes that
+were settled — so the sub-decisions it does not settle are listed at the end
+rather than assumed.
+
+### Why this is not really about Turnstile
+
+Every awkward part of this design descends from one sentence in R7:
+**"No account means no ban."** That is what makes pre-moderation mandatory
+rather than chosen, it is why a bot check is needed at all, and it is why
+withdrawing your own face rests on a random per-install id the spec has to
+apologise for in place.
+
+An account gives the handle back. Turnstile falling out is a side effect.
+
+The immediate trigger was smaller and worth recording as a mistake: Turnstile
+was chosen in the interview on the reasoning that it is "a script tag and one
+secret". **There is no script tag in a native Android app.** Turnstile has no
+native mobile SDK — the documented pattern is a WebView loading a page you host
+— so the interview's reasoning was web-shaped while the submission path is
+app-only. That was not caught until the app came to use it.
+
+It is worth being clear that this had nothing to do with choosing Cloudflare.
+Turnstile was chosen separately and earlier; the same WebView would have been
+needed on Azure.
+
+### The asymmetry is the design
+
+**Publishing needs an account. Complaining never does.**
+
+That is not a compromise, it is the correct shape. R2 exists because requiring
+an account to report was intolerable the moment submitting did not: "anyone
+could publish and only developers could complain." Putting a sign-in in front
+of the complaint path would reintroduce exactly the problem that moved this
+catalog off GitHub, and Play's UGC rules want a complaint path that is
+reachable.
+
+So reports stay anonymous and stay rate-limited. They are safe to leave open
+because **a report is a message, not an action** — nothing auto-hides, so
+flooding reports buys an attacker nothing but a longer queue for a human.
+
+| | Sign-in | Rate limited |
+| --- | --- | --- |
+| Browse, fetch a face, export | No | No |
+| Report an install | No | Yes |
+| Report a face | **No** | Yes |
+| Submit a face | **Yes** | Yes |
+| Withdraw your own face | **Yes** | No |
+
+### What is stored, and the part that cannot be promised away
+
+The app sends a Google ID token. The Worker verifies it properly — RS256
+against Google's published keys, checking `iss`, `aud` against our OAuth client
+id, and `exp` — which WebCrypto can do natively, with the key set cached.
+
+**The service stores `sha256(salt + sub)` and nothing else about the person.**
+`sub` is Google's per-application subject id: stable for that person in this
+app, meaningless anywhere else. Hashing it means a copy of the database does not
+hand out Google subject ids.
+
+**What cannot be promised, and must not be claimed:** the ID token Google issues
+carries the person's email and name whether the app asks for them or not. The
+honest statement is that the service reads `sub`, ignores the rest, and never
+stores or logs it — NOT that it never sees it. About must say the true thing.
+
+The `author` field stays exactly what it is today: an optional display string
+somebody types. It is not filled in from the Google profile, because a display
+name and an identity are different things and conflating them would put someone's
+real name on a watch face gallery by default.
+
+### What this deletes
+
+- **Turnstile**, entirely. No widget, no hosted page, no WebView, no site key,
+  no `TURNSTILE_SECRET`.
+- **The random per-install id.** It exists only to let an author withdraw a
+  face, and the spec concedes it is "deliberately weak: reinstalling makes a new
+  one, and the old face can then only be withdrawn by reporting it." With an
+  account, "my submissions" survives a reinstall and a new phone. This is the
+  part most worth deleting.
+- **R1's remaining awkwardness.** It has already moved once, from "no identity
+  of any kind" to "no account, and nothing that identifies a person". It becomes:
+  no account to browse, an account to publish, and nothing that identifies a
+  person kept either way.
+
+**No migration is needed, and that is why this is the moment.** The catalog is
+empty and nothing has ever been submitted. Adding accounts later would mean
+reconciling install ids with subject ids for real faces owned by real people.
+
+### Pre-moderation stays, for now
+
+Accounts make pre-moderation OPTIONAL. They do not make it wrong.
+
+The case for relaxing it is real: with an identity that can be blocked, publishing
+immediately and removing on report is how most communities work, and it takes
+the maintainer off the critical path of every submission.
+
+Rejected for now, on three grounds:
+
+1. `MODERATION.md`'s promises are already published and assume nothing appears
+   without review.
+2. A first-post-visible model means harmful content is visible until somebody
+   reports it. At zero volume that trade buys nothing.
+3. It can be relaxed later. Going the other way — tightening after people have
+   been publishing freely — is much worse.
+
+The natural middle, if volume ever justifies it, is to auto-publish for authors
+with a clean history and hold first submissions. That needs the per-author
+counts below, which is a reason to record them from the start.
+
+### What accounts newly make possible
+
+- **Blocking an author.** A `blocked_authors` table keyed by `author_key`; a
+  blocked author's submission is refused at POST. This is the capability the
+  whole design was missing.
+- **History as a moderation signal.** How many of this author's faces have been
+  published, and how many rejected. A moderator has never had this, and it is
+  the main thing an account buys them. Worth recording from the first
+  submission even though nothing consumes it yet.
+- **Real withdrawal**, above.
+
+### A new obligation: deleting an account's data
+
+Holding an account identifier brings a duty that anonymity avoided entirely.
+Google Play requires an app that lets people create an account to offer a data
+deletion path, in the app AND reachable from the web.
+
+`DELETE /me`, authenticated the same way, needs to exist. What it does needs
+deciding rather than discovering — see "Still open".
+
+### About has to change, and it is the app's only promotion
+
+Today it says "No account. No ads. No cost." The replacement has to keep the
+promise honest without burying the change in a privacy page nobody reads:
+
+```text
+Free. No ads. No subscription.
+
+Browsing the community gallery needs no account, and sends nothing about you.
+
+Sharing a face needs a Google sign-in — so a face can be taken down, and its
+author asked about it. We keep an anonymous id for that and nothing else: not
+your name, not your email.
+
+When you install a community face, the app adds one to that face's counter so
+the gallery can show popular designs. That carries nothing about you.
+```
+
+### Shape of the change
+
+| Piece | Change |
+| --- | --- |
+| `faces.install_id` | becomes `author_key` |
+| new `blocked_authors` | `author_key`, reason, when |
+| `POST /faces` | `Authorization: Bearer <Google ID token>`, no `turnstile` |
+| `POST /submissions/<id>/withdraw` | same token instead of `installId` |
+| `POST /reports` | unchanged, still anonymous, no token |
+| `GET /*` | unchanged, still anonymous |
+| `DELETE /me` | new |
+| `GET /admin/queue` | gains the author's published/rejected counts |
+| `POST /admin/authors/<key>/block` | new |
+| `CatalogService` | `turnstileToken` becomes `idToken`; `installId` goes |
+| `:mobile` | Credential Manager sign-in, prompted only on Share |
+
+Android uses Credential Manager with `GoogleIdOption`, which needs an OAuth
+client id and the signing certificate registered — **both debug and release
+certificates**, or sign-in works for the developer and fails for everyone else.
+That is the classic way this is got wrong.
+
+### What this does NOT solve
+
+Burner accounts. A Google account raises the cost of abuse a great deal and is
+not a wall, so pre-moderation is still doing real work and the moderation
+promises still have to be keepable by one person.
+
 ## Still open
 
+- **Whether to adopt sign-in-to-publish at all.** Written up above; the
+  operator has seen the shape but the sub-decisions below are unanswered.
+- **What `DELETE /me` does to a PUBLISHED face.** Deleting it removes something
+  other people have installed and may be showing on a wrist. Keeping it but
+  dropping the author link is the obvious answer and it means "delete my data"
+  does not delete the face, which has to be said in the app rather than
+  discovered. Not decided.
+- **Whether reporting stays anonymous.** Recommended yes, on R2's original
+  reasoning. Recorded here because it is the one place where the account
+  argument could plausibly be extended and should not be.
 - **Turnstile.** `TURNSTILE_SECRET` is unset, so submit and report answer 403.
-  That is the fail-closed path working as designed, and it is also the reason
-  the service cannot accept anything yet. It needs a widget created in the
-  dashboard.
-- **Submit and report UI**, once Turnstile exists.
+  That is the fail-closed path working as designed. If sign-in is adopted, this
+  stops being a gap and becomes something to delete.
+- **Submit and report UI**, once the identity question is settled.
+- **The Ops Console moderation UI** is filed as `01a0551a` and the operator has
+  told BFG Operations to HOLD. The admin endpoints it describes are a subset of
+  what sign-in would add — blocking an author, and per-author history.
 - **Retiring `miopea/bfg-watchfaces-catalog`**, which is LAST. It still hosts the
   app's only working complaint path.
 - **The app's submit and report paths.** The service has no client yet: the
