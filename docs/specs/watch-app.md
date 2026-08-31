@@ -7,7 +7,7 @@ after.
 `backlog.md` is everything not built. This file is only the part that was
 scoped, in the order it was scoped in. Decisions taken are in `DECISIONS.md`.
 
-## 0. The finding that reordered everything
+## 0. The activation one-shot, and a correction
 
 `setWatchFaceAsActive` is **not** an undocumented quota that might reset. From
 Google's own reference, verbatim:
@@ -28,10 +28,32 @@ assigned to it lets `DefaultProviderPolicy` apply. Removing the active face
 deactivates it — so every send needs an activation, and only the first one can
 have it.
 
-**The current install path therefore works once and then leaves every wearer on
-a fallback face, from their second face onward.** Not a rare edge; the normal
-case, one send later. It has not been seen yet only because the operator's own
-watch has not sent enough faces since the change.
+**Corrected 2026-08-31, before any of this was acted on.** The paragraph above
+described a disaster that cannot happen, and the correction matters more than
+the original claim.
+
+`resetComplications` is what selects remove-then-add, and **nothing in the phone
+app ever passes it as true.** It defaults to false at every call site; only
+`DebugInstallReceiver` can set it. So every real send already takes the
+`updateWatchFace` branch: no face is ever removed, and there is no window where
+the wearer has nothing.
+
+What IS true, and is the whole of the problem:
+
+- Every send calls `setWatchFaceAsActive` — the update branch asks too, and
+  deliberately, because dropping it was a previous regression where only the
+  first face ever switched.
+- Google documents that call as usable **once**. From the second send on it
+  throws. `FaceInstaller` catches it with `runCatching`, logs "installed, but
+  could not switch to it", and reports the send as succeeded-but-not-switched.
+- On a different-package update the new face **inherits active status
+  automatically**. So the failed call is very likely noise: the face switches
+  anyway and the app says it did not.
+
+That is a message that lies, not a watch that breaks. Still worth fixing — being
+told "installed, but could not switch to it" while looking at the new face on
+your wrist is the kind of thing that makes someone distrust every other message
+the app shows — but it is not a release blocker, and this file said it was.
 
 ### The fix is in the same document
 
@@ -73,19 +95,28 @@ The riskiest path in the system does not get rebuilt on a documentation reading.
 
 ### The test, on the operator's watch
 
-1. Design a face, name it **A**, send it. Note its complications.
-2. Change the complications, name it **B** — a genuinely different name — send.
-3. Read what B renders.
+Two sends answer three questions, because every send already takes the
+`updateWatchFace` branch.
 
-- B shows **its own** complications → Google's documented behaviour holds,
-  remove-then-add is unnecessary, and step 4 below proceeds.
-- B shows **A's** complications → the documentation does not describe this
-  device, remove-then-add was right, and the activation problem needs a
-  different answer. Record that, because it contradicts a published reference.
+1. Design a face, name it **A**, give it distinctive complications, send it.
+2. Design a second, name it **B** — a genuinely different name, so a different
+   package — give it DIFFERENT complications, send it.
 
-On a pass, `FaceInstaller` drops the remove-then-add branch and always calls
-`updateWatchFace`. `resetComplications` stops meaning "remove and add" and
-starts meaning nothing at all — the package name already decides.
+Then read three things off the watch:
+
+- **Does B render its own complications?** Yes → the documented full-replacement
+  behaviour holds and remove-then-add is dead code that can go. No → the
+  documentation does not describe this device, and that is worth recording
+  because it contradicts a published reference.
+- **Did the watch actually switch to B?** If it did, the one-shot is spent and
+  the automatic inheritance is doing the work.
+- **What did the app SAY?** If it said it could not switch while B is on the
+  wrist, that is the lying message, confirmed.
+
+On a pass, `FaceInstaller` loses the unreachable remove-then-add branch, and
+stops reporting a failed `setWatchFaceAsActive` as a failure to switch when the
+face is already active. `isWatchFaceActive` answers that without spending
+anything.
 
 ### What the wearer is told when activation is gone
 
