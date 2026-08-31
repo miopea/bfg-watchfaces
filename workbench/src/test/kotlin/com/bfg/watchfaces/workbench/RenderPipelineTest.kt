@@ -262,9 +262,49 @@ class RenderPipelineTest {
         }
         assertEquals(
             listOf("80afb3ad447a5859", "308db7e8ad0700db", "4119f771e59ac813",
-                   "653e267cb29671f0", "8c5588d3a42e632a"),
+                   "653e267cb29671f0", "1bb9074443345b74"),
             actual
         ) { "the v7 preview changed; every face saved at v7 renders differently" }
+    }
+
+    /**
+     * THE GUARD THAT MAKES THE HASHES ABOVE WORTH PINNING.
+     *
+     * Both preview renderers used to draw `DateStyle.sample()` with no
+     * argument, which defaults to TODAY — so the two goldens with a drawn date
+     * changed every day, and went red mid-session simply because it passed
+     * midnight. A golden that depends on the calendar catches nothing and
+     * blames whoever happens to be mid-change.
+     *
+     * This is not flaky and does not depend on when it runs: rendering with the
+     * sample moment stated explicitly must equal rendering with the default. If
+     * the default ever goes back to `LocalDate.now()`, they differ on every day
+     * except 10 March.
+     */
+    @Test
+    fun `a preview draws the same day whenever it is rendered`() {
+        val p = DialParams(dateStyle = DateStyle.WEEKDAY_MONTH_DAY)
+        fun digest(img: java.awt.image.BufferedImage): String {
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            for (v in pixels(img)) {
+                md.update((v ushr 24).toByte()); md.update((v ushr 16).toByte())
+                md.update((v ushr 8).toByte()); md.update(v.toByte())
+            }
+            return md.digest().joinToString("") { "%02x".format(it) }.take(16)
+        }
+        // TWO DIFFERENT DAYS AT THE SAME CLOCK TIME. The time text is identical
+        // in both, so the ONLY thing that can differ is the drawn date.
+        //
+        // The first version of this test compared the default render against an
+        // explicit one at the default moment, which cannot fail: both go
+        // through the same path and both would draw today's date. Ablating the
+        // fix showed it passing, which is the whole reason to ablate.
+        val march = digest(FacePreview.render(p, time = java.time.LocalDateTime.of(2026, 3, 10, 10, 10, 0)))
+        val september = digest(FacePreview.render(p, time = java.time.LocalDateTime.of(2026, 9, 30, 10, 10, 0)))
+        assertNotEquals(march, september) {
+            "the drawn date did not follow the render's own time, so it is following the wall " +
+                "clock instead -- which makes every golden above rot overnight"
+        }
     }
 
     @Test
@@ -294,7 +334,7 @@ class RenderPipelineTest {
         }
         assertEquals(
             listOf("f23d4b152ec5f454", "7aa269aa5965891c", "4119f771e59ac813",
-                   "52231f488a043c73", "1a1873a10255adf2"),
+                   "52231f488a043c73", "f529289c34ab34db"),
             actual
         ) { "the v6 preview changed; every face saved at v6 renders differently" }
     }

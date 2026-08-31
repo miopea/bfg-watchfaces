@@ -1,5 +1,50 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — A preview drew today's date beside a clock fixed at 10:10
+
+`RenderPipelineTest`'s pinned preview hashes went red mid-session, on code that
+had passed forty minutes earlier. The session had crossed midnight.
+
+`DateStyle.sample()` defaults its argument to `LocalDate.now()`, and both
+preview renderers called it with no argument — so a preview drew whatever day it
+happened to be rendered on, next to a clock permanently set to 10:10.
+
+### The flake was the smaller half
+
+`preview.png` is baked into the APK by `Workbench.exportTo` and is the thumbnail
+the watch face carousel shows. Every built face carried its BUILD DATE, frozen,
+beside a clock saying something else. Nobody had noticed because you have to
+look at a preview built on a different day from the one you are looking at it on.
+
+### What was checked before changing anything
+
+- **The emitter does not use `sample()`.** A real watch fills the date in from
+  Watch Face Format's own sources, so nothing here changes what an installed
+  face displays. Confirmed by grep, not assumed.
+- **`widestSample()` was already pinned** to a fixed date, which is what feeds
+  the emitted font size. Whoever wrote it had this exact problem in mind for the
+  half that reaches the watch, and stopped one line short of the half that does
+  not.
+- Exactly two callers, both previews: the workbench renderer and the Android one.
+
+### 10 March is not arbitrary
+
+It is the moment the rest of the preview already uses. `Complications.sample`
+renders `DAY_AND_DATE` as "MAR 10" and both renderers put the clock at 10:10.
+`DateStyle.SAMPLE_DATE` names it once; the workbench derives it from the render's
+own `time` so a live preview at a real moment still agrees with itself.
+
+### The guard was wrong the first time, and ablating is why that was found
+
+The first version compared a default render against an explicit one at the
+default moment — both go through the same path, so it could not fail. Ablating
+the fix showed it passing.
+
+It now renders TWO DIFFERENT DAYS AT THE SAME CLOCK TIME, so the drawn date is
+the only thing that can differ. Ablated again: fails without the fix, passes
+with it. A golden that depends on the calendar catches nothing and blames
+whoever happens to be mid-change when the date turns.
+
 ## 2026-08-31 — Sign in to publish, anonymous to complain
 
 Proposed by the operator: a Google sign-in, required only to POST to the

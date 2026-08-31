@@ -103,7 +103,10 @@ object FacePreview {
         // control changes nothing in the only view anyone judges it in.
         SlotGeometry.dateBand(p)?.let { band ->
             val dateInk = if (ambient) withAlpha(ambientSlotInk, 140) else ink
-            drawCentered(g, p.dateStyle.sample(), band.y, band.h,
+            // The render's OWN date, so the drawn date agrees with the clock
+            // beside it. Defaulting to today made this preview non-deterministic
+            // and put the build date into every baked preview.png.
+            drawCentered(g, p.dateStyle.sample(now.toLocalDate()), band.y, band.h,
                 SlotGeometry.fittedDateSize(p).toDouble(), Font.PLAIN, dateInk)
         }
 

@@ -344,6 +344,37 @@ enum class DateStyle(val label: String) {
      */
     fun widestSample(): String = sample(java.time.LocalDate.of(2026, 9, 30))
 
+    companion object {
+        /**
+         * The day a PREVIEW pretends it is.
+         *
+         * Both preview renderers used to call [sample] with no argument, which
+         * defaults to today — so a preview drew a date of whenever it happened
+         * to be rendered, beside a clock permanently fixed at 10:10. Two
+         * consequences, and the second is the one that mattered:
+         *
+         * 1. `RenderPipelineTest`'s pinned preview hashes changed every day.
+         *    They went red mid-session simply because it passed midnight, which
+         *    is the kind of failure that gets blamed on whoever's change is in
+         *    flight.
+         * 2. `preview.png` is baked into the APK by `Workbench.exportTo` and is
+         *    the thumbnail the watch face carousel shows. Every built face
+         *    carried its BUILD DATE, frozen, next to a clock saying something
+         *    else.
+         *
+         * 10 March is not arbitrary: it is the moment the rest of the preview
+         * already uses. `Complications.sample` renders `DAY_AND_DATE` as
+         * "MAR 10" and both renderers put the clock at 10:10. This makes the
+         * drawn date agree with them.
+         *
+         * NOT used by [WffEmitter]. A real watch fills the date in from Watch
+         * Face Format's own sources, so nothing here changes what an installed
+         * face displays — and [widestSample], which DOES feed the emitted font
+         * size, was already pinned to a fixed date for exactly that reason.
+         */
+        val SAMPLE_DATE: java.time.LocalDate = java.time.LocalDate.of(2026, 3, 10)
+    }
+
     fun sample(today: java.time.LocalDate = java.time.LocalDate.now()): String {
         val loc = java.util.Locale.getDefault()
         fun weekdayShort() = today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, loc)

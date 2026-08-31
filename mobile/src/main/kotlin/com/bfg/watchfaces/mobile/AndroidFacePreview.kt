@@ -116,7 +116,9 @@ object AndroidFacePreview {
         // control changes nothing in the only view anyone judges it in.
         SlotGeometry.dateBand(p)?.let { band ->
             drawCenteredIn(
-                canvas, p.dateStyle.sample(),
+                // The same fixed day the workbench preview uses, so the two
+                // agree and neither draws today's date beside a 10:10 clock.
+                canvas, p.dateStyle.sample(DateStyle.SAMPLE_DATE),
                 band.x.toFloat(), band.y.toFloat(),
                 band.w.toFloat(), band.h.toFloat(),
                 SlotGeometry.fittedDateSize(p).toFloat(),
