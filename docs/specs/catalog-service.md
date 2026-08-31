@@ -857,6 +857,37 @@ Burner accounts. A Google account raises the cost of abuse a great deal and is
 not a wall, so pre-moderation is still doing real work and the moderation
 promises still have to be keepable by one person.
 
+## The sequencing risk was real, but not where everyone was looking
+
+Checked on 2026-08-31, because it decides when the old repository can be
+retired.
+
+**`CatalogStore.reportUrl` is called from exactly one place: `Workbench.kt`.**
+The workbench is the localhost dev tool and is never shipped. `:mobile` has
+never referenced it, never linked to a GitHub issue form, and never had a
+complaint path at all.
+
+So the instruction repeated through every handoff — do not retire the GitHub
+route before the app points at the replacement — was protecting a route the
+SHIPPED APP DID NOT HAVE.
+
+That is not as alarming as it sounds, and the reason matters: the shipped app
+showed no user content either. Its Community tab was a hardcoded empty state
+until 46c1cfe, so there was nothing for Play's UGC rules to attach to. No
+content, no obligation, no gap.
+
+What is worth noticing is that both halves arrived in the same session and in
+the right order: the Community tab began showing other people's faces
+(46c1cfe), and the report path that Play requires alongside it landed with it
+(3a24ee2). No Play release has been cut since either — the published build still
+has the empty placeholder — so nothing has ever been in front of a user without
+a way to complain about it.
+
+**The rule this leaves behind is sharper than the one it replaces.** It was
+never "keep the GitHub repository alive". It is: *the build that first shows
+community content must be the build that first carries the report path.* They
+are in the same commit range and must ship together.
+
 ## Still open
 
 - ~~Whether to adopt sign-in-to-publish~~ **SETTLED 2026-08-31: adopt it.**
