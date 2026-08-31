@@ -108,7 +108,25 @@ object FaceInstaller {
                     // Still ask to activate. Dropping this was a regression:
                     // before, EVERY install tried, and a face sent to a watch
                     // wearing something else silently stopped switching.
-                    val active = onFaceInstalled(context, details.slotId)
+                    val asked = onFaceInstalled(context, details.slotId)
+                    // ASK THE WATCH, rather than believing the call that failed.
+                    //
+                    // `setWatchFaceAsActive` works ONCE per install -- Google's
+                    // reference says so in as many words -- so from the second
+                    // send onward it throws, and this used to report
+                    // OK_NOT_ACTIVE and tell the wearer to long-press and pick
+                    // the face. Reported from a wrist: "the text says something
+                    // about long press and set it, which doesn't need to be
+                    // done." It did not: an update whose package name differs
+                    // inherits active status by itself, so the face had already
+                    // switched and the app was describing a failure that had no
+                    // consequence.
+                    //
+                    // `isWatchFaceActive` costs nothing and is the only thing
+                    // here that actually knows.
+                    val active = asked || runCatching {
+                        manager.isWatchFaceActive(details.packageName)
+                    }.getOrElse { false }
                     Result.Installed(details.slotId, replaced = true, active = active)
                 } else if (ours != null) {
                     // Whether OUR face is the one on the wrist decides if the
@@ -136,11 +154,19 @@ object FaceInstaller {
                     // setWatchFaceAsActive has an undocumented attempt limit
                     // this project has already hit, so it is not spent on a
                     // face that was sitting in the picker anyway.
-                    val active = if (wasActive) onFaceInstalled(context, details.slotId) else false
+                    val asked = if (wasActive) onFaceInstalled(context, details.slotId) else false
+                    // Same as the update branch: the activation call is not the
+                    // authority on whether the face is on the wrist.
+                    val active = asked || runCatching {
+                        manager.isWatchFaceActive(details.packageName)
+                    }.getOrElse { false }
                     Result.Installed(details.slotId, replaced = true, active = active)
                 } else if (existing.remainingSlotCount > 0) {
                     val details = manager.addWatchFace(fd, token)
-                    val active = onFaceInstalled(context, details.slotId)
+                    val asked = onFaceInstalled(context, details.slotId)
+                    val active = asked || runCatching {
+                        manager.isWatchFaceActive(details.packageName)
+                    }.getOrElse { false }
                     Result.Installed(details.slotId, replaced = false, active = active)
                 } else {
                     // Slots are FULL and none of them is ours to replace.

@@ -1,5 +1,66 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — Three things a wrist found that no test could
+
+All three came back from a real phone and watch within an hour of 1.37, and
+each is a case of the app asserting something it had not checked.
+
+### "There is no Google account" — told to a phone that had one
+
+Sharing failed with "there is no Google account on this device to sign in
+with", and offered no way forward. The phone had an account.
+
+`GetGoogleIdOption` is the bottom sheet, and Google's own description says what
+it leaves out: it "excludes accounts that require re-authentication", and "if no
+Google Accounts exist on the device, the bottom sheet UI does not appear". Both
+throw `NoCredentialException`, and this app read that one exception as the
+strongest of its possible meanings.
+
+`GetSignInWithGoogleOption` — the BUTTON flow — is the one that reaches a
+re-auth account and can add a new one. So the sheet is an optimisation and the
+button is the answer: try the sheet, and on `NoCredentialException` fall
+through rather than giving up. Only when BOTH are out of ideas is "no account
+this phone can use" an honest thing to say.
+
+Cancelling is deliberately not retried. Dismissing the sheet is a decision, and
+answering it by opening a second sign-in UI is the app arguing with someone who
+just said no.
+
+### "Long-press your watch face and pick it" — for a face already on the wrist
+
+Reported as "the text says something about long press and set it, which doesn't
+need to be done", from someone who had sent faces repeatedly and watched every
+one of them work.
+
+`setWatchFaceAsActive` works ONCE per install; Google's reference says so
+outright. From the second send it throws, `FaceInstaller` caught it, and
+reported `OK_NOT_ACTIVE` — which `WatchLink.Report.describe` renders as the
+long-press instruction. Meanwhile `updateWatchFace` with a different package
+name inherits active status by itself, so the face had already switched.
+
+The app was describing a failed call rather than the state of the watch.
+`isWatchFaceActive` costs nothing and is the only thing in the room that
+actually knows, so the verdict is now `asked || isWatchFaceActive(...)`.
+
+**This also answers "does the watch send back an ack": it always has.**
+`WatchLink.Report` writes `OK`, `OK_NOT_ACTIVE` or `FAILED <reason>` back on the
+same channel, plus the provider catalog. The ack was right; the value it carried
+was wrong.
+
+### The send messages did not look like the app
+
+A stock Material 3 `Snackbar` is `inverseSurface` — near-black, floating, and
+indistinguishable from every system toast on the phone. It is also where the
+LONGEST text this app shows appears, so the surface most likely to be read
+carefully was the one that looked least like it belonged. Now `primaryContainer`
+on the app's own palette, with the large shape.
+
+### What the three have in common
+
+Each was the app stating something it had not verified: that there was no
+account, that the face had not switched, that a message was ours. The fixes are
+the same shape — ask the thing that knows, and only assert what comes back.
+
 ## 2026-08-31 — Sharing works, and the bug was in the sheet that asked
 
 A face designed on the phone reached the live catalog, was seen in the

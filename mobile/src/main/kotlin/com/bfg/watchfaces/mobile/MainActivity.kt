@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -201,7 +202,26 @@ class MainActivity : ComponentActivity() {
                                 }
                         }
                     },
-                    snackbarHost = { SnackbarHost(snackbar) }
+                    snackbarHost = {
+                        // The app's own colours, not Material's default.
+                        //
+                        // A stock Snackbar is `inverseSurface` -- near-black,
+                        // floating, and identical to every system toast on the
+                        // phone. Reported from a device: the send messages
+                        // "don't look like they are part of the app". They were
+                        // also the LONGEST text the app shows, so the one
+                        // surface most likely to be read carefully was the one
+                        // that looked least like it belonged.
+                        SnackbarHost(snackbar) { data ->
+                            Snackbar(
+                                snackbarData = data,
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                actionColor = MaterialTheme.colorScheme.primary,
+                                shape = MaterialTheme.shapes.large
+                            )
+                        }
+                    }
                 ) { inner ->
                     when (tab) {
                         Tab.DESIGNS -> DesignsScreen(
