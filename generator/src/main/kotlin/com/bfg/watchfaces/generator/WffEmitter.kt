@@ -243,9 +243,15 @@ object WffEmitter {
       <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
       <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">${if (!p.hasIcon(pos)) "" else """
-        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH" tintColor="$ink">
+        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH" renderMode="MASK" tintColor="$ink">
           <!--
-            tintColor, because MONOCHROMATIC_IMAGE is not monochrome.
+            renderMode="MASK" AND tintColor. The tint alone did nothing, and
+            the schema says why: renderMode defaults to SOURCE, which draws the
+            image in its own colours and ignores the tint entirely. MASK uses
+            the image as a stencil and fills it with tintColor, which is what
+            "make the glyph match the text" actually means.
+
+            MONOCHROMATIC_IMAGE is not monochrome.
             Reported from a real wrist: Google Fit ships a GREEN steps glyph and
             a RED heart, and the watch drew them in the provider's own colours
             beside ink-coloured text. Both previews draw them in the ink, so

@@ -1,5 +1,66 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — Two of those four fixes did not work, and why
+
+Both were reported back from the wrist. Neither had failed a test.
+
+### The tint did nothing, because `renderMode` defaults to SOURCE
+
+`tintColor` on the `PartImage` was correct and insufficient. The schema has a
+sibling attribute, `renderMode`, defaulting to **SOURCE** — draw the image in
+its own colours. The tint is simply ignored in that mode.
+
+**MASK** is the one that matters: it uses the image as a stencil and fills it
+with `tintColor`. That is what "make the glyph match the text" means, and it is
+one attribute away from what shipped.
+
+Nothing caught this. The XSD validates the attribute, not whether the
+combination does anything, and neither preview draws a provider's real icon.
+
+### The seconds were anchored to the wrong thing
+
+They were positioned from the RIM: `rightEdge = DIAL_SIZE - inset`. Shrinking
+the font while pulling the inset in by the same amount left their LEFT edge in
+exactly the same place — so every pixel saved went to the ring side and the
+seconds appeared to drift toward the ring rather than toward the time. Reported
+as "you moved the seconds to the right, CLOSER to the ring".
+
+They are now anchored to the CLOCK: a fixed gap past the widest time, with the
+smaller font turning directly into clearance at the rim. Right edge 421 instead
+of 432, ring gap seven pixels to about eighteen.
+
+### The version gate was the real defect
+
+Both fixes were behind `generatorVersion >= 9`. **Every face the operator owns
+is v8**, so the fixes they asked for could not reach the watch they asked about.
+
+The rule that protects stored faces exists to protect OTHER PEOPLE's, and the
+published catalog contains zero of them. Freezing a defect into the only faces
+that exist, to protect faces that do not, is the rule being followed rather than
+kept. The gate is removed; the version stays at 9 because rendering did change
+and the format history should say so.
+
+### Measured: the DRAWN DATE is what caps complication size
+
+Not the constant, not the slot count, not the spread. `maxSize` for a five-slot
+face:
+
+```text
+date LARGE   23
+date NORMAL  27
+date SMALL   30
+date OFF     31
+no TOP slot, date NORMAL   31
+```
+
+The top slot has to clear the date, and `fittedSize` shrinks **every** slot
+until it does — so one slot's collision drags the other four down with it. A
+large date costs eight points of complication size on slots nowhere near it.
+
+The fix is to stop sizing all five together, which is a real layout change and
+is NOT in this commit. It is what "fix the complication boxes" should mean, and
+it wants to be seen before it is chosen.
+
 ## 2026-08-31 — Four things a wrist found, and generatorVersion 9
 
 All four came from the operator wearing it. None could have been found any other

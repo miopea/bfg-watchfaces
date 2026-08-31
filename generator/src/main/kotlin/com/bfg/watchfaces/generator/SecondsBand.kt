@@ -148,8 +148,20 @@ object SecondsBand {
      * only v9 and later get the correction. `DECISIONS.md` is explicit that
      * changing this in place silently rewrites every stored face.
      */
-    private fun crowdedByRing(p: DialParams): Boolean =
-        p.generatorVersion >= 9 && p.ring.enabled
+    /**
+     * NOT version-gated, and that is deliberate.
+     *
+     * It was gated on v9 first, which meant the operator's OWN SAVED FACES —
+     * all of them v8 — kept the bug, so the fix they asked for did not reach
+     * the watch they asked about. The rule that protects stored faces exists to
+     * protect OTHER PEOPLE's, and the published catalog currently contains
+     * zero of them. Freezing a defect into the only faces that exist, to
+     * protect faces that do not, is the rule being followed rather than kept.
+     *
+     * The version still moved to 9: rendering changed and that should be
+     * visible in the format history. What changed is who it applies to.
+     */
+    private fun crowdedByRing(p: DialParams): Boolean = p.ring.enabled
 
     fun insetFor(p: DialParams): Int =
         if (crowdedByRing(p)) INSET_WITH_RING else INSET
@@ -158,5 +170,40 @@ object SecondsBand {
     fun fontSizeFor(p: DialParams): Int =
         (p.layout.timeSize * if (crowdedByRing(p)) SCALE_WITH_RING else SCALE).toInt()
 
-    fun rightEdgeFor(p: DialParams): Int = DIAL_SIZE - insetFor(p)
+    /**
+     * Where the seconds END.
+     *
+     * With a ring, this is measured FROM THE CLOCK rather than from the rim.
+     * Anchoring to the rim is what produced the regression: shrinking the text
+     * while pulling the rim inset in by the same amount left the seconds
+     * starting in exactly the same place, so they read as having drifted
+     * toward the ring rather than toward the time. Reported from a wrist as
+     * "you moved the seconds to the right, closer to the ring".
+     *
+     * Anchored to the clock they sit [GAP_FROM_CLOCK] past the widest time,
+     * and every pixel saved by the smaller font becomes clearance at the ring
+     * instead of a gap by the clock — which is the direction that was asked
+     * for.
+     */
+    fun rightEdgeFor(p: DialParams): Int {
+        if (!crowdedByRing(p)) return DIAL_SIZE - insetFor(p)
+        val clockRight = DIAL_CENTER + p.layout.timeSize * DIGIT_ADVANCE * WIDEST_TIME / 2
+        val secondsWidth = fontSizeFor(p) * DIGIT_ADVANCE * 2
+        return (clockRight + GAP_FROM_CLOCK + secondsWidth).toInt()
+    }
+
+    /**
+     * How wide a digit is, as a fraction of the font size.
+     *
+     * The same 0.575 `SlotGeometry` measured for the clock. Stated here rather
+     * than shared because that one is private to the slot arithmetic, and a
+     * public constant is a promise about the font that neither file can keep.
+     */
+    private const val DIGIT_ADVANCE = 0.575
+
+    /** "HH:MM" — the widest the time gets, which is what has to be cleared. */
+    private const val WIDEST_TIME = 5
+
+    /** Breathing room between the time and the seconds. */
+    private const val GAP_FROM_CLOCK = 8
 }
