@@ -34,16 +34,34 @@ renders `DAY_AND_DATE` as "MAR 10" and both renderers put the clock at 10:10.
 `DateStyle.SAMPLE_DATE` names it once; the workbench derives it from the render's
 own `time` so a live preview at a real moment still agrees with itself.
 
-### The guard was wrong the first time, and ablating is why that was found
+### The guard was wrong TWICE, and ablating is why both were found
 
 The first version compared a default render against an explicit one at the
 default moment — both go through the same path, so it could not fail. Ablating
-the fix showed it passing.
+the fix showed it passing. It now renders TWO DIFFERENT DAYS AT THE SAME CLOCK
+TIME, so the drawn date is the only thing that can differ.
 
-It now renders TWO DIFFERENT DAYS AT THE SAME CLOCK TIME, so the drawn date is
-the only thing that can differ. Ablated again: fails without the fix, passes
-with it. A golden that depends on the calendar catches nothing and blames
-whoever happens to be mid-change when the date turns.
+The second was a test asserting the EXPORTED `preview.png` equals
+`FacePreview.render`. It was named as though it proved determinism, and it does
+not: both sides go through the same renderer, so if that renderer read the wall
+clock both would read it and still match. Ablation caught this one too. It is
+kept — it does catch `exportTo` drifting onto a different renderer or
+quantization — but renamed to claim only that.
+
+**Twice on one bug is a habit, not an accident:** a guard that compares two
+calls down one code path cannot fail, and reads exactly like one that can.
+
+### What finally proves it, given there is no faketime on this machine
+
+- **A source-level check that no renderer calls `sample()` bare or reads
+  `LocalDate.now()`.** Blunt, and the only thing that covers
+  `AndroidFacePreview` — which needs an Android runtime, so no JVM test
+  exercises it, and which is half the bug because the phone preview and the
+  baked preview are two renderers that can disagree. Ablated against BOTH
+  renderers; it catches both.
+- **Looking at an exported `preview.png`.** It reads "Tue Mar 10", its
+  complication reads "MAR 10", and the clock reads 10:10 — three parts of one
+  image describing one moment. Before the fix the first of those said today.
 
 ## 2026-08-31 — Sign in to publish, anonymous to complain
 
