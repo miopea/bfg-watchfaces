@@ -73,6 +73,7 @@ object Presentation {
         "complicationSpread" -> "Spacing"
         "complicationY" -> "Middle row"
         "dateY" -> "Top slot"
+        "dateSize" -> "Date size limit"
         "batteryY" -> "Bottom slot"
         else -> controlId
     }
@@ -82,6 +83,7 @@ object Presentation {
         ComplicationSource.STEP_COUNT -> "Steps"
         ComplicationSource.HEART_RATE -> "Heart rate"
         ComplicationSource.DAY_AND_DATE -> "Day and date"
+        ComplicationSource.TIME_AND_DATE -> "Time and date"
         ComplicationSource.DATE -> "Date"
         ComplicationSource.DAY_OF_WEEK -> "Day of week"
         ComplicationSource.WATCH_BATTERY -> "Battery"
@@ -91,6 +93,19 @@ object Presentation {
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> "Notifications"
         ComplicationSource.APP_SHORTCUT -> "App shortcut"
         ComplicationSource.FAVORITE_CONTACT -> "Favourite contact"
+        ComplicationSource.WEATHER_TEMPERATURE -> "Weather"
+        ComplicationSource.WEATHER_CONDITION -> "Conditions"
+        ComplicationSource.WEATHER_TEMP_CONDITION -> "Weather and conditions"
+        ComplicationSource.WEATHER_HIGH_LOW -> "High and low"
+        ComplicationSource.WEATHER_RAIN -> "Chance of rain"
+        ComplicationSource.WEATHER_UV -> "UV index"
+        ComplicationSource.SHORTCUT_MUSIC -> "Music"
+        ComplicationSource.SHORTCUT_ALARM -> "Alarms"
+        ComplicationSource.SHORTCUT_SETTINGS -> "Settings"
+        ComplicationSource.SHORTCUT_PHONE -> "Phone"
+        ComplicationSource.SHORTCUT_CALENDAR -> "Calendar"
+        ComplicationSource.SHORTCUT_MESSAGES -> "Messages"
+        ComplicationSource.SHORTCUT_APP -> "Open an app"
     }
 
     /**
@@ -104,7 +119,8 @@ object Presentation {
         ComplicationSource.NONE -> ""
         ComplicationSource.STEP_COUNT -> "8,412"
         ComplicationSource.HEART_RATE -> "62"
-        ComplicationSource.DAY_AND_DATE -> "MAR 10"
+        ComplicationSource.DAY_AND_DATE -> "TUE MAR 10"
+        ComplicationSource.TIME_AND_DATE -> "10:10 TUE"
         ComplicationSource.DATE -> "10"
         ComplicationSource.DAY_OF_WEEK -> "TUE"
         ComplicationSource.WATCH_BATTERY -> "78%"
@@ -114,7 +130,48 @@ object Presentation {
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> "3"
         ComplicationSource.APP_SHORTCUT -> "Maps"
         ComplicationSource.FAVORITE_CONTACT -> "Ann"
+        ComplicationSource.WEATHER_TEMPERATURE -> "72°"
+        ComplicationSource.WEATHER_CONDITION -> "Cloudy"
+        ComplicationSource.WEATHER_TEMP_CONDITION -> "72° Cloudy"
+        ComplicationSource.WEATHER_HIGH_LOW -> "78° / 61°"
+        ComplicationSource.WEATHER_RAIN -> "30%"
+        ComplicationSource.WEATHER_UV -> "UV 6"
+        // A shortcut shows only its glyph; there is nothing to read.
+        ComplicationSource.SHORTCUT_MUSIC,
+        ComplicationSource.SHORTCUT_ALARM,
+        ComplicationSource.SHORTCUT_SETTINGS,
+        ComplicationSource.SHORTCUT_PHONE,
+        ComplicationSource.SHORTCUT_CALENDAR,
+        ComplicationSource.SHORTCUT_MESSAGES,
+        ComplicationSource.SHORTCUT_APP -> ""
     }
+
+    /**
+     * The handful nearly everyone wants, in the order they want them.
+     *
+     * The full list is fourteen system sources plus what we draw, and will grow
+     * again once the watch reports its installed providers -- 37 of them on a
+     * bare emulator. Nine in ten people want one of these six, and a flat
+     * alphabetical list would put Battery a long scroll from Steps.
+     *
+     * Curation is presentation, so it lives here and not in :generator.
+     */
+    val PICKER_COMMON: List<ComplicationSource> = listOf(
+        ComplicationSource.NONE,
+        ComplicationSource.DAY_AND_DATE,
+        ComplicationSource.STEP_COUNT,
+        ComplicationSource.HEART_RATE,
+        ComplicationSource.WEATHER_TEMPERATURE,
+        ComplicationSource.WATCH_BATTERY
+    )
+
+    /** Everything else, in the enum's own order. */
+    /** The tappable shortcuts, grouped so they read as buttons not readings. */
+    val PICKER_SHORTCUTS: List<ComplicationSource> =
+        ComplicationSource.entries.filter { it.isShortcut }
+
+    val PICKER_REST: List<ComplicationSource> =
+        ComplicationSource.entries.filter { it !in PICKER_COMMON && !it.isShortcut }
 
     fun label(pos: SlotPosition): String = when (pos) {
         SlotPosition.TOP -> "Top"

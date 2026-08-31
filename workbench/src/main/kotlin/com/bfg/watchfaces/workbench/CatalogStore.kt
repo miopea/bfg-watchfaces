@@ -1,10 +1,15 @@
 package com.bfg.watchfaces.workbench
 
+import com.bfg.watchfaces.generator.CatalogContract
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.WffEmitter
 import java.io.File
 import java.time.Instant
+import com.bfg.watchfaces.appcore.Json
+import com.bfg.watchfaces.appcore.FaceCodec
+import com.bfg.watchfaces.appcore.FaceLibrary
+import com.bfg.watchfaces.appcore.PublishedSlug
 
 /**
  * The community catalog: `catalog/faces/<slug>.json` plus a generated
@@ -25,62 +30,32 @@ import java.time.Instant
  * usual here because a schema-invalid face installs cleanly and then never
  * appears in the carousel -- there is nothing for a reviewer to notice.
  *
- * Served in production from jsDelivr, NOT raw.githubusercontent.com, which is
- * rate limited and not a CDN. See [CDN_URL].
  *
- * ## This whole file is on its way out
+ * ## The GitHub parts are gone
  *
- * Operator decision `01a049a3-0a0c-7521-a6f3-f40510b81cf7` moves the catalog off
- * GitHub entirely, because GitHub has no anonymous write path of any kind and
- * the aim is that anyone can share a face and anyone can report one without an
- * account. `docs/specs/catalog-service.md` is the contract for the replacement.
+ * `CDN_URL`, `REPO_URL` and `reportUrl` were removed on 2026-08-31, once the
+ * catalog service was deployed and the app's own report path was observed
+ * reaching it. They were kept until then because deleting a complaint path
+ * before its replacement works is worse than one that needs an account.
  *
- * The GitHub-shaped parts below are still here ON PURPOSE, not by oversight.
- * [reportUrl] is the app's Play-required complaint path, and deleting it before
- * the replacement is deployed would leave the app with none at all — strictly
- * worse than one that needs an account. The spec's sequencing section says the
- * same thing in as many words.
+ * What is left is the FORMAT and the VALIDATOR, which outlived the transport:
+ * `Entry` is still the face record, `toJson` still writes the shape `/export`
+ * emits, and `validateDocument` is still the only place a face meets Google's
+ * XSD. `docs/specs/catalog-service.md` is the contract.
+ *
+ * Served in production by the service now, not by jsDelivr.
  */
 object CatalogStore {
 
     /**
-     * jsDelivr, per docs/SPEC.md. Pinned to a ref so a bad main cannot break
-     * clients.
+     * A face is parameters. Anything much larger than this is not a face.
      *
-     * INTERIM — becomes the service's index endpoint. Nothing fetches this
-     * today: it is reported in JSON and printed by the catalog task, and the
-     * Community tab reads the local catalog directory. The network read path
-     * was never built, which is why moving off GitHub costs less than it looks.
+     * The number lives in [CatalogContract] because the catalog service
+     * enforces the same limit from JavaScript, having read it out of the
+     * generated contract. Two constants would be two limits that can disagree,
+     * and the one that disagrees is on the public endpoint.
      */
-    const val CDN_URL = "https://cdn.jsdelivr.net/gh/miopea/bfg-watchfaces-catalog@main/index.json"
-
-    /** Where submissions are opened, and where a face is reported. INTERIM. */
-    const val REPO_URL = "https://github.com/miopea/bfg-watchfaces-catalog"
-
-    /**
-     * The report form for one face.
-     *
-     * Google Play requires a working in-app complaint path for any app showing
-     * user content, so this is not decoration -- without a reachable route to
-     * it, the app cannot ship. The slug and title are prefilled so a reporter
-     * does not have to know what a face is called internally.
-     *
-     * Field ids match .github/ISSUE_TEMPLATE/report-a-face.yml in the catalog.
-     *
-     * INTERIM, and the highest-risk thing to replace. It requires a GitHub
-     * account, which was tolerable while submitting needed one too and stops
-     * being tolerable the moment submitting does not: anyone could publish and
-     * only developers could complain. Replaced by the service's report endpoint
-     * once that exists — and not one moment before, per the note on this object.
-     */
-    fun reportUrl(slug: String, name: String): String {
-        fun enc(s: String) = java.net.URLEncoder.encode(s, Charsets.UTF_8)
-        return "$REPO_URL/issues/new?template=report-a-face.yml" +
-               "&slug=${enc(slug)}&title=${enc("report: $name")}"
-    }
-
-    /** A face is parameters. Anything much larger than this is not a face. */
-    const val MAX_FACE_BYTES = 8 * 1024
+    const val MAX_FACE_BYTES = CatalogContract.MAX_FACE_BYTES
 
     data class Entry(
         val slug: String,
@@ -131,11 +106,11 @@ object CatalogStore {
         val o = Json.obj(Json.parse(text))
         val name = Json.str(o, "name", "")
         return Entry(
-            slug = Json.str(o, "slug", FaceStore.slugify(name)),
+            slug = Json.str(o, "slug", FaceLibrary.slugify(name)),
             name = name,
             author = Json.str(o, "author", ""),
             created = Json.str(o, "created", ""),
-            params = ParamCodec.fromJson(Json.obj(o["params"]))
+            params = FaceCodec.fromJson(Json.obj(o["params"]))
         )
     }
 
@@ -144,23 +119,57 @@ object CatalogStore {
   "slug": ${Json.quote(e.slug)},
   "author": ${Json.quote(e.author)},
   "created": ${Json.quote(e.created)},
-  "params": ${ParamCodec.toJson(e.params).prependIndent("  ").trimStart()}
+  "params": ${FaceCodec.toJson(e.params).prependIndent("  ").trimStart()}
 }
 """
 
     // ---- validation ---------------------------------------------------------
 
     /**
-     * Every reason a submission can be refused, checked in one pass so a PR
-     * author sees all of them at once rather than one per CI run.
+     * How a face's slug is expected to relate to its name.
+     *
+     * The two differ and it is not cosmetic. In the git catalog a file is
+     * `<slug>.json` and the slug IS `slugify(name)` — anything else is a
+     * mismatched pair. A face published by the SERVICE carries a random short
+     * id (`midnight_7f3a`) because the slug is the Watch Face Push package
+     * suffix and two strangers may pick the same name.
+     *
+     * Applying the git rule to a service submission would reject every single
+     * one of them. Applying the service rule to a git file would let a
+     * mismatched pair through. So the caller says which world it is in rather
+     * than one rule guessing.
      */
-    fun validate(root: File, file: File): List<Problem> {
-        val problems = mutableListOf<Problem>()
-        fun bad(msg: String) = problems.add(Problem(file.name, msg))
+    enum class SlugRule {
+        /** `<slug>.json` in a git checkout: the slug is exactly `slugify(name)`. */
+        GIT_CATALOG,
 
-        val text = runCatching { file.readText() }.getOrElse {
-            bad("cannot be read: ${it.message}"); return problems
-        }
+        /** Published by the service: `slugify(name)` truncated, plus a short id. */
+        PUBLISHED
+    }
+
+    /**
+     * Every reason a submission can be refused, checked in one pass so an
+     * author sees all of them at once rather than one per attempt.
+     *
+     * Takes the document as TEXT rather than a file, because the moderation
+     * pass validates what came back over HTTP and has nothing on disk to point
+     * at. [label] is only used to name the thing in a [Problem].
+     *
+     * This is the ONLY place a face is checked against Google's XSD. The
+     * catalog service cannot do it — a Worker is JavaScript, the emitter is
+     * Kotlin and the validator is Xerces — so if this does not run before
+     * publication, nothing does. A schema-invalid face installs cleanly,
+     * reports success, and then never appears in the carousel.
+     */
+    fun validateDocument(
+        root: File,
+        label: String,
+        text: String,
+        slugRule: SlugRule = SlugRule.GIT_CATALOG
+    ): List<Problem> {
+        val problems = mutableListOf<Problem>()
+        fun bad(msg: String) = problems.add(Problem(label, msg))
+
         if (text.toByteArray().size > MAX_FACE_BYTES) {
             bad("is ${text.toByteArray().size} bytes; a face is parameters and must stay under $MAX_FACE_BYTES")
         }
@@ -170,11 +179,17 @@ object CatalogStore {
         }
 
         if (entry.name.isBlank()) bad("has no name")
-        if (entry.slug != FaceStore.slugify(entry.name)) {
-            bad("slug '${entry.slug}' does not match its name '${entry.name}' (expected '${FaceStore.slugify(entry.name)}')")
-        }
-        if (file.nameWithoutExtension != entry.slug) {
-            bad("filename does not match slug '${entry.slug}'")
+        when (slugRule) {
+            SlugRule.GIT_CATALOG ->
+                if (entry.slug != FaceLibrary.slugify(entry.name)) {
+                    bad("slug '${entry.slug}' does not match its name '${entry.name}' (expected '${FaceLibrary.slugify(entry.name)}')")
+                }
+            SlugRule.PUBLISHED ->
+                if (!PublishedSlug.matches(entry.slug, entry.name)) {
+                    bad("slug '${entry.slug}' is not a published slug for '${entry.name}' " +
+                        "(expected '${PublishedSlug.stemFor(entry.name)}_' plus a short id). " +
+                        "The slug is the package name, so the watch would file it under something the gallery does not call it")
+                }
         }
         runCatching { WffEmitter.pushPackageName("com.bfg.watchfaces", entry.slug) }
             .onFailure { bad("slug is not a legal Watch Face Push package segment: ${it.message}") }
@@ -193,13 +208,28 @@ object CatalogStore {
         // unreachable code that looks like protection.
 
         // The one that actually bites: a schema-invalid face installs, reports
-        // success, and never appears. CI is the only place this gets caught.
+        // success, and never appears.
         val xml = runCatching { WffEmitter.emit(entry.params, entry.name) }.getOrElse {
             bad("does not render: ${it.message}"); return problems
         }
         when (val issues = WffValidator.validate(root, xml)) {
             null -> bad("could not be schema-checked: the WFF schema is not installed (run scripts/bootstrap.sh)")
             else -> issues.take(3).forEach { bad("emits schema-invalid WFF at line ${it.line}: ${it.message}") }
+        }
+        return problems
+    }
+
+    /** A face on disk, in a git catalog checkout. */
+    fun validate(root: File, file: File): List<Problem> {
+        val text = runCatching { file.readText() }.getOrElse {
+            return listOf(Problem(file.name, "cannot be read: ${it.message}"))
+        }
+        val problems = validateDocument(root, file.name, text, SlugRule.GIT_CATALOG).toMutableList()
+        // Only meaningful for a file: the service has no filenames.
+        runCatching { parse(text) }.getOrNull()?.let { entry ->
+            if (file.nameWithoutExtension != entry.slug) {
+                problems.add(Problem(file.name, "filename does not match slug '${entry.slug}'"))
+            }
         }
         return problems
     }
@@ -276,7 +306,7 @@ $rows
     fun submit(
         schemaRoot: File,
         catalogRoot: File,
-        face: FaceStore.StoredFace,
+        face: FaceLibrary.StoredFace,
         author: String
     ): Pair<File, List<Problem>> {
         val entry = Entry(

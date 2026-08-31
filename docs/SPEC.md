@@ -66,7 +66,8 @@ own package, and the client is the WATCH app.
 
 A face is ~5KB of JSON. The device regenerates the artwork locally. Consequences:
 
-- A catalog of 10,000 faces is ~50MB of Git repo. Hosting is free via jsDelivr.
+- A catalog of 10,000 faces is ~50MB. That is why it can be hosted for nothing,
+  and it is why an index of it is one request rather than a thousand.
 - **The generator is the file format.** `DialParams` + `PatternEngines` together
   define what a stored face means. Changing engine geometry silently rewrites
   every community face. This is why `generatorVersion` exists and why
@@ -156,39 +157,63 @@ identical on a soft low-contrast dial. Do this always.
 
 ## Community catalog
 
-Built, and it lives in its own public repository:
-<https://github.com/miopea/bfg-watchfaces-catalog>. `faces/<slug>.json`, one per
-face, plus a generated `index.json`.
+**A service, not a repository.** <https://bfg-catalog.bfg-solutions.workers.dev>
+— Cloudflare Workers and D1, on the BFG Solutions account. Deployed 2026-08-30.
+`docs/specs/catalog-service.md` is the contract; this is the summary.
 
-It is separate on purpose: strangers opening pull requests against a folder of
-JSON is a very different risk profile from strangers opening them against the
-app's source.
+It used to be a public git repository of `faces/<slug>.json` with submissions
+arriving as pull requests. That model is gone entirely, for one reason:
+**GitHub has no anonymous write path.** Commits, pull requests, issues and gists
+all need an account, and reading anonymously does not help when the thing you
+need is for a stranger to be able to complain. Requiring an account to report
+became indefensible the moment submitting did not.
 
-- The index carries name, author, engine and colours only, so a gallery of a
-  thousand faces is ONE request. Full parameters stay in the per-face files and
-  are fetched when someone opens one.
-- Served via jsDelivr -- free, no bandwidth limits, GitHub-integrated.
-  Not `raw.githubusercontent.com`, which is not a CDN and is rate limited.
-- Submissions are PRs. `./gradlew :workbench:catalog --args="--check"` runs in
-  CI and fails on a face that does not parse, does not render, emits
-  schema-invalid WFF, has a slug disagreeing with its name or filename, exceeds
-  8KB, or leaves `index.json` stale. Invalid faces are rejected before human
-  review because a reviewer cannot see schema-invalidity in a diff.
-- **Parametric submissions only.** `TEXTURE` faces are refused automatically.
-- The app stages a submission; it does not open the PR. Publishing is the
-  author's action, not a button press in a design tool.
+- **Reads are anonymous and cheap.** `GET /index.json` carries name, author,
+  engine, colours and an install count, so a gallery of a thousand faces is ONE
+  request. Full parameters live behind `/faces/<slug>` and are fetched when
+  somebody opens one. Served from the edge cache.
+- **Publishing needs a Google sign-in. Reporting never does.** That asymmetry is
+  the design, not a compromise: publishing is a privilege, complaining is not.
+  The service stores a hash of the Google subject id and nothing else — no name,
+  no email.
+- **Nothing is public until a person approves it.** With little or no identity
+  behind a submission, pre-moderation is the abuse control; rate limiting only
+  slows a flood that still lands.
+- **Parametric submissions only.** `TEXTURE` faces are refused at the boundary.
+- **`GET /export`** emits every published face as the same `faces/<slug>.json`
+  and `index.json` the git catalog used. That is deliberate: it is what buys
+  back the portability a repository gave for free, and it means the on-disk
+  format stays the interchange format rather than becoming legacy.
 
-Moderation and reporting are documented in the catalog repo's `MODERATION.md`:
-what is disallowed, how to report it, and how fast a report is acted on. Play's
-UGC policy requires a working complaint path for any app surfacing user content.
+### The service does not know what a face is
+
+`catalog-service/params-contract.json` is GENERATED from `CatalogContract` in
+`:generator` by `./gradlew :workbench:contract`. Ranges come from
+`ControlInventory`, bounds from `SlotGeometry`, enums from `DialParams`, the
+field list from `FaceCodec.toQuery`. The Worker reads that file; it never
+decides what a legal face looks like. Writing those ranges out again in
+TypeScript would be a second definition of the file format.
+
+### Where a face meets Google's XSD
+
+`./gradlew :workbench:moderate`. A Worker is JavaScript and cannot run Xerces,
+so the schema check moved to a JVM pass that runs before publication — and it is
+the ONLY place it happens. A schema-invalid face installs cleanly and then never
+appears in the carousel, with no error on either side.
+
+Moderation policy lives in the catalog repository's `MODERATION.md`: what is
+disallowed, how to report it, and how fast a report is acted on. Play's UGC
+policy requires a working complaint path for any app surfacing user content.
 
 Still open:
 
-- **The in-app Report action.** The catalog has an issue template and a stated
-  policy; the app does not yet link to it. That is the remaining store-blocking
-  gap.
-- **The catalog repo's CI cannot reach this validator while this repo is
-  private.** See DECISIONS.md 2026-08-28.
+- **Sharing from the app**, which needs a Google OAuth client id. The service
+  fails closed without one, so publishing is off rather than open.
+- **A route for rights holders who are not app users**, and a way to answer an
+  appeal. `MODERATION.md` states this gap rather than hiding it. It is a
+  condition of the catalog being opened to the public.
+- **Retiring `miopea/bfg-watchfaces-catalog`.** Authorised; the repository is
+  already inert.
 
 ## Ongoing costs
 

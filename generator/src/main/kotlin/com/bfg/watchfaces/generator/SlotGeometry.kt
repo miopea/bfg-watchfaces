@@ -75,16 +75,248 @@ object SlotGeometry {
     fun boxWidth(size: Int): Int = (size * 3.9).roundToInt()
 
     /**
-     * Icon over a single line of text, and nothing more. The old 4.0x height
-     * left ~15px of dead space inside every slot, which is what made five slots
-     * look crowded when they were merely mis-measured.
+     * Icon over a single line of text — or just the text.
+     *
+     * A slot whose glyph is off does not need the icon's height OR the offset
+     * that clears it. It used to get both: the value sat low in a box reserving
+     * room for something never drawn, and the wasted height counted against
+     * every OTHER slot, because the vertical stack (top, clock, row, bottom) is
+     * what caps the complication size on a 456 dial. Measured: with all five
+     * slots on, "Large" was silently clamped from 28 to 25.
      */
-    fun boxHeight(size: Int): Int = (size * 3.3).roundToInt()
+    fun boxHeight(
+        size: Int,
+        withIcon: Boolean = true,
+        version: Int = CURRENT_GENERATOR_VERSION
+    ): Int = when {
+        version < 6 -> (size * 3.3).roundToInt()      // v1..v5: one height, icon or not
+        withIcon && version >= 7 -> (size * 2.45).roundToInt()
+        withIcon -> (size * 2.85).roundToInt()
+        else -> textHeight(size, version)
+    }
 
-    fun iconHeight(size: Int): Int = (size * 1.25).roundToInt()
-    fun textOffset(size: Int): Int = (size * 1.45).roundToInt()
-    fun textHeight(size: Int): Int = (size * 1.7).roundToInt()
-    fun fontSize(size: Int): Int = (size * 0.92).roundToInt()
+    /**
+     * The glyph, which from v7 is SMALLER than the value it labels.
+     *
+     * It was 1.25x the slot size against a 0.92x value -- the little symbol was
+     * bigger than the number, which is backwards for something whose whole job
+     * is to say what the number means. Shrinking it also buys the vertical room
+     * the size control had run out of.
+     */
+    fun iconHeight(size: Int, version: Int = CURRENT_GENERATOR_VERSION): Int =
+        (size * if (version >= 7) 0.85 else 1.25).roundToInt()
+
+    /**
+     * Where the face's own drawn date goes, or null when there is not one.
+     *
+     * Here rather than in the emitter, because the emitter and BOTH previews
+     * need it and the first version of the date computed `dateY - dateSize / 2`
+     * in all three. That is the duplicate-geometry mistake this object was
+     * created to end -- the slot boxes were once computed independently in two
+     * places, agreed in a test, and overlapped on both axes in reality.
+     *
+     * Full width and centred, matching the emitted PartText.
+     *
+     * Placed directly ABOVE THE CLOCK rather than at `dateY`. Despite the name,
+     * `dateY` has always been the TOP SLOT's anchor -- see the top block in
+     * [layoutAt] -- so putting the drawn date there put two things in one place
+     * and left nothing above for the slot. Sitting against the clock instead
+     * gives the whole upper dial back to the top complication, which is what
+     * makes both fit at every complication size.
+     */
+    /**
+     * Average character advance, as a fraction of the font size.
+     *
+     * Measured with AWT at the sizes this face actually uses: "10:10" at 104
+     * is 299px, so a digit runs about 0.575. Letters and spaces average wider
+     * per character than digits once mixed, and 0.62 reproduced the measured
+     * fits within a point across every date style.
+     *
+     * An ESTIMATE, and it has to be: the emitter runs on the phone, where
+     * java.awt does not exist, and the same number has to serve the emitter and
+     * both previews or they disagree about how big the date is.
+     */
+    private const val DIGIT_ADVANCE = 0.575
+    private const val TEXT_ADVANCE = 0.62
+
+    /**
+     * The date, scaled to sit across roughly the same width as the time.
+     *
+     * A single stored size cannot do this: at a 104pt clock, "Wed Sep 30" fits
+     * at 49 and "Sep 30" at 85. So the size is DERIVED from how wide the
+     * style's longest form is, and nothing stored constrains it.
+     *
+     * It was briefly clamped to [Layout.dateSize] as a ceiling, which looked
+     * like a way to keep the control meaningful and quietly undid the whole
+     * change: a face SAVED before this carries the old small value, so the fit
+     * was clamped straight back down to it and the date did not move. Raising
+     * the default only ever helped faces that did not exist yet.
+     *
+     * `dateSize` is therefore no longer read when drawing. It stays in [Layout]
+     * and in the file so faces written by any build still parse.
+     *
+     * Seconds are excluded from the target on purpose: they sit in the gutter
+     * beside the clock, not on its line, so matching "HH:MM" is what makes the
+     * date look the same width as the time.
+     */
+    fun fittedDateSize(p: DialParams): Int {
+        if (p.dateStyle == DateStyle.NONE) return 0
+        val l = p.layout
+        val clockWidth = l.timeSize * DIGIT_ADVANCE * "HH:MM".length
+        val chars = p.dateStyle.widestSample().length.coerceAtLeast(1)
+        val fitted = clockWidth / (TEXT_ADVANCE * chars) * p.dateScale.factor
+        return fitted.roundToInt().coerceIn(MIN_DATE_SIZE, MAX_DATE_SIZE)
+    }
+
+    /**
+     * The date never grows past this, whatever the arithmetic says.
+     *
+     * "30" alone would fit at 96 against a 104pt clock, which is a date the
+     * size of the time. Matching the WIDTH is the ask; matching the height is
+     * not.
+     */
+    const val MAX_DATE_SIZE = 56
+
+    const val MIN_DATE_SIZE = 12
+
+    /**
+     * What a drawn slot actually renders: which wording, and at what size.
+     *
+     * ## Shorten before shrinking
+     *
+     * A complication's text belongs to its provider, which shortens its own
+     * value for a small slot. A DRAWN source has no provider to do that, so a
+     * long one is simply clipped — "72° Cloudy" reached a watch as "° Unknow".
+     * The first fix was to shrink the font until it fit, and it worked in the
+     * sense that nothing was clipped: "71° Cloudy" rendered at 19pt beside
+     * neighbours at 29, and came back from a wrist as "almost impossible to
+     * read".
+     *
+     * The order is now the other way round. Ask the full wording at full size;
+     * if it does not fit, ask [ComplicationSource.compact] — the same value
+     * with the droppable part dropped — at full size. Only when there is
+     * nothing shorter to say does the font come down.
+     *
+     * One function because the emitter and both previews all need the same
+     * answer, and a preview that shortened differently from the watch would be
+     * a preview of a different face.
+     */
+    data class DrawnText(
+        val format: String,
+        val expressions: List<String>,
+        val fontSize: Int,
+        /** What a preview draws, when the shortened form was chosen. */
+        val sample: String?,
+        /** How wide this wording runs, so a caller can check it is not clipped. */
+        val widestValue: Int
+    )
+
+    fun drawnText(source: ComplicationSource, box: Box, base: Int): DrawnText {
+        val chars = source.widestValue
+        val full = DrawnText(source.format, source.drawn.toList(), base, null, chars)
+        if (chars <= 0) return full
+
+        // A LITTLE smaller is cheaper than a word missing. Dropping the
+        // condition is a real loss -- the wearer asked for it -- so it is
+        // worth a point or two of size to keep. What is not worth it is the
+        // 19-against-29 the row slots were producing.
+        val fullSize = sizeThatFits(chars, box.w, base)
+        if (fullSize >= (base * LEGIBLE_SHRINK).roundToInt()) return full.copy(fontSize = fullSize)
+
+        val short = source.compact
+        if (short != null && fitsAt(short.widestValue, box.w, base))
+            return DrawnText(short.format, short.drawn, base, short.sample, short.widestValue)
+
+        // Nothing shorter, or the short form does not fit either. Shrink —
+        // but shrink the SHORTEST wording we have, so the font comes down as
+        // little as possible.
+        val use = short ?: return full.copy(fontSize = sizeThatFits(chars, box.w, base))
+        return DrawnText(
+            use.format, use.drawn,
+            sizeThatFits(use.widestValue, box.w, base), use.sample, use.widestValue
+        )
+    }
+
+    /**
+     * FLOOR, not round: rounding up overflows the box by a fraction of a
+     * character, which is a clipped last letter rather than a tight fit.
+     */
+    private fun widestFitting(chars: Int, width: Int): Int =
+        (width / (TEXT_ADVANCE * chars)).toInt()
+
+    private fun fitsAt(chars: Int, width: Int, size: Int): Boolean =
+        size <= widestFitting(chars, width)
+
+    /**
+     * How far a value may be shrunk before dropping a word is the better deal.
+     *
+     * 0.85, and it is the line between the two failures. "71° Cloudy" in a row
+     * slot fits only at 56% of the others, which is what came back from a
+     * wrist as unreadable. In the wide TOP and BOTTOM slots the same string
+     * fits at 97%, and shortening THERE would delete a word the wearer chose
+     * for no benefit anyone could see.
+     */
+    private const val LEGIBLE_SHRINK = 0.85
+
+    /** Never grows, only shrinks: a short value should not out-shout its neighbour. */
+    private fun sizeThatFits(chars: Int, width: Int, base: Int): Int =
+        minOf(base, widestFitting(chars, width)).coerceAtLeast(MIN_DRAWN_FONT)
+
+    /** Below this a value is not worth drawing; it would be a smudge. */
+    const val MIN_DRAWN_FONT = 10
+
+    fun dateBand(p: DialParams): Box? {
+        if (p.dateStyle == DateStyle.NONE) return null
+        val l = p.layout
+        val (timeTop, _) = timeBand(l)
+        val h = (fittedDateSize(p) * 1.6).roundToInt()
+        return Box(0, timeTop - GAP - h, DIAL_SIZE, h)
+    }
+    /** Where the value sits inside its box: below the glyph, or at the top. */
+    fun textOffset(
+        size: Int,
+        withIcon: Boolean = true,
+        version: Int = CURRENT_GENERATOR_VERSION
+    ): Int = when {
+        !withIcon && version >= 6 -> 0
+        version >= 7 -> (size * 1.05).roundToInt()   // the glyph above is smaller
+        else -> (size * 1.45).roundToInt()
+    }
+    /**
+     * The value's own box: one line, so 1.35x the slot size.
+     *
+     * It was 1.7x, which is 1.85x the FONT — half a line of empty space under
+     * every value. Harmless on its own, and not harmless in aggregate: the
+     * vertical stack of top, clock, row and bottom is what caps the
+     * complication size, so the slack was being paid for by the size control,
+     * which silently clamped "Large" from 28 down to 25.
+     */
+    fun textHeight(size: Int, version: Int = CURRENT_GENERATOR_VERSION): Int =
+        (size * if (version >= 6) 1.35 else 1.7).roundToInt()
+    /**
+     * The value's font.
+     *
+     * ## 1.10, and why it is bigger than the slot size
+     *
+     * It was 0.92, sitting in a line box of [textHeight] — 1.35x the slot
+     * size. So the text filled about two thirds of the room already reserved
+     * for it and the remaining third was empty, which on a wrist reads as
+     * numbers that are too small next to a 104pt clock: "it's almost
+     * impossible to read the numbers, they're so small".
+     *
+     * The obvious answer was to make the slots bigger, and it was measured and
+     * rejected. On a five-slot face the ceiling is size 31; tightening the
+     * spacing buys NOTHING (the ceiling is 31 at every spread from 60 to 92,
+     * and falls to 28 past 100), turning off the bottom slot, the top slot or
+     * the date each buy nothing, and narrowing the boxes from 3.9x to 3.2x
+     * buys three size points worth two points of font — while reflowing every
+     * stored face.
+     *
+     * Raising this factor costs none of that. 1.10 takes the value from 29pt
+     * to 34 at the largest size, and the line box is still 1.24x the font,
+     * which is an ordinary line height. No box changes size and no slot moves.
+     */
+    fun fontSize(size: Int): Int = (size * 1.10).roundToInt()
 
     /** The visual extent of the clock, which slots must not collide with. */
     private fun timeBand(l: Layout): Pair<Int, Int> {
@@ -140,7 +372,10 @@ object SlotGeometry {
      * for; overlapping is not a layout. The step-down is bounded and the result
      * is reported by [fittedSize] so the UI can say what it actually used.
      */
-    fun boxes(p: DialParams): LinkedHashMap<SlotPosition, Box> = layoutAt(p, fittedSize(p))
+    fun boxes(p: DialParams): LinkedHashMap<SlotPosition, Box> {
+        val row = fittedSize(p)
+        return layoutAt(p, row, topSize = fittedTopSize(p, row))
+    }
 
     /**
      * What the layout actually used, versus what was asked for.
@@ -190,21 +425,197 @@ object SlotGeometry {
             sizeClamped = size != l.complicationSize,
             spreadClamped = row.size > 1 && spread != l.complicationSpread,
             // Nothing to move is also a control that did nothing.
-            verticalClamped = air != 0 && (ends.isEmpty() || ends.any { it != air })
+            // LESS than the air asked for, not merely different from it.
+            // Spacing now pushes the row down as well as the ends out, so the
+            // bottom slot travels FURTHER than `air` -- it moves with the row
+            // and then again below it. Moving further is not a refusal, and
+            // reporting it as one told people a control had been ignored while
+            // it was working.
+            // "Fell SHORT in the direction asked for", which is direction
+            // dependent: positive air pushes the ends apart and negative air
+            // pulls them together, so a refusal is `less` in one case and
+            // `more` in the other.
+            //
+            // Not "different from air": spacing now pushes the row down as well
+            // as the ends out, so the bottom slot travels FURTHER than `air` --
+            // with the row, then again below it. Moving further is not a
+            // refusal, and calling it one told people a working control had
+            // been ignored.
+            verticalClamped = air != 0 && (
+                ends.isEmpty() || ends.any { if (air >= 0) it < air else it > air }
+            )
         )
     }
 
-    /** The size actually used, which is [Layout.complicationSize] unless it did not fit. */
+    /**
+     * The size actually used, which is [Layout.complicationSize] unless it did
+     * not fit.
+     *
+     * ## The top slot no longer drags the other four down
+     *
+     * The drawn date sits where the top slot wants to be, so the top slot has
+     * to go above it. This used to shrink EVERY slot until it did, which is a
+     * measured and expensive mistake: for a five-slot face the ceiling was 23
+     * with a large date, 27 with a normal one, 31 with no date at all — and 31
+     * with a normal date if the top slot happened to be empty. Slots at the
+     * bottom of the dial were being shrunk by a date they are nowhere near.
+     *
+     * Now the date constrains only the slot it touches. This returns the size
+     * for the row and the bottom; [fittedTopSize] answers separately for the
+     * top, and is never larger. On a face where the date is what binds, the
+     * top complication renders a little smaller than the row — which is what
+     * the geometry has been saying all along, and was previously expressed by
+     * making everything small instead.
+     */
     fun fittedSize(p: DialParams): Int {
         val requested = p.layout.complicationSize.coerceIn(MIN_SIZE, MAX_SIZE)
         var size = requested
         while (size > MIN_SIZE) {
-            val boxes = layoutAt(p, size)
-            if (fits(boxes.values)) return size
+            if (fits(layoutAt(p, size, topSize = fittedTopSize(p, size)).values)) return size
             size -= 1
         }
         return MIN_SIZE
     }
+
+    /**
+     * The size THIS slot is drawn at.
+     *
+     * One question, asked the same way by the emitter and both previews. The
+     * top slot can be smaller than the row when a drawn date is in its way, and
+     * a renderer that used the row's size for every slot would draw the top
+     * one's text too large for the box it was given.
+     */
+    fun sizeAt(p: DialParams, pos: SlotPosition): Int {
+        val row = fittedSize(p)
+        return if (pos == SlotPosition.TOP) fittedTopSize(p, row) else row
+    }
+
+    /**
+     * The size the TOP slot can take, given the row is at [rowSize].
+     *
+     * Never larger than the row: a top complication bigger than the three below
+     * it reads as a mistake rather than a hierarchy. Smaller is fine and is the
+     * whole point.
+     */
+    fun fittedTopSize(p: DialParams, rowSize: Int): Int {
+        if (!p.slot(SlotPosition.TOP).enabled) return rowSize
+        val band = dateBand(p) ?: return rowSize
+        var size = rowSize
+        while (size > MIN_SIZE) {
+            val top = layoutAt(p, rowSize, topSize = size)[SlotPosition.TOP]
+            if (top == null || top.y + top.h <= band.y) return size
+            size -= 1
+        }
+        return MIN_SIZE
+    }
+
+    /**
+     * The biggest complication size THIS face can take.
+     *
+     * Five slots and a 104pt clock on a 456 dial is a genuinely tight budget,
+     * and the ceiling moves with the layout: turn the top slot off and there is
+     * room for much more. A UI that offers a fixed "Large" therefore offers a
+     * number that is sometimes impossible, silently clamps, and looks broken --
+     * which is what "when I select larger they should be larger" was about.
+     *
+     * Offer sizes derived from THIS, and Large always means as large as this
+     * face allows.
+     */
+    /**
+     * The spacings this face can actually take, narrowest to widest.
+     *
+     * Asked of the layout rather than assumed, because the stored value is only
+     * a REQUEST: `layoutAt` widens it so boxes cannot touch and narrows it so
+     * they cannot leave the rim. Fixed options stopped meaning anything once
+     * the boxes grew — measured at complication size 27, "Tight" 84, "Normal"
+     * 92 and "Wide" 110 all came out as 115, because the minimum had passed all
+     * three. Three controls, one result.
+     *
+     * Derived options cannot drift like that: they are whatever this layout
+     * will honour today.
+     */
+    /**
+     * The three complication sizes to offer, smallest first.
+     *
+     * Here rather than in a UI so it can be TESTED, and so the workbench and
+     * the phone cannot drift. The steps are deliberately far apart: three
+     * controls that produce nearly the same face read as a broken control, and
+     * this project has shipped that twice — once when Large was clamped to
+     * within four points of Medium, once when all three spacings came out as
+     * the same number.
+     */
+    fun sizeOptions(p: DialParams): List<Int> {
+        val max = maxSize(p)
+        // 0.70/0.85/1.00, not 0.60/0.79/1.00.
+        //
+        // From a wrist: "Small is still way too small." So every option moves
+        // up. On the face that prompted it the three go from 18/24/30 to
+        // 21/26/30.
+        //
+        // THE ASK WAS FOR MORE THAN THIS and it could not be met. "Large
+        // should be medium and medium small" wants the whole scale to shift up
+        // a notch, which needs a bigger Large to shift into. 0.80/0.90/1.00
+        // was tried first and `ControlsAreNoticeableTest` refused it: three
+        // options between 24 and 30 differ by about 2pt of text, and the
+        // operator's own earlier instruction was that changing size must be
+        // noticeable. A scale where every step is invisible is worse than one
+        // that starts lower.
+        //
+        // THE TOP OF THE RANGE DID NOT MOVE, and cannot without changing
+        // geometry. `max` is not `MAX_SIZE` (40); it is the largest size whose
+        // boxes still fit, and measurement puts that at 30 for a five-slot
+        // face. It is the dial being ROUND that binds: `fits` requires every
+        // box corner inside the circle. Turning the date off buys 1. Widening
+        // the spread makes it WORSE, 28, because it pushes boxes toward the
+        // rim. So a genuinely larger Large is a geometry change and a version
+        // bump, not a number here.
+        return listOf((max * 0.70).roundToInt(), (max * 0.85).roundToInt(), max)
+            .map { it.coerceAtLeast(MIN_SIZE) }
+            .distinct()
+    }
+
+    /** The three spacings to offer, narrowest first. See [sizeOptions]. */
+    fun spreadOptions(p: DialParams): List<Int> {
+        val r = spreadRange(p)
+        return listOf(r.first, (r.first + r.last) / 2, r.last)
+    }
+
+    fun spreadRange(p: DialParams): IntRange {
+        val lo = spreadAt(p, 0)
+        // SCANNED, not probed at the extreme. Spacing also drives vertical air,
+        // so an enormous request pushes the row down until the complications
+        // have to shrink -- and a shrunk box allows a NARROWER spread than a
+        // moderate request did. Measured: asking for 456 produced 47px, while
+        // 160 produced 144.
+        //
+        // So walk up and keep the widest that still leaves the complications
+        // the size this face would otherwise have. Anything that shrinks them
+        // is not a wider layout, it is a different one.
+        val baseline = fittedSize(p)
+        var hi = lo
+        var request = lo
+        while (request <= DIAL_SIZE) {
+            val q = p.copy(layout = p.layout.copy(complicationSpread = request))
+            if (fittedSize(q) >= baseline) {
+                val actual = spreadAt(p, request)
+                if (actual > hi) hi = actual
+            }
+            request += 4
+        }
+        return lo..hi
+    }
+
+    /** What the layout settles on when asked for [requested]. */
+    private fun spreadAt(p: DialParams, requested: Int): Int {
+        val boxes = boxes(p.copy(layout = p.layout.copy(complicationSpread = requested)))
+        val left = boxes[SlotPosition.LEFT]
+        val middle = boxes[SlotPosition.MIDDLE] ?: boxes[SlotPosition.RIGHT]
+        return if (left != null && middle != null) middle.x - left.x
+        else p.layout.complicationSpread
+    }
+
+    fun maxSize(p: DialParams): Int =
+        fittedSize(p.copy(layout = p.layout.copy(complicationSize = MAX_SIZE)))
 
     const val MIN_SIZE = 10
     const val MAX_SIZE = 40
@@ -223,10 +634,41 @@ object SlotGeometry {
     }
 
     /** [airOverride] exists so [effective] can compare against the no-air layout. */
-    private fun layoutAt(p: DialParams, size: Int, airOverride: Int? = null): LinkedHashMap<SlotPosition, Box> {
+    private fun layoutAt(
+        p: DialParams,
+        size: Int,
+        airOverride: Int? = null,
+        topSize: Int = size
+    ): LinkedHashMap<SlotPosition, Box> {
         val l = p.layout
         val w = boxWidth(size)
-        val h = boxHeight(size)
+        // Per slot: a glyph-less slot is shorter, which is what frees the
+        // vertical room the size control was running out of.
+        fun hFor(pos: SlotPosition) = boxHeight(
+            if (pos == SlotPosition.TOP) topSize else size,
+            pos in p.iconSlots,
+            p.generatorVersion
+        )
+
+        /**
+         * TOP and BOTTOM are alone on their rows, so they are not held to a
+         * third of the dial the way the middle row is.
+         *
+         * They were, and it showed: a provider returning "Sat, Aug 30" had to
+         * fit a box built for three-across, and the watch shrank the text to
+         * make it — so the top complication read as tiny beside the others
+         * while the emitted font size was identical. Measured on a watch with
+         * the same provider in all five slots: they render the same, and the
+         * difference only appears with a long value.
+         *
+         * Capped rather than given the whole chord: a slot that ran the width
+         * of the dial would stop reading as one of a set.
+         */
+        fun wFor(pos: SlotPosition): Int = when (pos) {
+            SlotPosition.TOP -> (boxWidth(topSize) * 1.7).roundToInt()
+            SlotPosition.BOTTOM -> (w * 1.7).roundToInt()
+            else -> w
+        }
         val anchor = (size * 1.2).roundToInt()
         val (timeTop, timeBottom) = timeBand(l)
         val air = airOverride ?: verticalAir(p)
@@ -240,10 +682,17 @@ object SlotGeometry {
         val top = p.slot(SlotPosition.TOP)
         var topBottom = 0
         if (top.enabled) {
+            val h = hFor(SlotPosition.TOP)
             var y = l.dateY - anchor - air         // spacing pushes it away from the clock
             y = min(y, timeTop - GAP - h)          // never run into the clock
+            // The drawn date sits AT dateY, which is where the top slot anchors
+            // -- so with both on they land on each other. The date wins the
+            // band and the slot goes above it. Seen on a phone: "SUN AUG 30"
+            // printed straight through the top complication's own text.
+            dateBand(p)?.let { y = min(y, it.y - GAP - h) }
             y = max(y, highestY)                   // and never leave the circle
-            out[SlotPosition.TOP] = Box(DIAL_SIZE / 2 - w / 2, y, w, h)
+            val tw = wFor(SlotPosition.TOP)
+            out[SlotPosition.TOP] = Box(DIAL_SIZE / 2 - tw / 2, y, tw, h)
             topBottom = y + h
         }
 
@@ -252,8 +701,13 @@ object SlotGeometry {
             .filter { p.slot(it).enabled }
         var rowBottom = max(topBottom, timeBottom)
         if (rowPositions.isNotEmpty()) {
+            val h = rowPositions.maxOf { hFor(it) }
             var y = l.complicationY - anchor
-            y = max(y, timeBottom + GAP)           // below the clock
+            // Spacing pushes the row DOWN from the clock as well as pushing the
+            // slots apart. It only widened before, so "Wide" spread the row out
+            // and left it as close to the time as "Tight" did -- the gap that
+            // actually reads as crowding.
+            y = max(y, timeBottom + GAP + max(0, air))
             y = max(y, topBottom + GAP)            // and below the top slot
             y = min(y, lowestBottom - h)
 
@@ -271,7 +725,7 @@ object SlotGeometry {
 
             rowPositions.forEachIndexed { index, pos ->
                 val offset = (index - (rowPositions.size - 1) / 2.0) * spread
-                out[pos] = Box((DIAL_SIZE / 2 + offset - w / 2).roundToInt(), y, w, h)
+                out[pos] = Box((DIAL_SIZE / 2 + offset - w / 2).roundToInt(), y, w, hFor(pos))
             }
             rowBottom = y + h
         }
@@ -279,13 +733,15 @@ object SlotGeometry {
         // ---- BOTTOM: centred, below the row ----
         val bottom = p.slot(SlotPosition.BOTTOM)
         if (bottom.enabled) {
+            val h = hFor(SlotPosition.BOTTOM)
             // Clear of the row, then inside the circle. If those two cannot
             // both hold at this size, the layout is rejected by fits() and the
             // caller retries a size down -- rather than shipping a slot that
             // hangs into the bezel, which is what the clamp used to do.
             var y = max(l.batteryY - anchor + air, rowBottom + GAP + max(0, air))
             y = min(y, lowestBottom - h)
-            out[SlotPosition.BOTTOM] = Box(DIAL_SIZE / 2 - w / 2, y, w, h)
+            val bw = wFor(SlotPosition.BOTTOM)
+            out[SlotPosition.BOTTOM] = Box(DIAL_SIZE / 2 - bw / 2, y, bw, h)
         }
 
         return out

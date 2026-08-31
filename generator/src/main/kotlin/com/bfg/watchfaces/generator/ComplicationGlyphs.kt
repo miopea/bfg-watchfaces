@@ -90,7 +90,16 @@ object ComplicationGlyphs {
 
     /** What to draw for a source. Empty when the slot shows nothing. */
     fun shapes(source: ComplicationSource): List<Shape> = when (source) {
-        ComplicationSource.NONE -> emptyList()
+        // A drawn source has no glyph: the icons come from the provider's
+        // MONOCHROMATIC_IMAGE and a drawn source has no provider. The value is
+        // centred in its box instead.
+        ComplicationSource.NONE,
+        ComplicationSource.WEATHER_TEMPERATURE,
+        ComplicationSource.WEATHER_CONDITION,
+        ComplicationSource.WEATHER_TEMP_CONDITION,
+        ComplicationSource.WEATHER_HIGH_LOW,
+        ComplicationSource.WEATHER_RAIN,
+        ComplicationSource.WEATHER_UV -> emptyList()
         ComplicationSource.STEP_COUNT -> steps()
         ComplicationSource.HEART_RATE -> heart()
         ComplicationSource.WATCH_BATTERY -> battery()
@@ -98,38 +107,70 @@ object ComplicationGlyphs {
         ComplicationSource.DATE,
         ComplicationSource.DAY_OF_WEEK -> calendar(dot = false)
         ComplicationSource.NEXT_EVENT -> calendar(dot = true)
-        ComplicationSource.WORLD_CLOCK -> clock()
+        ComplicationSource.WORLD_CLOCK,
+        ComplicationSource.TIME_AND_DATE -> clock()
         ComplicationSource.SUNRISE_SUNSET -> sunrise()
         ComplicationSource.UNREAD_NOTIFICATION_COUNT -> bell()
-        ComplicationSource.APP_SHORTCUT -> apps()
+        ComplicationSource.APP_SHORTCUT,
+        ComplicationSource.SHORTCUT_APP -> apps()
+        ComplicationSource.SHORTCUT_MUSIC -> note()
+        ComplicationSource.SHORTCUT_ALARM -> alarm()
+        ComplicationSource.SHORTCUT_SETTINGS -> gear()
+        ComplicationSource.SHORTCUT_PHONE -> handset()
+        ComplicationSource.SHORTCUT_CALENDAR -> calendar(dot = false)
+        ComplicationSource.SHORTCUT_MESSAGES -> speechBubble()
         ComplicationSource.FAVORITE_CONTACT -> person()
     }
 
     /** Two footprints, offset, like the Wear steps glyph. */
-    private fun steps(): List<Shape> = listOf(
-        foot(8.0, 8.5, -0.18),
-        foot(16.0, 14.0, 0.18)
+    /**
+     * Two footprints, and deliberately UNROTATED.
+     *
+     * They used to lean via [Shape.Rotated], which Watch Face Format cannot
+     * express: a rotated ellipse is not an axis-aligned one, and there is no
+     * primitive for it. That made this glyph undrawable on a watch, which is
+     * why the emitter had to fall back to the provider's own icon — and the
+     * provider's icon is green.
+     *
+     * Losing the lean costs a little character and buys a glyph that renders
+     * identically in both previews and on the watch, in the wearer's ink.
+     */
+    private fun steps(): List<Shape> = foot(8.0, 8.5) + foot(16.0, 14.0)
+
+    private fun foot(cx: Double, cy: Double) = listOf(
+        Shape.Oval(cx - 2.6, cy - 4.0, 5.2, 7.2, fill = true),
+        Shape.Oval(cx - 2.2, cy + 3.0, 4.4, 3.0, fill = true)
     )
 
-    private fun foot(cx: Double, cy: Double, lean: Double) = Shape.Rotated(
-        cx, cy, lean,
-        listOf(
-            Shape.Oval(-2.6, -4.0, 5.2, 7.2, fill = true),
-            Shape.Oval(-2.2, 3.0, 4.4, 3.0, fill = true)
-        )
-    )
-
+    /**
+     * A heart as two lobes and two strokes, rather than one cubic outline.
+     *
+     * The cubic version was prettier and could not be drawn on a watch — Watch
+     * Face Format has no bézier — so this glyph fell back to the provider's
+     * icon, which Google Fit ships in red.
+     *
+     * Two half-ellipses meeting at the centre, and two lines down to the point.
+     * An outline rather than a fill, because an arc can only be stroked.
+     */
     private fun heart(): List<Shape> = listOf(
-        Shape.Curve(
-            start = Pt(12.0, 20.0),
-            segments = listOf(
-                Cubic(Pt(2.0, 13.5), Pt(3.0, 6.0), Pt(7.8, 5.0)),
-                Cubic(Pt(10.2, 4.5), Pt(11.6, 6.2), Pt(12.0, 7.4)),
-                Cubic(Pt(12.4, 6.2), Pt(13.8, 4.5), Pt(16.2, 5.0)),
-                Cubic(Pt(21.0, 6.0), Pt(22.0, 13.5), Pt(12.0, 20.0))
-            ),
-            closed = true, fill = true
-        )
+        // THE CLASSIC CONSTRUCTION: a square turned 45 degrees, with a circle
+        // on each of its two upper edges. Filled, so there is no outline to go
+        // wrong.
+        //
+        // Three attempts at an outline made of arcs and lines came before this,
+        // and the last of them looked like a heart in the AWT preview and not
+        // on the watch. Arcs are the one shape whose geometry has to be
+        // CONVERTED for this format — AWT counts counter-clockwise from three
+        // o'clock, the format clockwise from twelve — so an arc-built glyph has
+        // a whole class of failure that a filled ellipse and a rectangle simply
+        // do not have.
+        //
+        // The square is centred on the pivot so the part rotates about it.
+        Shape.Oval(2.61, 2.61, 11.0, 11.0, fill = true),
+        Shape.Oval(10.39, 2.61, 11.0, 11.0, fill = true),
+        Shape.Rotated(12.0, 12.0, Math.PI / 4, listOf(
+            Shape.RoundRect(-5.5, -5.5, 11.0, 11.0, 0.6, 0.6, fill = true)
+        ))
     )
 
     private fun battery(): List<Shape> = listOf(
@@ -162,14 +203,10 @@ object ComplicationGlyphs {
     )
 
     private fun bell(): List<Shape> = listOf(
-        Shape.Curve(
-            start = Pt(6.0, 16.5),
-            segments = listOf(
-                Cubic(Pt(6.0, 12.0), Pt(6.2, 7.0), Pt(12.0, 7.0)),
-                Cubic(Pt(17.8, 7.0), Pt(18.0, 12.0), Pt(18.0, 16.5))
-            ),
-            closed = true, fill = false
-        ),
+        // The dome, as half an ellipse rather than two cubics. It was being
+        // DROPPED silently by the WFF writer, which would have shipped a bell
+        // with no bell in it the moment this glyph was drawn on a watch.
+        Shape.Arc(6.0, 7.0, 12.0, 19.0, 0.0, 180.0),
         Shape.Line(4.4, 16.5, 19.6, 16.5),
         Shape.Line(12.0, 4.4, 12.0, 6.6),
         Shape.Arc(10.0, 17.2, 4.0, 3.4, 200.0, 140.0)
@@ -180,6 +217,52 @@ object ComplicationGlyphs {
             add(Shape.RoundRect(cx - 3.2, cy - 3.2, 6.4, 6.4, 1.8, 1.8, fill = false))
         }
     }
+
+    /** A quaver: a filled head and a stem with a flag. */
+    private fun note(): List<Shape> = listOf(
+        Shape.Oval(4.0, 15.0, 6.0, 5.0, fill = true),
+        Shape.Line(10.0, 17.5, 10.0, 5.0),
+        // Lines and arcs only: these glyphs are also emitted as WFF draw
+        // primitives, and the format has Line, Ellipse, Rect, RoundRect and
+        // Arc but no cubic. A shape a watch cannot draw is not a shape.
+        Shape.Line(10.0, 5.0, 18.0, 7.5),
+        Shape.Line(10.0, 9.0, 18.0, 11.5)
+    )
+
+    /** A clock face with the two bell feet an alarm has. */
+    private fun alarm(): List<Shape> = listOf(
+        Shape.Oval(4.5, 5.5, 15.0, 15.0, fill = false),
+        Shape.Line(12.0, 9.5, 12.0, 13.0),
+        Shape.Line(12.0, 13.0, 14.5, 14.5),
+        Shape.Line(3.0, 5.0, 6.5, 2.5),
+        Shape.Line(21.0, 5.0, 17.5, 2.5)
+    )
+
+    /** A cog: a ring, a hub, and four teeth on the axes. */
+    private fun gear(): List<Shape> = buildList {
+        add(Shape.Oval(6.0, 6.0, 12.0, 12.0, fill = false))
+        add(Shape.Oval(10.0, 10.0, 4.0, 4.0, fill = false))
+        add(Shape.Line(12.0, 2.5, 12.0, 5.5))
+        add(Shape.Line(12.0, 18.5, 12.0, 21.5))
+        add(Shape.Line(2.5, 12.0, 5.5, 12.0))
+        add(Shape.Line(18.5, 12.0, 21.5, 12.0))
+    }
+
+    /** A handset, drawn as the familiar diagonal. */
+    private fun handset(): List<Shape> = listOf(
+        Shape.Arc(2.0, 2.0, 20.0, 20.0, 180.0, -110.0),
+        Shape.Line(20.0, 15.0, 15.5, 14.0),
+        Shape.Line(15.5, 14.0, 13.5, 16.0),
+        Shape.Line(9.0, 5.0, 5.0, 4.0),
+        Shape.Line(9.0, 5.0, 10.0, 9.5)
+    )
+
+    /** A rounded rectangle with a tail: a message. */
+    private fun speechBubble(): List<Shape> = listOf(
+        Shape.RoundRect(3.5, 5.0, 17.0, 12.0, 3.0, 3.0, fill = false),
+        Shape.Line(8.0, 17.0, 8.0, 21.0),
+        Shape.Line(8.0, 21.0, 12.5, 17.0)
+    )
 
     private fun person(): List<Shape> = listOf(
         Shape.Oval(8.2, 4.0, 7.6, 7.6, fill = false),

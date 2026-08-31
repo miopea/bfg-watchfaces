@@ -44,3 +44,20 @@ textures/
 *.jks
 *.keystore
 keystore.properties
+
+# Built by scripts/build-pack-android.sh from pinned, patched google/pack.
+# Build output, not source -- and not Androidify's prebuilt binaries either.
+mobile/src/main/jniLibs/
+
+# Rust build output for the JNI wrapper.
+scripts/pack-java/target/
+
+# Python bytecode from scripts/ (play-release.py is imported by ad-hoc checks).
+__pycache__/
+*.pyc
+
+# The catalog service's dependencies. package-lock.json IS committed, so an
+# install is reproducible; node_modules is 100MB of somebody else's code and
+# carries the workerd binary for whichever platform ran npm install.
+catalog-service/node_modules/
+catalog-service/.wrangler/

@@ -29,6 +29,21 @@ object PatternEngines {
         4 -> v4(p)
         // v5 changed complication SPACING, not engine geometry.
         5 -> v4(p)
+        // v6 reshaped the complication BOX (SlotGeometry), not the dial. No
+        // engine changed, so this delegates rather than copying the code.
+        6 -> v4(p)
+        // v7 shrank the complication glyph. No engine changed.
+        7 -> v4(p)
+        // v8 made the definition authoritative and added drawn sources.
+        8 -> v4(p)
+        // v9 moved the SECONDS left to clear the step ring, and tinted the
+        // complication glyph to the ink. Neither is a dial pattern, so this
+        // delegates rather than copying an engine.
+        9 -> v4(p)
+        // v10 raised the complication VALUE's font inside the box it already
+        // had, and lets a long drawn value drop a word rather than shrink.
+        // Both are SlotGeometry; the dial pattern is untouched.
+        10 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

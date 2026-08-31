@@ -43,8 +43,29 @@
 
   <uses-permission android:name="com.google.wear.permission.SET_PUSHED_WATCH_FACE_AS_ACTIVE" />
 
-  <application android:label="BFG Watch Faces">
-    <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
+  <application
+      android:label="BFG Watch Faces"
+      android:icon="@mipmap/ic_launcher"
+      android:roundIcon="@mipmap/ic_launcher_round">
+    <!--
+      TRUE, and this is what stops the app appearing in the Play Store on a
+      watch when it is false.
+
+      "Non-standalone" is the Wear 2.x arrangement: the watch app was not
+      independently installable and Play pushed it out automatically when the
+      phone app was installed. Wear OS 3 removed that delivery, so a
+      non-standalone app is simply not offered on a modern watch — which is
+      exactly the symptom, an app released to a track that never appears in the
+      list.
+
+      It was false because when it was written this app had no launcher activity
+      at all: there was nothing to open and nothing to install on its own. That
+      stopped being true when WatchActivity landed. The app now installs, opens,
+      and tells you whether it is ready and whether it may switch your face. It
+      needs the phone app to be USEFUL, which is a different question from
+      whether it can stand on its own.
+    -->
+    <meta-data android:name="com.google.android.wearable.standalone" android:value="true" />
 
     <!--
       Receives a face from the device over ChannelClient and installs it.
@@ -73,6 +94,23 @@
       callback never arrives and the one irreversible answer is silently lost.
       Observed on Wear OS 6, 2026-08-29 — see ActivationRequestActivity.
     -->
+    <!--
+      The launcher entry. Until 2026-08-29 there was none: the app was a
+      listener service and a permission activity, so installed from Play it
+      was invisible and a tester had no way to open it or tell whether it
+      worked. See WatchActivity.
+    -->
+    <activity
+        android:name=".WatchActivity"
+        android:exported="true"
+        android:label="BFG Watch Faces"
+        android:taskAffinity="">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+
     <activity
         android:name=".ActivationRequestActivity"
         android:exported="false"

@@ -1,0 +1,54 @@
+# The community catalog service.
+#
+# Cloudflare rather than Azure, settled 2026-08-30: the Cosmos free tier in the
+# only reachable subscription is taken, that subscription is the operator's
+# EMPLOYER's, the install counter is on the app's critical path and Workers have
+# no cold start, and D1 enforces the dedup rule in the engine.
+# docs/specs/catalog-service.md carries the full comparison.
+#
+# The database id is an identifier, not a secret -- Cloudflare's own docs put it
+# in this committed file. The three SECRETS are set with `wrangler secret put`
+# and are listed at the bottom without their values.
+
+name = "bfg-catalog"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# Both stated rather than defaulted, because the deploy warns that it is
+# choosing them for you and the choice is not obvious.
+#
+# workers_dev is how the service is reachable at all today: there is no custom
+# domain on it yet.
+workers_dev = true
+
+# Preview URLs are OFF. Every version would otherwise get its own public
+# address bound to THIS SAME D1 database -- so a submission through a preview
+# URL lands in the real moderation queue, and a second public entry point
+# exists that nobody is thinking about. The abuse model here is pre-moderation
+# plus one bearer token; a spare front door is not worth the convenience.
+preview_urls = false
+
+# The published catalog changes only when a maintainer approves something, so
+# reads are served from the edge cache and the database is not touched at all on
+# a cache hit. See CACHE_SECONDS in src/index.ts.
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bfg-catalog"
+database_id = "9fa40371-9cfe-4fc8-a8f5-9592c447deb4"
+
+[vars]
+# The OAuth client id every ID token must be issued for. Public by necessity --
+# the app needs the same value to ask Google for a token. Empty means publishing
+# is switched off, and the write endpoints fail closed rather than accepting
+# anybody.
+GOOGLE_CLIENT_ID = ""
+
+# Secrets, set with `wrangler secret put <name>` and never written here:
+#
+#   MODERATOR_TOKEN    the only credential in the system; guards /admin/*
+#   IP_SALT            salts the hashed IP used for rate limiting AND the hashed
+#                      Google subject id stored as author_key, so neither a raw
+#                      address nor a raw subject id is ever written down

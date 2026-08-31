@@ -11,6 +11,11 @@ dependencies {
     // WffSchemaTest uses. Populated by scripts/bootstrap.sh; not committed.
     implementation(fileTree("../generator/libs") { include("*.jar") })
 
+    // The Watch Face Push validator, JVM build. Lets a candidate APK be checked
+    // and tokenised here, so pushing one to a watch by hand does not need a
+    // phone app that can mint tokens.
+    implementation(libs.wfp.validator.jvm)
+
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
@@ -47,6 +52,42 @@ tasks.register<JavaExec>("bake") {
     group = "bfg"
     description = "Bake dial_bg.png, preview.png and watchface.xml into watchface-template"
     mainClass.set("com.bfg.watchfaces.workbench.Bake")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
+/** Regenerate the app icon from BrandMark. Writes checked-in files. */
+tasks.register<JavaExec>("brand") {
+    group = "bfg"
+    description = "Write the launcher icons, the Play store icon and docs/brand from BrandMark"
+    mainClass.set("com.bfg.watchfaces.workbench.Brand")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
+/** Regenerate the catalog service's params contract. Writes a checked-in file. */
+tasks.register<JavaExec>("contract") {
+    group = "bfg"
+    description = "Write catalog-service/params-contract.json from CatalogContract"
+    mainClass.set("com.bfg.watchfaces.workbench.Contract")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
+/** Work the catalog service's moderation queue. */
+tasks.register<JavaExec>("moderate") {
+    group = "bfg"
+    description = "Review, publish or reject faces in the catalog service's queue"
+    mainClass.set("com.bfg.watchfaces.workbench.Moderate")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
+/** A Watch Face Push validation token for an APK, so it can be pushed by hand. */
+tasks.register<JavaExec>("token") {
+    group = "bfg"
+    description = "Print a Watch Face Push validation token for an APK"
+    mainClass.set("com.bfg.watchfaces.workbench.Token")
     classpath = sourceSets["main"].runtimeClasspath
     workingDir = rootProject.projectDir
 }

@@ -272,10 +272,661 @@ which Play's UGC rules require before it can ship at all.
 So the instruction is authorised and queued, not ignored. It happens at step 4
 of the sequencing above, after the service is deployed and the app points at it.
 
+## Settled by interview, 2026-08-30
+
+### A published slug carries an id, because a slug is a package name
+
+`watchfacepush.<slug>` is the Watch Face Push package. Two community faces both
+called "Midnight" produce the SAME package, and installing the second silently
+replaces the first on the watch — the kind of invisible difference that has cost
+the most this week.
+
+A published face's slug is therefore `name_<short id>`:
+
+```text
+watchfacepush.midnight_7f3a
+watchfacepush.midnight_c214
+```
+
+Collisions become impossible by construction rather than by policy, and nobody
+has to be told their name is taken. The package name is slightly uglier and is
+visible in Settings on the watch; that is the price.
+
+Locally saved faces keep their plain slug. This applies when a face is
+PUBLISHED, which is the only moment two strangers' names can meet.
+
+### Bot check: Cloudflare Turnstile
+
+The operator already has a Cloudflare account, so the "second cloud" objection
+that shaped the hosting decision does not apply. Free, needs no account from the
+person submitting, and tracks nobody. A script tag and one secret is a far
+smaller commitment than a second runtime, which is what the hosting argument was
+actually about.
+
+### The queue grows; oldest first
+
+Submissions are always accepted and worked through in order. Nothing is lost and
+nobody is turned away because strangers arrived first. "Awaiting review" can
+therefore mean weeks, and that is said in the app rather than implied — the
+response promises in `MODERATION.md` are about REPORTS, not submissions, and
+that distinction now needs to be explicit there too.
+
+A cap was rejected: it turns real submissions away and hands an attacker a way
+to hold the queue full. Auto-publishing after a timeout was rejected outright —
+it defeats R3, since an attacker need only wait.
+
+### Withdrawal: a random per-install id
+
+A random value made on first run and stored on the device. Sent ONLY when
+submitting or reporting, never on reads, so browsing stays anonymous. It lets
+someone withdraw their own face and lets the app show what they have submitted.
+
+It is deliberately weak: reinstalling makes a new one, and the old face can then
+only be withdrawn by reporting it. That is stated at submit rather than
+discovered.
+
+**It is NOT used for moderation.** Blocking by install id would make it a real
+identity with consequences, while still being defeated by a reinstall — the
+worst of both. It exists to give an author their own face back.
+
+**R1's wording changes.** "No identity of any kind" was true and is no longer.
+It becomes: no account, and nothing that identifies a person. About says so in
+the promise itself rather than in a privacy page nobody reads.
+
+### Reports queue for a human and never auto-hide
+
+A report is a message, not an action. Mass-reporting achieves nothing but a
+longer queue. Auto-hiding on N reports was rejected because with no accounts "N
+people" is one person and a loop — it hands anyone a takedown button.
+
+The cost is accepted and already written into `MODERATION.md`: a harmful face
+stays up until a person sees it, which is what the 72-hour promise means.
+
+### Pending faces live in My faces
+
+Marked "Waiting to be reviewed", with a withdraw option, where the person's
+faces already are. No new screen, and it sets the expectation that review takes
+time. A confirmation-and-nothing-else was rejected: it cannot distinguish "still
+waiting" from "quietly rejected", which is the state people actually ask about.
+
+### Byte-identical submissions are rejected; near-duplicates are not
+
+An exact parameter match adds nothing. Anything else is somebody's judgement
+about colour and scale, and refereeing that needs a threshold nobody can defend
+and would land in the appeals path.
+
+### The gallery is ordered by popularity, and that costs something
+
+Chosen over newest-first with the cost named: ranking by installs means the app
+REPORTS installs, and the app has promised that browsing sends nothing.
+
+The reporting is made as small as it can be:
+
+```text
+POST /faces/<slug>/installed
+(empty body)
+
+stored:  midnight_7f3a -> 1,412
+```
+
+No install id, no device details, nothing correlatable, one number per face. A
+per-person history is exactly what this must not become, which is why the
+install id is not attached even though it exists.
+
+The count is inflatable by anyone posting in a loop, so the ranking is a hint
+rather than a truth. That is acceptable for ordering a gallery and would not be
+for anything else.
+
+**About states it in the promise**, not in a footnote:
+
+```text
+No account. No ads. No cost.
+
+When you install a community face, the app adds one to that face's counter so
+the gallery can show popular designs. Nothing about you is sent — not a name,
+not a number, not your other faces.
+```
+
+### Offline: the cached index, marked as possibly stale
+
+The index is a few MB and changes rarely, so caching it is nearly free, and a
+face is parameters — anything cached still previews and still sends to a watch.
+Someone can therefore browse and install a face that has since been removed,
+which `MODERATION.md` already admits it cannot prevent on a wrist.
+
+## Checked 2026-08-30: the Azure recommendation does not survive
+
+Both halves of the "check before building" turned out badly, and the second one
+is the important one.
+
+### The Cosmos free tier is already taken
+
+```text
+az cosmosdb list
+  rcgcrm   freeTier=True   rg=crm
+```
+
+One free-tier account per subscription, and `rcgcrm` has it. The option will not
+even appear. Table Storage would be cents a month — and cents is not zero, which
+is exactly what the About screen promises.
+
+### The Azure that is available is the EMPLOYER'S
+
+```text
+az account list
+  Information Technology (EA)   tenant=rcg.org   Enabled     <- the only one
+```
+
+This is the decision that matters, and the spec got it wrong by reasoning from
+the wrong evidence. "They already use Azure, decisively — 325 files across the
+sibling repos" is true, and every one of those repos is work. The Azure in
+question belongs to The Restored Church of God, under an Enterprise Agreement.
+
+BFG Watch Faces is a personal open-source project. Putting its community service
+into an employer's EA subscription is not a hosting choice, it is a question
+about whose resources, whose bill, whose policy and whose ownership — and it is
+not a question this document can answer.
+
+### Cloudflare, checked and working
+
+The operator has their own account, and everything the service needs is
+available on it:
+
+```text
+account: BFG Solutions
+  D1 databases       OK (0 of the free tier's 1 used)
+  Workers scripts    OK (1 already deployed: budgetbug-email-inbound)
+  Turnstile widgets  OK
+  Pages projects     OK
+```
+
+Workers is already in production use on that account, so the "second deploy
+story, second set of credentials, second thing to remember exists" argument does
+not apply either — it is the same account the bot check was already going to use
+after the interview.
+
+### Both are in use, so: which is better and cheaper
+
+| | Cloudflare (BFG Solutions) | Azure (Information Technology EA) |
+| --- | --- | --- |
+| Whose account | The operator's | The employer's |
+| Published catalog | Pages / Workers, cached at the edge, free | Static Web Apps Free, cached at the edge, free |
+| Submit, report, count | Workers Free, 100k requests/day | Managed Functions, included in SWA Free |
+| Moderation queue | D1 Free — 1 database, 500 MB, indefinite | Cosmos free tier TAKEN → Table Storage, pence/month |
+| Bot check | Turnstile, same account, same request | Turnstile, cross-account call |
+| Domain for it | `bfgsolutions.net` already on the account | DNS points from Cloudflare anyway |
+| Can it generate a bill | No — Free stops serving | Storage bills pence to the employer |
+| Already running there | Yes: `budgetbug-email-inbound`, subdomain `bfg-solutions` | Yes, but all of it work |
+
+Two differences are worth more than the rest.
+
+**`POST /faces/<slug>/installed` is on the app's critical path.** Every install
+of a community face makes that call, and Workers run as V8 isolates with
+effectively no cold start, where Functions on the Static Web Apps Free plan cold
+start in seconds. Submit and report are rare enough not to care; the counter is
+not.
+
+**Turnstile is Cloudflare's.** Validating a token from a Worker is one
+same-account call. From Azure it is a cross-cloud hop with a second credential
+to store and rotate — which is the "second cloud" cost the original decision was
+trying to avoid, arriving anyway, just pointing the other way.
+
+Azure would win if this needed to sit inside existing operational tooling —
+monitoring, alerting, an on-call rota. A personal free gallery has none of that,
+and the sibling repos' Azure is not the operator's to borrow for it.
+
+### Settled 2026-08-30: Cloudflare
+
+The operator chose Cloudflare in the terminal — "Cloudflare, go ahead" — after
+instructing that account ownership was not a factor and the choice was to be
+made on technical merit alone. **The ownership argument above is therefore
+retired and must not be raised again.** It is left in the record because it was
+made, not because it still counts.
+
+The merit case, which is what decided it:
+
+- **Workers have no cold start, and the install counter is on the critical
+  path.** Every install of a community face calls
+  `POST /faces/<slug>/installed`. Workers are V8 isolates; Functions on the
+  Static Web Apps Free plan cold start in seconds. Submit and report are rare
+  enough not to care; the counter is not.
+- **D1 is real SQL, so the dedup rule is enforced by the engine.**
+  "Byte-identical submissions are rejected" is one partial unique index. Table
+  Storage cannot express it, so on Azure it becomes a read-then-write in
+  application code with a race two simultaneous submissions can drive through.
+  Cosmos would fix that and its free tier is taken.
+- **Turnstile is a same-platform call** rather than a second service with a
+  second credential to store and rotate.
+
+Azure's genuine advantages were named and judged not to apply yet: App Insights,
+point-in-time restore, staging slots, and a read path with zero compute per
+gallery view. All of it is operational maturity for a project with no on-call,
+no alerting and no restore drill.
+
+The numbers still hold: Workers Free is 100,000 requests/day and D1 Free is one
+database at 500 MB, against a catalog sized for 10,000 faces of ~5KB each.
+
+**One ceiling is worth writing down**, because it is the place this design would
+first hurt: a response served from `caches.default` still costs a Worker
+invocation, so the 100k/day free limit applies to total requests rather than
+cache misses. Azure's shape avoids that by serving the index as a genuinely
+static file. Cloudflare can match it with Pages or a zone Cache Rule, and that
+is the move if the request count ever approaches the limit — not a migration.
+
+## Validation is split, and the split is the interesting part
+
+R3 says "submissions validate without a human". That was written assuming a JVM
+and it cannot be satisfied as written: a Worker is JavaScript, the emitter is
+Kotlin and the schema validator is Xerces.
+
+Porting either into JavaScript was rejected outright. It would be a second
+implementation of the file format, which is the thing `SlotGeometry`,
+`ControlInventory`, `EngravedStroke` and `FaceCodec` all exist to prevent, and
+each of those was created *after* a duplicated implementation had already caused
+a real bug.
+
+So the check happens in two places:
+
+| Where | What it catches | When |
+| --- | --- | --- |
+| The Worker, from the generated contract | Values outside a slider's range, unknown enum members, malformed colours, unknown fields, and strings that would break out of an XML attribute | At the POST |
+| The moderation pass, on the JVM | Whether the face renders and emits WFF that passes Google's XSD | Before publication |
+
+**Nothing reaches the public without an automated verdict**, which is what R3
+was protecting. What changed is that the verdict no longer arrives while the
+submitter is waiting. That is worth stating plainly because a schema-invalid
+face installs cleanly and then never appears in the carousel — there is no
+error, on either side, so the automated check is the only signal that exists.
+
+### The contract is generated, not written twice
+
+`catalog-service/params-contract.json` comes from `CatalogContract` in
+`:generator` via `./gradlew :workbench:contract`. Ranges come from
+`ControlInventory`, layout bounds from `SlotGeometry`, enums from `DialParams`,
+the field list from `FaceCodec.toQuery`, the colour and ComponentName patterns
+from `DialParams`' own regexes, and the font weights from Watch Face Format's
+XSD. It is committed because a `wrangler deploy` must not depend on a JVM having
+been run, and `ContractFileTest` fails when the committed copy goes stale.
+
+The test fixture is generated by the same task, from `FaceCodec` and
+`CatalogStore`. This is not fastidiousness: the generated fixture immediately
+caught `dateSize` being bounded by `SlotGeometry.MAX_DATE_SIZE` (56) when the
+stored default is 64. Every genuine submission would have been rejected on the
+public endpoint, and every test using a hand-written fixture would have passed.
+
+### One security bound that was not previously needed
+
+`WffEmitter` interpolates `fontFamily` and every ComponentName straight into XML
+attributes with no escaping. That is harmless while every face is made on the
+machine that renders it, and stops being harmless the moment a stranger can
+submit one — a quote closes the attribute. The contract publishes patterns for
+both and the Worker enforces them.
+
+## The moderation pass
+
+Built. `./gradlew :workbench:moderate`, driven by `BFG_CATALOG_URL` and
+`BFG_MODERATOR_TOKEN` from the environment.
+
+It is split in two on purpose. `Moderation` takes a queue row and returns a
+verdict, with no network in it; `Moderate` does the talking. That is what makes
+the load-bearing half provable while the service is not deployed — and it is the
+load-bearing half, because this is the only place in the system where a face
+meets Google's XSD.
+
+Three things it does that are not obvious:
+
+- **It renders every face to a PNG**, into `build/moderation/`. "Slurs and
+  harassment removed on sight" is not a figure of speech, and a queue of
+  parameter blobs is an inbox rather than something one person can work
+  through. The automated half cannot tell you a dial is somebody's logo.
+- **It refuses to run without the schema installed.** Every verdict would come
+  back clean, which is indistinguishable from an empty queue and would publish
+  exactly the faces this pass exists to catch.
+- **The passing verdict is called `LOOKS_FINE`, not `APPROVE`**, and a test
+  asserts no verdict is ever named APPROVE. It means the automated checks found
+  nothing, which says nothing about trademark, impersonation or harassment.
+
+### The slug rule differs between the two catalogs, and getting it wrong is silent
+
+In the git catalog a face is `<slug>.json` and the slug is exactly
+`slugify(name)`. A face published by the SERVICE carries a short random id,
+because the slug is the Watch Face Push package suffix and two strangers can
+pick the same name.
+
+Reusing the git rule in the moderation pass would have refused **every**
+submission the service ever accepted. `CatalogStore.validateDocument` therefore
+takes a `SlugRule` rather than one rule guessing, and `PublishedSlug` in
+`:appcore` holds the published form — construct in the Worker, verify here, both
+downstream of the same two numbers in the generated contract.
+
+## Deployed 2026-08-30
+
+<https://bfg-catalog.bfg-solutions.workers.dev>, version `e8b13e72`, serving
+100% of traffic on the BFG Solutions account.
+
+Verified against the live service rather than the upload's own output: reads
+answer, `/admin/*` refuses a missing and a wrong token, and the moderator token
+round-trips from 1Password into a working `/admin/queue`. The D1 database is
+`bfg-catalog`; `schema.sql` created three tables.
+
+`wrangler login --device` is what made this possible from here. The default flow
+redirects to `localhost:8976` on the machine running wrangler, which is not the
+machine with the browser; the device grant prints a URL and a code instead.
+
+**Preview URLs are explicitly disabled.** Every version would otherwise get its
+own public address bound to the SAME database, so a submission through a preview
+URL would land in the real moderation queue and a second public entry point
+would exist that nobody was thinking about.
+
+## The app's client, 2026-08-30
+
+`CatalogService` in `:appcore` is the seam. One base URL, one place to point
+somewhere else — which is what made the whole migration reversible and was the
+condition the sequencing was built around. A test asserts the URL appears in
+exactly one file.
+
+`CatalogTransport` is an interface so tests can answer without a network, with
+one real implementation on `HttpURLConnection` because that works unchanged on
+the JVM and on Android. `java.net.http` is nicer and is API 34+, which would
+have meant two implementations of three methods.
+
+### What is verified, and how
+
+**The read path, on a real Android runtime against the deployed service.** The
+Community tab was driven on an SDK 36 phone emulator: it fetched
+`index.json`, rendered the empty state, and wrote the response to
+`cache/catalog/catalog-index.json` — a document the live Worker stamped
+`"generated":"2026-08-30T23:17:54.876Z"`. That timestamp is the evidence; an
+empty gallery on its own looks exactly like a placeholder.
+
+The discriminating test was taking the network away. With no cache and no
+network the tab says the catalog is not answering, naming the real host in the
+underlying failure. With a cache it shows the cached list, marked.
+
+**Five live tests** run the client against the deployed service
+(`BFG_CATALOG_URL=... ./gradlew :appcore:test --tests '*CatalogLive*'`), and
+skip otherwise so a machine with no network does not fail a build.
+
+### What is NOT verified, and cannot be yet
+
+**Submit and report have never run end to end.** The client methods exist and
+are tested against the seam, including that a refusal surfaces the service's own
+per-field problems rather than collapsing to "failed". But both need a Turnstile
+token, Turnstile is not configured, and the service fail-closes — so the furthest
+either has gone against the live service is a 403 that arrives as a readable
+message. One live test asserts submissions are switched off, and it will FAIL
+when Turnstile lands, which is the intended reminder that this paragraph has
+gone stale.
+
+**There is no submit or report UI.** Building a share button that cannot work
+would be worse than not having one.
+
+### Two things caught by running it
+
+- **A cached empty list was reported as "Nothing shared yet".** That is a claim
+  about the catalog which a phone holding a snapshot of unknown age cannot make.
+  Online and offline looked identical. It now says it is showing what it last
+  downloaded.
+- **The failure message was developer speech** — `Unable to resolve host
+  "bfg-catalog.bfg-solutions.workers.dev": No address associated with hostname`,
+  on a real screen. The transport's cause is now dropped rather than shown.
+
+### A tile fetches its own face
+
+`index.json` carries name, author, engine and two colours — enough to browse,
+deliberately not enough to render, because full parameters for ten thousand
+faces is not an index. Drawing a tile from the engine and colours alone would
+show a face that is not the one somebody submitted. So each tile fetches its own
+parameters and renders them through the one rasterizer; a `LazyVerticalGrid`
+only composes what is visible, so that is a handful of requests and they come
+from the edge cache.
+
+## Sign in to publish, anonymous to complain (proposed 2026-08-31)
+
+Proposed by the operator, and it is a bigger change than the bot check it
+replaces. Written up before building, and it revises interview outcomes that
+were settled — so the sub-decisions it does not settle are listed at the end
+rather than assumed.
+
+### Why this is not really about Turnstile
+
+Every awkward part of this design descends from one sentence in R7:
+**"No account means no ban."** That is what makes pre-moderation mandatory
+rather than chosen, it is why a bot check is needed at all, and it is why
+withdrawing your own face rests on a random per-install id the spec has to
+apologise for in place.
+
+An account gives the handle back. Turnstile falling out is a side effect.
+
+The immediate trigger was smaller and worth recording as a mistake: Turnstile
+was chosen in the interview on the reasoning that it is "a script tag and one
+secret". **There is no script tag in a native Android app.** Turnstile has no
+native mobile SDK — the documented pattern is a WebView loading a page you host
+— so the interview's reasoning was web-shaped while the submission path is
+app-only. That was not caught until the app came to use it.
+
+It is worth being clear that this had nothing to do with choosing Cloudflare.
+Turnstile was chosen separately and earlier; the same WebView would have been
+needed on Azure.
+
+### The asymmetry is the design
+
+**Publishing needs an account. Complaining never does.**
+
+That is not a compromise, it is the correct shape. R2 exists because requiring
+an account to report was intolerable the moment submitting did not: "anyone
+could publish and only developers could complain." Putting a sign-in in front
+of the complaint path would reintroduce exactly the problem that moved this
+catalog off GitHub, and Play's UGC rules want a complaint path that is
+reachable.
+
+So reports stay anonymous and stay rate-limited. They are safe to leave open
+because **a report is a message, not an action** — nothing auto-hides, so
+flooding reports buys an attacker nothing but a longer queue for a human.
+
+| | Sign-in | Rate limited |
+| --- | --- | --- |
+| Browse, fetch a face, export | No | No |
+| Report an install | No | Yes |
+| Report a face | **No** | Yes |
+| Submit a face | **Yes** | Yes |
+| Withdraw your own face | **Yes** | No |
+
+### What is stored, and the part that cannot be promised away
+
+The app sends a Google ID token. The Worker verifies it properly — RS256
+against Google's published keys, checking `iss`, `aud` against our OAuth client
+id, and `exp` — which WebCrypto can do natively, with the key set cached.
+
+**The service stores `sha256(salt + sub)` and nothing else about the person.**
+`sub` is Google's per-application subject id: stable for that person in this
+app, meaningless anywhere else. Hashing it means a copy of the database does not
+hand out Google subject ids.
+
+**What cannot be promised, and must not be claimed:** the ID token Google issues
+carries the person's email and name whether the app asks for them or not. The
+honest statement is that the service reads `sub`, ignores the rest, and never
+stores or logs it — NOT that it never sees it. About must say the true thing.
+
+The `author` field stays exactly what it is today: an optional display string
+somebody types. It is not filled in from the Google profile, because a display
+name and an identity are different things and conflating them would put someone's
+real name on a watch face gallery by default.
+
+### What this deletes
+
+- **Turnstile**, entirely. No widget, no hosted page, no WebView, no site key,
+  no `TURNSTILE_SECRET`.
+- **The random per-install id.** It exists only to let an author withdraw a
+  face, and the spec concedes it is "deliberately weak: reinstalling makes a new
+  one, and the old face can then only be withdrawn by reporting it." With an
+  account, "my submissions" survives a reinstall and a new phone. This is the
+  part most worth deleting.
+- **R1's remaining awkwardness.** It has already moved once, from "no identity
+  of any kind" to "no account, and nothing that identifies a person". It becomes:
+  no account to browse, an account to publish, and nothing that identifies a
+  person kept either way.
+
+**No migration is needed, and that is why this is the moment.** The catalog is
+empty and nothing has ever been submitted. Adding accounts later would mean
+reconciling install ids with subject ids for real faces owned by real people.
+
+### Pre-moderation stays, for now
+
+Accounts make pre-moderation OPTIONAL. They do not make it wrong.
+
+The case for relaxing it is real: with an identity that can be blocked, publishing
+immediately and removing on report is how most communities work, and it takes
+the maintainer off the critical path of every submission.
+
+Rejected for now, on three grounds:
+
+1. `MODERATION.md`'s promises are already published and assume nothing appears
+   without review.
+2. A first-post-visible model means harmful content is visible until somebody
+   reports it. At zero volume that trade buys nothing.
+3. It can be relaxed later. Going the other way — tightening after people have
+   been publishing freely — is much worse.
+
+The natural middle, if volume ever justifies it, is to auto-publish for authors
+with a clean history and hold first submissions. That needs the per-author
+counts below, which is a reason to record them from the start.
+
+### What accounts newly make possible
+
+- **Blocking an author.** A `blocked_authors` table keyed by `author_key`; a
+  blocked author's submission is refused at POST. This is the capability the
+  whole design was missing.
+- **History as a moderation signal.** How many of this author's faces have been
+  published, and how many rejected. A moderator has never had this, and it is
+  the main thing an account buys them. Worth recording from the first
+  submission even though nothing consumes it yet.
+- **Real withdrawal**, above.
+
+### A new obligation: deleting an account's data
+
+Holding an account identifier brings a duty that anonymity avoided entirely.
+Google Play requires an app that lets people create an account to offer a data
+deletion path, in the app AND reachable from the web.
+
+`DELETE /me`, authenticated the same way, needs to exist. What it does needs
+deciding rather than discovering — see "Still open".
+
+### About has to change, and it is the app's only promotion
+
+Today it says "No account. No ads. No cost." The replacement has to keep the
+promise honest without burying the change in a privacy page nobody reads:
+
+```text
+Free. No ads. No subscription.
+
+Browsing the community gallery needs no account, and sends nothing about you.
+
+Sharing a face needs a Google sign-in — so a face can be taken down, and its
+author asked about it. We keep an anonymous id for that and nothing else: not
+your name, not your email.
+
+When you install a community face, the app adds one to that face's counter so
+the gallery can show popular designs. That carries nothing about you.
+```
+
+### Shape of the change
+
+| Piece | Change |
+| --- | --- |
+| `faces.install_id` | becomes `author_key` |
+| new `blocked_authors` | `author_key`, reason, when |
+| `POST /faces` | `Authorization: Bearer <Google ID token>`, no `turnstile` |
+| `POST /submissions/<id>/withdraw` | same token instead of `installId` |
+| `POST /reports` | unchanged, still anonymous, no token |
+| `GET /*` | unchanged, still anonymous |
+| `DELETE /me` | new |
+| `GET /admin/queue` | gains the author's published/rejected counts |
+| `POST /admin/authors/<key>/block` | new |
+| `CatalogService` | `turnstileToken` becomes `idToken`; `installId` goes |
+| `:mobile` | Credential Manager sign-in, prompted only on Share |
+
+Android uses Credential Manager with `GoogleIdOption`, which needs an OAuth
+client id and the signing certificate registered — **both debug and release
+certificates**, or sign-in works for the developer and fails for everyone else.
+That is the classic way this is got wrong.
+
+### What this does NOT solve
+
+Burner accounts. A Google account raises the cost of abuse a great deal and is
+not a wall, so pre-moderation is still doing real work and the moderation
+promises still have to be keepable by one person.
+
+## The sequencing risk was real, but not where everyone was looking
+
+Checked on 2026-08-31, because it decides when the old repository can be
+retired.
+
+**`CatalogStore.reportUrl` is called from exactly one place: `Workbench.kt`.**
+The workbench is the localhost dev tool and is never shipped. `:mobile` has
+never referenced it, never linked to a GitHub issue form, and never had a
+complaint path at all.
+
+So the instruction repeated through every handoff — do not retire the GitHub
+route before the app points at the replacement — was protecting a route the
+SHIPPED APP DID NOT HAVE.
+
+That is not as alarming as it sounds, and the reason matters: the shipped app
+showed no user content either. Its Community tab was a hardcoded empty state
+until 46c1cfe, so there was nothing for Play's UGC rules to attach to. No
+content, no obligation, no gap.
+
+What is worth noticing is that both halves arrived in the same session and in
+the right order: the Community tab began showing other people's faces
+(46c1cfe), and the report path that Play requires alongside it landed with it
+(3a24ee2). No Play release has been cut since either — the published build still
+has the empty placeholder — so nothing has ever been in front of a user without
+a way to complain about it.
+
+**The rule this leaves behind is sharper than the one it replaces.** It was
+never "keep the GitHub repository alive". It is: *the build that first shows
+community content must be the build that first carries the report path.* They
+are in the same commit range and must ship together.
+
 ## Still open
 
-- Whether authors can withdraw a face they submitted. With no account there is
-  no way to prove they wrote it, so this may simply not be possible — worth
-  deciding rather than discovering.
-- Whether the Cosmos DB free tier is still available on the subscription, which
-  only the account holder can see.
+- ~~Whether to adopt sign-in-to-publish~~ **SETTLED 2026-08-31: adopt it.**
+- ~~What `DELETE /me` does to a published face~~ **SETTLED 2026-08-31: the face
+  is abandoned, not removed.** The operator's reasoning, and it is the end of
+  the question rather than a trade-off to weigh: a watch face is parameters —
+  "knotwork, scale 26, pewter" — and settings are not personal information.
+  The ACCOUNT ID is the personal data here; the face is not. So deleting an
+  account drops the link and leaves the face, which people may already be using
+  and which nothing should pull off their wrists.
+- ~~Whether reporting stays anonymous~~ **SETTLED: yes**, on R2's original
+  reasoning.
+- **Turnstile.** `TURNSTILE_SECRET` is unset, so submit and report answer 403.
+  That is the fail-closed path working as designed. If sign-in is adopted, this
+  stops being a gap and becomes something to delete.
+- **Submit and report UI**, once the identity question is settled.
+- **The Ops Console moderation UI** is filed as `01a0551a` and the operator has
+  told BFG Operations to HOLD. The admin endpoints it describes are a subset of
+  what sign-in would add — blocking an author, and per-author history.
+- **Retiring `miopea/bfg-watchfaces-catalog`**, which is LAST. It still hosts the
+  app's only working complaint path.
+- **The app's submit and report paths.** The service has no client yet: the
+  Community tab still reads a local directory and the report sheet still opens a
+  GitHub issue. That is step 3 of the sequencing, and step 4 does not begin
+  until it is done.
+
+## Release gates, not tasks
+
+Raised in the interview and answered "this isn't released, there isn't anyone to
+notify" — correct today, and both become blocking before the app goes public.
+
+- **A route for rights-holders that is not the app.** `MODERATION.md` promises
+  to act on IP claims within 72 hours, and a rights-holder is usually not a
+  user. When the GitHub repo retires, its issue form goes with it. A published
+  email address is the minimum.
+- **A working in-app complaint path.** Play's UGC rules require one before an
+  app showing user content can ship. The GitHub route covers this today and must
+  not be removed before the replacement is live — which is what the sequencing
+  above already says.
+
+Neither is needed while the app is on internal testing with one tester. Both are
+needed before the Community tab is visible to anyone else.

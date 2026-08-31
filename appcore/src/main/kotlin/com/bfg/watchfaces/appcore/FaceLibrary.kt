@@ -1,4 +1,4 @@
-package com.bfg.watchfaces.workbench
+package com.bfg.watchfaces.appcore
 
 import com.bfg.watchfaces.generator.DialParams
 import java.io.File
@@ -6,6 +6,12 @@ import java.time.Instant
 
 /**
  * Saved faces, on disk, as `faces/<slug>.json`.
+ *
+ * In :appcore because the PHONE saves faces too, into its own app storage, and
+ * a face saved there has to be the same file a workbench save produces -- same
+ * slug rule, same JSON. The slug is the Watch Face Push package suffix, so a
+ * second implementation that disagreed would produce faces that install under a
+ * different package and silently stop replacing each other on the watch.
  *
  * This is deliberately the shape docs/SPEC.md describes for the community
  * catalog: one JSON file per face, parameters only, no rasters. A face saved in
@@ -16,7 +22,7 @@ import java.time.Instant
  * "knotwork engine, scale 26, pewter". Imported photos, if they ever exist,
  * stay local and never become one of these files.
  */
-object FaceStore {
+object FaceLibrary {
 
     data class StoredFace(
         val slug: String,
@@ -72,13 +78,13 @@ object FaceStore {
   "name": ${Json.quote(f.name)},
   "slug": ${Json.quote(f.slug)},
   "created": ${Json.quote(f.created)},
-  "params": ${ParamCodec.toJson(f.params).prependIndent("  ").trimStart()}
+  "params": ${FaceCodec.toJson(f.params).prependIndent("  ").trimStart()}
 }
 """
 
     fun fromJson(text: String): StoredFace {
         val root = Json.obj(Json.parse(text))
-        val params = ParamCodec.fromJson(Json.obj(root["params"]))
+        val params = FaceCodec.fromJson(Json.obj(root["params"]))
         val name = Json.str(root, "name", "Untitled")
         return StoredFace(
             slug = Json.str(root, "slug", slugify(name)),

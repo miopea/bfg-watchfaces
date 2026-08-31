@@ -2,6 +2,8 @@ package com.bfg.watchfaces.workbench
 
 import com.bfg.watchfaces.generator.DialParams
 import java.io.File
+import com.bfg.watchfaces.appcore.FaceCodec
+import com.bfg.watchfaces.appcore.Presets
 
 /**
  * Headless bake: params in, dial_bg.png + preview.png + watchface.xml out.
@@ -44,17 +46,17 @@ object Bake {
         // stamping every bake "Untitled".
         val faceName = kv.remove("name") ?: preset ?: "Untitled"
         val base: DialParams = if (preset != null) {
-            ParamCodec.presets.entries.firstOrNull { it.key.equals(preset, ignoreCase = true) }?.value
+            Presets.ALL.entries.firstOrNull { it.key.equals(preset, ignoreCase = true) }?.value
                 ?: run {
-                    System.err.println("unknown preset '$preset'. known: ${ParamCodec.presets.keys.joinToString(", ")}")
+                    System.err.println("unknown preset '$preset'. known: ${Presets.ALL.keys.joinToString(", ")}")
                     kotlin.system.exitProcess(2)
                 }
         } else DialParams()
 
         // Explicit flags win over the preset, so you can nudge one value.
-        val merged = ParamCodec.fromQuery(ParamCodec.toQuery(base).toQueryMap() + kv)
+        val merged = FaceCodec.fromQuery(FaceCodec.toQuery(base).toQueryMap() + kv)
 
-        val root = findRoot()
+        val root = RepoRoot.find()
         println("baking into ${root.absolutePath}")
         println("  \"$faceName\" -- engine=${merged.engine} scale=${merged.scale} dial=${merged.dialColor} ink=${merged.inkColor}")
 
@@ -92,12 +94,4 @@ object Bake {
                 java.net.URLDecoder.decode(it.substring(i + 1), Charsets.UTF_8)
         }.toMap()
 
-    private fun findRoot(): File {
-        var d: File? = File(System.getProperty("user.dir")).absoluteFile
-        while (d != null) {
-            if (File(d, "settings.gradle.kts").isFile) return d
-            d = d.parentFile
-        }
-        return File(System.getProperty("user.dir")).absoluteFile
-    }
 }

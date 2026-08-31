@@ -51,6 +51,21 @@ its name when someone saves it, and that name becomes the carousel label, the
 hardcoded face identity — that is what "Silver Sand" was, and it went away on
 2026-08-27.
 
+**The app icon is generated, never hand-drawn.** `BrandMark` in `:workbench`
+describes the mark once; `./gradlew :workbench:brand` writes the Android adaptive
+icon for both apps, the 512px Play PNG and the SVGs under `docs/brand`. All of it
+is checked in — the Android build must not depend on a JVM task having been run.
+Judge any change with `--sheet=`, which crops the way a launcher does: the mask
+takes the middle 72dp of the 108dp layer, not all of it. See `DECISIONS.md`
+2026-08-29.
+
+**Shared app rules live in `:appcore`, not `:workbench`.** `Presets`, the face
+JSON (`FaceCodec`), the saved-face library (`FaceLibrary`) and its slug rule are
+there because both shipped apps need them and `:workbench` is never shipped. The
+slug is the Watch Face Push package suffix — a second implementation that
+disagreed would install faces under a different package and silently stop
+replacing them.
+
 **Controls come from `ControlInventory`.** Which sliders exist, their ranges and
 their order live in `:generator`; both UIs build from it. Labels and the curated
 engine order stay in the UI — those are presentation. Do not hardcode a control
@@ -91,6 +106,8 @@ rejected — not a changelog.
 ./gradlew :workbench:bake               # dial_bg.png + preview.png + watchface.xml
 ./gradlew :workbench:bake --args="--preset=Rosette Noir"
 ./gradlew :workbench:catalog            # validate catalog + rewrite index.json
+./gradlew :workbench:brand              # launcher icons, Play icon, docs/brand SVGs
+./gradlew :workbench:brand --args="--sheet=/tmp/i.png"   # icon as a launcher masks it
 
 make docs-check                         # markdownlint + cspell over the docs
 
@@ -121,14 +138,14 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 
 Verified — built and run, not assumed:
 
-- `:generator` — 335 tests green, including validation against Google's official
+- `:generator` — 343 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
-- `:appcore` — 30 tests green. Rules and words the shipped apps share, pure
+- `:appcore` — 38 tests green. Rules and words the shipped apps share, pure
   JVM. Not `:generator` (that is the file format) and not `:workbench` (never
   shipped). Holds `ActivationConsent`, whose one-shot rule guards the only
   unrecoverable action in the system.
-- `:workbench` — 98 tests green. Serves the app at localhost:7777; bakes
+- `:workbench` — 118 tests green. Serves the app at localhost:7777; bakes
   `dial_bg.png`, `preview.png`, `watchface.xml`, `strings.xml` and the manifest
   package from parameters. Quantization measured at 64 colours, mean error
   0.51/255. Saves designs to `faces/<slug>.json`, the catalog format.
@@ -141,16 +158,31 @@ Verified — built and run, not assumed:
 
 Installed and driven on emulators (2026-08-29):
 
-- `:mobile` — the Studio screen from the localhost app: composite preview with
-  clock and complications, ambient toggle, style chips, dial and ink swatches,
-  complication slots, and every slider built from `ControlInventory`. All
-  thirteen styles render. Seen running on an SDK 36 phone emulator.
+- `:mobile` — four screens behind a bottom bar, matching the localhost app:
+  Designs (styles gallery), Studio, My faces, About. Naming, local save in the
+  catalog format, the Fine tune bottom sheet, complication size and spacing, and
+  a Material 3 `ExposedDropdownMenuBox` for each slot. Seen on an SDK 36 phone
+  emulator; a face saved and came back on the list. The Community tab reads the
+  live catalog and **Report works with no account** — verified onto the live
+  moderation queue. Share is still absent, because publishing needs a Google
+  OAuth client id that does not exist yet. Imported images are still absent.
 - `:wear` — installed on a Wear OS 6 emulator, and `addWatchFace` works from it.
   See below.
 
-Neither has run on real hardware, and the phone cannot yet BUILD a face to send:
-that needs `google/pack` on the device and the validator wired in. The Studio
-designs; nothing leaves the phone.
+The phone builds a face on the device: `google/pack` runs through `PackBridge`,
+`ApkSigning` signs it, and the validator issues the token — measured at 2.7s for
+a 520KB APK.
+
+Building the native library needs a toolchain, once:
+
+```bash
+scripts/build-pack.sh          # clones + patches pack, builds the desktop CLI
+scripts/build-pack-android.sh  # libpack_java.so for four ABIs, into jniLibs/
+```
+
+Needs rustup, `cargo install cargo-ndk`, protoc and an NDK; the script says so
+and names the install lines. The `.so` files are gitignored build output, and
+deliberately not Androidify's prebuilt ones — see `docs/THIRD-PARTY.md`.
 
 Confirmed on a Wear OS 6 emulator (2026-08-29):
 
@@ -188,20 +220,44 @@ On Google Play (2026-08-29):
   password in 1Password, read from the environment at build time. A release
   build fails loudly rather than emitting an unsigned bundle.
 
+On real hardware (2026-08-30):
+
+- **A face designed on a Pixel 11 Pro XL reached a Pixel Watch 5 over Bluetooth
+  and installed.** Built on the phone, sent over `ChannelClient`, installed by
+  `FaceInstaller`. That closes the transport, sending a face, and the activation
+  permission all at once — the three things this section listed as never tested.
+- Finding it cost three bugs no emulator could have shown: v1 signing was off
+  and Watch Face Push needs it; `sendFile(Uri.fromFile(...))` sends nothing and
+  reports success; `receiveFile` completes when the transfer is SET UP rather
+  than finished. See `DECISIONS.md` 2026-08-30.
+
+The community catalog is live (2026-08-30):
+
+- **The service runs at `https://bfg-catalog.bfg-solutions.workers.dev`** —
+  Cloudflare Workers, D1, on the BFG Solutions account. Anonymous submit,
+  anonymous report, pre-moderation, and an export endpoint so the catalog
+  survives the service. `catalog-service/` holds it; `docs/specs/catalog-service.md`
+  is the contract.
+- **It does not know what a face is.** `params-contract.json` is GENERATED from
+  `CatalogContract` in `:generator` by `./gradlew :workbench:contract`, and the
+  Worker reads it. Never write those ranges out again in TypeScript.
+- **The Community tab reads it**, verified on an SDK 36 phone emulator against
+  the deployed service. `CatalogService` in `:appcore` is the one seam, and a
+  test asserts the URL appears in exactly one file.
+- **Moderation is `./gradlew :workbench:moderate`.** It is the only place a face
+  meets Google's XSD — a Worker cannot run Xerces — so if it does not run before
+  publication, nothing does.
+
 Still never tested:
 
-- **An actual watch.** The above is an emulator, which is a smaller claim.
-- **The transport.** `CapabilityClient`, `ChannelClient` and the Bluetooth
-  crossing. Emulators run on this box now (`chmod 0666 /dev/kvm` — the node, not
-  the group; this namespace sets `setgroups=deny`), and two started from one
-  session share a single `netsimd`, so that half is solved. What remains is the
-  Wear OS companion app, which needs a Play sign-in on the phone. **A fresh Wear
-  AVD self-provisions and never runs a pairing wizard** — the earlier claim that
-  a factory reset would help was wrong, see `DECISIONS.md` 2026-08-29.
-- **Sending a face.** The phone has no APK to send until `pack` runs on the
-  device. `addWatchFace` was exercised by putting the APK on the watch directly.
-- **The activation permission has still never been requested, and cannot be from
-  where the design puts it.** `startActivity` from the install path is refused —
-  `Background activity launch blocked`. A `WearableListenerService` is a
-  background context by the same rule, so the shipped path is blocked too. This
-  needs a design decision; see `DECISIONS.md` 2026-08-29.
+- **Submitting, end to end.** `GOOGLE_CLIENT_ID` is unset, so publishing fails
+  closed with 401. That is the design working, and it is why nothing can be
+  shared yet. A live test asserts submissions are off and will FAIL the day the
+  client id lands. **Reporting is NOT in this list any more** — it runs end to
+  end from the app, with no account, verified onto the live queue on
+  2026-08-31.
+- **There is no share UI**, deliberately — a share button that cannot work is
+  worse than no button. There IS a report UI.
+- **Imported images.** `Engine.TEXTURE` still has nowhere on the device to
+  resolve an image id from.
+- **`reskin.sh`** — written and read, not exercised since the workbench landed.

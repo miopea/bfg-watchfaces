@@ -2,6 +2,11 @@
 kotlin = "2.0.21"
 agp = "8.13.2"
 wfp-validator = "1.1.0-alpha01"
+# On-device APK build. apksig signs what google/pack compiles -- pack does not
+# sign, and Watch Face Push will not take an unsigned artefact. BouncyCastle is
+# only for minting the self-signed certificate that goes with the Keystore key.
+apksig = "2.3.0"
+bouncycastle = "1.85"
 playServicesWearable = "18.2.0"
 watchfacePush = "1.0.0"
 junit = "5.11.3"
@@ -10,6 +15,9 @@ junit = "5.11.3"
 # refuses anything lower. This BOM pins compose-ui 1.10.3, which compiles
 # against 36. Moving it forward means moving AGP and the compileSdk together.
 composeBom = "2026.02.00"
+# Wear Compose is versioned on its own track, NOT by the compose BOM: the BOM
+# covers androidx.compose.*, and androidx.wear.compose.* is a different group.
+wearCompose = "1.6.2"
 # The AndroidX versions below are held back for the SAME reason as the BOM: the
 # newest of each now requires compileSdk 37. They move as a set, with AGP and
 # compileSdk, or not at all.
@@ -26,8 +34,12 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "1.11.3" }
 play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "playServicesWearable" }
 wear-watchface-push = { module = "androidx.wear.watchfacepush:watchfacepush", version.ref = "watchfacePush" }
+wear-compose-material3 = { module = "androidx.wear.compose:compose-material3", version.ref = "wearCompose" }
+wear-compose-foundation = { module = "androidx.wear.compose:compose-foundation", version.ref = "wearCompose" }
 wfp-validator-android = { module = "com.google.android.wearable.watchface.validator:validator-push-android", version.ref = "wfp-validator" }
 wfp-validator-jvm = { module = "com.google.android.wearable.watchface.validator:validator-push", version.ref = "wfp-validator" }
+apksig = { module = "com.android.tools.build:apksig", version.ref = "apksig" }
+bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 
 # Compose, per DECISIONS 2026-08-28: the shipped app mirrors the localhost app
 # screen for screen, natively. The BOM pins every compose artifact together --

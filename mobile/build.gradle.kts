@@ -24,8 +24,8 @@ android {
         // so anything lower fails the manifest merge. Android 9 and up.
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 37
+        versionName = "1.36"
         // pack ships as native libs; limit ABIs to what you actually ship
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
@@ -65,6 +65,16 @@ android {
         }
     }
 
+    // BouncyCastle ships LICENSE.md and NOTICE.md in all three of its jars, and
+    // the merger will not pick between identical files. Excluding them keeps the
+    // licences out of the APK, which is why they are reproduced in
+    // docs/THIRD-PARTY.md instead of being silently dropped.
+    packaging {
+        resources.excludes += setOf("META-INF/LICENSE.md", "META-INF/NOTICE.md",
+                                    "META-INF/LICENSE", "META-INF/NOTICE",
+                                    "META-INF/DEPENDENCIES", "META-INF/versions/9/OSGI-INF/MANIFEST.MF")
+    }
+
     buildTypes {
         release {
             // Fail loudly rather than emit an unsigned bundle that Play rejects
@@ -95,8 +105,12 @@ dependencies {
     implementation(libs.play.services.wearable)   // Data Layer: Channel/Message/Capability
     implementation(libs.wfp.validator.android)    // local token generation, no network
 
-    // google/pack -- builds and signs the watch face APK on-device.
-    // Prebuilt .so files go in src/main/jniLibs/<abi>/. Androidify ships a set;
-    // building fresh needs the NDK plus Rust. See docs/SPEC.md.
-    // implementation(files("libs/pack-java.aar"))
+    // google/pack builds the watch face APK on the device. The native library
+    // is NOT a dependency and NOT Androidify's prebuilt one: it is built from
+    // the same pinned, patched pack the desktop CLI uses, by
+    // scripts/build-pack-android.sh, into src/main/jniLibs/<abi>/. Gitignored --
+    // build output, not source. PackBridge.isAvailable is how the app finds out
+    // whether this build has it.
+    implementation(libs.apksig)             // pack compiles; it does not sign
+    implementation(libs.bouncycastle.pkix)  // the self-signed cert for the Keystore key
 }

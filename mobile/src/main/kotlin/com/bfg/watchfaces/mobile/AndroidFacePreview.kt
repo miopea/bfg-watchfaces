@@ -7,9 +7,13 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import com.bfg.watchfaces.generator.AmbientPalette
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.ClockText
+import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.EngravedStroke
+import com.bfg.watchfaces.generator.SecondsBand
 import com.bfg.watchfaces.generator.SlotGeometry
+import com.bfg.watchfaces.generator.StepRing
 import com.bfg.watchfaces.generator.SlotPosition
 
 /**
@@ -35,6 +39,9 @@ object AndroidFacePreview {
     /** A fixed time, so a preview does not change under the person mid-edit. */
     private const val SAMPLE_HOUR = 10
     private const val SAMPLE_MINUTE = 10
+    private const val SAMPLE_SECOND = 30
+
+    /** Kept the same as WffEmitter's, so the preview and the face agree. */
 
     fun render(p: DialParams, ambient: Boolean = false, size: Int = DIAL_SIZE): Bitmap {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -56,10 +63,9 @@ object AndroidFacePreview {
         val l = p.layout
         val ink = EngravedStroke.withAlpha(EngravedStroke.rgb(p.inkColor), 255)
 
-        val iconSize = SlotGeometry.iconHeight(l.complicationSize).toFloat()
-        val textY = SlotGeometry.textOffset(l.complicationSize)
-        val textH = SlotGeometry.textHeight(l.complicationSize)
-        val fontSize = SlotGeometry.fontSize(l.complicationSize).toFloat()
+        // Sizes are PER SLOT and computed inside the loop below, matching the
+        // emitter: the top slot can be smaller than the row when a drawn date
+        // is in its way.
 
         // From v3 a complication carries an ambient colour Variant when the ink
         // would be unreadable on black. Mirror it, or the preview would show a
@@ -71,29 +77,81 @@ object AndroidFacePreview {
             else ink
 
         for ((pos, box) in SlotGeometry.boxes(p)) {
+            val fitted = SlotGeometry.sizeAt(p, pos)
+            val iconSize = SlotGeometry.iconHeight(fitted, p.generatorVersion).toFloat()
+            val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
+            val fontSize = SlotGeometry.fontSize(fitted).toFloat()
             val source = p.slot(pos)
             val a = if (ambient) (if (pos == SlotPosition.TOP) 140 else 0) else 255
             if (a <= 0) continue
             val c = withAlpha(if (ambient) ambientSlotInk else ink, a)
-            AndroidComplicationIcons.draw(
-                canvas, source,
-                x = box.x + (box.w - iconSize) / 2f,
-                y = box.y.toFloat(),
-                size = iconSize,
-                color = c
-            )
+            // Honours iconSlots, or the toggles appear to do nothing in the one
+            // view somebody uses to judge them.
+            if (p.hasIcon(pos)) {
+                AndroidComplicationIcons.draw(
+                    canvas, source,
+                    x = box.x + (box.w - iconSize) / 2f,
+                    y = box.y.toFloat(),
+                    size = iconSize,
+                    color = c
+                )
+            }
+            // Which wording and what size both come from SlotGeometry, the
+            // same call the emitter makes. It shortens before it shrinks.
+            val drawn = SlotGeometry.drawnText(source, box, fontSize.toInt())
             drawCenteredIn(
-                canvas, Presentation.sample(source),
-                box.x.toFloat(), (box.y + textY).toFloat(),
-                box.w.toFloat(), textH.toFloat(), fontSize, c, bold = false
+                canvas, drawn.sample ?: Presentation.sample(source),
+                box.x.toFloat(),
+                (box.y + SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)).toFloat(),
+                box.w.toFloat(), textH.toFloat(),
+                drawn.fontSize.toFloat(), c, bold = false
             )
         }
 
         // Time: the emitter ships TWO TimeText elements, one interactive
         // (alpha 255 -> ambient 0) and one ambient-only (alpha 0 -> ambient 255,
         // THIN weight, dimmed ink). Reproduce that split rather than dimming one.
+        val timeText = ClockText.of(p, SAMPLE_HOUR, SAMPLE_MINUTE)
         val hh = SAMPLE_HOUR % 12
-        val timeText = "%02d:%02d".format(if (hh == 0) 12 else hh, SAMPLE_MINUTE)
+        // Seconds are an AWAKE-only affordance, so the ambient preview must not
+        // show them -- otherwise the toggle appears to do nothing in the one
+        // view where it is deliberately absent.
+        // The date the FACE draws, matching WffEmitter's PartText: centred at
+        // dateY, dimmed in ambient rather than hidden. Without this the Date
+        // control changes nothing in the only view anyone judges it in.
+        SlotGeometry.dateBand(p)?.let { band ->
+            drawCenteredIn(
+                // The same fixed day the workbench preview uses, so the two
+                // agree and neither draws today's date beside a 10:10 clock.
+                canvas, p.dateStyle.sample(DateStyle.SAMPLE_DATE),
+                band.x.toFloat(), band.y.toFloat(),
+                band.w.toFloat(), band.h.toFloat(),
+                SlotGeometry.fittedDateSize(p).toFloat(),
+                if (ambient) withAlpha(ambientSlotInk, 140) else ink,
+                bold = false
+            )
+        }
+
+        if (p.ring.enabled && !ambient) {
+            val b = StepRing.box()
+            val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = StepRing.THICKNESS.toFloat()
+                strokeCap = Paint.Cap.ROUND
+            }
+            val oval = android.graphics.RectF(
+                b.x.toFloat(), b.y.toFloat(), (b.x + b.w).toFloat(), (b.y + b.h).toFloat()
+            )
+            ringPaint.color = withAlpha(ink, StepRing.TRACK_ALPHA)
+            canvas.drawArc(oval, 0f, 360f, false, ringPaint)
+            ringPaint.color = ink
+            // Android measures clockwise from 3 o'clock, so 12 is -90.
+            canvas.drawArc(
+                oval, -90f,
+                StepRing.sweepDegrees(StepRing.SAMPLE_PERCENT).toFloat(), false, ringPaint
+            )
+        }
+
         val timeColor = if (ambient) {
             // Mirror the emitter's version branch exactly. From v3 the ambient
             // ink clears a contrast floor against black; before that it is the
@@ -108,13 +166,36 @@ object AndroidFacePreview {
             canvas, timeText,
             0f, (l.timeY - l.timeSize / 2).toFloat(),
             DIAL_SIZE.toFloat(), (l.timeSize * 1.4).toFloat(),
-            l.timeSize.toFloat(), timeColor,
+            // Same size with or without seconds; see SecondsBand.
+            l.timeSize.toFloat(),
+            timeColor,
             // AWT only has PLAIN and BOLD, and the workbench renders MEDIUM as
             // PLAIN rather than overstate the weight. Match that here, so the
             // two previews agree about the one thing that matters most --
             // legibility of the time.
             bold = !ambient && l.fontWeight.uppercase() == "BOLD"
         )
+
+        // Seconds in the right gutter, matching WffEmitter: just under half the
+        // clock, lightest weight, awake only.
+        //
+        // The BOX and the alignment both come from SecondsBand, because with a
+        // ring drawn they are anchored to the clock rather than to the rim. An
+        // end-aligned run hangs its left edge off a width estimate, and that is
+        // what pushed the seconds back toward the ring after a change meant to
+        // move them away from it.
+        if (p.showSeconds && !ambient) {
+            val startAligned = SecondsBand.alignFor(p) == "START"
+            drawCenteredIn(
+                canvas, "%02d".format(SAMPLE_SECOND),
+                SecondsBand.boxLeftFor(p, timeText.length).toFloat(), SecondsBand.topInDial(l).toFloat(),
+                SecondsBand.boxWidthFor(p, timeText.length).toFloat(), SecondsBand.height(l).toFloat(),
+                SecondsBand.fontSizeFor(p).toFloat(),
+                withAlpha(timeColor, SecondsBand.ALPHA), bold = false,
+                alignEnd = !startAligned,
+                alignStart = startAligned
+            )
+        }
         return bitmap
     }
 
@@ -124,7 +205,11 @@ object AndroidFacePreview {
     private fun drawCenteredIn(
         canvas: Canvas, text: String,
         x: Float, y: Float, w: Float, h: Float,
-        size: Float, color: Int, bold: Boolean
+        size: Float, color: Int, bold: Boolean,
+        /** Right-align inside the box instead of centring. Used by the seconds. */
+        alignEnd: Boolean = false,
+        /** Left-align instead. The seconds use this when a ring crowds them. */
+        alignStart: Boolean = false
     ) {
         if (text.isEmpty()) return
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -133,7 +218,11 @@ object AndroidFacePreview {
             typeface = Typeface.create(Typeface.SANS_SERIF, if (bold) Typeface.BOLD else Typeface.NORMAL)
         }
         val fm = paint.fontMetrics
-        val tx = x + (w - paint.measureText(text)) / 2f
+        val tx = when {
+            alignStart -> x
+            alignEnd -> x + w - paint.measureText(text)
+            else -> x + (w - paint.measureText(text)) / 2f
+        }
         // WFF centres text vertically within the element box.
         val ty = y + (h - (fm.descent - fm.ascent)) / 2f - fm.ascent
         canvas.drawText(text, tx, ty, paint)

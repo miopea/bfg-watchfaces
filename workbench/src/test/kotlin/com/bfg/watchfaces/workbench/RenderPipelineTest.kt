@@ -2,6 +2,7 @@ package com.bfg.watchfaces.workbench
 
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.ComplicationSource
+import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -15,6 +16,8 @@ import org.junit.jupiter.params.provider.EnumSource
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
+import com.bfg.watchfaces.appcore.FaceCodec
+import com.bfg.watchfaces.appcore.Presets
 
 /**
  * The bake path is now load-bearing: it produces the artwork that ships inside
@@ -148,8 +151,8 @@ class RenderPipelineTest {
             engine = Engine.ROSETTE, scale = 17.5, depth = 6.25, freq = 11,
             dialColor = "#23262B", inkColor = "#E8E6E1", lens = false, lensAmount = 12.0
         )
-        val back = ParamCodec.fromQuery(
-            ParamCodec.toQuery(p).split("&").associate {
+        val back = FaceCodec.fromQuery(
+            FaceCodec.toQuery(p).split("&").associate {
                 val i = it.indexOf('=')
                 java.net.URLDecoder.decode(it.substring(0, i), Charsets.UTF_8) to
                     java.net.URLDecoder.decode(it.substring(i + 1), Charsets.UTF_8)
@@ -189,7 +192,7 @@ class RenderPipelineTest {
     @Test
     fun `every preset is renderable and schema valid`() {
         val root = repoRoot()
-        for ((name, p) in ParamCodec.presets) {
+        for ((name, p) in Presets.ALL) {
             val img = DialRenderer.render(p)
             assertTrue(img.width == DIAL_SIZE) { "$name did not render" }
             val issues = WffValidator.validate(root, com.bfg.watchfaces.generator.WffEmitter.emit(p))
@@ -206,16 +209,47 @@ class RenderPipelineTest {
      * A failure here is not automatically a bug. It means the preview's
      * appearance changed, and whoever changed it has to say so on purpose.
      */
+        /**
+     * The same guard for v6, covering what v6 actually introduced.
+     *
+     * [GeneratorVersionTest] asks for golden coverage of a new version, and the
+     * v5 fixture above cannot supply it: it is pinned to v5 on purpose, so it
+     * would never notice the new box heights, the glyph-less slot layout, the
+     * drawn date or the seconds moving onto the clock's line.
+     */
+    /**
+     * The drawn-date entry in the v6 and v7 goldens was re-recorded on
+     * 2026-08-30, deliberately and against the usual rule.
+     *
+     * The date is now SIZED to sit across roughly the width of the clock
+     * instead of using a stored point size, and that was applied to every
+     * version rather than gated. A date too small to read beside a 104pt clock
+     * is a defect, not a look someone chose -- it was reported twice -- so
+     * preserving it for older faces would be preserving the complaint.
+     *
+     * Every other entry in both goldens is untouched, which is the check that
+     * only the intended thing changed.
+     */
+    /**
+     * The CURRENT version's golden.
+     *
+     * Every version now has its own pinned fixture, because twice in a row a
+     * golden left on the default silently became a golden for the next version
+     * the moment it was bumped -- and the failure reads like a renderer
+     * regression rather than a fixture that moved.
+     */
     @Test
-    fun `the composite preview is byte-for-byte what it has always been`() {
+    fun `the v7 preview is pinned too`() {
         val faces = listOf(
-            DialParams(),
-            DialParams(engine = Engine.KNOTWORK, dialColor = "#2B2E33", inkColor = "#C9A227"),
-            DialParams(complications = ComplicationSource.entries.take(5)),
-            // A generated surface, so the procedural shading is pinned too. The
-            // stroked engines do not exercise it at all.
-            DialParams(engine = Engine.BRUSHED, contrast = 62.0, relief = 3.4),
-            DialParams(engine = Engine.GRAIN, dialColor = "#3E4A3F")
+            DialParams(generatorVersion = 7),
+            DialParams(generatorVersion = 7, complications = listOf(
+                ComplicationSource.NONE, ComplicationSource.STEP_COUNT,
+                ComplicationSource.HEART_RATE, ComplicationSource.DAY_AND_DATE,
+                ComplicationSource.DATE
+            )),
+            DialParams(generatorVersion = 7, iconSlots = emptySet()),
+            DialParams(generatorVersion = 7, showSeconds = true),
+            DialParams(generatorVersion = 7, dateStyle = DateStyle.WEEKDAY_MONTH_DAY)
         )
         val actual = faces.map { p ->
             val img = FacePreview.render(p)
@@ -226,7 +260,142 @@ class RenderPipelineTest {
             }
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
-        assertEquals(listOf("f161fc20d0acadfc", "00d9ca560ad79da1", "d8df01efa40bfedc", "0f4b86e7c410afaf", "eaa62fd3f6ee8016"), actual) {
+        assertEquals(
+        // REPINNED 2026-08-31, second time today: the complication VALUE's
+        // font went from 0.92x the slot size to 1.10x, filling the line box it
+        // already had. Every fixture here draws at least one value, so all
+        // five move -- including the glyph-less one, which is the check that
+        // this was the text and not the glyph.
+            listOf(
+                "02c2ddf3167b9ae7", "3179511aafde6012", "5a28005f816665b4",
+                "e8fb3d6686168253", "9589e36dead08381"
+            ),
+            actual
+        ) { "the v7 preview changed; every face saved at v7 renders differently" }
+    }
+
+    /**
+     * THE GUARD THAT MAKES THE HASHES ABOVE WORTH PINNING.
+     *
+     * Both preview renderers used to draw `DateStyle.sample()` with no
+     * argument, which defaults to TODAY — so the two goldens with a drawn date
+     * changed every day, and went red mid-session simply because it passed
+     * midnight. A golden that depends on the calendar catches nothing and
+     * blames whoever happens to be mid-change.
+     *
+     * This is not flaky and does not depend on when it runs: rendering with the
+     * sample moment stated explicitly must equal rendering with the default. If
+     * the default ever goes back to `LocalDate.now()`, they differ on every day
+     * except 10 March.
+     */
+    @Test
+    fun `a preview draws the same day whenever it is rendered`() {
+        val p = DialParams(dateStyle = DateStyle.WEEKDAY_MONTH_DAY)
+        fun digest(img: java.awt.image.BufferedImage): String {
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            for (v in pixels(img)) {
+                md.update((v ushr 24).toByte()); md.update((v ushr 16).toByte())
+                md.update((v ushr 8).toByte()); md.update(v.toByte())
+            }
+            return md.digest().joinToString("") { "%02x".format(it) }.take(16)
+        }
+        // TWO DIFFERENT DAYS AT THE SAME CLOCK TIME. The time text is identical
+        // in both, so the ONLY thing that can differ is the drawn date.
+        //
+        // The first version of this test compared the default render against an
+        // explicit one at the default moment, which cannot fail: both go
+        // through the same path and both would draw today's date. Ablating the
+        // fix showed it passing, which is the whole reason to ablate.
+        val march = digest(FacePreview.render(p, time = java.time.LocalDateTime.of(2026, 3, 10, 10, 10, 0)))
+        val september = digest(FacePreview.render(p, time = java.time.LocalDateTime.of(2026, 9, 30, 10, 10, 0)))
+        assertNotEquals(march, september) {
+            "the drawn date did not follow the render's own time, so it is following the wall " +
+                "clock instead -- which makes every golden above rot overnight"
+        }
+    }
+
+    @Test
+    fun `the v6 preview is pinned too`() {
+        // Pinned to v6 explicitly. Left on the default it silently became a v7
+        // golden the moment the version moved -- the same drift that broke the
+        // v5 fixture, one version later.
+        val faces = listOf(
+            DialParams(generatorVersion = 6),
+            DialParams(generatorVersion = 6, complications = listOf(
+                ComplicationSource.NONE, ComplicationSource.STEP_COUNT,
+                ComplicationSource.HEART_RATE, ComplicationSource.DAY_AND_DATE,
+                ComplicationSource.DATE
+            )),
+            DialParams(generatorVersion = 6, iconSlots = emptySet()),
+            DialParams(generatorVersion = 6, showSeconds = true),
+            DialParams(generatorVersion = 6, dateStyle = DateStyle.WEEKDAY_MONTH_DAY)
+        )
+        val actual = faces.map { p ->
+            val img = FacePreview.render(p)
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            for (v in pixels(img)) {
+                md.update((v ushr 24).toByte()); md.update((v ushr 16).toByte())
+                md.update((v ushr 8).toByte()); md.update(v.toByte())
+            }
+            md.digest().joinToString("") { "%02x".format(it) }.take(16)
+        }
+        assertEquals(
+        // REPINNED 2026-08-31, second time today: the complication VALUE's
+        // font went from 0.92x the slot size to 1.10x, filling the line box it
+        // already had. Every fixture here draws at least one value, so all
+        // five move -- including the glyph-less one, which is the check that
+        // this was the text and not the glyph.
+            listOf(
+                "5a6c31aba74aa625", "e32484504a769c8e", "5a28005f816665b4",
+                "c335878e7ee7ad5e", "133c9c19e167ae15"
+            ),
+            actual
+        ) { "the v6 preview changed; every face saved at v6 renders differently" }
+    }
+
+    @Test
+    fun `the composite preview is byte-for-byte what it has always been`() {
+        // Pinned to v5 EXPLICITLY, not left on the default.
+        //
+        // These hashes are "what it has always been", and the default version
+        // moves. When v6 changed the complication box, every one of them broke
+        // at once -- which reads like the renderer regressed and actually means
+        // the fixture drifted onto a new version. A golden has to name the
+        // version it is a golden OF.
+        // The complication list is named EXPLICITLY, not entries.take(5).
+        // Adding TIME_AND_DATE to the enum changed what take(5) returned and
+        // broke this golden -- which reads like the renderer regressed and
+        // actually means the fixture moved. A golden must not depend on the
+        // order or length of an enum that is expected to grow.
+        val faces = listOf(
+            DialParams(generatorVersion = 5),
+            DialParams(generatorVersion = 5, engine = Engine.KNOTWORK, dialColor = "#2B2E33", inkColor = "#C9A227"),
+            DialParams(generatorVersion = 5, complications = listOf(
+                ComplicationSource.NONE, ComplicationSource.STEP_COUNT,
+                ComplicationSource.HEART_RATE, ComplicationSource.DAY_AND_DATE,
+                ComplicationSource.DATE
+            )),
+            // A generated surface, so the procedural shading is pinned too. The
+            // stroked engines do not exercise it at all.
+            DialParams(generatorVersion = 5, engine = Engine.BRUSHED, contrast = 62.0, relief = 3.4),
+            DialParams(generatorVersion = 5, engine = Engine.GRAIN, dialColor = "#3E4A3F")
+        )
+        val actual = faces.map { p ->
+            val img = FacePreview.render(p)
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            for (v in pixels(img)) {
+                md.update((v ushr 24).toByte()); md.update((v ushr 16).toByte())
+                md.update((v ushr 8).toByte()); md.update(v.toByte())
+            }
+            md.digest().joinToString("") { "%02x".format(it) }.take(16)
+        }
+        // REPINNED 2026-08-31, second time today, for the larger complication
+        // value font. The glyph-less v6/v7 fixture moved too, and by the same
+        // amount in both -- text, not geometry.
+        assertEquals(listOf(
+                "f5581defb01d49ff", "a3fd38e6967db2f4", "9503c0d6ad3bf925",
+                "8c39cef41335a92e", "0c4c8bc3f7447530"
+            ), actual) {
             "the composite preview changed; every preview.png built after this differs"
         }
     }

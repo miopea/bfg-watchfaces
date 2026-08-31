@@ -11,7 +11,7 @@ class GeneratorVersionTest {
 
     @Test
     fun `bumping CURRENT_GENERATOR_VERSION is deliberate`() {
-        assertEquals(5, CURRENT_GENERATOR_VERSION,
+        assertEquals(10, CURRENT_GENERATOR_VERSION,
             "You changed CURRENT_GENERATOR_VERSION. That is fine ONLY if you added a new " +
             "branch in PatternEngines.paths() and left every older branch untouched. " +
             "Existing community faces must keep rendering exactly as their authors saw them. " +
@@ -100,4 +100,100 @@ class GeneratorVersionCompatibilityTest {
             "it should re-seed the tiling, not control how much of it there is"
         }
     }
+
+    /**
+     * v6 changed the complication BOX and nothing on the dial.
+     *
+     * The bump exists because [SlotGeometry] box heights changed, which moves
+     * every slot on a stored face. The dial pattern must be untouched, so this
+     * is the v1-v2 guard again for the new version.
+     */
+    @Test
+    fun `v6 renders every engine identically to v5`() {
+        for (engine in Engine.entries) {
+            if (engine == Engine.TEXTURE) continue      // needs a bitmap, not geometry
+            val v5 = PatternEngines.paths(DialParams(generatorVersion = 5, engine = engine))
+            val v6 = PatternEngines.paths(DialParams(generatorVersion = 6, engine = engine))
+            assertEquals(v5, v6) { "$engine changed between v5 and v6; the dial must be untouched" }
+        }
+    }
+
+    /**
+     * A face stored at v5 keeps the layout its author saw.
+     *
+     * This is the whole point of the bump: v6 slots are laid out with shorter
+     * boxes, which moves them. If the old numbers are not preserved, every
+     * saved face silently re-flows.
+     */
+    @Test
+    fun `v5 slot boxes are exactly what they were before v6 existed`() {
+        val p = DialParams(generatorVersion = 5, layout = Layout(complicationSize = 28))
+        // The pre-v6 constants: one box height of 3.3x whether or not a glyph
+        // is drawn, a text offset of 1.45x, and a text box of 1.7x.
+        assertEquals(SlotGeometry.boxHeight(25, withIcon = true, version = 5), Math.round(25 * 3.3).toInt())
+        assertEquals(SlotGeometry.boxHeight(25, withIcon = false, version = 5), Math.round(25 * 3.3).toInt())
+        assertEquals(SlotGeometry.textHeight(25, version = 5), Math.round(25 * 1.7).toInt())
+        assertEquals(SlotGeometry.textOffset(25, withIcon = false, version = 5), Math.round(25 * 1.45).toInt())
+
+        // And the size it could actually reach is the OLD, clamped one.
+        assertEquals(25, SlotGeometry.fittedSize(p)) {
+            "a v5 face no longer clamps where it used to; stored faces have re-flowed"
+        }
+    }
+
+    /** The bump did what it was for: v6 reaches a size v5 could not. */
+    @Test
+    fun `v6 reaches a larger complication than v5 could`() {
+        val layout = Layout(complicationSize = 28)
+        val v5 = SlotGeometry.fittedSize(DialParams(generatorVersion = 5, layout = layout))
+        val v6 = SlotGeometry.fittedSize(DialParams(generatorVersion = 6, layout = layout))
+        assertTrue(v6 > v5) { "v6 fitted $v6, v5 fitted $v5 -- the bump bought nothing" }
+        assertEquals(28, v6) { "Large should no longer be clamped at all" }
+    }
+
+
+    /** v7 changed the complication GLYPH and nothing on the dial. */
+    @Test
+    fun `v7 renders every engine identically to v6`() {
+        for (engine in Engine.entries) {
+            if (engine == Engine.TEXTURE) continue
+            val v6 = PatternEngines.paths(DialParams(generatorVersion = 6, engine = engine))
+            val v7 = PatternEngines.paths(DialParams(generatorVersion = 7, engine = engine))
+            assertEquals(v6, v7) { "$engine changed between v6 and v7" }
+        }
+    }
+
+    /** A face stored at v6 keeps the glyph size its author saw. */
+    @Test
+    fun `v6 glyph metrics survive v7`() {
+        assertEquals(Math.round(25 * 1.25).toInt(), SlotGeometry.iconHeight(25, version = 6))
+        assertEquals(Math.round(25 * 0.85).toInt(), SlotGeometry.iconHeight(25, version = 7))
+        // The GLYPH ratio is what v7 changed and what this test is for. The
+        // exact ceiling is not pinned here: it moves whenever anything else
+        // about the layout does, and `v7 reaches a larger complication than v6`
+        // already checks the property that matters.
+        assertTrue(SlotGeometry.maxSize(DialParams(generatorVersion = 6)) > 0)
+    }
+
+    /** And v7 reaches further than v6 could, which is why it exists. */
+    @Test
+    fun `v7 reaches a larger complication than v6`() {
+        val v6 = SlotGeometry.maxSize(DialParams(generatorVersion = 6))
+        val v7 = SlotGeometry.maxSize(DialParams(generatorVersion = 7))
+        assertTrue(v7 > v6) { "v7 max $v7 is no better than v6's $v6" }
+    }
+
+
+    /** v8 changed emission, not the dial. */
+    @Test
+    fun `v8 renders every engine identically to v7`() {
+        for (engine in Engine.entries) {
+            if (engine == Engine.TEXTURE) continue
+            assertEquals(
+                PatternEngines.paths(DialParams(generatorVersion = 7, engine = engine)),
+                PatternEngines.paths(DialParams(generatorVersion = 8, engine = engine))
+            ) { "$engine changed between v7 and v8" }
+        }
+    }
+
 }

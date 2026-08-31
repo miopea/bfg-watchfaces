@@ -1,5 +1,2354 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — v10: the numbers got bigger without the boxes moving
+
+"It's almost impossible to read the numbers, they're so small. Perhaps they can
+scale larger when we squeeze the spacing tighter?"
+
+### Squeezing the spacing buys nothing, and that was measured first
+
+Sweeping the requested spread on a five-slot face: 60, 70, 80 and 92 all give
+the same ceiling, complication size **31**. Past 100 it gets WORSE — 29, then
+28 — because a wider row pushes boxes toward the rim. The proposal was checked
+before anything was built, and it does not work.
+
+Neither does anything else structural. Turning off the bottom slot: still 31.
+The top slot: still 31. The date: still 31. Narrowing the row box from 3.9x the
+slot size to 3.2x moves the ceiling to 34 and the FONT only from 29 to 31 —
+two points of text in exchange for reflowing every stored face. Rejected.
+
+Only two things moved the number, and neither is the size control.
+
+### The font was filling two thirds of the space already reserved for it
+
+`fontSize` was 0.92x the slot size, inside a line box (`textHeight`) of 1.35x.
+So a third of the room set aside for the value was empty, and the size control
+had been asked to make up the difference by growing the whole box — which is
+the request the geometry cannot honour.
+
+1.10x takes the value from 29pt to 34 at the largest size, and the line box is
+still 1.24x the font, an ordinary line height. **No box changes size and no
+slot moves.** The thing that was measured as impossible was making the boxes
+bigger; making better use of the boxes was never tried.
+
+### Shorten before shrinking
+
+"71° Cloudy" is ten characters in a 121px row box. `drawnFontSize` shrank the
+font until it fit — 19pt beside neighbours at 29 — which is not clipped and is
+also not readable. That is the wrong lever: the box is about four characters
+wide, so the font has to fall by a third to buy room for a word you can get by
+looking out of the window.
+
+A drawn source now declares a `compact` form — the same reading with the
+droppable part dropped, "72° Cloudy" to "72°" and "78° / 61°" to "78/61". The
+order is: full wording at full size; if that does not fit, the compact wording
+at full size; only then does the font come down, and it comes down on the
+shorter string so it falls as little as possible.
+
+**A little smaller beats a word missing**, so shortening needs a threshold
+rather than a yes/no. `LEGIBLE_SHRINK` is 0.85: in the 121px row slots the full
+string fits only at 56% of its neighbours and the condition goes, but in the
+206px TOP and BOTTOM slots it fits at 97% and is KEPT at 33pt. Deleting a word
+the wearer chose, to save one point of size, would be the fix overshooting.
+
+`WffSchemaTest` asserts both halves — the expressions of whichever wording was
+chosen do reach the XML, and the full form still reaches a slot somewhere. A
+shortened form that still emitted the dropped expression would be reading a
+sensor in order to display nothing.
+
+### Not version-gated, for the second time today
+
+Same reasoning as the seconds this morning, and it should be recorded as a
+pattern rather than rediscovered a third time: the rule protecting stored faces
+exists to protect OTHER PEOPLE's, the published catalog contains zero of them,
+and every face the operator owns is v9. Gating on v10 would freeze the defect
+into the only faces that exist in order to protect faces that do not.
+
+The version still moved to 10, and `PatternEngines` gets a v10 branch
+delegating to v4 — no engine changed, and saying so in the dispatch is how that
+stays provable.
+
+### Three preview goldens moved, and this time all five fixtures did
+
+Including the glyph-less one, which is correct: every fixture draws at least one
+value and every value grew. It moved by the same amount at v6 and v7, which is
+the check that this was text and not geometry.
+
+## 2026-08-31 — The seconds follow the clock, and the heart stopped being an outline
+
+Two things came back from the wrist after the last build, on a photo showing
+`7:56` with a character-wide hole before the seconds.
+
+### There is no number that puts a fixed gap beside a centred clock
+
+The gutter was arithmetic: measure the widest time, add a gap, put the seconds
+there. That is exactly right for three hours a day and wrong for the other
+nine — a 12-hour clock renders `7:56` from one o'clock to nine and `12:56`
+after, the clock is CENTRED, and so its right edge moves a whole character
+between those cases. Sizing for the wide one strands the seconds most of the
+day. Sizing for the narrow one runs them into the time at ten, eleven and
+twelve. There is no third number.
+
+Watch Face Format cannot help with this the way a layout engine would: it
+positions everything absolutely, cannot measure text, and `TimeText` takes only
+`Variant` children, so no transform and no relative placement. Looked up rather
+than tried: the format's answer is `Condition`, which holds an expression and a
+set of branches and renders the first that matches. The seconds are emitted
+TWICE, thirty points apart, and `[HOUR_1_12] < 10` picks. `HOUR_1_12` is in
+the schema's own `sourceType` enumeration, so this is the format's vocabulary
+rather than a guess at it.
+
+Only 12-hour faces pay for it. `hh:mm` zero-pads — a 24-hour face, and an
+automatic one on a 24-hour watch — so the width never changes and one element
+is emitted, which matters on a file that crosses by Bluetooth.
+
+The previews were the other half. They draw a specific time, so they KNOW the
+width, and they now pass its character count to the same `SecondsBand`
+function the `Condition` branches are built from. Before this they always asked
+for the wide position and so reproduced the bug they were supposed to catch.
+
+Rejected: shrinking the seconds further, which trades a visible gap for
+illegible digits; and padding the hour to `hh:mm` on a 12-hour face, which
+fixes the layout by changing the design the wearer chose.
+
+### The heart is a construction, not a drawing
+
+Three outline attempts, each rendered and looked at, and the third looked like a
+heart in AWT and not on the watch. Arcs are the one shape whose geometry has to
+be CONVERTED for this format — AWT counts counter-clockwise from three o'clock
+with a bounding box, the format clockwise from twelve with a centre — so an
+arc-built glyph carries a whole class of failure that nothing else does.
+
+So it is built the way a heart is constructed rather than traced: a square
+turned 45 degrees with a filled circle on each of its two upper edges. Two
+`Ellipse` fills and one `RoundRectangle` fill, and the rotation is a real
+attribute of the part (`angle` with `pivotX`/`pivotY` on `abstractPartType`)
+rather than something the emitter has to bake into coordinates. No arcs, no
+strokes, no joins to go wrong, and the same three shapes in both previews and
+on the watch.
+
+### Three preview goldens moved, and one deliberately did not
+
+Repinned for the heart. The fixture with `iconSlots = emptySet()` is
+byte-identical across the change, which is the thing that says this was the
+glyph and not the renderer — a golden set where everything moves together
+proves nothing.
+
+## 2026-08-31 — The heart, and why the seconds drifted back
+
+The glyphs came back monochrome, so drawing our own was right. Two things it
+left behind, both reported from the wrist.
+
+### An end-aligned run hangs its left edge off an estimate
+
+The seconds were moved left by computing a RIGHT edge and letting the text be
+`align="END"` to it. That reads as equivalent to moving them and is not: the
+right edge was derived from an ESTIMATE of how wide two digits are, so every
+pixel the estimate was wrong by pushed the text away from the clock and toward
+the ring. "The seconds slipped back to the right" — after a change whose entire
+purpose was to move them left.
+
+They are anchored by their LEFT edge now, `align="START"` at a fixed gap past
+the widest time. The gap to the clock is exact because it is the thing being
+set rather than the thing being inferred, and any error in the width estimate
+lands on the ring side, which has room for it.
+
+### The heart took three attempts and a render each time
+
+Approximating a cubic outline with arcs and lines is not arithmetic, it is
+drawing, and it cannot be reasoned about from coordinates:
+
+1. Two half-ellipses side by side. They OVERLAPPED and crossed, leaving a notch
+   and a stray mark where the strokes met.
+2. Made to meet exactly. Now a clean shape and still not a heart — a shield,
+   because a 180 degree lobe leaves the sides as straight walls.
+3. Lobes sweeping 218 degrees, so each comes over the top AND wraps down the
+   outside, meeting at a shallow dip rather than plunging to the waist.
+
+Each version was rendered at 160px and looked at. There was no version of this
+that could have been got right by thinking harder about the numbers.
+
+### Three preview goldens moved again
+
+Deliberately, and for the second time today: the heart really did change. That
+is what a golden is for — it made a change to a glyph shape impossible to ship
+without noticing.
+
+## 2026-08-31 — We draw the complication glyph ourselves now
+
+Fifth and last attempt at the glyph colour, and the first that does not depend
+on a provider behaving.
+
+### The tint was correct and could never have worked
+
+`tintColor` on `ComplicationSlot` IS the documented mechanism, and the previous
+build had it in the right place. It still did nothing, and the documentation
+says why: a tint can only recolour an image the provider ships WHITE-FILLED.
+Google Fit sends a green steps glyph and a red heart. No watch face can override
+that; the fix would be in Fit.
+
+So the question stopped being "how do we tint their icon" and became "why are we
+drawing their icon at all".
+
+### We were never meant to be drawing it
+
+Both previews have always drawn [ComplicationGlyphs] — our own shapes, in the
+wearer's ink. That is why the preview showed a monochrome glyph while the watch
+showed a green one. The emitter was the odd one out.
+
+The reason it was the odd one out is now fixed rather than worked around: **two
+glyphs could not be expressed in Watch Face Format at all.** Steps was a
+`Rotated` pair and heart rate a cubic `Curve`, and `GlyphWff` drops what it
+cannot express, so both produced an empty `PartDraw`. Falling back to the
+provider's image was the only thing that could work.
+
+- Steps is two footprints without the lean. A rotated ellipse is not an
+  axis-aligned one and the format has no primitive for it.
+- Heart rate is two half-ellipses and two lines. An outline rather than a fill,
+  because an arc can only be stroked.
+
+### And one that was quietly broken
+
+The notification bell's dome was a `Curve` too. That glyph rendered — it just
+rendered WITHOUT ITS DOME, and nothing failed. It had never been drawn on a
+watch because that slot also fell back to the provider's icon, so the defect was
+waiting rather than absent.
+
+`GlyphDrawableTest` now asserts every enabled source's shapes survive the trip
+into the format, counted in and counted out, and that no glyph uses a shape the
+format cannot express. A glyph that loses a stroke on the way to the watch looks
+right everywhere it is checked and wrong where it is worn.
+
+### What this costs
+
+A third-party provider's distinctive icon is replaced by ours. For a slot
+pointed at an app, our shape still describes the SOURCE behind it, which is what
+the wearer chose. The three preview goldens moved, deliberately, because the
+glyphs really did change.
+
+### The one thing still unproven
+
+`PartDraw` inside a `Complication` element. `PartImage` and `PartText` render
+there today and `PartDraw` is the same element family, which is a much better
+footing than `renderMode="MASK"` ever had — that was a mode flag whose runtime
+behaviour was opaque. If it fails, the glyph moves to scene level, where the
+step ring already proves `PartDraw` renders.
+
+## 2026-08-31 — The tint belongs on the ComplicationSlot
+
+Fourth attempt at the glyph colour, and the first one grounded in documentation
+rather than in reading the schema and guessing.
+
+The operator settled it by observation: "I see this on other faces so I know it
+is possible." That is worth more than three failed hypotheses — it turns "is
+this achievable" into "where does the attribute go", which is answerable.
+
+`tintColor` is on `ComplicationSlot`, and that is the documented place for it.
+Everything tried before was on the wrong element:
+
+| Where | What happened |
+| --- | --- |
+| `tintColor` on `PartImage` | Ignored. `renderMode` defaults to SOURCE. |
+| `renderMode="MASK"` on `PartImage` | Slots with a provider glyph rendered NOTHING |
+| Our own glyph instead | Impossible — see below |
+| **`tintColor` on `ComplicationSlot`** | This |
+
+### Why drawing our own glyph is not an option
+
+It was the attractive fix — both previews already draw our shapes, so it would
+have made the watch match the preview at the root instead of patching the
+symptom. `GlyphWff` can only emit `Line`, `Oval`, `RoundRectangle` and `Arc`.
+**Steps is a `Rotated` pair and heart rate is a `Curve`** — cubic béziers, which
+Watch Face Format has no equivalent for. They produce an empty `PartDraw`, and
+77 tests said so immediately.
+
+That is also why the emitter reaches for the provider's image for these slots in
+the first place. It was never a shortcut.
+
+### The limit that is not ours
+
+A tint can only recolour an image the provider ships WHITE-FILLED. A
+black-filled icon cannot be changed by a watch face at all, and the fix for that
+would be in the provider's app. Fit's glyphs are green and red rather than
+black, so this should reach them.
+
+### Why this one is safe in a way MASK was not
+
+MASK changed a render MODE, and the failure took the whole slot's content with
+it. This adds a colour attribute to an element that already renders correctly.
+Verified the emitted face differs from the working build by exactly that
+attribute moving, and nothing else. The worst realistic outcome is that the
+glyphs stay coloured.
+
+The tint follows the ink into ambient when a dark ink is being lifted for
+contrast, for the same reason the text's colour does.
+
+## 2026-08-31 — renderMode="MASK" made complications vanish, and is reverted
+
+Reported from the wrist: the row of three complications was simply gone. Time,
+date, weather and battery still there; steps, heart rate and world clock
+missing.
+
+### Finding it took ruling out the obvious suspect first
+
+The previous change was per-slot complication sizing, which is exactly the kind
+of thing that loses a slot. It was not that. Emitting the operator's face at the
+commit before and after that change and stripping comments gave **byte-identical
+XML** — at a stored size of 19 the new sizing rule changes nothing, because
+nothing was being clamped.
+
+That left one candidate. `renderMode="MASK"` shipped one release earlier and
+this was the first face built with it.
+
+### What it does, and what nobody could have caught
+
+MASK is the schema's answer to tinting: SOURCE, the default, draws a
+complication's image in the provider's own colours and ignores `tintColor`. MASK
+should stencil it and fill with the tint.
+
+On a real watch it made the slots that HAVE a provider glyph render nothing at
+all. The battery slot survived, which fits — a slot whose provider supplies no
+monochromatic image has nothing for MASK to fail on.
+
+**Nothing here could have caught it.** The XSD validates that the attribute
+exists, not what a runtime does with it, and neither preview draws a provider's
+real icon — both draw their own glyph in the ink. The face validated, installed,
+and lost three complications.
+
+### Reverted, and the colour complaint stays open
+
+`tintColor` stays (it shipped in a working build and does nothing on its own);
+`renderMode` is gone. Verified the emitted XML now differs from the broken one
+by exactly that attribute and nothing else.
+
+So the glyphs are still the provider's colours. **A missing complication is
+worse than a green one**, and the trade is not close. Whatever fixes the colour
+next has to be tried on a watch before it ships — this is now the third
+wrist-only defect in a row, and the pattern is that anything about how a
+PROVIDER's content renders is unobservable from here.
+
+### The comment rule bit again
+
+Writing that explanation put `--` inside an emitted XML comment for the third
+time this session, and 93 tests went red instantly. The guard works; the habit
+is mine.
+
+## 2026-08-31 — The date only constrains the slot it touches
+
+Approved from a rendered before/after rather than described: the operator saw
+both cases and said go.
+
+### What was wrong
+
+The top slot has to sit above the drawn date. When it could not, `fittedSize`
+shrank EVERY slot until it did — so a date squeezed three row slots and a bottom
+slot that are nowhere near it. Measured ceiling for a five-slot face:
+
+```text
+date LARGE   23        no TOP slot, date NORMAL   31
+date NORMAL  27
+date SMALL   30
+date OFF     31
+```
+
+The last line is the tell. Remove the ONE slot the date touches and the ceiling
+comes back — so the other four were being shrunk by a constraint that never
+applied to them.
+
+### What it does now
+
+`fittedSize` answers for the row and the bottom; `fittedTopSize` answers
+separately for the top and is never larger. On the operator's face the row goes
+27 to 31; with a large date, 23 to 31.
+
+All three renderers ask one question, `SlotGeometry.sizeAt(p, pos)`, inside
+their own per-slot loops. They previously hoisted a single size out of the loop,
+which would have drawn the top slot's text at the row's scale inside the smaller
+box it was given — the emitter and both previews would have disagreed in exactly
+the way this project keeps being bitten by.
+
+### The trade, which was shown before it was taken
+
+The top complication now renders SMALLER than the row when a date is in its way
+— 21 against 31 at a large date, which is visible. It reads as hierarchy:
+weather above, the row you scan below. The previous behaviour expressed the same
+constraint by making everything small instead, which is not obviously better and
+was never a choice anybody made.
+
+Capped at the row's size. A bigger complication above three smaller ones would
+read as a mistake rather than a hierarchy.
+
+## 2026-08-31 — Two of those four fixes did not work, and why
+
+Both were reported back from the wrist. Neither had failed a test.
+
+### The tint did nothing, because `renderMode` defaults to SOURCE
+
+`tintColor` on the `PartImage` was correct and insufficient. The schema has a
+sibling attribute, `renderMode`, defaulting to **SOURCE** — draw the image in
+its own colours. The tint is simply ignored in that mode.
+
+**MASK** is the one that matters: it uses the image as a stencil and fills it
+with `tintColor`. That is what "make the glyph match the text" means, and it is
+one attribute away from what shipped.
+
+Nothing caught this. The XSD validates the attribute, not whether the
+combination does anything, and neither preview draws a provider's real icon.
+
+### The seconds were anchored to the wrong thing
+
+They were positioned from the RIM: `rightEdge = DIAL_SIZE - inset`. Shrinking
+the font while pulling the inset in by the same amount left their LEFT edge in
+exactly the same place — so every pixel saved went to the ring side and the
+seconds appeared to drift toward the ring rather than toward the time. Reported
+as "you moved the seconds to the right, CLOSER to the ring".
+
+They are now anchored to the CLOCK: a fixed gap past the widest time, with the
+smaller font turning directly into clearance at the rim. Right edge 421 instead
+of 432, ring gap seven pixels to about eighteen.
+
+### The version gate was the real defect
+
+Both fixes were behind `generatorVersion >= 9`. **Every face the operator owns
+is v8**, so the fixes they asked for could not reach the watch they asked about.
+
+The rule that protects stored faces exists to protect OTHER PEOPLE's, and the
+published catalog contains zero of them. Freezing a defect into the only faces
+that exist, to protect faces that do not, is the rule being followed rather than
+kept. The gate is removed; the version stays at 9 because rendering did change
+and the format history should say so.
+
+### Measured: the DRAWN DATE is what caps complication size
+
+Not the constant, not the slot count, not the spread. `maxSize` for a five-slot
+face:
+
+```text
+date LARGE   23
+date NORMAL  27
+date SMALL   30
+date OFF     31
+no TOP slot, date NORMAL   31
+```
+
+The top slot has to clear the date, and `fittedSize` shrinks **every** slot
+until it does — so one slot's collision drags the other four down with it. A
+large date costs eight points of complication size on slots nowhere near it.
+
+The fix is to stop sizing all five together, which is a real layout change and
+is NOT in this commit. It is what "fix the complication boxes" should mean, and
+it wants to be seen before it is chosen.
+
+## 2026-08-31 — Four things a wrist found, and generatorVersion 9
+
+All four came from the operator wearing it. None could have been found any other
+way, and two of them the previews actively hid.
+
+### The glyphs were the provider's colours, not the ink
+
+Reported: "steps are green and heart rate red" on the watch, monochrome in the
+preview. The emitter asks for `[COMPLICATION.MONOCHROMATIC_IMAGE]`, and **that
+name describes what is REQUESTED, not what arrives** — Google Fit ships a green
+steps glyph and a red heart, and Watch Face Format drew them as sent.
+
+Both previews draw the glyph in the ink, so nothing disagreed and nothing
+failed. The built face simply looked different from the tool that designed it,
+which is the failure mode this project keeps meeting.
+
+Fixed with `tintColor` on the `PartImage`, which `abstractPartType` has carried
+all along.
+
+### The seconds could not simply move
+
+Reported as "very tight to the ring", and the arithmetic agreed: the ring's
+inner edge sits at x=439 at the seconds' height, and they ended at 432. Seven
+pixels.
+
+Moving them left to an inset of 34 was the first fix and **rendering it showed
+it was wrong** — the gap to the CLOCK closed to about three pixels and the
+picture just traded one crowded side for the other. There is not room in that
+gutter for seconds at 0.35 of the clock beside a full-size time.
+
+So with a ring they also shrink, to 0.30, at an inset of 32: about ten clear of
+the time, fifteen clear of the ring. Faces with no ring are untouched — nothing
+crowds them, and the old inset was measured against the clock in the first
+place.
+
+The lesson is the loop rather than the numbers: the first version passed every
+test and looked wrong the moment it was drawn.
+
+### Complication sizes went up, but not as far as asked
+
+"Small is still way too small. Large should be medium and medium small" wants
+the whole scale to shift up a notch, which needs a bigger Large to shift into.
+
+**There is no bigger Large.** `sizeOptions` is a fraction of `maxSize`, which is
+not the `MAX_SIZE` constant (40) but the largest size whose boxes still fit —
+measured at 30 for a five-slot face. It is the dial being ROUND that binds:
+`fits` requires every box corner inside the circle. Turning the date off buys
+one pixel. Widening the spread makes it WORSE, 28, because it pushes boxes
+toward the rim.
+
+0.80/0.90/1.00 was tried and `ControlsAreNoticeableTest` refused it: three
+options between 24 and 30 differ by about 2pt of text, and the operator's own
+earlier instruction was that a size change must be noticeable. So the range is
+0.70/0.85/1.00 — 21/26/30 instead of 18/24/30 — and a genuinely larger Large is
+a geometry change with its own decision, not a number here.
+
+### The hour picker had one label that wrapped
+
+Three segments share a row and "Match my watch" was the only one needing two
+lines, so its button grew taller than the others. It is "Automatic" now; the row
+is labelled "Time", which carries the context the longer wording did.
+
+### Version 9, and what it does NOT change
+
+The seconds move and the glyph tint both alter how a stored face renders, so the
+version bumped and `PatternEngines` gained a `9 -> v4(p)` branch — no engine
+changed, so it delegates rather than copying. A v8 face keeps its seconds where
+its author saw them.
+
+Two guards fired on their own and both were right to: `GeneratorVersionTest`
+refused the bump until the branch existed, and `ContractFileTest` caught that
+the deployed catalog validator would have rejected v9 faces until the generated
+contract was regenerated and the Worker redeployed.
+
+## 2026-08-31 — A preview drew today's date beside a clock fixed at 10:10
+
+`RenderPipelineTest`'s pinned preview hashes went red mid-session, on code that
+had passed forty minutes earlier. The session had crossed midnight.
+
+`DateStyle.sample()` defaults its argument to `LocalDate.now()`, and both
+preview renderers called it with no argument — so a preview drew whatever day it
+happened to be rendered on, next to a clock permanently set to 10:10.
+
+### The flake was the smaller half
+
+`preview.png` is baked into the APK by `Workbench.exportTo` and is the thumbnail
+the watch face carousel shows. Every built face carried its BUILD DATE, frozen,
+beside a clock saying something else. Nobody had noticed because you have to
+look at a preview built on a different day from the one you are looking at it on.
+
+### What was checked before changing anything
+
+- **The emitter does not use `sample()`.** A real watch fills the date in from
+  Watch Face Format's own sources, so nothing here changes what an installed
+  face displays. Confirmed by grep, not assumed.
+- **`widestSample()` was already pinned** to a fixed date, which is what feeds
+  the emitted font size. Whoever wrote it had this exact problem in mind for the
+  half that reaches the watch, and stopped one line short of the half that does
+  not.
+- Exactly two callers, both previews: the workbench renderer and the Android one.
+
+### 10 March is not arbitrary
+
+It is the moment the rest of the preview already uses. `Complications.sample`
+renders `DAY_AND_DATE` as "MAR 10" and both renderers put the clock at 10:10.
+`DateStyle.SAMPLE_DATE` names it once; the workbench derives it from the render's
+own `time` so a live preview at a real moment still agrees with itself.
+
+### The guard was wrong TWICE, and ablating is why both were found
+
+The first version compared a default render against an explicit one at the
+default moment — both go through the same path, so it could not fail. Ablating
+the fix showed it passing. It now renders TWO DIFFERENT DAYS AT THE SAME CLOCK
+TIME, so the drawn date is the only thing that can differ.
+
+The second was a test asserting the EXPORTED `preview.png` equals
+`FacePreview.render`. It was named as though it proved determinism, and it does
+not: both sides go through the same renderer, so if that renderer read the wall
+clock both would read it and still match. Ablation caught this one too. It is
+kept — it does catch `exportTo` drifting onto a different renderer or
+quantization — but renamed to claim only that.
+
+**Twice on one bug is a habit, not an accident:** a guard that compares two
+calls down one code path cannot fail, and reads exactly like one that can.
+
+### What finally proves it, given there is no faketime on this machine
+
+- **A source-level check that no renderer calls `sample()` bare or reads
+  `LocalDate.now()`.** Blunt, and the only thing that covers
+  `AndroidFacePreview` — which needs an Android runtime, so no JVM test
+  exercises it, and which is half the bug because the phone preview and the
+  baked preview are two renderers that can disagree. Ablated against BOTH
+  renderers; it catches both.
+- **Looking at an exported `preview.png`.** It reads "Tue Mar 10", its
+  complication reads "MAR 10", and the clock reads 10:10 — three parts of one
+  image describing one moment. Before the fix the first of those said today.
+
+## 2026-08-31 — Sign in to publish, anonymous to complain
+
+Proposed by the operator: a Google sign-in, required only to POST to the
+community and never to view it. Written up in full in
+`docs/specs/catalog-service.md`; this records why it is right and what it costs.
+
+### It is not really about the bot check
+
+Every awkward part of the catalog descends from one sentence in R7: **no account
+means no ban.** That is what makes pre-moderation mandatory rather than chosen,
+why a bot check is needed at all, and why withdrawing your own face rests on a
+random per-install id the spec has to apologise for in place. An account gives
+that handle back. Turnstile falling out is a side effect, not the point.
+
+### The mistake that triggered it, recorded as a mistake
+
+Turnstile was chosen in the interview because it is "a script tag and one
+secret". **There is no script tag in a native Android app.** Turnstile has no
+native mobile SDK; the documented pattern is a WebView loading a page you host.
+The reasoning was web-shaped while the submission path is app-only, and nobody
+noticed until the app came to use it.
+
+Worth separating from the hosting decision, because the operator reasonably
+asked whether Azure would have avoided it: no. Turnstile was chosen separately
+and earlier, and the same WebView would have been needed either way.
+
+### The asymmetry is the design, not a compromise
+
+**Publishing needs an account. Complaining never does.** R2 exists because
+requiring an account to report became intolerable the moment submitting did not
+— "anyone could publish and only developers could complain" is what moved this
+catalog off GitHub in the first place. Putting a sign-in in front of the
+complaint path would reintroduce exactly that, and Play's UGC rules want a
+reachable complaint path.
+
+Reports are safe to leave open because a report is a MESSAGE, not an action.
+Nothing auto-hides, so flooding buys an attacker a longer queue and nothing else.
+
+### What is promised, and the part that cannot be
+
+The service stores `sha256(salt + sub)` — Google's per-application subject id,
+hashed — and nothing else about the person. The display `author` stays an
+optional string somebody types, deliberately NOT taken from the Google profile:
+a display name and an identity are different things, and conflating them would
+put someone's real name on a gallery by default.
+
+What must not be claimed: Google's ID token carries the person's email and name
+whether the app asks or not. The true statement is that the service reads `sub`,
+ignores the rest, and never stores or logs it — not that it never sees it. About
+has to say the true one.
+
+### Rejected: relaxing pre-moderation at the same time
+
+Accounts make pre-moderation optional, and publishing immediately with removal
+on report is how most communities work. Rejected for now: `MODERATION.md`'s
+published promises assume review; harmful content would be visible until
+reported, which buys nothing at zero volume; and it can be relaxed later, where
+tightening afterwards is far worse.
+
+### Accepted costs, none of them free
+
+- **About changes**, and it is the app's only promotion. "No account" becomes
+  "no account to browse, an account to share".
+- **A deletion obligation.** Play requires an app with accounts to offer data
+  deletion in the app and from the web. `DELETE /me` has to exist, and what it
+  does to an already-PUBLISHED face is not decided — removing it takes something
+  off other people's wrists, keeping it means "delete my data" does not delete
+  the face, which has to be said rather than discovered.
+- **Burner accounts still work.** This raises the cost of abuse a lot and is not
+  a wall, so pre-moderation is still doing real work.
+
+### Why now rather than later
+
+The catalog is empty and nothing has ever been submitted, so there is no
+migration. Adding accounts after real faces exist would mean reconciling install
+ids with subject ids for faces owned by real people.
+
+## 2026-08-30 — WffEmitter escapes, and a face called "Rock -- Roll" builds again
+
+The question raised was narrow: `WffEmitter` interpolates `fontFamily` and every
+ComponentName into XML attributes with no escaping. Now that strangers can
+submit a face, should the emitter escape, or is refusing bad values at the
+catalog boundary the right and sufficient place?
+
+**Both, because they are not the same job.** The objection to doing both was
+that this repo has been hurt four times by one rule living in two places —
+`SlotGeometry`, `ControlInventory`, `EngravedStroke` and `PublishedSlug` each
+exist to undo an instance of it. That objection does not apply here:
+
+- **Validation is policy.** "Is `Roboto Flex` a legal font family?" has one
+  right answer and must have one home, which is the generated contract.
+- **Escaping is encoding.** "How do I write an arbitrary string into an XML
+  attribute?" is not a question about watch faces at all. It belongs to whatever
+  writes the XML, and its answer does not change when the policy does.
+
+Those are different questions. Keeping both is the difference between knowing a
+value is acceptable and knowing the file is well-formed.
+
+### What actually settled it was a bug with nothing to do with the catalog
+
+A face named `Rock -- Roll` did not build:
+
+```text
+The string "--" is not permitted within comments.
+```
+
+The name goes into the header comment, and it never passes through
+`DialParams` — it is a separate argument to `emit` — so there was no upstream
+seam that could have caught it even in principle. "Validate at the boundary"
+would have left that in place, because the boundary is the catalog and this
+breaks for someone who never touches it.
+
+Two other things fell out of probing rather than reasoning:
+
+- **A quote in `fontFamily` produces perfectly well-formed XML.** It just
+  carries an attribute the emitter never wrote. So a test that only parses the
+  result PASSES on a successful injection — the tests check for the injected
+  content specifically.
+- **A face name containing `-->` closes the comment.** ComponentName was
+  already safe: `DialParams`' constructor refuses one that is not a
+  ComponentName, which the probe confirmed rather than assumed.
+
+### Comments cannot be escaped, only sanitized
+
+XML expands no entities inside a comment, so there is no escape for `--`; it is
+simply illegal, as is a trailing `-`. The only options are to change the text or
+leave it out. `XmlSafe.comment` collapses hyphen runs, so `Rock -- Roll` becomes
+`Rock - Roll` in the header — a comment is documentation, and a faithful-enough
+rendering beats refusing to build. It also strips control and format characters,
+because a bidirectional override makes the header render as something other than
+what it says.
+
+### Why this is safe for every face already saved
+
+Community faces are stored as parameters, so the emitter IS the renderer for the
+stored file format, and changing its output silently rewrites everything. It
+does not change: escaping only alters a string containing a character that had
+no business being there, and `escaping changes nothing about a value that was
+already legal` pins that. All 438 generator tests passed unchanged, including
+the schema validation and the v1-v2 geometry guard. No `generatorVersion` bump,
+because no output moved.
+
+### The ablation was run, not assumed
+
+Stripping every `XmlSafe` call from the emitter fails 5 of the 10 new tests. The
+5 that still pass are the helper's own unit tests and the "changes nothing
+legal" checks, which do not depend on the emitter calling it — which is correct,
+and worth stating so nobody later reads them as coverage they are not.
+
+### One thing deliberately left alone, and then not
+
+`Workbench.exportTo` hand-rolled its own escape for `strings.xml` — `&` and `<`
+only. It stayed outside that change rather than widening it, and was filed
+separately.
+
+**Picked up afterwards, and the "it is not wrong" half turned out to be wrong.**
+`&` and `<` are the only two characters that must ALWAYS be escaped in element
+text, which is the reasoning everyone including me applied. But the XML
+specification also requires `>` to be escaped when it falls in the sequence
+`]]>`, and a face name is exactly the field where a sequence like that arrives.
+Exporting a face called `Bracket ]]> Face` produced a `strings.xml` no parser
+accepts — and that file is built into an APK by aapt2, so the symptom would have
+been a link failure saying nothing about the name.
+
+Established by writing the test first and watching it fail against the existing
+line, rather than by reading the spec and assuming. `XmlSafe.text` escapes `>`
+unconditionally, so substituting it fixed the case as a side effect of removing
+the duplication.
+
+One real difference is recorded rather than glossed: a name containing a bare
+`>` now produces different BYTES than before, because the helper escapes it
+whether or not it is part of `]]>`. It parses to the same string, so the
+resource in the APK is identical. "No behaviour change" was the acceptance line
+and blanket byte-identity would have been a claim too strong to make.
+
+## 2026-08-30 — The catalog service runs on Cloudflare, and validation splits in two
+
+### Cloudflare, decided on merit
+
+The spec recommended Azure on the grounds that the sibling repos use it heavily,
+then reversed itself on the grounds that the only reachable Azure subscription
+belongs to the operator's employer. The operator rejected the framing outright —
+they use both clouds, they do not care who owns the accounts, they want the best
+solution — and chose Cloudflare once the comparison was redone on technical
+merit alone.
+
+What actually decided it, all three specific to this workload:
+
+- **No cold start on the install counter.** `POST /faces/<slug>/installed` fires
+  on every community install and a person is waiting on it. Workers are V8
+  isolates; Static Web Apps' Free-plan Functions cold start in seconds.
+- **D1 is real SQL, so "byte-identical submissions are rejected" is a partial
+  unique index** enforced by the database. On Table Storage it becomes a
+  read-then-write in application code with a race two simultaneous submissions
+  can drive straight through. Cosmos would fix that, and its one free-tier
+  account per subscription is already taken.
+- **Turnstile is a same-platform call**, not a second service with a second
+  credential to rotate.
+
+Rejected, with the reasons named rather than dismissed: Azure's App Insights,
+point-in-time restore and staging slots are real advantages, and they are
+operational maturity for a project that has no on-call, no alerting and no
+restore drill. If this ever needs those, that is when the argument changes.
+
+One ceiling is recorded because it is where this design would first hurt: a
+response served from `caches.default` still costs a Worker invocation, so
+Workers Free's 100,000 requests/day applies to total requests, not cache misses.
+The fix if it is ever approached is Pages or a zone Cache Rule, not a migration.
+
+**The account-ownership argument is retired.** It was raised three times after
+the operator had twice said it was not a factor. It stays in the spec's history
+because it was made, not because it counts.
+
+### The Worker does not know what a face is
+
+A Cloudflare Worker is JavaScript. The thing it has to validate is defined in
+Kotlin. The obvious move — write the ranges and enums out again in TypeScript —
+is exactly the shape this repo has already been hurt by four times, and
+`ControlInventory`'s header says why: "A test that two copies match cannot tell
+you they are both correct."
+
+So `CatalogContract` in `:generator` emits `params-contract.json`, and the
+Worker reads it. Ranges from `ControlInventory`, layout bounds from
+`SlotGeometry`, enums from `DialParams`, the field list from
+`FaceCodec.toQuery`, the colour and ComponentName patterns from `DialParams`'
+own regexes, and the font weights from Watch Face Format's XSD — with a test
+that reads the XSD and fails when the transcription drifts.
+
+It is committed, like the launcher icons and for the same reason: a
+`wrangler deploy` must not depend on a JVM task having been run.
+`ContractFileTest` is what makes the committed copy trustworthy.
+
+**The test fixture is generated too**, from `FaceCodec` and `CatalogStore`, and
+this immediately earned itself. It caught `dateSize` bounded by
+`SlotGeometry.MAX_DATE_SIZE` (56) when the stored default is 64 — those
+constants bound the DERIVED date size, not the stored field, which
+`fittedDateSize` stopped reading when the date became fitted. The service would
+have rejected every genuine submission on a public endpoint, and a hand-written
+fixture would have passed every test while it did.
+
+The general guard added for that class of bug: a test asserting the DEFAULTS
+satisfy every bound the contract states. A validator stricter than the format
+rejects real work and nothing else notices.
+
+### Validation happens twice, in two languages, and that is deliberate
+
+R3 said "submissions validate without a human", written when the catalog was
+git and CI was a JVM. It cannot be satisfied as written — the emitter is Kotlin
+and the schema validator is Xerces, and neither runs in a Worker.
+
+Rejected: porting the emitter to JavaScript. That is a second implementation of
+the file format, and every one of `SlotGeometry`, `ControlInventory`,
+`EngravedStroke` and `FaceCodec` exists because a duplicated implementation had
+already caused a real bug.
+
+Chosen: the Worker checks what is cheap and structural at the POST — ranges,
+enums, colours, unknown fields, and strings that would break out of an XML
+attribute — and the moderation pass runs the real render and the real XSD on the
+JVM before anything is published. Nothing reaches the public without an
+automated verdict, which is what R3 was protecting; the verdict just no longer
+arrives while the submitter waits.
+
+Said plainly because it is the failure nobody can see: a schema-invalid face
+installs cleanly and then never appears in the carousel. There is no error on
+either side, so the automated check is the only signal that exists.
+
+### A boundary that only mattered once strangers could reach it
+
+`WffEmitter` writes `fontFamily` and every ComponentName straight into XML
+attributes with no escaping. Harmless while a face is made on the machine that
+renders it; an injection the moment anyone can submit one, since a quote closes
+the attribute. The contract publishes patterns for both, `DialParams.HEX` and
+`COMPONENT` became public rather than being described a second time, and the
+ComponentName pattern is anchored on the way out — Kotlin's `Regex.matches`
+requires a full match, `RegExp.test` does not, and an unanchored copy would have
+accepted anything wrapped around a valid value.
+
+### Two smaller things
+
+The colour pattern was briefly written as uppercase-only, which reads as tidier
+and would have rejected `#7d7369` on the public endpoint while the app went on
+saving it happily. It is now `DialParams.HEX` itself. A validator stricter than
+the format is a bug only strangers hit.
+
+Duplicate detection no longer matches text in a database error message. It asks
+the database. A driver's error string is not an interface, it differs between
+SQLite builds, and getting it wrong turned every duplicate into five pointless
+retries and a 503 — which is what it did, until the tests said so.
+
+## 2026-08-30 — The transport works, and the three bugs that hid inside it
+
+A face designed on a Pixel 11 Pro XL reached a Pixel Watch 5 and installed:
+
+```text
+phone:  BUILT wrist.apk  520822 bytes  1837ms
+        TARGET Ready(Pixel Watch 5)
+        wrote 520822 bytes to the channel
+watch:  channel opened: /bfg-watchfaces/face/YkxoNUNH...
+        received 520822 bytes
+        slots: 0 free, 1 used   -> installed
+```
+
+Three separate bugs, each of which required a real watch to find.
+
+### 1. v1 signing was off, and Watch Face Push needs it
+
+`ApkSigning` had `setV1SigningEnabled(false)`, reasoned as "the face declares
+minSdkVersion 33, so a JAR signature is dead weight". That is true of the ANDROID
+INSTALLER and false of Watch Face Push, which reads `META-INF/MANIFEST.MF`
+itself.
+
+Rejected with `ERROR_MALFORMED_WATCHFACE_APK` — "The provided watch face is not
+a valid Android APK" — while `adb install` of the identical file succeeded and
+the Push validator issued a token for it. The Wear OS 6 emulator accepted it;
+Wear OS 7 does not.
+
+Isolated by pushing the SAME face built two ways: `watchface.apk` (aapt2)
+accepted, `packface.apk` (pack) rejected, then the pack one re-signed with
+`--v1-signing-enabled true` accepted. Content held constant, one variable moved.
+
+### 2. `sendFile(Uri.fromFile(...))` sends nothing, successfully
+
+Google Play services opens that URI from ITS process and uid. Under scoped
+storage neither `cacheDir` nor `getExternalFilesDir` is readable there — and the
+send Task resolves anyway. The watch received 0 bytes and `addWatchFace`
+rejected the empty file as malformed, which is an error about packaging that was
+really about transport.
+
+The bytes now go to `ChannelClient.getOutputStream`, which needs no cross-process
+file access at all.
+
+### 3. `receiveFile` completes when the transfer is SET UP, not finished
+
+The watch awaited it, read a 0-byte file, failed to install, and closed the
+channel — aborting the phone mid-write with `ChannelIOException: Channel closed
+unexpectedly before stream was finished`. **Each end was reporting the other
+end's fault**, which is why the phone's "sent" and the watch's "malformed" were
+both true and neither was the cause.
+
+The receiver now reads `getInputStream` to EOF, which is the only unambiguous
+signal that a face is complete, and does the work inline: launching into a
+service-scoped coroutine got it cancelled on teardown with "Job was cancelled".
+
+### 4. And then it installed and did not switch
+
+`setWatchFaceAsActive` was only ever called from `ActivationRequestActivity`, at
+the instant permission was granted. So the FIRST face switched and every one
+after it installed silently into the picker — which from outside is "I sent a
+face and nothing happened", indistinguishable from the transport failing, and
+exactly what it looked like once the transport finally worked.
+
+`FaceInstaller` now switches whenever `ActivationConsent.canActivate` is true.
+
+Confirmed on the watch: `DeclarativeWatchFaceRuntime` rendering
+`com.bfg.watchfaces.watchfacepush.on`.
+
+### What this cost, and why
+
+Four wrong diagnoses before the first log was read: `minSdk`, `standalone`, a
+native arm64 crash, 16 KB page alignment. Each was a plausible mechanism reasoned
+from what I knew. `adb logcat` on the failing device named every real cause in
+one command.
+
+The emulator pair cannot pair, so this entire path had never run. "Verified on
+the emulator" was doing far less work than it sounded like all week.
+
+## 2026-08-30 — The crash on Send, and why every emulator run missed it
+
+Tapping "Send to watch" on a real phone killed the app. Not the native crash I
+expected — I had assumed the arm64 `libpack_java.so`, on the reasoning that only
+the x86_64 one had ever executed. It was a Compose layout crash:
+
+```text
+java.lang.IllegalStateException: Vertically scrollable component was measured
+with an infinity maximum height constraints, which is disallowed.
+```
+
+`MainActivity` wrapped the handoff branch in a `Column(Modifier.verticalScroll())`,
+and `ActivationHandoffScreen` already scrolls itself — it was written as a
+standalone screen before the Scaffold existed. A scrolling container inside a
+scrolling container gives the inner one infinite height, which Compose refuses
+with a hard crash rather than a layout warning.
+
+Introduced on 2026-08-29 in the four-screen rebuild, and it fires only when that
+screen is actually opened.
+
+### Why it survived
+
+Every attempt to reach the handoff screen on the emulator missed. The taps hit a
+segmented control, a system pairing dialog stole focus, the page scrolled between
+the screenshot and the tap. Each time I moved on, because the thing I was checking
+at that moment was something else. **The screen was never once rendered on an
+emulator**, and the only thing that ever reached it was a person with a real phone.
+
+The status line and the persistent denied note moved into a `footer` slot on
+`ActivationHandoffScreen`. Outside it they either sat in the second scrolling
+container that caused this, or fell off the bottom where the one line saying what
+happened would never be read.
+
+### The diagnosis was wrong twice before it was right
+
+`minSdk`, then `standalone`, then `native arm64` — three plausible mechanisms
+reasoned out from what I knew, none of them checked. The 16 KB page alignment
+check was the same instinct and came back clean at `0x4000`. What actually solved
+it was `adb logcat -b crash` on the device that was failing.
+
+The pattern across today: every wrong answer came from reasoning about a system
+instead of reading what it said. Every right answer came from running the real
+thing and looking at the output.
+
+## 2026-08-30 — Two notes, each shown to exactly the people it is for
+
+**"Complications are chosen here now."** Said once, and only to someone whose
+PREVIOUS face predates v8 — until then the watch's own editor owned a slot once
+it had touched one, so anything picked there survived every send, and now it
+does not. Their choices changing with no explanation is indistinguishable from a
+bug.
+
+Nobody else hears it. To a person whose first face is v8 or later there is
+nothing to migrate, and the note would be a warning about a world they never
+saw. Appended to the send result rather than shown separately, because that is
+what they are already reading.
+
+**"Uses the app's name, which isn't on your watch."** A face can point a slot at a
+provider app or at an app to open. Without it the provider falls back to the
+slot's system source and a shortcut simply does nothing — so the face renders,
+and renders DIFFERENTLY from its preview, with nothing anywhere saying why.
+
+Only shown once the watch has actually reported a catalog. An empty cache means
+"we do not know", and treating it as "nothing is installed" would put a warning
+on every face someone owns. That distinction is the whole reason the note is
+trustworthy.
+
+Quiet rather than alarming: the face works, it just will not look the way its
+preview does.
+
+Verified by seeding a saved face naming an app the cached catalog does not
+contain — and by getting the fixture wrong first. `FaceLibrary` nests the dial
+under `"params"`, so a flat file parses as a face with default everything: the
+name and slug appeared, the providers did not, and the note correctly stayed
+away. The code was right and the test was wrong, which is worth knowing before
+concluding the opposite.
+
+## 2026-08-30 — Sources that validate and render nothing, and a ring you choose
+
+**The ring shows what you pick.** Steps against the day's goal, the watch
+battery, or the chance of rain — the only three PERCENTAGES Watch Face Format
+offers, and a ring is a proportion of a circle. Heart rate is a number, not a
+fraction of anything, which is why it is not on the list.
+
+`stepRing` was a boolean for exactly one release. The codec still reads it, so a
+face saved in that window opens with its ring intact rather than silently off.
+
+**Two weather sources validate and render nothing.** `WEATHER.TEMPERATURE_HIGH`
+and `WEATHER.TEMPERATURE_LOW` are in Google's enum and pass Google's XSD, and a
+face using either goes BLACK on a watch — everything gone, not just that slot.
+They only exist per day: `WEATHER.DAYS.0.TEMPERATURE_HIGH`. So does UV, and the
+enum's `WEATHER.WEATHER.UV_INDEX` has a doubled prefix that is simply a typo in
+the schema.
+
+Found by installing each source on a watch ONE AT A TIME and looking: battery
+ring renders, chance of rain renders, high/low blank, UV blank. Nothing else
+would have found it — the XSD is the authority everywhere else in this project,
+and here it is wrong twice.
+
+A test now guards the three dead spellings. It cannot test the behaviour, only
+that those strings never come back, and it says so.
+
+The pattern is worth naming now that it has happened three times:
+`[MONTH_DAY]` was a fractional month, `[WEATHER.TEMPERATURE_UNIT]` was a numeric
+code, and these two do not exist at all. Every one validated. The schema
+describes the SHAPE of a face, never what a source means or whether a watch
+implements it, and this project has repeatedly treated validation as proof.
+
+## 2026-08-30 — A step ring the watch keeps current, and a clock you can read
+
+**The ring costs no slot.** A goal is a proportion, and a proportion reads
+better as a shape than as "8,412 / 10,000" in a box four characters wide — so it
+goes round the rim rather than into one of five slots that are already fought
+over.
+
+`[STEP_PERCENT]` is a first-class WFF source and `<Transform target="endAngle">`
+binds an arithmetic expression to any attribute, so the sweep is
+`clamp([STEP_PERCENT], 0, 100) * 3.6` and the WATCH keeps it current. Nothing
+here recomputes it and nothing is re-sent as someone walks.
+
+The clamp is not decoration: an emulator reporting 107,520 steps against a
+10,000 goal asks for a sweep of 3,800 degrees. Clamped, exceeding the goal fills
+the ring exactly once.
+
+Verified in two steps, because the emulator could only ever show a finished
+goal: the live ring renders as a complete circle, and pinning the sweep to 40%
+by hand drew a bright arc from 12 o'clock to roughly five, over the faint track.
+Direction and start point are right.
+
+**12 or 24 hours, and no leading zero on 12.** WFF takes `hourFormat="12"` and a
+`format` of `h:mm` — a single `h` is what drops the zero, and "06:10" on a
+12-hour face reads as a mistake. `Match my watch` stays the default, because it
+is the only setting that is still right after someone travels.
+
+`ClockText` is shared, because the watch formats its own clock and a preview
+that formats it differently is a preview of a different face.
+
+**The top complication was not smaller — it was narrower.** Measured with the
+same provider in all five slots: identical, 105x66 at font 25. The difference
+only appears with a LONG value, because TOP and BOTTOM were held to a box built
+for three-across while being alone on their rows, so a provider returning "Sat,
+Aug 30" had its text shrunk to fit. They get 1.7x the width now. Capped rather
+than given the whole chord: a slot spanning the dial stops reading as one of a
+set.
+
+## 2026-08-30 — A control has to change something a person can see
+
+"It should be noticeable to a user and logical for what they expect." That is a
+testable claim, and this project has failed it three times: "Large" clamped to
+within four points of "Medium"; Tight, Normal and Wide all resolving to the same
+number; and a date size that could not exceed the value already stored. Each
+time the code did what it said and the face did not move, and each time a person
+found it rather than a test.
+
+`ControlsAreNoticeableTest` now asserts the RENDERED result, not the numbers:
+each complication size is at least 3pt of text bigger than the one below it,
+each spacing moves the row slots at least 6px further apart, wider spacing also
+moves the row DOWN, and each date size differs by at least 4pt. Across four
+faces whose available room differs a lot.
+
+It failed immediately, which is the point.
+
+**Spacing did nothing on the default face** — 84, 84, 84. `spreadRange` probed
+the maximum by asking for `DIAL_SIZE`, and spacing also drives vertical air, so
+an enormous request pushes the row down until the complications must shrink, and
+a shrunk box permits a NARROWER spread than a moderate request did. Measured:
+456 produced 47px where 160 produced 144. It scans now and keeps the widest that
+still leaves the complications the size the face would otherwise have. The
+options are 84 / 115 / 147, and the sizes step 15 / 19 / 25pt.
+
+**Spacing pushes the row away from the clock**, not only the slots apart. The
+gap that reads as crowding is the one between the time and the complications,
+and spacing left it alone entirely.
+
+That broke `effective()`'s clamp reporting, which asked whether a slot travelled
+EXACTLY the air requested. The bottom slot now travels further — with the row,
+then again below it — and further is not a refusal. It asks whether the travel
+fell SHORT, which is direction-dependent because negative air pulls in.
+
+**Weather can be temperature, conditions, or both.** "Both" is where the
+assumption that there was room turned out to be wrong: "72° Cloudy" is ten
+characters against a box about four and a bit wide, and it reached a watch with the
+temperature gone and the condition cut off mid-word. A drawn value has no provider to shorten it, so it is now shrunk to
+fit its box — floored, not rounded, because rounding up overflows by a fraction
+of a character, which is a clipped last letter.
+
+## 2026-08-30 — A slot that opens any app on the watch
+
+`launchTargetType` is a union with `xs:string`, so a ComponentName is a legal
+`Launch` target. A slot set to "Open an app" names one. Verified on a watch:
+tapping it opened `com.google.android.contacts/…ContactsActivity`.
+
+The app is per SLOT, not per source — one enum member for "some app" rather than
+one per app — so it lives in `launchers`, the same shape as `providers`. They
+are separate maps because they are different jobs: a provider FILLS a slot with
+a reading, a launcher is what pressing it OPENS. A slot could sensibly have both
+one day, and conflating them would make that impossible.
+
+The token carries both, with different markers: `STEP_COUNT+app:pkg/cls` fills,
+`SHORTCUT_APP+open:pkg/cls` opens. One string per slot still, and it has to be
+able to say which it meant.
+
+**What the watch reports is now two lists.** Which apps can FILL a slot and
+which can be OPENED are different questions — an app can be either, both or
+neither — so `launchable()` is a second query, for activities answering
+MAIN/LAUNCHER, and it rides back as a second line of the same reply. A watch
+that sends only the first line is not broken; the second is simply absent.
+
+**An invalid ComponentName fails silently.** A first attempt used an invented
+class name and tapping did nothing at all — no error anywhere. That is why the
+picker only ever offers components the WATCH enumerated, rather than letting one
+be typed.
+
+`enabled` had to stop testing `launch != null`. SHORTCUT_APP has no fixed
+target, so the field is null and the slot was dropped from the layout entirely —
+it simply did not appear, and nothing failed.
+
+## 2026-08-30 — Tap actions, and the format could draw all along
+
+Backlog item 2. A slot can now hold a SHORTCUT: a glyph you press, with nothing
+to read. Music, Alarms, Settings, Phone, Calendar and Messages, using Watch Face
+Format's own `<Launch>` targets. Verified on a watch — tapping the alarm glyph
+opened `com.google.android.deskclock/.AlarmGatewayActivity`.
+
+`<Launch>` has been available on every part since the beginning of the format
+and this app never used it, which is why a face here could show a step count and
+not start a timer.
+
+**The glyphs are vectors, not PNGs.** `PartDraw` has Line, Ellipse, Rectangle,
+RoundRectangle and Arc, and every shape in `ComplicationGlyphs` except a cubic
+maps onto one. Baking a PNG per shortcut would have meant rasterising the same
+shapes in two more places — the workbench and the phone — and shipping bytes for
+something the watch can draw. Two shortcut glyphs were redrawn without curves
+for this: a shape a watch cannot draw is not a shape, and the converter dropping
+one silently would ship a glyph missing a stroke that validates perfectly.
+
+Three bugs, all caught by the schema test rather than by a watch:
+
+`Arc` takes a CENTRE and clockwise angles from 12 o'clock; the glyphs are
+authored with a bounding box and AWT's counter-clockwise from 3. That difference
+was already written down in `ComplicationGlyphs` for the renderers, and it
+caught this too.
+
+An empty `PartDraw` is invalid, which is what a shortcut with no glyph produces.
+
+And the worst: `launch` was added BEFORE the `vararg drawn`, so
+`WEATHER_TEMPERATURE(null, "%s°", "[WEATHER.TEMPERATURE]")` passed its data
+source as a LAUNCH TARGET. Weather quietly became a shortcut with no glyph. A
+parameter in front of a vararg swallows positional arguments, and every existing
+call site kept compiling.
+
+## 2026-08-30 — Three spacings that were one number, and a date you can size
+
+**"Tight and Normal are the same."** They were, and so was Wide. Measured at
+complication size 27: 84, 92 and 110 all came out as 115, because `layoutAt`
+widens any request so boxes cannot touch, and the minimum had passed all three.
+Three controls, one result.
+
+Fixed numbers cannot survive a layout whose minimum moves, and it moved twice
+this week — v7 shrank the glyph and let complications grow, which grew the boxes
+they have to clear. The options are DERIVED now, by asking the layout what it
+would honour at its narrowest and widest and taking the ends and the middle.
+At size 19 that is 84 / 121 / 159; at 27 it is 115 / 125 / 135. The range
+narrows as the boxes grow, which is the truth rather than a control pretending
+otherwise.
+
+**The selected option is matched by nearest, not by equality.** The stored value
+is a request the layout may not honour, so it rarely equals any option — nothing
+looked selected, which reads as a broken control. The same was true of the size
+options, derived since v7 and compared by equality ever since.
+
+**The date has Small, Normal and Large**, in the dialog where the style is
+chosen, because it is the same decision. A SCALE of the fitted size rather than
+a point size: 0.72, 1.0 and 1.22 of whatever matches the clock, so it means the
+same thing at every style and clock size. 35, 48 and 56pt for a weekday date.
+
+A stored point size was tried for this and was wrong twice — right for one style
+and wrong for the rest, then clamping the fit back down to the old value. The
+lesson is the same as the spacing one: store the INTENT, derive the number.
+
+## 2026-08-30 — The ceiling quietly undid the fitted date
+
+"The date seems to be the same size, so no change there." It was: the fitted
+size was clamped to `Layout.dateSize` as a ceiling, and a face SAVED before the
+change carries the old small value. So the fit was computed and then clamped
+straight back down to what it was replacing. Raising the default only ever
+helped faces that did not exist yet — which is every face except the ones people
+have.
+
+Keeping the control "meaningful" is what caused it, and the control existed only
+because the date used to be too small. Auto-fitting removes the reason for it,
+so the control is gone and `dateSize` is no longer read when drawing. It stays
+in `Layout` and in the file so faces from any build still parse.
+
+Verified the way the report came in: a face baked with `--dateSize=30`, the old
+stored value, now emits `size="48"`.
+
+**The date is part of the size budget now.** It is sized against the CLOCK, not
+against what is left over, so something else has to give when it grows — and
+`fittedSize` did not know about it, so the top slot was clamped to the rim and
+drawn through the date. Complications now shrink instead: with a top slot and a
+weekday date, 28 becomes 27; with the short "30" form, which fits at 56, they
+drop to 23.
+
+Capped at 56 regardless. "30" alone would fit at 96 against a 104pt clock, which
+is a date the size of the time. Matching the WIDTH was the ask.
+
+## 2026-08-30 — The watch's provider list, carried by the reply
+
+Backlog item 1, and it became cheap the moment the install report existed: the
+catalog rides back on the SAME reply, behind the verdict line. No second
+connection, no background job, no new path or listener.
+
+A complication provider is a service on the WATCH, so the phone can never
+enumerate them and its picker could only ever offer what the build knew — which
+is why "Google Health isn't in the list" had no answer. `ProviderCatalog` finds
+them with the LEGACY action; the AndroidX spelling returns nothing.
+
+The phone caches what came back, so the list is exactly as fresh as the last
+send. An app installed since will not appear until the next one, and that is the
+accepted price of a picker that opens with the watch charging in another room
+rather than one that needs Bluetooth.
+
+Choosing one writes `primaryProvider` and keeps the system source as the
+fallback, because `defaultSystemProvider` is required and a watch without that
+app has to show something. Choosing a system or drawn source clears the app: a
+slot holds one thing.
+
+Verified on the phone emulator by seeding a catalog the way a watch would:
+"Moon phase / Clock" and "Daily steps / Google Fit" appear under "From your
+watch". The watch half is exercised by the same reply path that carries the
+verdict, which is still first run on real hardware.
+
+## 2026-08-30 — The date is sized to the clock, not stored
+
+"Scale it close to the width of the time." A stored point size cannot do that:
+measured with AWT at a 104pt clock, whose "10:10" is 299px wide, "Wed Sep 30"
+fits at 49 and "Sep 30" at 85. One number is right for one style and wrong for
+the rest, which is why the control kept needing adjusting.
+
+The size is DERIVED now, from how wide the style's longest form is, and
+`Layout.dateSize` became the CEILING — still a control, now meaning "no bigger
+than this".
+
+The width estimate is exactly that, and has to be: the emitter runs on the
+phone, where `java.awt` does not exist, and the emitter and both previews must
+agree about how big the date is or they draw different faces. 0.575 per digit
+and 0.62 per mixed character reproduced the AWT measurements within a point
+across every style.
+
+Sized against "HH:MM", not the seconds. Seconds sit in the gutter beside the
+clock rather than on its line, so matching the time means matching the part
+that IS the line.
+
+The widest form is computed from a fixed date — Wednesday 30 September — not
+today's. Sizing to today would resize the face on the 1st of the month.
+
+**The v6 and v7 golden hashes were re-recorded for this, deliberately**, and the entry
+in this file is the justification the rule asks for. The change was applied to
+every version rather than gated: a date too small to read beside the clock is a
+defect, reported twice, and preserving it for older faces would be preserving
+the complaint. Only the drawn-date entry moved in either golden set, which is the
+check that nothing else came with it.
+
+## 2026-08-30 — Units the provider does not supply, and "782"
+
+Two from the wrist, both about a bare number with no unit.
+
+**Weather rendered "782".** `[WEATHER.TEMPERATURE_UNIT]` returns a numeric CODE,
+not a symbol, so concatenating it appended the enum value: 78, then 2. It is
+gone. The temperature carries a literal degree sign instead, which is right in
+either scale — and the scale is the wearer's system setting, not something a
+face should assert. Confirmed on a watch.
+
+**The battery had no per cent sign** because the provider supplies "72" with no
+title, which was measured days ago and reported twice since. It now carries one.
+
+The reason that is safe ONLY NOW is worth recording: while `isCustomizable` was
+TRUE the wearer could swap a slot's provider on the watch, so a hardcoded "%%"
+could have ended up after a step count. From v8 the definition is authoritative,
+so a slot holds what the designer chose and a unit belongs to it.
+
+`%%` is the escape for a literal per cent in a WFF Template — tested on a watch
+rather than assumed, because the alternative renders "%s" or swallows the sign,
+and neither shows up in schema validation. Verified: battery "64%", weather "0°"
+on an emulator with no weather data.
+
+One `format` field now serves both a drawn source and a complication, because
+the need is identical: the provider hands over a bare number and the unit is
+ours to add.
+
+## 2026-08-30 — The watch says what it did, on the channel it already has
+
+"Sending does nothing. It says sent but nothing happens on my watch" — after
+three fixes that were all real and none of which were the cause.
+
+The reason each round cost an evening is that the phone could not tell the
+difference between the outcomes. `FaceSender` resolved when the BYTES were
+across. Installed, refused, installed-but-not-switched, never-picked-up: one
+message for all four. Every diagnosis this week was inference from a symptom
+that could not distinguish them, and inference kept being wrong.
+
+The watch now writes a single line back on the SAME channel before closing it,
+and the phone reads it with a timeout. `OK`, `OK_NOT_ACTIVE`, or `FAILED
+<reason>` — turned into a sentence naming the one action that works:
+
+```text
+"My Face" is on Pixel Watch and switched on.
+"My Face" is on Pixel Watch. Long-press your watch face and pick it.
+Pixel Watch could not install "My Face": the watch has no free watch face slot.
+```
+
+The same channel, not a message or a second connection: it is already open,
+already correlated with this exact face, and needs no new path, listener or
+manifest entry.
+
+**Silence is reported as unknown, not as either outcome.** A watch on an older
+build writes nothing, and the read falls back to what the phone used to say.
+Claiming success or failure on no evidence is the whole bug being fixed here, so
+the degraded path must not do it either.
+
+`FaceInstaller.Result.Installed` carries `active` now, because whether the watch
+SWITCHED is the fact the wearer cares about and it was never captured — the
+activation result was logged and dropped.
+
+**Unverified here, deliberately said:** the reply needs a paired phone and
+watch, and this project's emulators cannot pair. The wording is tested, both
+apps build, and the fallback is safe — but the round trip itself is first
+exercised on the operator's own hardware. That is the same gap that has made
+every transport bug this week expensive, and it is not closed by this change.
+
+## 2026-08-30 — The reset could delete the face, and was never needed
+
+Audit of what the last three builds introduced, prompted by "fix whatever issue
+we introduced". Two more regressions, both mine, both in the path the operator
+was actually using.
+
+**The phone asked the watch to REBUILD the slots on every complication change.**
+Resetting removes the installed face and then adds it again. Between those two
+calls the watch has no face from this app, and if the add fails it stays that
+way — which is exactly "I sent it several times and mine is not even in the
+list". It was requested on the single most common edit anyone makes.
+
+Worse, it bought nothing. The reset existed because `isCustomizable="TRUE"` let
+the watch's editor own a slot forever, so only a fresh slot would take the
+design's complications. v8 made the definition authoritative in the same
+release. Measured now: swap two complications, send with NO reset, and the face
+shows the new arrangement — left 64 battery, right 105100 steps. A plain
+`updateWatchFace` applies the design.
+
+So the phone no longer asks. The watch still understands the request and the
+debug receiver can still make it; nothing in the normal path does.
+`ComplicationChange` is deleted rather than left as a decision nobody consults.
+
+**A normal update stopped trying to activate.** Restructuring the branches lost
+`onFaceInstalled` from the update-in-place path, so from v8 a face sent to a
+watch wearing something else could never switch to itself. Every install used to
+try. Restored.
+
+**And the reset branch is loud now.** If the remove succeeds and the add fails,
+the log says so in those words, rather than surfacing a generic failure with no
+hint that something was deleted.
+
+The pattern across all three of this week's regressions is the same: a
+restructure that kept the happy path and quietly dropped a guard —
+`remainingSlotCount`, `onFaceInstalled`, and the reason the reset existed at
+all. Each was invisible because the phone reports success as soon as the bytes
+land.
+
+## 2026-08-30 — A dropped slot check, and a failure the phone cannot see
+
+Follow-up: the face is not in the watch's list at all. So it is not merely
+unselected, it is not installing — and the phone said "Sent" every time.
+
+**A rewrite dropped the free-slot check.** The original refused to call
+`addWatchFace` when `remainingSlotCount` was zero and replaced the oldest of our
+own faces instead. Restructuring the branches for the reset path lost that
+guard, leaving a bare `else -> addWatchFace`. With a full slot that fails with
+`ERROR_SLOT_LIMIT_REACHED`, and the phone — which only learns whether the BYTES
+arrived — still reports success.
+
+It needs a slot that is FULL and holds nothing this install can attribute to
+itself. `listWatchFaces` reports the faces THIS install pushed, so a reinstall
+can leave a face occupying the only slot with nothing left to claim it. Every
+emulator test had a face of ours present, so `ours` was never null and the
+branch was never taken.
+
+Restored, and it now returns a Failed with a sentence a person could act on
+rather than throwing away the reason.
+
+**The real hole is that "Sent" cannot fail.** `FaceSender` resolves when the
+transfer completes. An `addWatchFace` failure, a slot limit, a rejected token —
+all invisible to the phone, all indistinguishable from success. Two bugs this
+week hid behind that, and both cost hours of the operator's time before anyone
+could even tell which half was broken. The install result has to come back over
+the same channel. That is the next thing to build, ahead of the provider
+catalog.
+
+## 2026-08-30 — "It says it sent okay" and the watch does not change
+
+Reported after 1.12: the watch shows a black background with a time, several
+sends in a row, the app reporting success every time.
+
+Reproduced the whole path rather than guessing. A face built by the PHONE's own
+`pack` — pulled straight out of the app's cache and pushed to a watch — renders
+correctly: dial, complications, date, time. So neither v8 nor the on-device build
+is broken, and updating the watch app over a live face does not break it either.
+
+What "black background with a time" actually is: Wear's OWN default face. The
+face is installed and simply not the one being worn.
+
+**"Sent" was claiming too much.** `FaceSender` resolves when the TRANSFER completes.
+Whether the watch then switched to the face is decided on the watch and never
+reported back — and it usually does not switch, because `setWatchFaceAsActive`
+succeeds once per app install and is refused afterwards. So from the second send
+onwards a face installs perfectly, the wrist does not change, and the phone says
+"Sent". That reads as "nothing happened", which is exactly how it was reported.
+
+The message now says what this side actually knows, and names the one action
+that works: long-press the face and pick it.
+
+**Still claiming too much, and worth naming:** "Sent" also does not mean INSTALLED.
+The phone reports success when the bytes are across; an `addWatchFace` failure
+on the other side is invisible to it. A face that fails to install and a face
+that installs without switching produce the same message. The fix is a reply
+over the same channel, which needs both apps again.
+
+## 2026-08-30 — v8: the definition wins, weather is drawn, and two bugs only a watch found
+
+Built from `docs/specs/slot-content.md`. Everything below was watched on a Wear
+OS 6 emulator before release, because the last round proved that neither the XSD
+nor any test here can see how a face actually renders.
+
+**`isCustomizable="FALSE"`, and it fixes the reported bug.** A face declaring
+`day+date / battery / heart / steps / day-of-week` rendered exactly that on the
+watch: left 99990, middle 66, right 64, bottom "Sun". The same face at TRUE had
+rendered the assignments of a build before it. The complication picker now does
+what it says.
+
+Deliberately NOT version-gated for rendering. Every other branch preserves how
+an old face looked; here the old behaviour IS the bug, and a face someone is
+wearing should stop ignoring them.
+
+**Weather is drawn, not a complication**, and it lives in the same list as Steps
+and Heart rate because that is where a person looks for it. A drawn slot emits a
+`PartText` in the slot's own box: no `ComplicationSlot`, no provider, no glyph.
+`SlotGeometry` needed no new geometry.
+
+**Two bugs that only running it could show.**
+
+`[WEATHER.TEMPERATURE][WEATHER.TEMPERATURE_UNIT]` in ONE `<Parameter>` is
+schema-valid and renders the whole face BLACK. WFF fills one `%s` per parameter;
+juxtaposing two sources is not concatenation. This is the same mistake as
+`[MONTH_DAY]` in the date, one day later, in a place the existing guard could not
+see: `each Template placeholder has one Parameter` PASSED, because one `%s` and
+one parameter holding `[A][B]` balance perfectly. The guard now also asserts that
+no single expression names two sources, and was confirmed to fail (7 failures)
+with the old form restored.
+
+A drawn slot skipped the glyph's height, so its value sat visibly higher than the
+numbers beside it. `hasIcon` now decides only whether the GLYPH IS DRAWN; the
+LAYOUT still asks `iconSlots`, so a row shares one baseline whatever fills it.
+
+**One namespaced string per slot**, as specified: a bare name is a system
+provider, `NAME+app:pkg/cls` names an installed provider app. The `+app:` half
+is not decoration — a slot has to carry BOTH the chosen app and what shows on a
+watch without it, because `defaultSystemProvider` is required by the schema.
+Dropping the fallback made round trips lossy, turning every app slot into the
+same arbitrary source; the round-trip test caught it.
+
+A provider for a slot that is off is now rejected rather than silently dropped:
+the slot's content is one value in the file, so there is nowhere to put one.
+
+**The dial preview is pinned.** Every control changes the dial, and judging a
+change meant scrolling up to look and back down to adjust. It is also smaller
+than it was: at full width the dial and one toggle filled the screen, which is
+what made the scrolling cost so much.
+
+**Not done, and worth naming.** The picker's "More" section lists what this
+build knows, not what the watch has: `ProviderCatalog` enumerates installed
+providers but nothing carries that list to the phone yet. Until it does, `app:`
+slots can be stored and rendered but not chosen in the UI.
+
+## 2026-08-30 — The activation allowance is ONE per app install, and WFF has weather
+
+Gating the reset was built as decided: a separate channel path
+(`/bfg-watchfaces/face-reset/`), the watch honouring it, and `ComplicationChange`
+on the phone deciding when the complications actually changed. All of it works
+and was watched working on an emulator: `updated slot ... in place` when nothing
+changed, `replacing slot ... (active=true)` when it did.
+
+**And then measuring killed the design.** After a clean reinstall of the watch
+app the first activation succeeded, and the very next one was refused:
+
+```text
+switched to the new face (slot 55c1e952)      <- install
+installed, but could not switch to it         <- next reset
+SetWatchFaceAsActiveException: The maximum number of attempts
+```
+
+One successful `setWatchFaceAsActive` per app install. Not a large budget, not a
+daily budget — one. So "remove and re-add whenever the complications change"
+buys the wearer exactly ONE complication change per reinstall, and every change
+after that leaves them on a default face with their design uninstalled. That is
+worse than the bug. The gate is worth having and is kept, but it cannot be the
+answer on its own.
+
+**The answer is that the face definition should be authoritative.** Proven
+earlier the same way: the identical face with `isCustomizable="FALSE"` and a
+plain `updateWatchFace` rendered exactly what the XML declared, with no reset,
+no deactivation and no activation spent.
+
+The reason that looked unacceptable was that the watch's editor is the only
+place a wearer can reach a third-party provider. That reason is now gone:
+`primaryProvider` names any provider by ComponentName from inside the face, and
+`ProviderCatalog` enumerates what is installed on the watch. The app can offer
+weather and Google Health directly, in the app, where the design is being made.
+
+**WFF has first-class weather sources.** `[WEATHER.TEMPERATURE]`,
+`TEMPERATURE_UNIT`, `TEMPERATURE_HIGH`, `TEMPERATURE_LOW`, `CONDITION`,
+`CONDITION_NAME`, `CHANCE_OF_PRECIPITATION`, `UV_INDEX`, `IS_DAY`,
+`IS_AVAILABLE`, `IS_ERROR`. Confirmed schema-valid in an emitted face. Weather
+needs no complication slot and no provider at all — it is drawn like `[DAY]` is.
+The earlier note that "there is no weather in WFF" was about the SYSTEM
+COMPLICATION PROVIDER list, and stands, but it was not the whole picture and
+read as though it were.
+
+Also in the schema and unused here: `STEP_GOAL` and `STEP_PERCENT` (so a goal
+ring needs no complication), `HEART_RATE_Z`, and the whole accelerometer family
+`ACCELEROMETER_ANGLE_X/Y/Z/XY` with `ACCELEROMETER_IS_SUPPORTED`, which is what
+tilt-reactive faces are built from.
+
+## 2026-08-30 — Remove and re-add, and the activation budget it spends
+
+Operator decision on the `isCustomizable` trade-off: the APP's design wins.
+`FaceInstaller` now removes the installed face and adds a fresh one rather than
+calling `updateWatchFace`, because a fresh slot has nothing assigned to it and
+`DefaultProviderPolicy` therefore applies. `isCustomizable` stays TRUE, so a
+wearer can still pick weather or Google Health on the watch — those choices are
+simply reset by the next send, which was accepted deliberately.
+
+**The cost is not theoretical.** Tried on the emulator immediately afterwards:
+
+```text
+replacing slot 55c1e952 (active=true)
+installed, but could not switch to it
+SetWatchFaceAsActiveException: The maximum number of attempts to set the
+watch face as active has been reached.
+```
+
+Removing the active face deactivates it, so every send now needs a
+`setWatchFaceAsActive`, and that call has an undocumented and finite allowance
+which this session exhausted. The failure mode is worse than the bug it fixes:
+the old face is gone, the new one is not active, and the watch falls back to a
+default. `isWatchFaceActive` is checked before removing so the call is not spent
+on a face that was only sitting in the picker, but that does not help the normal
+case, which is replacing the face you are wearing.
+
+**The fix is to spend it only when it buys something** — reset the slots when
+the complication configuration actually CHANGED, and use `updateWatchFace`
+otherwise. The phone is what knows this: it keeps the last face it sent. But the
+watch is what installs, and the only channel between them is the channel path,
+which already carries the validation token and is parsed by the SHIPPED watch
+app. Changing its shape breaks sends from a new phone to an old watch outright,
+so it needs a watch release alongside, and that is a decision rather than a
+detail.
+
+Not released. Left here with the evidence.
+
+## 2026-08-30 — isCustomizable is why the app's complication choices never applied
+
+The operator said to check on the emulator before releasing. Doing it found two
+bugs no test in this repo could have caught, and disproved a fix that had
+already shipped.
+
+**`[MONTH_DAY]` is not the day of the month.** The drawn date rendered
+"Sun Aug 8.935" on a watch. `MONTH_DAY` sits in WFF's CONTINUOUS source group,
+next to `MINUTE_SECOND` and `HOUR_1_12_MINUTE` — fractional composites for
+smooth hand movement. 8.935 is month 8 plus 29/31 of the way through it. The
+day of the month is `[DAY]`. The XSD validates both, so only running it on a
+watch could show this.
+
+**`isCustomizable="TRUE"` makes the watch ignore `DefaultProviderPolicy`
+forever.** This is the real cause of "the right complication is always the same
+as the bottom one, no matter what I check".
+
+Established by experiment, not reasoning. A face was built with slot 1=battery,
+2=heart rate, 3=steps, 4=day of week, and the watch rendered left=steps,
+right=battery — assignments from an EARLIER build, unchanged across three
+different faces. Rebuilding the same face with `isCustomizable="FALSE"` rendered
+exactly what the XML said. The policy only supplies a default for a slot nothing
+has been assigned to, and once the wearer's editor owns a slot it owns it
+permanently.
+
+The earlier fix — position-keyed slot ids and display names — was correct and
+necessary, and it was NOT this bug. Both were shipped as the cure for the same
+symptom; only one of them was. Recording that plainly because the release notes
+for 1.11 claim more than they delivered.
+
+The trade-off is genuine and unresolved: `TRUE` is what lets a wearer pick
+weather or Google Health on the watch, which is the only way to get them at all
+— there is no weather in WFF's fourteen system providers. `FALSE` makes the
+app's choices authoritative and removes on-watch editing entirely.
+`removeWatchFace` exists in the Push API, so a third path is possible: remove
+and re-add so the app wins, at the cost of the wearer's own edits and an
+`addWatchFace` call each send. That last one is not free — `setWatchFaceAsActive`
+has an undocumented attempt limit this project has already hit.
+
+Left for the operator to decide rather than picked silently.
+
+**Also found on the watch:** appending `[COMPLICATION.TITLE]` to `TEXT` renders
+"Aug 30Sun", "0180Step" and "70BPM" run together, and does not produce the per
+cent sign it was tried for — the battery provider supplies "100" with no title.
+Reverted to `TEXT` alone. And `DateStyle.sample()` was uppercasing in both
+previews while the watch draws "Sun Aug 30" from its own sources, so the preview
+was shouting a word the face never renders.
+
+## 2026-08-30 — The slot name was the bug, and generator v7
+
+More wrist reports. The important one: "whatever's in the right position is
+always the exact same as the bottom one".
+
+**Slot names were keyed by the SOURCE, not the POSITION.** `WffEmitter` wrote
+`displayName="@string/slot_${source}"`, so a slot was named after whatever
+happened to be in it. Two slots holding the same source got the SAME name, which
+is what the watch's own editor uses to tell slots apart. `displayName` is the
+name of the SLOT, so it has to say where the slot is.
+
+**And the phone never emitted those strings at all.** `FaceBuilder.strings()`
+emitted `watch_face_name` and nothing else, while the WFF referenced a
+`@string/slot_*` per slot. Every face built on the device shipped dangling
+resource references for its complication names.
+
+Nothing caught it, and the reason is worth recording: the workbench builds with
+aapt2, which FAILS on an unresolved `@string`, so that path was safe by
+accident. The phone builds with `pack`, which does not fail. The face compiled,
+signed, installed and ran with no name for any slot. This is the same shape as
+the schema tests — a check that exists on one path and not the one that ships.
+
+Both are now position-keyed, both builders emit all five names from one place in
+`:appcore`, and a test walks every configuration asserting that every `@string`
+the emitter references is one a builder supplies. It was confirmed to fail with
+the old keying restored.
+
+**v7 shrinks the complication glyph** from 1.25x the slot size to 0.85x. The
+symbol was larger than the number it labels, which is backwards, and the height
+was being paid for by the size control: v6 still ran out at 29.
+
+**The size options are now derived from the layout** rather than fixed at
+14/20/28. The ceiling moves with the face — five slots and a 104pt clock is a
+tight budget, and turning off a slot or a glyph frees real room — so a fixed
+"Large" was sometimes a number the layout refused and silently clamped. "Large"
+now means as large as this face allows.
+
+Honest limit: a five-slot face tops out around 31 (font 29), against v5's 25
+(font 23). "Make Small equal today's Large and scale up from there" is not
+reachable while five slots and a full-size clock share a 456 dial. Said plainly
+rather than papered over.
+
+**TIME_AND_DATE was missing.** Google's `defaultProviderType` has fourteen
+members; this app offered twelve plus NONE. There is no weather provider in that
+list at all, and third-party providers (Google Health and the like) cannot be
+named at build time — they are assigned by the wearer in the watch's editor,
+which is why the slot-name bug mattered more than it looked.
+
+**Seconds go THIN to LIGHT.** At a third of the clock's size THIN stopped
+reading as type. Both previews draw a normal weight because AWT has no light
+face, so this also narrows a gap where the preview was heavier than the face.
+
+**The drawn date goes to 40.** 30 was still a subtitle beside a 104pt clock.
+
+Two fixture lessons, one repeated. The v5 golden broke when `TIME_AND_DATE` was
+added to the enum, because a fixture used `ComplicationSource.entries.take(5)`
+-- a golden must not depend on the length of an enum expected to grow. And the
+v6 golden silently became a v7 golden the moment the version moved, exactly as
+the v5 one had. Every version now pins its own fixture explicitly.
+
+## 2026-08-30 — Four bugs from a real wrist, and generator v6
+
+Reported after using the published build: turning seconds on shrank everything;
+the seconds sat below the time; "Large" complications were barely larger than
+Medium; and the last complication was always Notifications whatever was picked.
+All four were real. None had a test.
+
+**The clock no longer shrinks.** It was scaled to 82% whenever seconds were on,
+to open a gutter. Measured instead: at full size the widest time runs to x=377
+on a 456 dial, so there are 79 points of gutter and the seconds need 46 at a
+third of the clock's size. They did not fit only because they were held 48 from
+the rim. Inset 24 and they fit beside a full-size clock. Turning a feature on
+must not resize the rest of the face.
+
+**The seconds share the clock's element box**, so both centre on one line,
+instead of sitting 0.72 of the clock's size below its origin.
+
+**Slot ids are now the POSITION, not a running count of the enabled slots.**
+This was the Notifications bug, and it is the worst of the four. Wear stores the
+wearer's complication choice against the slotId, and that choice OVERRIDES
+`DefaultProviderPolicy` permanently — the policy only fills a slot nothing has
+been assigned to. While ids were a running count, turning any slot off
+renumbered every slot after it, so the watch's memory reattached to a different
+position and no amount of choosing in the app could dislodge it. Ids are
+therefore not contiguous, which is fine: slotId is an identifier, not an index.
+
+The old test asserted they were "unique and contiguous" and passed throughout,
+because it emitted `DialParams()` with all five slots on and never turned one
+off. Same blind spot as the schema tests: a fixture that never exercises the
+case cannot see the bug.
+
+**Generator v6: the complication BOX changed, not the dial.** A slot whose glyph
+is off no longer reserves the icon's height or the offset that cleared it, and
+the value's own box drops from 1.7x the slot size to 1.35x — it was 1.85x the
+FONT, half a line of air under every value. That slack was not free: the
+vertical stack of top, clock, row and bottom is what caps complication size, so
+"Large" (28) was silently clamped to 25 and looked like Medium. At v6 it fits,
+and the font goes 18 -> 26 rather than 18 -> 23.
+
+Gated on `generatorVersion` because it moves every slot on a stored face.
+`PatternEngines.v6` delegates to v5; a test asserts every engine renders
+identically across the two, and another pins the v5 box numbers so saved faces
+keep the layout their author saw.
+
+**The metrics used the REQUESTED size while the boxes used the FITTED one.** The
+emitter and both previews derived glyph, text and font from
+`layout.complicationSize` while `SlotGeometry.boxes` used `fittedSize`. At a
+clamped size the text was drawn to a scale its own box was never built for — at
+"Large", a font of 26 inside a box laid out for 25.
+
+**The date had no size control at all**, only a position one, and defaulted to
+21 next to a 104pt clock. It read as a caption. Default 30, and `dateSize` is
+now in `ControlInventory`. Changing the default touches no saved face: the size
+is stored per face.
+
+Two guards earned their keep. The v5 golden broke and was NOT re-recorded: it
+was correct, and the failure was real — the previews called `textHeight(fitted)`
+without a version, so they used v6 metrics to draw a v5 face. Threading
+`p.generatorVersion` through fixed it and the golden passed byte-for-byte. The
+label test caught `dateSize` shipping as a raw parameter name.
+
+Rejected: re-recording the v5 golden's hashes. A golden that is updated whenever it
+fails is a record of what the code does, not of what it should do. It is now
+pinned to `generatorVersion = 5` explicitly rather than riding the default, so
+it cannot drift onto a new version again, and a separate v6 golden covers the
+new box, the glyph-less slot, the drawn date and the seconds.
+
+## 2026-08-30 — SecondsBand, and seconds that were the wrong colour
+
+The seconds shipped with `0.45` and `48` written out in `WffEmitter`, the
+workbench preview and the Android preview. Three copies of one judgement, which
+is the arrangement this file keeps recording as how two renderers drift apart.
+They are now `SecondsBand` in `:generator`, alongside `SlotGeometry` and
+`EngravedStroke`, for the same reason.
+
+Consolidating them found a real disagreement. The emitter coloured the seconds
+`inkDim` — the AMBIENT ink — on an element whose ambient alpha is 0, so it is
+only ever seen awake. From v3 `inkDim` is lifted to clear a contrast floor
+against black, so a pale dial with dark ink built a face with pale seconds on a
+pale dial while both previews drew them dark at alpha 190.
+
+Nothing failed. `WffSchemaTest` validated it happily — a colour is a colour to
+the XSD — and the previews were right, so the only way to see it was to build
+that specific face and look at a watch. The test now pins the seconds to the
+awake ink, and was confirmed to fail (3 failures) with `inkDim` restored.
+
+Rejected: keeping `inkDim` and dimming the previews to match. That is agreeing
+on the wrong answer — the person picked an ink for a dial they can see, and the
+ambient palette exists to solve a problem this element does not have.
+
+## 2026-08-30 — Glyphs are per slot, and the drawn date sits against the clock
+
+Two features asked for together, and the second one moved the first.
+
+**Per-slot glyphs.** `showComplicationIcons` was one switch for the whole face.
+The reason to hide a glyph is almost always about ONE complication — a date
+reads as a date without a calendar above it, while a bare number wants the
+footprint that says it is a step count — so a single switch forces that
+judgement on all five. It is now `iconSlots: Set<SlotPosition>`, and the toggle
+lives inside each slot's own dialog, where someone is already deciding about
+that slot. The row's glyph dims rather than vanishing when it is off: the row
+still has to say which complication it is.
+
+`showComplicationIcons` is still READ by the codec, because faces were saved
+with it — false meant no glyph anywhere, true meant all of them. Only the new
+key is written.
+
+**The drawn date does not go at `dateY`.** It did at first, and it printed
+straight through the top complication on a phone. Despite the name, `dateY` has
+always been the TOP SLOT's anchor — `layoutAt` reads it for exactly that — so
+putting the date there put two things in one place. Clamping the slot above the
+date does not work either: at complication size 28 there is no room, and the
+existing floor pushes it back down into the date.
+
+The date now takes the band directly above the clock, which hands the whole
+upper dial back to the top slot and fits at every size. `SlotGeometry.dateBand`
+owns that, because the emitter and BOTH previews need it and the first version
+computed `dateY - dateSize / 2` in all three — the duplicate-geometry mistake
+`SlotGeometry` was created to end.
+
+Rejected: hiding the top complication automatically when the drawn date is on.
+It is a reasonable guess and it is still a guess, made by silently discarding a
+choice someone made. Turning the slot off, or turning its glyph off, are both
+one tap and both visible.
+
+Also rejected: leaving the previews alone. `dateStyle` reached the emitter
+first, so the control changed the built face and nothing on screen — the exact
+complaint ("nothing really changes") that the complication-size fix answered a
+day earlier.
+
+## 2026-08-30 — A schema test that only tests defaults is not a schema test
+
+`showSeconds` and `dateStyle` shipped to a real phone emitting an XML comment
+containing `--`, which XML forbids. The face built, signed and validated locally
+in every test we had, and the validator on the device rejected it with a
+`SAXParseException` the person saw raw.
+
+`WffSchemaTest` is described in `CLAUDE.md` as the only signal between a refactor
+and a face that silently never appears. It has 20 tests. Every one of them
+emitted `DialParams()` with the new features **off**, so the elements under test
+were never in the document being validated. The test was not weak; it was
+looking somewhere else.
+
+Fixed by validating the feature matrix — every `DateStyle` crossed with seconds
+and complication icons on and off — plus a direct check that no emitted comment
+contains `--`. Both were confirmed to FAIL with the bug reintroduced (8 failures)
+and pass with it fixed, rather than merely added and observed green.
+
+Rejected: escaping `--` in a comment helper. That fixes one occurrence and
+leaves the next author to rediscover the rule. The test makes the rule
+enforceable, and the comment can stay prose.
+
+## 2026-08-30 — The query form silently upgraded every stored face
+
+`FaceCodec.fromQuery` reads `generatorVersion`, defaulting to
+`CURRENT_GENERATOR_VERSION`. `FaceCodec.toQuery` never wrote it. So any face
+round-tripped through the query form came back claiming to be current, and
+`PatternEngines` — which IS the renderer for the stored file format — drew it
+with today's geometry.
+
+That is exactly the silent rewrite the "never change engine geometry in place"
+rule exists to prevent, arriving through the codec instead of through an engine.
+It reached the workbench's saved-face list (`Workbench.kt:361,491`) and
+`bake --preset` (`Bake.kt:57`).
+
+Found by a completeness test, not by reading the code: `FaceCodec` had **no test
+at all** despite being what a saved face IS. The new test derives its field list
+from `DialParams`'s own `toString`, so a field added to the params and forgotten
+in the codec fails without anyone remembering to update the test. That is why it
+found `generatorVersion` while looking for `dateStyle`.
+
+Rejected: asserting a hand-maintained list of field names. That is the same
+failure one level up — it passes until someone updates it, which is precisely
+what does not happen.
+
+## 2026-08-30 — The app does not show people the validator's stack trace
+
+A build or validation failure had no user-facing cause and no user action, and
+the app printed the validator's own output: `CheckFailure(name=Watch Face Format,
+category=WATCH_FACE_FORMAT, failureMessage=... org.xml.sax.SAXParseException ...)`.
+
+That names our bug in our vocabulary and reads, to the person holding the phone,
+like they broke something. They cannot act on any of it.
+
+The detail now goes to logcat under `BfgStudio`, where it is useful, and the
+person gets a sentence saying it is our fault and their design is safe. The
+APK size in kilobytes and the internal slug came out of the success and failure
+messages for the same reason: they are ours, not theirs.
+
+## 2026-08-29 — The Wear OS track has its own tester list
+
+The opt-in link returned "Your account hasn't yet been invited to participate in
+this app's internal testing program" for an account that was already a tester
+and already had the phone app installed.
+
+**Internal testing is two tracks, not one, and each carries its own testers.**
+The Play Console's track pages are scoped by a form-factor selector at the top
+right — "Phones, Tablets, Chrome OS, Android XR" and "Wear OS only". They are
+separate rows with separate release histories and separate tester lists.
+
+The `Internal Testers` list (2 users) was ticked on the phone track and unticked
+on the Wear OS one, so the Wear track had no testers at all. Its summary read
+**Inactive** while the phone track read Active — which is the tell, and it is
+easy to miss because both pages are titled "Internal testing" and look identical.
+
+Ticking the list flipped the Wear track to Active.
+
+Worth writing down because nothing about it is visible from the API. Reading the
+tracks back with `play-release.py` shows `wear:internal versionCodes=['1004']
+status=completed`, which is true and says nothing about whether a single human
+can install it.
+
+### The full set of gates, in order
+
+For a Wear app to reach a tester's watch, all of these have to be true, and each
+one fails silently in a different way:
+
+1. A Wear bundle released to `wear:internal`. Visible in the API.
+2. Wear OS screenshots on the store listing. Console only.
+3. **Wear OS form factor opted in** under Advanced settings. Console only; until
+   then Play says the app is not compatible with the watch.
+4. **The tester list ticked on the WEAR track specifically.** Console only; until
+   then the opt-in link says the account was never invited.
+
+Three of the four are invisible to the tooling this project uses to verify
+releases. That is the lesson, not the individual settings.
+
+## 2026-08-29 — Why the watch app was released and still not installable
+
+Released to `wear:internal`, opted in as a tester, and the Play Store on the
+watch said **not compatible**. The cause was a Play Console setting, not
+anything in the app:
+
+**Test and release → Advanced settings → Form factors → Wear OS** has a
+three-step checklist. Two were done — Wear screenshots uploaded, a bundle
+released to a testing track — and the third, **"Opt-in to Wear OS and agree to
+the review policy"**, had never been done. Until it is, Play does not consider
+the app available for Wear OS devices at all, testers included.
+
+`developer.android.com/training/wearables/packaging` is explicit:
+
+> "In the Play Console for your app, click the Test and release menu... Choose
+> Advanced Settings, select the Form factors tab, and click Add form factor.
+> Click Wear OS..."
+
+Opting in flips the form factor to **Active** immediately. It does NOT wait for
+the review it warns about — the dialog says the app will be reviewed against the
+Wear OS quality guidelines, and separately that the change can be sent for
+review from Publishing overview, but the distribution setting itself takes effect
+on the spot.
+
+### Two things I got wrong on the way, both by guessing instead of reading
+
+**`standalone` was not the cause.** I changed
+`com.google.android.wearable.standalone` from `false` to `true` on the theory
+that Wear OS 3 stopped delivering non-standalone apps. The documentation says
+the opposite:
+
+> "If the value of `com.google.android.wearable.standalone` is `false`, the app
+> is still downloadable from the Play Store, but it requires its companion
+> mobile app for it to be usable."
+
+That is exactly this app: it installs and opens on its own, and needs the phone
+app to do anything with a face. The value is left at `true` for now because it
+is shipped in 1004 and churning it again proves nothing — but the honest reading
+of the definition ("fully usable without a paired phone") is `false`, and it
+should go back when there is another reason to touch the manifest.
+
+**`minSdk 36` was not the cause either.** The operator's watch is a Pixel Watch 5
+running Wear OS 7, comfortably above the floor.
+
+The pattern in both: I reasoned from a plausible platform rule instead of opening
+the page that states it. The operator's "look at the documentation and stop
+guessing" was the correction, and it was right.
+
+## 2026-08-29 — The permission nobody asked for
+
+`POST_NOTIFICATIONS` was declared in `:wear`'s manifest and requested nowhere.
+On Wear OS 6 that is a runtime permission, and the failure it produces is the
+worst kind:
+
+1. A face arrives and installs correctly.
+2. `ActivationPrompt` checks `areNotificationsEnabled()`, finds false, and posts
+   nothing — it is written to, precisely so `notify` is not a silent no-op.
+3. Nobody is ever asked whether the watch may switch faces.
+4. The face sits there installed and inactive, with no error anywhere.
+
+Somebody testing this for the first time would conclude the whole pipeline was
+broken, and every log line would say it had worked.
+
+`WatchActivity` now asks on open, and shows a red line with a button if the
+answer was no. This is the only screen the watch app has, and a person opening
+it is the one moment when asking is not an ambush. The install path cannot ask —
+it is a background context, the same wall that stops it raising the activation
+dialog directly.
+
+Found by auditing the receiving half before handing it to somebody with real
+hardware, rather than by watching it fail on their wrist.
+
+### And one that was fine, checked anyway
+
+The channel encoding changed earlier today, so the `WearableListenerService`'s
+`android:pathPrefix` was worth re-checking: it is `/bfg-watchfaces`, the constant
+is `/bfg-watchfaces/face/`, and only the segment AFTER that prefix changed. It
+still matches.
+
+It is now a test. The prefix is a hardcoded manifest string and the constant is
+Kotlin, and nothing else connects them — a mismatch means the device opens a
+channel, the service is never invoked, the bytes go nowhere and nothing is
+logged. Same class of silent failure as the capability name, which already had
+a test for the same reason.
+
+## 2026-08-29 — The channel path carried a token it could not carry
+
+`WatchLink` put the validator's token in the Data Layer channel path raw, and
+the test that covered it used `eyJhbGciOiJI.UzI1NiJ9-_==` — a URL-safe shape
+somebody assumed. Running the real validator on a device produced this:
+
+```text
+EsHCFGgf0GIQjD5UfB61BgMka8ShjdykSmb1SVS+MmU=:MS4wLjA=
+```
+
+Standard base64, with a version suffix. Its alphabet includes `+`, `=` and
+**`/`** — and a `/` in a path is a new path segment. The receiver strips a prefix
+so it would have recovered the token anyway, but nothing promises the transport
+hands the path back byte for byte once it contains separators, and the failure
+would be intermittent: fine for most tokens, broken for the ones that happen to
+contain a slash.
+
+The segment is now URL-safe base64 of the token's bytes — `[A-Za-z0-9_-]` and
+nothing else, whatever the validator emits. Three tests cover it, including a
+token with a slash in it. Nothing has ever crossed this link, so there was no
+wire compatibility to keep.
+
+Worth naming the shape of this bug: a test existed, it passed, and it was
+testing an invented value. The fix was not cleverness, it was running the real
+thing once and looking at what came out.
+
+## 2026-08-29 — How far the pipeline gets, exactly
+
+Measured on the emulators, in one run:
+
+```text
+pack available: true
+BUILT   cache/debug_face.apk   520631 bytes   3256ms
+TOKEN   EsHCFGgf0GIQjD5UfB61BgMka8Shjdyk...
+TARGET  NoWatch
+```
+
+Build, sign and validate all work on the device. `findTarget` executes the real
+`CapabilityClient` and `NodeClient` calls without error and correctly reports
+that there is no watch — which is the truth: the two emulators are not paired,
+and `CLAUDE.md` already records that a Wear AVD self-provisions and never runs a
+pairing wizard.
+
+So `FaceSender.send` has still never run. Everything on both sides of it is
+verified; the Bluetooth crossing needs real hardware.
+
+One real bug fell out of trying: `Tasks.await` refuses to run on the main
+thread, and a `BroadcastReceiver`'s `onReceive` IS the main thread. The app was
+always fine — `MainActivity` calls this inside `withContext(Dispatchers.IO)` —
+but `DebugPackReceiver` was not, and now uses `goAsync()` the way `:wear`'s
+receiver already did.
+
+## 2026-08-29 — pack on the device: the pipeline runs
+
+The on-device build path is written and compiles: `PackBridge` (JNI onto
+google/pack), `ApkSigning` (Android Keystore key, self-signed cert, apksig v2/v3)
+and `FaceBuilder`, which turns `DialParams` into a signed APK carrying only the
+four paths Watch Face Push permits.
+
+**It runs.** With the operator's go-ahead the toolchain went on this box —
+rustup with the minimal profile, the four Android targets, `cargo-ndk`, a
+user-level `protoc`, and NDK r27c — and `scripts/build-pack-android.sh` produced
+`libpack_java.so` for all four ABIs from the pinned, patched pack.
+
+Measured on the SDK 36 phone emulator, not assumed:
+
+```text
+pack available: true
+BUILT   /data/user/0/com.bfg.watchfaces/cache/debug_face.apk
+package com.bfg.watchfaces.watchfacepush.debug_face
+bytes   520631
+took    2687ms
+TOKEN   EsHCFGgf0GIQjD5UfB61BgMka8ShjdykSmb1SVS+MmU=:...
+```
+
+`aapt2 dump` on the APK the PHONE built shows exactly the permitted paths and
+nothing else — no `kotlin/`, no `DebugProbesKt.bin` — signed `CN=BFG Watch
+Faces`, and **`(nodpi)` read back out of the resource table**. That last line is
+the patch earning its keep: Androidify's prebuilt binary would have recorded
+those two drawables as mdpi.
+
+That APK then installed on the Wear OS 6 emulator through the existing
+`DebugInstallReceiver`, took the slot from the previous face, and
+`DeclarativeWatchFaceRuntime` rendered it with live complications.
+
+**What that does NOT prove.** The APK crossed from phone to watch by `adb`, not
+over Bluetooth. `CapabilityClient` and `ChannelClient` are still the untested
+link, and they are now the only thing between here and a face that a person can
+send from their own phone.
+
+### Why not Androidify's prebuilt .so, again
+
+`scripts/build-pack.sh` already refused to scavenge them — "unversioned binaries
+nobody here can audit" — and pointing at a device does not change that. There is
+now a second, sharper reason: **theirs is built from UNPATCHED pack.** This repo
+carries `scripts/pack-qualifiers.patch`, without which `res/drawable-nodpi` is
+recorded as density 0 — mdpi, not "unspecified" — and the watch scales a dial
+image that explicitly says do not scale me. That bug was found and fixed here on
+2026-08-28. Taking their binary would silently reintroduce it on the device path
+only, which is the hardest place to notice it.
+
+A third reason emerged while writing the binding: **a JNI symbol encodes the Java
+package.** Androidify's library exports
+`Java_com_android_developers_androidify_watchface_creator_PackPackage_nativeCompilePackage`,
+so using it forces the binding to live in their package. Building ours puts it in
+`com.bfg.watchfaces.mobile.pack`, where it belongs.
+
+### Absent is a state, not a crash
+
+`PackBridge.isAvailable` wraps `System.loadLibrary` in `runCatching`, so a
+checkout that has not run the build script gets a sentence it can show rather
+than an `UnsatisfiedLinkError` at class-load time on someone's phone. The send
+flow builds BEFORE it looks for a watch, deliberately: telling somebody "no watch
+found" when the real problem is that this build cannot pack a face would send
+them into their Bluetooth settings for an hour.
+
+### Signing, and why a throwaway key is the right key
+
+Nothing about a pushed watch face depends on who signed it — Watch Face Push
+trusts the validation token the validator issues for the bytes. So the per-device
+Keystore key is not a weaker version of a real signing key, it is the right shape
+for the job. It also means two phones produce differently-signed APKs for the
+same design, which is why the SLUG and not the signature decides whether a face
+replaces an earlier one.
+
+## 2026-08-29 — The phone app catches up with the workbench, and what did not
+
+`DECISIONS.md` 2026-08-28 made the localhost app the specification for the phone
+app. Measured against it on 2026-08-29 the phone app was one scrolling studio
+against four screens, and the gap was not cosmetic: it could not save a face,
+name one, or list one. Nothing downstream — sending to a watch, sharing to a
+catalog — can be built on a screen with nowhere to keep anything.
+
+Now at parity: bottom navigation, Designs (styles gallery), Studio, My faces,
+About, the naming sheet, local save in the catalog format, the Fine tune bottom
+sheet, complication size and spacing, and an Android-standard complication
+picker.
+
+### Three things worth keeping the reasoning for
+
+**The picker was wrong in ways a screenshot cannot show.** It was a `Row` with a
+coloured value and a raw `DropdownMenu` hung off it — no affordance that it
+opened anything, a touch target the width of whatever the text happened to be,
+no field semantics for TalkBack, and a menu anchored to the `Box` rather than the
+control, so it opened over its own label on a short screen.
+`ExposedDropdownMenuBox` is the standard answer and supplies all four.
+
+**Fine tune had to become a sheet.** Inline, the dial had scrolled off the top by
+the time you reached the lower sliders, so you were adjusting an engraving you
+could not see. The localhost app marks that sheet `short` for exactly this
+reason. Fine tuning is a feedback loop and a loop you cannot see is guessing.
+
+**Dynamic colour went away.** Material You is the right default for a utility and
+the wrong one for an app whose entire subject is choosing colours: the chrome
+took its identity from the wallpaper and competed with the swatches, so a person
+could not tell which purple was theirs and which was the phone's. The scheme is
+now the brand's, the same plum and blush as the launcher icon.
+
+### Still missing, deliberately
+
+- **Community.** Needs the catalog service, which is its own task and is held
+  for an operator interview. The tab exists and says honestly that nothing is
+  shared yet, rather than inventing faces or pretending to load.
+- **Share and Report.** Both are catalog actions. Same blocker.
+- **Your image (`Engine.TEXTURE`).** `AndroidDialRenderer` has never supported
+  imported bitmaps; that is a renderer gap, not a UI one.
+- **The custom colour picker.** The swatches work; an arbitrary-colour sheet is
+  additive rather than a gap in the flow.
+- **The schema validity pill.** The workbench validates against Google's XSD on
+  every change because it has Xerces and the schema on disk. The phone has
+  neither, and validation belongs at the point a face is packed, not while
+  someone drags a slider.
+
+Verified on the SDK 36 phone emulator, not assumed: all four tabs render, and a
+design named "Midnight Knot" saved to `files/faces/midnight_knot.json` in the
+catalog format and came back on the My faces list with its slug.
+
+## 2026-08-29 — How to put a local file into the Play Console from a headless box
+
+The store listing is complete: icon, feature graphic, five phone screenshots,
+name, short and full description. Verified by reading it back with
+`scripts/play-listing.py --show`, not by looking at the page that wrote it.
+
+The API was still refusing listing commits hours after the "Manage store
+presence" grant, so this went through the browser — which has its own problem:
+Chrome runs on the operator's Windows laptop and the assets are generated on this
+Linux box.
+
+**Play has no file input to fill.** `document.querySelectorAll('input[type=file]')`
+returns nothing. Play creates one on demand and calls `.click()`, which opens a
+native dialog — invisible to automation, and it FREEZES the session because
+nothing can dismiss it.
+
+So, in order:
+
+1. Neutralise every route to a dialog first, before touching any button:
+   override `HTMLInputElement.prototype.click` to a no-op for `type=file`, and
+   make `showOpenFilePicker` throw. Do this BEFORE the click, not after.
+2. Create your own `<input type="file">`, attach it to the document, and fill it
+   with the file-upload tool — which can read this machine's paths.
+3. Take `input.files`, build a `DataTransfer`, and dispatch
+   `dragenter`/`dragover`/`drop` on Play's drop zone. Play's asset picker opens
+   with the file already ingested; select it and press Add.
+
+**Address the drop zone by its help text, not by index.** There are eight
+identical "Add assets" elements. Their order CHANGES as slots fill, so an index
+that meant "phone screenshots" before the icon was set means something else
+after — the first attempt silently dropped five screenshots onto nothing.
+
+**Screenshot order is drag-and-drop and it matters.** Play showed them in
+roughly reverse upload order, which put the black always-on screen first — the
+one that looks like a blank rectangle. A real click-drag between thumbnails
+reorders them, where a synthetic drag event does not.
+
+Not done: the listing is SAVED, not submitted. Sending it for review is a
+separate, operator-level decision and there is no reason to make it before the
+app can actually send a face to a watch.
+
+## 2026-08-29 — Store listing assets upload by API too, and that needed a permission
+
+`scripts/play-listing.py` does for the listing what `play-release.py` does for
+tracks: reads it, sets the words, uploads the icon, feature graphic and
+screenshots. Same reason — the assets are generated on this Linux box and the
+console's file picker runs on a Windows laptop, so "drag the PNG in" means
+copying every asset across the bridge for every revision. The file input is not
+in the accessibility tree either, so browser automation cannot reach it: clicking
+the button opens a native dialog with nothing on the other side of it.
+
+### The permission that was missing, and how it fails
+
+`play-publisher@budgetbug-495002` held "Release apps to testing tracks" and not
+**"Manage store presence"**. The failure is worth writing down because it is
+misleading in two ways:
+
+- The image UPLOAD succeeds. Play accepts the PNG, returns an image id, and only
+  the `edits:commit` fails.
+- The commit fails with a bare `403 PERMISSION_DENIED / "The caller does not have
+  permission"` that names neither the permission nor the listing.
+
+An edit containing no changes at all commits fine under the same credentials,
+which is how the block was localised to the listing content rather than to
+committing edits. That two-line diagnostic is worth keeping in mind for the next
+opaque 403.
+
+Granted on 2026-08-29 with the operator's go-ahead, scoped to this app: the
+console shows the app's permission count going 8 to 9. It does **not** include
+production release.
+
+**The grant is not immediate, and a careless probe will tell you it worked.**
+The console showed 9 straight away and the API was still returning 403 twenty
+minutes later. A probe that PUT the listing back with its existing values did
+commit — but Play treats an unchanged listing as a no-op, so that commit
+authorised nothing and was not evidence of anything. Any probe of this has to
+change a value.
+
+## 2026-08-29 — The app icon: H6 with an onion crown, generated from one description
+
+The app shipped to internal testing with `icon=''` — no launcher icon at all.
+The mark chosen to fix that is an open guilloché dial (two arcs, the gap toward
+the lower left) with a domed "onion" crown at two o'clock, in the BFG light
+palette: `#F4E6EB` ground, `#80475C` ink.
+
+### Why a generator and not four drawn files
+
+The same mark has to exist as an Android adaptive icon (two vector drawables on
+a 108dp canvas), a 512px PNG for Play, and an SVG for the docs site. Drawn
+separately those are four chances for the crown to sit at a different angle, and
+nobody notices until they are side by side on a phone. So the shapes are data in
+`BrandMark` and each format is an executor — the arrangement `ComplicationGlyphs`
+already uses, for the same reason.
+
+`./gradlew :workbench:brand` writes all of it. The outputs are **checked in**:
+the Android build must not depend on a JVM task having been run.
+
+Rejected: putting the mark in `:generator`. It is not part of the watch face file
+format, and `:generator` is the definition of that format and nothing else.
+
+### Three things only visible at size, and what they cost
+
+**The hands read as the letter V.** Two hands of near-equal length, near-symmetric
+about vertical, are a chevron and not a watch. The hour hand is now 11.5 units
+against the minute's 18.5, and heavier. Obvious in hindsight; invisible at 96px.
+
+**The crown read as a balloon on a string.** Its stem started at radius 29, inside
+the outer ring at 30.5, so the ring covered the stem and left a floating dot. The
+stem now starts *on* the ring.
+
+**The strokes were sized for an artboard, not a launcher.** The design was judged
+at 120px. Inside a 60dp keyline a 2.6-unit stroke lands on about 1.4 device pixels
+at a 48px launcher icon, and the mark goes grey. Every weight went up roughly 30%.
+This is a deliberate departure from the approved artboards: the alternative is an
+icon that is correct in the file and a smudge on the phone.
+
+### The safe zone is 60dp, not 72dp, and getting it wrong is silent
+
+An adaptive icon's 108dp layer is not what anyone sees. The system reserves 18dp
+on each side for parallax, so the mask applies to the middle **72dp**, and
+Material's keyline for a round motif is **60dp** inside that. Sized to 72dp the
+mark looks perfect in a square preview and loses its crown to the first circular
+mask it meets — there is no error and no warning.
+
+`./gradlew :workbench:brand --args="--sheet=<path>"` renders the icon cropped the
+way a launcher crops it, at 192 down to 24px, in both palettes. That contact sheet
+is what caught all four problems above; a 512px render caught none of them.
+
+### Light, not dark
+
+The dark palette is a near-black tile. On the dark wallpaper of a phone that asked
+for dark mode it stops being an icon and becomes a hole. The dark mark stays in
+`docs/brand` for the site and the README, where there is a page behind it.
+
+### Not built: the Play feature graphic
+
+The remaining store-listing asset is a 1024×500 feature graphic, which needs
+typography. This machine has DejaVu, Liberation and FreeSerif and nothing else —
+setting the BFG wordmark in Liberation Serif would contradict the brand it is
+meant to carry. It waits for a real face rather than shipping a generic one.
+
 ## 2026-08-29 — On Play internal testing, published by script rather than by hand
 
 `BFG Watch Faces` exists on Google Play as `com.bfg.watchfaces`, in the BFG

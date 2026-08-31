@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.workbench
 
 import java.io.File
+import com.bfg.watchfaces.appcore.Json
 
 /**
  * Validate the community catalog and regenerate its index.
@@ -19,7 +20,7 @@ object Catalog {
     fun main(args: Array<String>) {
         System.setProperty("java.awt.headless", "true")
         val checkOnly = args.contains("--check")
-        val repoRoot = findRoot()
+        val repoRoot = RepoRoot.find()
 
         // --dir lets the catalog repo's own CI validate its checkout using this
         // validator, so there is one implementation rather than a copy that
@@ -28,7 +29,7 @@ object Catalog {
         val catalogRoot = explicit?.let { File(it) } ?: CatalogStore.resolveRoot(repoRoot)
         if (catalogRoot == null) {
             println("no catalog checkout found.")
-            println("  clone ${CatalogStore.REPO_URL} beside this repo, or set BFG_CATALOG_DIR")
+            println("  set BFG_CATALOG_DIR, or put one beside this repo as bfg-watchfaces-catalog")
             return
         }
         val root = repoRoot          // schema lives here; the catalog may not
@@ -100,7 +101,10 @@ object Catalog {
 
         val n = CatalogStore.writeIndex(catalogRoot)
         println("  wrote ${CatalogStore.indexFile(catalogRoot).absolutePath} ($n face(s))")
-        println("  served in production from ${CatalogStore.CDN_URL}")
+        // No production URL to print any more: the live catalog is the
+        // service, and this task validates a LOCAL checkout. Saying where
+        // production served from was true when the checkout WAS production.
+        println("  this is a local checkout; the live catalog is the service")
     }
 
     /** How many faces the committed index claims, or 0 if there is no index. */
@@ -116,12 +120,4 @@ object Catalog {
     private fun stripGenerated(s: String) =
         s.lines().filterNot { it.trimStart().startsWith("\"generated\"") }.joinToString("\n")
 
-    private fun findRoot(): File {
-        var d: File? = File(System.getProperty("user.dir")).absoluteFile
-        while (d != null) {
-            if (File(d, "settings.gradle.kts").isFile) return d
-            d = d.parentFile
-        }
-        return File(System.getProperty("user.dir")).absoluteFile
-    }
 }
