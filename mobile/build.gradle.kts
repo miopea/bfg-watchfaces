@@ -105,6 +105,14 @@ dependencies {
     implementation(libs.play.services.wearable)   // Data Layer: Channel/Message/Capability
     implementation(libs.wfp.validator.android)    // local token generation, no network
 
+    // Google sign-in, used for ONE thing: publishing a face to the community
+    // catalog. Browsing, installing and reporting stay anonymous, so nothing
+    // here may become a gate on any of those. Credential Manager rather than
+    // the deprecated GoogleSignInClient.
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.google.id)
+
     // google/pack builds the watch face APK on the device. The native library
     // is NOT a dependency and NOT Androidify's prebuilt one: it is built from
     // the same pinned, patched pack the desktop CLI uses, by

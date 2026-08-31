@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bfg.watchfaces.appcore.FaceLibrary
+import com.bfg.watchfaces.appcore.SubmissionLog
 import com.bfg.watchfaces.generator.EngravedStroke
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -62,6 +63,24 @@ fun MyFacesScreen(
     onOpen: (FaceLibrary.StoredFace) -> Unit,
     onSend: (FaceLibrary.StoredFace) -> Unit,
     onDelete: (FaceLibrary.StoredFace) -> Unit,
+    onShare: (FaceLibrary.StoredFace) -> Unit,
+    /**
+     * What each face has been shared as, keyed by slug.
+     *
+     * Passed in rather than read here so the list does not hit the disk once
+     * per row per recomposition, and so a share or a withdrawal updates every
+     * row at once instead of whichever happened to redraw.
+     */
+    shared: Map<String, SubmissionLog.Record>,
+    /**
+     * Whether sharing is possible at all right now.
+     *
+     * False hides the button entirely rather than disabling it. A share button
+     * that cannot work is worse than no button -- that is why there was no
+     * share UI for so long, and it stays true when the service is the thing
+     * that is switched off.
+     */
+    canShare: Boolean,
     modifier: Modifier = Modifier
 ) {
     var confirming by remember { mutableStateOf<FaceLibrary.StoredFace?>(null) }
@@ -89,8 +108,11 @@ fun MyFacesScreen(
         items(faces, key = { it.slug }) { face ->
             FaceRow(
                 face,
+                shared = shared[face.slug],
+                canShare = canShare,
                 onOpen = { onOpen(face) },
                 onSend = { onSend(face) },
+                onShare = { onShare(face) },
                 onDelete = { confirming = face }
             )
             HorizontalDivider()
@@ -115,8 +137,11 @@ fun MyFacesScreen(
 @Composable
 private fun FaceRow(
     face: FaceLibrary.StoredFace,
+    shared: SubmissionLog.Record?,
+    canShare: Boolean,
     onOpen: () -> Unit,
     onSend: () -> Unit,
+    onShare: () -> Unit,
     onDelete: () -> Unit
 ) {
     // A face can name an app this watch does not have. It still renders, just
@@ -170,10 +195,24 @@ private fun FaceRow(
                     color = MaterialTheme.colorScheme.error
                 )
             }
+            // Said in the SAME words the share sheet uses, from one function,
+            // so the row and the sheet cannot describe one state two ways.
+            shared?.let {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    statusOf(it.state),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         // Send is the point of having saved it. Putting it behind "open in the
         // studio, then send" made the list a staging area rather than a library.
         TextButton(onClick = onSend) { Text("Send") }
+        // "Shared" rather than "Share" once it is: the button still opens the
+        // same sheet, but it is now the way back to taking it down, and
+        // labelling that "Share" would invite somebody to send it twice.
+        if (canShare) TextButton(onClick = onShare) { Text(if (shared == null) "Share" else "Shared") }
         TextButton(onClick = onDelete) { Text("Delete") }
     }
 }

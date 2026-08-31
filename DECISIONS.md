@@ -1,5 +1,58 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — Sharing works, and the bug was in the sheet that asked
+
+A face designed on the phone reached the live catalog, was seen in the
+moderation queue, and was taken back again. That is the last of the three
+things `CLAUDE.md` listed as never tested.
+
+### The bug only running it could find
+
+The first attempt did nothing. The account picker appeared, the account was
+chosen, and the queue stayed empty. No crash, no error, no log line.
+
+`ModalBottomSheet` fires `onDismissRequest` when something else takes focus,
+and Google's account picker is an activity — so choosing an account dismissed
+the sheet, which removed the composable, which cancelled the
+`rememberCoroutineScope` the submit was running in. Half a network call, thrown
+away silently.
+
+Two changes, and both are the same lesson: **work that outlives a sheet cannot
+live in the sheet.** The share state and the coroutine moved up to the
+activity, whose composition survives; and `onDismissRequest` now refuses while
+busy, so the picker taking focus cannot close the thing waiting for its answer.
+
+`ShareSheet` is a view now — it holds no state but the half-typed author name
+and starts nothing. Every other sheet in this app is safe only because nothing
+in it opens another activity.
+
+### The words are for the person, not the system
+
+No "submission", no "moderation queue", no "slug", no id. Somebody sharing a
+watch face is not administering a service: they put a thing they made where
+others can find it, someone checks it, and they can take it back. The row says
+"Waiting for someone to check it", and the sheet and the row get that sentence
+from ONE function so they cannot describe a state two different ways.
+
+The sheet also refuses to say "your face is live", because it is not. Nothing
+appears until a person looks. An app that said "shared!" and showed nothing in
+the gallery would read as broken, and the author would send it again.
+
+### An unknown state reads as "still waiting"
+
+`SubmissionLog.State.of` maps any word it does not recognise to PENDING. The
+alternative defaults all end with the app telling an author their face was
+refused because the service learned a new word — bad news that never happened,
+about something somebody made.
+
+### What sharing keeps
+
+An anonymous hash of the account, and nothing else. Verified by reading the
+queue after a real submission: `author_key` is a hash, the author field was
+empty because the field was left blank, and no address is stored anywhere. The
+account exists so a face can be taken back, which is exactly what the sheet
+promises and now demonstrably does.
+
 ## 2026-08-31 — Sharing has a client id, in a project of its own
 
 The last blocker on the community catalog was an OAuth client, which is not

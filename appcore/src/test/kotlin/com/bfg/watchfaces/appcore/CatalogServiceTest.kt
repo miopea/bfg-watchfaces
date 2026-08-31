@@ -262,6 +262,63 @@ class CatalogServiceTest {
         assertTrue((open.config() as CatalogService.Result.Ok).value.acceptsSubmissions)
     }
 
+    /**
+     * Taking a face back is the promise the sign-in was ASKED FOR.
+     *
+     * The share sheet tells people the account exists so they can take the
+     * face back later. If withdraw stopped carrying the token it would 401 and
+     * the button would fail for everyone, which turns that sentence into a lie
+     * about the one thing the account was justified by.
+     */
+    @Test
+    fun `taking a face back carries the account that submitted it`() {
+        val fake = Fake(
+            mapOf("$base/submissions/sub-1/withdraw" to CatalogTransport.Reply(200, """{"ok":true}"""))
+        )
+        val result = CatalogService(fake, base).withdraw("sub-1", "google-id-token")
+        assertTrue(result is CatalogService.Result.Ok)
+
+        val (url, body) = fake.posts.single()
+        assertEquals("$base/submissions/sub-1/withdraw", url)
+        assertEquals("google-id-token", fake.bearers.single())
+        assertFalse(body.contains("google-id-token")) { "the token was put in the body as well" }
+    }
+
+    /**
+     * Asking what happened to a face needs no account at all.
+     *
+     * The state is not private -- a published face is public by definition --
+     * and requiring a sign-in to read it would mean the list could not show
+     * "waiting to be checked" without an account prompt on every open.
+     */
+    @Test
+    fun `asking what happened to a submission sends no identity`() {
+        val fake = Fake(
+            mapOf("$base/submissions/sub-1" to
+                CatalogTransport.Reply(200, """{"id":"sub-1","slug":"x_1","state":"pending"}"""))
+        )
+        val result = CatalogService(fake, base).submissionState("sub-1")
+        assertEquals("pending", (result as CatalogService.Result.Ok).value.state)
+        assertTrue(fake.bearers.isEmpty()) { "reading a state asked for an account" }
+        assertTrue(fake.posts.isEmpty()) { "reading a state was not a read" }
+    }
+
+    /**
+     * Every state the SERVICE can answer with is one the app has words for.
+     *
+     * `SubmissionLog.State.of` maps an unknown word to PENDING on purpose, so a
+     * drift here is silent: the author would be told "waiting" forever about a
+     * face that was actually refused. This is the test that notices.
+     */
+    @Test
+    fun `every state the service can report has words in the app`() {
+        for (wire in listOf("pending", "published", "rejected", "removed")) {
+            assertEquals(wire, SubmissionLog.State.of(wire).wire) {
+                "the app would silently read '$wire' as something else"
+            }
+        }
+    }
+
     @Test
     fun `the service is named in exactly one place`() {
         // The seam the sequencing was designed around: moving off GitHub is

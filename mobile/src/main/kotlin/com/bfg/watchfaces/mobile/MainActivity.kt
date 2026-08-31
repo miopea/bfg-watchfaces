@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.bfg.watchfaces.appcore.ActivationConsent
 import com.bfg.watchfaces.appcore.WatchLink
 import com.bfg.watchfaces.appcore.FaceLibrary
+import com.bfg.watchfaces.appcore.CatalogService
 import com.bfg.watchfaces.appcore.Presets
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.mobile.pack.FaceBuilder
@@ -118,6 +119,30 @@ class MainActivity : ComponentActivity() {
                 var sendingName by rememberSaveable { mutableStateOf(onWatch?.name ?: "My Face") }
                 var status by remember { mutableStateOf<String?>(null) }
                 var faces by remember { mutableStateOf(FaceStorage.list(context)) }
+                // What has been shared, and whether sharing is possible at all.
+                //
+                // `canShare` is asked of the SERVICE rather than assumed: it
+                // answers false when no sign-in is configured, and the button
+                // stays hidden rather than appearing and then failing. That was
+                // the whole reason there was no share UI until the client id
+                // existed, and it stays true if the id is ever lost.
+                var shared by remember { mutableStateOf(SubmissionStore.all(context).associateBy { it.slug }) }
+                var canShare by remember { mutableStateOf(false) }
+                var sharing by remember { mutableStateOf<FaceLibrary.StoredFace?>(null) }
+                // Sharing state lives HERE, not in the sheet.
+                //
+                // Signing in opens Google's own activity, which takes focus,
+                // which makes the sheet fire onDismissRequest -- and a sheet
+                // that removes itself cancels the coroutine doing the work.
+                // Measured on an emulator: the account was chosen and nothing
+                // ever reached the catalog. No crash, no error, empty queue.
+                var shareBusy by remember { mutableStateOf(false) }
+                var shareError by remember { mutableStateOf<String?>(null) }
+                var shareOutcome by remember { mutableStateOf<ShareOutcome?>(null) }
+                LaunchedEffect(Unit) {
+                    val config = withContext(Dispatchers.IO) { CatalogAccess.service(context).config() }
+                    canShare = (config as? CatalogService.Result.Ok)?.value?.acceptsSubmissions == true
+                }
 
                 var tuning by remember { mutableStateOf(false) }
                 var picking by remember { mutableStateOf(false) }
@@ -262,6 +287,9 @@ class MainActivity : ComponentActivity() {
                                 tab = Tab.STUDIO
                             },
                             onSend = { requestSend(it.name, it.params) },
+                            onShare = { sharing = it },
+                            shared = shared,
+                            canShare = canShare,
                             onDelete = { FaceStorage.delete(context, it.slug); faces = FaceStorage.list(context) },
                             modifier = Modifier.padding(inner)
                         )
@@ -321,6 +349,86 @@ class MainActivity : ComponentActivity() {
                             faces = FaceStorage.list(context)
                             naming = false
                             scope.launch { snackbar.showSnackbar("Saved “$name”") }
+                        }
+                    )
+                }
+
+                /**
+                 * Sign in, then do the thing, on a scope that outlives the sheet.
+                 *
+                 * The token is used for this one call and never stored: the
+                 * account is a way to prove the same person is taking a face
+                 * back, not a session the app keeps.
+                 */
+                fun withAccount(action: suspend (String) -> Unit) {
+                    shareBusy = true
+                    shareError = null
+                    scope.launch {
+                        try {
+                            val config = withContext(Dispatchers.IO) {
+                                CatalogAccess.service(context).config()
+                            }
+                            val clientId =
+                                (config as? CatalogService.Result.Ok)?.value?.googleClientId.orEmpty()
+                            when (val outcome = GoogleSignIn.idToken(this@MainActivity, clientId)) {
+                                is GoogleSignIn.Outcome.Ok -> action(outcome.idToken)
+                                // Changing your mind is not an error and must not look like one.
+                                GoogleSignIn.Outcome.Cancelled -> Unit
+                                is GoogleSignIn.Outcome.Failed -> shareError = outcome.message
+                            }
+                        } finally {
+                            shareBusy = false
+                        }
+                    }
+                }
+
+                sharing?.let { face ->
+                    ShareSheet(
+                        faceName = face.name,
+                        existing = shared[face.slug],
+                        outcome = shareOutcome,
+                        busy = shareBusy,
+                        failure = shareError,
+                        onShare = { author ->
+                            withAccount { token ->
+                                val result = withContext(Dispatchers.IO) {
+                                    CatalogAccess.service(context)
+                                        .submit(face.name, author, face.params, token)
+                                }
+                                when (result) {
+                                    is CatalogService.Result.Ok -> {
+                                        SubmissionStore.record(context, face.slug, result.value.id)
+                                        // Re-read from disk rather than patching the
+                                        // map by hand: the store is what changed, and
+                                        // a second opinion here is how the row and the
+                                        // sheet end up describing one state two ways.
+                                        shared = SubmissionStore.all(context).associateBy { it.slug }
+                                        shareOutcome = ShareOutcome.SENT
+                                    }
+                                    is CatalogService.Result.Failed -> shareError = result.message
+                                }
+                            }
+                        },
+                        onTakeBack = {
+                            val record = shared[face.slug] ?: return@ShareSheet
+                            withAccount { token ->
+                                val result = withContext(Dispatchers.IO) {
+                                    CatalogAccess.service(context).withdraw(record.id, token)
+                                }
+                                when (result) {
+                                    is CatalogService.Result.Ok -> {
+                                        SubmissionStore.forget(context, record.id)
+                                        shared = SubmissionStore.all(context).associateBy { it.slug }
+                                        shareOutcome = ShareOutcome.WITHDRAWN
+                                    }
+                                    is CatalogService.Result.Failed -> shareError = result.message
+                                }
+                            }
+                        },
+                        onDismiss = {
+                            sharing = null
+                            shareOutcome = null
+                            shareError = null
                         }
                     )
                 }
