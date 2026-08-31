@@ -96,9 +96,9 @@ class CatalogService(
         val faces: List<Face>
     )
 
-    /** What the service says about itself: the Turnstile site key, and limits. */
+    /** What the service says about itself: the sign-in client id, and limits. */
     data class Config(
-        val turnstileSiteKey: String,
+        val googleClientId: String,
         val contractVersion: Int,
         val currentGeneratorVersion: Int,
         val maxFaceBytes: Int
@@ -106,11 +106,11 @@ class CatalogService(
         /**
          * Whether the service can accept a submission at all right now.
          *
-         * An empty site key means Turnstile is not configured, and the write
-         * endpoints fail closed with 403. The app should say so up front rather
-         * than letting someone design, name and submit a face into a refusal.
+         * An empty client id means sign-in is not configured, and the write
+         * endpoints fail closed. The app should say so up front rather than
+         * letting someone design, name and submit a face into a refusal.
          */
-        val acceptsSubmissions: Boolean get() = turnstileSiteKey.isNotBlank()
+        val acceptsSubmissions: Boolean get() = googleClientId.isNotBlank()
     }
 
     // ---- reads --------------------------------------------------------------
@@ -164,7 +164,7 @@ class CatalogService(
         val o = Json.obj(Json.parse(reply.body))
         return Result.Ok(
             Config(
-                turnstileSiteKey = Json.str(o, "turnstileSiteKey", ""),
+                googleClientId = Json.str(o, "googleClientId", ""),
                 contractVersion = Json.num(o, "contractVersion", 0.0).toInt(),
                 currentGeneratorVersion = Json.num(o, "currentGeneratorVersion", 0.0).toInt(),
                 maxFaceBytes = Json.num(o, "maxFaceBytes", 0.0).toInt()
@@ -192,33 +192,28 @@ class CatalogService(
     /**
      * Share a face.
      *
-     * [turnstileToken] is proof of humanity, obtained by the UI. There is no
-     * way to submit without one and no way for this layer to get one — it comes
-     * from a widget the person interacts with.
+     * [idToken] is a Google ID token, obtained by the UI when somebody signs
+     * in. There is no way to submit without one and no way for this layer to
+     * get one.
      *
-     * [installId] is the random per-install value, sent ONLY here and on a
-     * report. It is what lets an author withdraw their own face. It is
-     * deliberately weak: reinstalling makes a new one, and the old face can
-     * then only be withdrawn by reporting it. The UI says that at submit rather
-     * than letting it be discovered.
+     * Signing in is required to PUBLISH and for nothing else — browsing,
+     * fetching a face and reporting all stay anonymous. Publishing is a
+     * privilege; complaining is not.
      */
     fun submit(
         name: String,
         author: String,
         params: DialParams,
-        turnstileToken: String,
-        installId: String
+        idToken: String
     ): Result<Submission> {
         val body = """{
   "name": ${Json.quote(name.trim())},
   "author": ${Json.quote(author.trim())},
   "slug": ${Json.quote(PublishedSlug.stemFor(name))},
-  "turnstile": ${Json.quote(turnstileToken)},
-  "installId": ${Json.quote(installId)},
   "params": ${FaceCodec.toJson(params)}
 }"""
         val reply = try {
-            transport.post("$baseUrl/faces", body)
+            transport.post("$baseUrl/faces", body, bearer = idToken)
         } catch (_: CatalogTransport.Unreachable) {
             return Result.Failed(UNREACHABLE)
         }
@@ -251,17 +246,23 @@ class CatalogService(
         OTHER("other", "Something else")
     }
 
+    /**
+     * Report a face. NO SIGN-IN, deliberately.
+     *
+     * Requiring an account to complain was intolerable the moment submitting
+     * did not require one — "anyone could publish and only developers could
+     * complain" is what moved this catalog off GitHub. It is safe to leave open
+     * because a report is a MESSAGE, not an action: nothing auto-hides.
+     */
     fun report(
         slug: String,
         reason: ReportReason,
-        detail: String,
-        turnstileToken: String
+        detail: String
     ): Result<String> {
         val body = """{
   "slug": ${Json.quote(slug)},
   "reason": ${Json.quote(reason.wire)},
-  "detail": ${Json.quote(detail.trim().take(2000))},
-  "turnstile": ${Json.quote(turnstileToken)}
+  "detail": ${Json.quote(detail.trim().take(2000))}
 }"""
         val reply = try {
             transport.post("$baseUrl/reports", body)
@@ -290,9 +291,10 @@ class CatalogService(
         )
     }
 
-    fun withdraw(id: String, installId: String): Result<String> {
+    /** Take back one of your own faces. Needs the account that submitted it. */
+    fun withdraw(id: String, idToken: String): Result<String> {
         val reply = try {
-            transport.post("$baseUrl/submissions/$id/withdraw", """{"installId": ${Json.quote(installId)}}""")
+            transport.post("$baseUrl/submissions/$id/withdraw", "{}", bearer = idToken)
         } catch (_: CatalogTransport.Unreachable) {
             return Result.Failed(UNREACHABLE)
         }

@@ -3,7 +3,7 @@
 # Cloudflare rather than Azure, settled 2026-08-30: the Cosmos free tier in the
 # only reachable subscription is taken, that subscription is the operator's
 # EMPLOYER's, the install counter is on the app's critical path and Workers have
-# no cold start, and Turnstile is on this same account.
+# no cold start, and D1 enforces the dedup rule in the engine.
 # docs/specs/catalog-service.md carries the full comparison.
 #
 # The database id is an identifier, not a secret -- Cloudflare's own docs put it
@@ -40,11 +40,15 @@ database_name = "bfg-catalog"
 database_id = "9fa40371-9cfe-4fc8-a8f5-9592c447deb4"
 
 [vars]
-# Public. The private half is a secret: `wrangler secret put TURNSTILE_SECRET`.
-TURNSTILE_SITE_KEY = ""
+# The OAuth client id every ID token must be issued for. Public by necessity --
+# the app needs the same value to ask Google for a token. Empty means publishing
+# is switched off, and the write endpoints fail closed rather than accepting
+# anybody.
+GOOGLE_CLIENT_ID = ""
 
 # Secrets, set with `wrangler secret put <name>` and never written here:
 #
-#   TURNSTILE_SECRET   proof-of-humanity, from the Turnstile dashboard
 #   MODERATOR_TOKEN    the only credential in the system; guards /admin/*
-#   IP_SALT            salts hashed IPs for rate limiting, so no raw IP is stored
+#   IP_SALT            salts the hashed IP used for rate limiting AND the hashed
+#                      Google subject id stored as author_key, so neither a raw
+#                      address nor a raw subject id is ever written down

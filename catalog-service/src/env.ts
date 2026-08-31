@@ -7,15 +7,14 @@
 export interface Env {
   readonly DB: D1Database;
 
-  /** Public half of the Turnstile pair. Only ever echoed to a client. */
-  readonly TURNSTILE_SITE_KEY: string;
-
   /**
-   * Private half. Absent means proof-of-humanity cannot be checked, and the
-   * write endpoints FAIL CLOSED rather than accepting everything — a missing
-   * secret must not silently become an open submission endpoint.
+   * The OAuth client id every ID token must be issued for.
+   *
+   * Public, and it has to be: the app needs it too. Absent means publishing
+   * fails closed rather than accepting anybody — a missing client id must not
+   * silently become an open submission endpoint.
    */
-  readonly TURNSTILE_SECRET?: string;
+  readonly GOOGLE_CLIENT_ID?: string;
 
   /**
    * The only credential in the system, guarding `/admin/*`.

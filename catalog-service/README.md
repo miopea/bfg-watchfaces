@@ -11,9 +11,10 @@ Verified against the live service, not the upload's own output: reads answer,
 endpoints return 403 because `TURNSTILE_SECRET` is not set yet — the
 fail-closed behaviour, working. Version `e8b13e72` is serving 100% of traffic.
 
-**Submit and report are switched off until Turnstile exists.** That is
-deliberate, not a gap: a missing bot-check secret must never quietly become an
-open submission endpoint.
+**Publishing needs a Google sign-in; reporting never does.** Submitting is off
+until an OAuth client id is configured — a missing one must never quietly become
+an open submission endpoint. Reporting works today, anonymously, because
+requiring an account to complain was intolerable the moment submitting did not.
 
 ## Why this exists rather than a GitHub repository
 
@@ -158,12 +159,19 @@ system and the only one a human needs to read back.
 
 ### What is still switched off
 
-`TURNSTILE_SECRET` is not set, so submit and report answer 403. To turn them on:
+`GOOGLE_CLIENT_ID` is empty, so publishing answers 401. To turn it on:
 
-1. Create a Turnstile widget in the Cloudflare dashboard for this account.
-2. `npx wrangler secret put TURNSTILE_SECRET` and paste the secret key.
-3. Put the SITE key in `wrangler.toml` under `TURNSTILE_SITE_KEY` and redeploy.
-   It is public — the app fetches it from `/config`.
+1. In Google Cloud Console, create an OAuth 2.0 **Web application** client id
+   for the project that already holds the Play service account.
+2. Register the Android app's SHA-1 fingerprints against it — **debug AND
+   release**, or sign-in works for the developer and fails for everybody else.
+   That is the usual way this is got wrong.
+3. Put the client id in `wrangler.toml` under `GOOGLE_CLIENT_ID` and redeploy.
+   It is public by necessity: the app fetches it from `/config` and needs the
+   same value to ask Google for a token.
+
+There is nothing to host and no page to serve. That requirement belonged to
+Turnstile, which is gone.
 
 Only then can the app be pointed at this service, behind one seam, per the
 spec's sequencing. **The GitHub report route stays live until that is done and

@@ -78,41 +78,40 @@ class CatalogLiveTest {
     /**
      * THE STATE OF PLAY, ASSERTED RATHER THAN ASSUMED.
      *
-     * Turnstile is not configured, so the service cannot accept submissions and
-     * says so through `/config`. When step 2 lands this test FAILS, which is
-     * exactly what should happen: it is the signal that the app may now offer
-     * sharing, and a reminder that this file's claim about the write path has
-     * gone out of date.
+     * Sign-in is not configured — no OAuth client id — so the service cannot
+     * accept submissions and says so through `/config`. When the client id
+     * lands this test FAILS, which is exactly what should happen: it is the
+     * signal that the app may now offer sharing, and a reminder that this
+     * file's claim about the write path has gone out of date.
      */
     @Test
     fun `submissions are switched off, and the app can tell`() {
         assumeTrue(url != null)
         val config = (service().config() as CatalogService.Result.Ok).value
         assertFalse(config.acceptsSubmissions) {
-            "Turnstile is now configured -- submissions are live. Update this test, and the " +
+            "sign-in is now configured -- submissions are live. Update this test, and the " +
                 "handoff that says submit and report have never run end to end."
         }
         assertEquals(1, config.contractVersion)
     }
 
     /**
-     * The write path, as far as it can go without a token: the client reaches
-     * the service, the service refuses, and the refusal arrives as a readable
-     * message rather than an exception or a silent success.
+     * The write path, as far as it can go without a real sign-in: the client
+     * reaches the service, the service refuses, and the refusal arrives as a
+     * readable message rather than an exception or a silent success.
      */
     @Test
-    fun `a submission without a real token is refused, and the reason survives`() {
+    fun `a submission without a real sign-in is refused, and the reason survives`() {
         assumeTrue(url != null)
         val result = service().submit(
             name = "Live Test Probe",
             author = "",
             params = DialParams(),
-            turnstileToken = "not-a-real-token",
-            installId = "live-test"
+            idToken = "not-a-real-token"
         )
         assertTrue(result is CatalogService.Result.Failed) { "an unverified submission was ACCEPTED" }
         val failed = result as CatalogService.Result.Failed
-        assertTrue(failed.message.contains("bot check")) {
+        assertTrue(failed.message.isNotBlank()) {
             "the service's own reason did not survive: ${failed.message}"
         }
     }

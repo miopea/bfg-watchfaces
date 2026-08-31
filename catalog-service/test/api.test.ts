@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { get, migrate, MODERATOR, post, reset, submission } from "./helpers";
+import { get, migrate, MODERATOR, post, reset, signedIn, submission } from "./helpers";
 
 beforeAll(migrate);
 beforeEach(reset);
@@ -11,8 +11,8 @@ interface Submitted {
   state: string;
 }
 
-async function submit(overrides: Record<string, unknown> = {}): Promise<Submitted> {
-  const response = await SELF.fetch(post("/faces", submission(overrides)));
+async function submit(overrides: Record<string, unknown> = {}, sub = "test-author-1"): Promise<Submitted> {
+  const response = await SELF.fetch(post("/faces", submission(overrides), await signedIn(sub)));
   expect(response.status).toBe(201);
   return (await response.json()) as Submitted;
 }
@@ -45,7 +45,7 @@ describe("submitting", () => {
     // genuinely different face that happens to share a name.
     const other = submission();
     (other["params"] as Record<string, unknown>)["scale"] = 27;
-    const response = await SELF.fetch(post("/faces", other));
+    const response = await SELF.fetch(post("/faces", other, await signedIn()));
     expect(response.status).toBe(201);
     const second = (await response.json()) as Submitted;
 
@@ -69,7 +69,7 @@ describe("submitting", () => {
 
   it("refuses a byte-identical resubmission", async () => {
     await submit();
-    const response = await SELF.fetch(post("/faces", submission()));
+    const response = await SELF.fetch(post("/faces", submission(), await signedIn()));
     expect(response.status).toBe(409);
   });
 
@@ -79,27 +79,27 @@ describe("submitting", () => {
     const params = reordered["params"] as Record<string, unknown>;
     // Same content, different insertion order.
     reordered["params"] = Object.fromEntries(Object.entries(params).reverse());
-    const response = await SELF.fetch(post("/faces", reordered));
+    const response = await SELF.fetch(post("/faces", reordered, await signedIn()));
     expect(response.status).toBe(409);
   });
 
   it("refuses an invalid face with every problem listed", async () => {
     const bad = submission();
     (bad["params"] as Record<string, unknown>)["engine"] = "TEXTURE";
-    const response = await SELF.fetch(post("/faces", bad));
+    const response = await SELF.fetch(post("/faces", bad, await signedIn()));
     expect(response.status).toBe(422);
     const body = (await response.json()) as { problems: { field: string }[] };
     expect(body.problems.some((p) => p.field === "engine")).toBe(true);
   });
 
-  it("refuses a submission with no proof of humanity", async () => {
-    const response = await SELF.fetch(post("/faces", submission({ turnstile: undefined })));
-    expect(response.status).toBe(403);
+  it("refuses a submission from nobody", async () => {
+    const response = await SELF.fetch(post("/faces", submission()));
+    expect(response.status).toBe(401);
   });
 
   it("refuses a body larger than a face can be", async () => {
     const huge = submission({ author: "x".repeat(9000) });
-    const response = await SELF.fetch(post("/faces", huge));
+    const response = await SELF.fetch(post("/faces", huge, await signedIn()));
     expect(response.status).toBe(413);
   });
 });
@@ -160,7 +160,7 @@ describe("publishing", () => {
     const first = await submit();
     const other = submission();
     (other["params"] as Record<string, unknown>)["scale"] = 27;
-    await SELF.fetch(post("/faces", other));
+    await SELF.fetch(post("/faces", other, await signedIn()));
 
     const queue = (await (await SELF.fetch(get("/admin/queue", MODERATOR))).json()) as {
       count: number;
@@ -188,18 +188,23 @@ describe("what a submitter can find out", () => {
     expect(rejected.reason).toBe("too close to a logo");
   });
 
-  it("lets the device that submitted a face withdraw it, and nobody else", async () => {
+  it("lets the author withdraw their own face, and nobody else", async () => {
     const { id } = await submit();
-    expect((await SELF.fetch(post(`/submissions/${id}/withdraw`, { installId: "someone-else" }))).status).toBe(403);
-    expect((await SELF.fetch(post(`/submissions/${id}/withdraw`, { installId: "install-aaaa" }))).status).toBe(200);
+    expect(
+      (await SELF.fetch(post(`/submissions/${id}/withdraw`, {}, await signedIn("someone-else")))).status
+    ).toBe(403);
+    expect((await SELF.fetch(post(`/submissions/${id}/withdraw`, {}))).status).toBe(401);
+    expect(
+      (await SELF.fetch(post(`/submissions/${id}/withdraw`, {}, await signedIn()))).status
+    ).toBe(200);
   });
 
   it("frees the parameters again once a face is withdrawn", async () => {
     // Taking your own face back has to leave you able to submit it again --
     // which is why the byte-identical index excludes withdrawn rows.
     const { id } = await submit();
-    await SELF.fetch(post(`/submissions/${id}/withdraw`, { installId: "install-aaaa" }));
-    const again = await SELF.fetch(post("/faces", submission()));
+    await SELF.fetch(post(`/submissions/${id}/withdraw`, {}, await signedIn()));
+    const again = await SELF.fetch(post("/faces", submission(), await signedIn()));
     expect(again.status).toBe(201);
   });
 });
@@ -218,9 +223,9 @@ describe("the install counter", () => {
     expect(response.status).toBe(204);
     expect(await response.text()).toBe("");
 
-    const row = await env.DB.prepare("SELECT installs, install_id FROM faces WHERE slug = ?")
+    const row = await env.DB.prepare("SELECT installs FROM faces WHERE slug = ?")
       .bind(slug)
-      .first<{ installs: number; install_id: string | null }>();
+      .first<{ installs: number }>();
     expect(row?.installs).toBe(1);
   });
 
@@ -237,7 +242,7 @@ describe("the install counter", () => {
     const quiet = await submit();
     const other = submission();
     (other["params"] as Record<string, unknown>)["scale"] = 27;
-    const popularResponse = await SELF.fetch(post("/faces", other));
+    const popularResponse = await SELF.fetch(post("/faces", other, await signedIn()));
     const popular = (await popularResponse.json()) as Submitted;
 
     await publish(quiet.id);
@@ -264,7 +269,7 @@ describe("reporting", () => {
     await publish(id);
 
     const response = await SELF.fetch(
-      post("/reports", { slug, reason: "impersonation", detail: "this is my logo", turnstile: "XXXX.DUMMY.TOKEN.XXXX" }),
+      post("/reports", { slug, reason: "impersonation", detail: "this is my logo" }),
     );
     expect(response.status).toBe(201);
 
@@ -282,7 +287,7 @@ describe("reporting", () => {
 
   it("refuses a reason that is not one of the listed ones", async () => {
     const response = await SELF.fetch(
-      post("/reports", { slug: "anything", reason: "made up", turnstile: "XXXX.DUMMY.TOKEN.XXXX" }),
+      post("/reports", { slug: "anything", reason: "made up" }),
     );
     expect(response.status).toBe(422);
   });
@@ -291,7 +296,7 @@ describe("reporting", () => {
     // A reporter should never have to know whether a face is published, and
     // telling them turns this into an enumeration endpoint.
     const response = await SELF.fetch(
-      post("/reports", { slug: "never_existed", reason: "spam", turnstile: "XXXX.DUMMY.TOKEN.XXXX" }),
+      post("/reports", { slug: "never_existed", reason: "spam" }),
     );
     expect(response.status).toBe(201);
   });
@@ -336,7 +341,7 @@ describe("rate limiting", () => {
     for (let i = 0; i < 12; i++) {
       const face = submission();
       (face["params"] as Record<string, unknown>)["scale"] = 10 + i;
-      last = await SELF.fetch(post("/faces", face));
+      last = await SELF.fetch(post("/faces", face, await signedIn()));
     }
     expect(last?.status).toBe(429);
     expect(last?.headers.get("retry-after")).toBeTruthy();

@@ -19,28 +19,9 @@ object CatalogAccess {
     fun service(context: Context): CatalogService =
         CatalogService(cacheDir = cacheDir(context))
 
-    private const val PREFS = "bfg-catalog"
-    private const val KEY_INSTALL_ID = "install-id"
-
-    /**
-     * The random per-install id.
-     *
-     * Made once on first use and kept. Sent ONLY when submitting or reporting,
-     * never on a read, so browsing stays anonymous.
-     *
-     * It is deliberately weak, and the app says so at submit rather than
-     * letting it be discovered: reinstalling makes a new one, and a face
-     * submitted under the old one can then only be withdrawn by reporting it.
-     *
-     * It is NOT used for moderation. Blocking by it would make it a real
-     * identity with consequences while still being defeated by a reinstall —
-     * the worst of both. It exists to give an author their own face back.
-     */
-    fun installId(context: Context): String {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.getString(KEY_INSTALL_ID, null)?.let { return it }
-        val fresh = UUID.randomUUID().toString()
-        prefs.edit().putString(KEY_INSTALL_ID, fresh).apply()
-        return fresh
-    }
+    // The random per-install id is GONE. It existed only so an author could
+    // withdraw their own face, and it was deliberately weak -- a reinstall made
+    // a new one and orphaned the old face. A Google sign-in does that job
+    // properly, and only when somebody publishes: browsing and reporting carry
+    // no identity at all. See DECISIONS.md 2026-08-31.
 }

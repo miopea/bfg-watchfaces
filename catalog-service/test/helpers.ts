@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import schema from "../schema.sql?raw";
 import fixture from "./fixtures/face.json";
+import { makeToken } from "./tokens";
 
 /**
  * Apply the real `schema.sql` to the test database.
@@ -52,11 +53,10 @@ export const FIXTURE = fixture as {
   params: Record<string, unknown>;
 };
 
-/**
- * Turnstile's documented always-passes test token, matched to the
- * always-passes secret in `vitest.config.ts`.
- */
-export const HUMAN = "XXXX.DUMMY.TOKEN.XXXX";
+/** A signed-in caller. `sub` picks which person. */
+export async function signedIn(sub = "test-author-1"): Promise<Record<string, string>> {
+  return { authorization: `Bearer ${await makeToken({ sub })}` };
+}
 
 export function submission(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -64,8 +64,6 @@ export function submission(overrides: Record<string, unknown> = {}): Record<stri
     author: FIXTURE.author,
     slug: FIXTURE.slug,
     params: structuredClone(FIXTURE.params),
-    turnstile: HUMAN,
-    installId: "install-aaaa",
     ...overrides,
   };
 }

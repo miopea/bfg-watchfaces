@@ -24,6 +24,7 @@ class CatalogServiceTest {
     ) : CatalogTransport {
         val gets = mutableListOf<String>()
         val posts = mutableListOf<Pair<String, String>>()
+        val bearers = mutableListOf<String?>()
 
         override fun get(url: String): CatalogTransport.Reply {
             gets += url
@@ -33,6 +34,7 @@ class CatalogServiceTest {
 
         override fun post(url: String, body: String, bearer: String?): CatalogTransport.Reply {
             posts += url to body
+            bearers += bearer
             if (unreachable) throw CatalogTransport.Unreachable("no network")
             return replies[url] ?: CatalogTransport.Reply(201, """{"id":"an-id","slug":"a_slug","state":"pending"}""")
         }
@@ -165,10 +167,10 @@ class CatalogServiceTest {
     }
 
     @Test
-    fun `a submission sends the published stem, the token and the install id`() {
+    fun `a submission sends the published stem and signs in with a bearer token`() {
         val fake = Fake()
         val result = CatalogService(fake, base)
-            .submit("Midnight Blue", "Ann", DialParams(), "turnstile-token", "install-aaaa")
+            .submit("Midnight Blue", "Ann", DialParams(), "google-id-token")
         assertTrue(result is CatalogService.Result.Ok)
 
         val (url, body) = fake.posts.single()
@@ -176,9 +178,26 @@ class CatalogServiceTest {
         // The stem, not a slug this layer invented: PublishedSlug is the one
         // implementation, and the service appends the short id.
         assertTrue(body.contains(""""slug": "${PublishedSlug.stemFor("Midnight Blue")}""""))
-        assertTrue(body.contains(""""turnstile": "turnstile-token""""))
-        assertTrue(body.contains(""""installId": "install-aaaa""""))
         assertTrue(body.contains(""""generatorVersion": 8""")) { "the params did not round-trip" }
+        // The identity travels in the Authorization header, never in the body.
+        assertEquals("google-id-token", fake.bearers.single())
+        assertFalse(body.contains("google-id-token")) { "the token was put in the body as well" }
+    }
+
+    /**
+     * Publishing needs an account; complaining never does.
+     *
+     * Requiring one to report was intolerable the moment submitting did not —
+     * "anyone could publish and only developers could complain" is what moved
+     * this catalog off GitHub. This is the test that fails if somebody
+     * "tidies up" by making report take a token too.
+     */
+    @Test
+    fun `reporting sends no identity of any kind`() {
+        val fake = Fake(mapOf("$base/reports" to CatalogTransport.Reply(201, """{"id":"r1"}""")))
+        CatalogService(fake, base)
+            .report("midnight_7f3a", CatalogService.ReportReason.SPAM, "junk")
+        assertEquals(listOf(null), fake.bearers) { "a report carried a bearer token" }
     }
 
     @Test
@@ -191,7 +210,7 @@ class CatalogServiceTest {
         val service = CatalogService(
             Fake(mapOf("$base/faces" to CatalogTransport.Reply(422, refusal))), base
         )
-        val failed = service.submit("X", "", DialParams(), "t", "i") as CatalogService.Result.Failed
+        val failed = service.submit("X", "", DialParams(), "t") as CatalogService.Result.Failed
         assertEquals("that face cannot be published", failed.message)
         assertEquals(2, failed.problems.size)
         assertTrue(failed.problems[0].contains("TEXTURE"))
@@ -201,11 +220,12 @@ class CatalogServiceTest {
     fun `a report sends one of the listed reasons, not free text alone`() {
         val fake = Fake(mapOf("$base/reports" to CatalogTransport.Reply(201, """{"id":"r1","state":"open"}""")))
         val result = CatalogService(fake, base)
-            .report("midnight_7f3a", CatalogService.ReportReason.IMPERSONATION, "that is my logo", "t")
+            .report("midnight_7f3a", CatalogService.ReportReason.IMPERSONATION, "that is my logo")
         assertTrue(result is CatalogService.Result.Ok)
         val (_, body) = fake.posts.single()
         assertTrue(body.contains(""""reason": "impersonation""""))
         assertTrue(body.contains("that is my logo"))
+        assertFalse(body.contains("turnstile")) { "the bot check is gone; nothing should still send one" }
     }
 
     @Test
@@ -226,8 +246,8 @@ class CatalogServiceTest {
      */
     @Test
     fun `the app can tell that submissions are switched off`() {
-        val off = """{"turnstileSiteKey":"","contractVersion":1,"currentGeneratorVersion":8,"maxFaceBytes":8192}"""
-        val on = """{"turnstileSiteKey":"0x4AAA","contractVersion":1,"currentGeneratorVersion":8,"maxFaceBytes":8192}"""
+        val off = """{"googleClientId":"","contractVersion":1,"currentGeneratorVersion":8,"maxFaceBytes":8192}"""
+        val on = """{"googleClientId":"x.apps.googleusercontent.com","contractVersion":1,"currentGeneratorVersion":8,"maxFaceBytes":8192}"""
 
         val closed = CatalogService(Fake(mapOf("$base/config" to CatalogTransport.Reply(200, off))), base)
         assertFalse((closed.config() as CatalogService.Result.Ok).value.acceptsSubmissions)

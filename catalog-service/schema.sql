@@ -24,11 +24,15 @@ CREATE TABLE IF NOT EXISTS faces (
   dial_color        TEXT NOT NULL,
   ink_color         TEXT NOT NULL,
   generator_version INTEGER NOT NULL,
-  -- The random per-install id, sent only on submit. It exists so an author can
-  -- withdraw their own face and for nothing else -- deliberately NOT used for
-  -- moderation, because blocking by it would make it a real identity with
-  -- consequences while still being defeated by a reinstall.
-  install_id        TEXT,
+  -- Who published it: sha256(salt + Google subject id). Never the subject id,
+  -- never an email, never a name.
+  --
+  -- NULL means the author deleted their account. The face is ABANDONED, not
+  -- removed: a watch face is parameters -- "knotwork, scale 26, pewter" -- and
+  -- settings are not personal information. The account id was the personal data
+  -- and it is what goes. Nothing should pull a face off a wrist because its
+  -- author left.
+  author_key        TEXT,
   state             TEXT NOT NULL DEFAULT 'pending'
                     CHECK (state IN ('pending','published','rejected','removed','withdrawn')),
   reason            TEXT,
@@ -70,6 +74,22 @@ CREATE TABLE IF NOT EXISTS reports (
 
 CREATE INDEX IF NOT EXISTS reports_by_state ON reports(state, created);
 CREATE INDEX IF NOT EXISTS reports_by_face  ON reports(face_slug);
+
+-- An author's own submissions, for "my faces" and for the per-author history a
+-- moderator has never had.
+CREATE INDEX IF NOT EXISTS faces_by_author ON faces(author_key);
+
+-- Blocked authors. This is the capability the anonymous design could not have:
+-- with nobody to block, pre-moderation was the only control there was.
+--
+-- Blocking is by author_key, which survives a reinstall and a new phone. It
+-- does NOT survive a new Google account, so it raises the cost of abuse a great
+-- deal and is not a wall -- pre-moderation is still doing real work.
+CREATE TABLE IF NOT EXISTS blocked_authors (
+  author_key TEXT PRIMARY KEY,
+  reason     TEXT NOT NULL,
+  created    TEXT NOT NULL
+);
 
 -- Per-IP rate limiting, understood as a speed bump rather than a control: with
 -- no accounts, pre-moderation is the substantive defence and this only slows a

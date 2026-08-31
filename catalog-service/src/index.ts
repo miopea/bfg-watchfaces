@@ -2,7 +2,7 @@ import { CONTRACT } from "./contract";
 import type { Env } from "./env";
 import { paramsHash } from "./hash";
 import { checkRate, LIMITS, sweepRate } from "./ratelimit";
-import { verifyTurnstile } from "./turnstile";
+import { identify } from "./auth";
 import { flatten, tooLarge, validateFace } from "./validate";
 
 /**
@@ -88,6 +88,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
   // ---- writes -------------------------------------------------------------
 
+  if (method === "GET" && path === "/mine") return getMine(request, env);
+  if (method === "DELETE" && path === "/me") return deleteMe(request, env);
   if (method === "POST" && path === "/faces") return postFace(request, env, ctx);
   if (method === "POST" && path === "/reports") return postReport(request, env, ctx);
 
@@ -226,7 +228,9 @@ async function getExport(env: Env): Promise<Response> {
 /** What a client needs to render the bot check. Public values only. */
 function getConfig(env: Env): Response {
   return json({
-    turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? "",
+    // Public by necessity: the app needs the same client id to ask Google for a
+    // token in the first place. Empty means publishing is switched off.
+    googleClientId: env.GOOGLE_CLIENT_ID ?? "",
     contractVersion: CONTRACT.contractVersion,
     currentGeneratorVersion: CONTRACT.currentGeneratorVersion,
     maxFaceBytes: CONTRACT.maxFaceBytes,
@@ -321,8 +325,13 @@ async function postFace(request: Request, env: Env, ctx: ExecutionContext): Prom
   if (typeof body !== "object" || body === null) return json({ error: "that is not JSON" }, 400);
   const envelope = body as Record<string, unknown>;
 
-  const human = await verifyTurnstile(env, envelope["turnstile"], ip);
-  if (!human.ok) return json({ error: human.reason }, 403);
+  const who = await identify(env, request.headers.get("authorization"));
+  if (!who.ok) return json({ error: who.reason }, 401);
+  if (await isBlocked(env, who.identity.authorKey)) {
+    // Deliberately the same words a stranger would get for any refusal. Telling
+    // somebody they are blocked tells them to make another account.
+    return json({ error: "that face cannot be published" }, 403);
+  }
 
   const problems = validateFace(envelope);
   if (problems.length > 0) {
@@ -335,7 +344,7 @@ async function postFace(request: Request, env: Env, ctx: ExecutionContext): Prom
   const baseSlug = envelope["slug"] as string;
   const rawParams = envelope["params"] as Record<string, unknown>;
   const flat = flatten(rawParams);
-  const installId = typeof envelope["installId"] === "string" ? envelope["installId"] : null;
+  const authorKey = who.identity.authorKey;
 
   const hash = await paramsHash(flat);
   const created = new Date().toISOString();
@@ -359,7 +368,7 @@ async function postFace(request: Request, env: Env, ctx: ExecutionContext): Prom
     try {
       await env.DB.prepare(
         `INSERT INTO faces (id, slug, name, author, params, params_hash, engine,
-                            dial_color, ink_color, generator_version, install_id, state, created)
+                            dial_color, ink_color, generator_version, author_key, state, created)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
       )
         .bind(
@@ -373,7 +382,7 @@ async function postFace(request: Request, env: Env, ctx: ExecutionContext): Prom
           String(flat["dialColor"]),
           String(flat["inkColor"]),
           Number(flat["generatorVersion"]),
-          installId,
+          authorKey,
           created,
         )
         .run();
@@ -429,9 +438,14 @@ async function postReport(request: Request, env: Env, ctx: ExecutionContext): Pr
     return json({ error: "that is not JSON" }, 400);
   }
 
-  const human = await verifyTurnstile(env, body["turnstile"], ip);
-  if (!human.ok) return json({ error: human.reason }, 403);
-
+  // NO SIGN-IN HERE, and that is the design rather than an omission. R2 exists
+  // because requiring an account to report became intolerable the moment
+  // submitting did not -- "anyone could publish and only developers could
+  // complain" is what moved this catalog off GitHub. Publishing is a privilege;
+  // complaining is not.
+  //
+  // Safe to leave open because a report is a MESSAGE, not an action: nothing
+  // auto-hides, so flooding buys a longer queue for a human and nothing else.
   const slug = body["slug"];
   if (typeof slug !== "string" || !/^[a-z][a-z0-9_]*$/.test(slug)) {
     return json({ error: "which face?" }, 422);
@@ -490,28 +504,90 @@ async function postInstalled(env: Env, request: Request, slug: string): Promise<
  * That is stated at submit rather than discovered.
  */
 async function postWithdraw(request: Request, env: Env, id: string): Promise<Response> {
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(await request.text()) as Record<string, unknown>;
-  } catch {
-    return json({ error: "that is not JSON" }, 400);
-  }
-  const installId = body["installId"];
-  if (typeof installId !== "string" || installId.length === 0) {
-    return json({ error: "this device cannot prove it submitted that face" }, 403);
-  }
+  const who = await identify(env, request.headers.get("authorization"));
+  if (!who.ok) return json({ error: who.reason }, 401);
 
   const result = await env.DB.prepare(
     `UPDATE faces SET state = 'withdrawn', reviewed = ?
-      WHERE id = ? AND install_id = ? AND state IN ('pending','published')`,
+      WHERE id = ? AND author_key = ? AND state IN ('pending','published')`,
   )
-    .bind(new Date().toISOString(), id, installId)
+    .bind(new Date().toISOString(), id, who.identity.authorKey)
     .run();
 
+  // Withdrawing somebody else's face and withdrawing one that does not exist
+  // are the same answer, so this cannot be used to find out who wrote what.
   if (result.meta.changes === 0) {
-    return json({ error: "this device cannot prove it submitted that face" }, 403);
+    return json({ error: "that is not one of your submissions" }, 403);
   }
   return json({ id, state: "withdrawn" });
+}
+
+/**
+ * An author's own submissions, for "my faces".
+ *
+ * Needs the account, so it is the one READ that is not anonymous — and it is a
+ * read of your own things, which is the only reason it can exist at all.
+ */
+async function getMine(request: Request, env: Env): Promise<Response> {
+  const who = await identify(env, request.headers.get("authorization"));
+  if (!who.ok) return json({ error: who.reason }, 401);
+
+  const { results } = await env.DB.prepare(
+    `SELECT id, slug, name, state, reason, created, reviewed
+       FROM faces WHERE author_key = ? ORDER BY created DESC LIMIT 200`,
+  )
+    .bind(who.identity.authorKey)
+    .all();
+  return json({ count: results.length, faces: results });
+}
+
+/**
+ * Delete the account's data.
+ *
+ * Play requires this once an app has accounts. What it does is settled and is
+ * narrower than it sounds: it drops the LINK and leaves the faces.
+ *
+ * The operator's reasoning, and it ends the question rather than balancing it:
+ * a watch face is parameters -- "knotwork, scale 26, pewter" -- and settings are
+ * not personal information. The account id was the personal data here, and it
+ * is what goes. Faces other people are already using stay where they are;
+ * nothing should pull one off a wrist because its author left.
+ *
+ * A PENDING face is withdrawn rather than abandoned, because nobody has it yet
+ * and leaving it would ask a moderator to review something with no one to
+ * answer for it.
+ */
+async function deleteMe(request: Request, env: Env): Promise<Response> {
+  const who = await identify(env, request.headers.get("authorization"));
+  if (!who.ok) return json({ error: who.reason }, 401);
+  const key = who.identity.authorKey;
+
+  const withdrawn = await env.DB.prepare(
+    `UPDATE faces SET state = 'withdrawn', author_key = NULL, reviewed = ?
+      WHERE author_key = ? AND state = 'pending'`,
+  )
+    .bind(new Date().toISOString(), key)
+    .run();
+
+  const abandoned = await env.DB.prepare(
+    `UPDATE faces SET author_key = NULL WHERE author_key = ?`,
+  )
+    .bind(key)
+    .run();
+
+  return json({
+    deleted: true,
+    pendingWithdrawn: withdrawn.meta.changes,
+    facesKept: abandoned.meta.changes,
+  });
+}
+
+/** Whether this author has been blocked. */
+async function isBlocked(env: Env, authorKey: string): Promise<boolean> {
+  const row = await env.DB.prepare(`SELECT 1 AS hit FROM blocked_authors WHERE author_key = ?`)
+    .bind(authorKey)
+    .first<{ hit: number }>();
+  return row !== null;
 }
 
 // ---------------------------------------------------------------------------
@@ -544,9 +620,15 @@ async function admin(
   if (method === "GET" && path === "/admin/queue") {
     const url = new URL(request.url);
     const state = url.searchParams.get("state") ?? "pending";
+    // The per-author counts are the main thing an account buys a moderator:
+    // whether this is somebody's first face or their eleventh, and how the
+    // previous ten went. No amount of looking at one face tells you that.
     const { results } = await env.DB.prepare(
-      `SELECT id, slug, name, author, params, state, reason, created, install_id IS NOT NULL AS withdrawable
-         FROM faces WHERE state = ? ORDER BY created ASC LIMIT 100`,
+      `SELECT f.id, f.slug, f.name, f.author, f.params, f.state, f.reason, f.created,
+              f.author_key,
+              (SELECT COUNT(*) FROM faces p WHERE p.author_key = f.author_key AND p.state = 'published') AS author_published,
+              (SELECT COUNT(*) FROM faces r WHERE r.author_key = f.author_key AND r.state IN ('rejected','removed')) AS author_rejected
+         FROM faces f WHERE f.state = ? ORDER BY f.created ASC LIMIT 100`,
     )
       .bind(state)
       .all();
@@ -591,6 +673,26 @@ async function admin(
     // Purge, so a removal is not served from the edge for another five minutes.
     ctx.waitUntil(purge(request, row.slug));
     return json({ id, slug: row.slug, state });
+  }
+
+  // Blocking an author. The capability the anonymous design could not have.
+  const block = /^\/admin\/authors\/([0-9a-f]{64})\/block$/.exec(path);
+  if (method === "POST" && block?.[1]) {
+    let reason = "";
+    try {
+      const body = JSON.parse(await request.text()) as Record<string, unknown>;
+      if (typeof body["reason"] === "string") reason = body["reason"];
+    } catch {
+      // handled below
+    }
+    if (!reason) return json({ error: "blocking an author needs a reason" }, 422);
+    await env.DB.prepare(
+      `INSERT INTO blocked_authors (author_key, reason, created) VALUES (?, ?, ?)
+       ON CONFLICT(author_key) DO UPDATE SET reason = excluded.reason`,
+    )
+      .bind(block[1], reason, new Date().toISOString())
+      .run();
+    return json({ authorKey: block[1], blocked: true });
   }
 
   const resolve = /^\/admin\/reports\/([0-9a-f-]{36})\/resolve$/.exec(path);
@@ -642,14 +744,14 @@ function tooMany(retryAfterSeconds: number): Response {
  * Open to any origin, and that is correct here rather than lax.
  *
  * Everything readable is already public, and every write is authorised by a
- * Turnstile token or a bearer token rather than by a cookie — so there is no
+ * signed token or a bearer token rather than by a cookie — so there is no
  * ambient authority for another origin to borrow, which is the thing the
  * same-origin policy protects.
  */
 function cors(): Record<string, string> {
   return {
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
     "access-control-allow-headers": "content-type, authorization",
   };
 }

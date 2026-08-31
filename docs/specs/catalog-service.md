@@ -859,16 +859,16 @@ promises still have to be keepable by one person.
 
 ## Still open
 
-- **Whether to adopt sign-in-to-publish at all.** Written up above; the
-  operator has seen the shape but the sub-decisions below are unanswered.
-- **What `DELETE /me` does to a PUBLISHED face.** Deleting it removes something
-  other people have installed and may be showing on a wrist. Keeping it but
-  dropping the author link is the obvious answer and it means "delete my data"
-  does not delete the face, which has to be said in the app rather than
-  discovered. Not decided.
-- **Whether reporting stays anonymous.** Recommended yes, on R2's original
-  reasoning. Recorded here because it is the one place where the account
-  argument could plausibly be extended and should not be.
+- ~~Whether to adopt sign-in-to-publish~~ **SETTLED 2026-08-31: adopt it.**
+- ~~What `DELETE /me` does to a published face~~ **SETTLED 2026-08-31: the face
+  is abandoned, not removed.** The operator's reasoning, and it is the end of
+  the question rather than a trade-off to weigh: a watch face is parameters —
+  "knotwork, scale 26, pewter" — and settings are not personal information.
+  The ACCOUNT ID is the personal data here; the face is not. So deleting an
+  account drops the link and leaves the face, which people may already be using
+  and which nothing should pull off their wrists.
+- ~~Whether reporting stays anonymous~~ **SETTLED: yes**, on R2's original
+  reasoning.
 - **Turnstile.** `TURNSTILE_SECRET` is unset, so submit and report answer 403.
   That is the fail-closed path working as designed. If sign-in is adopted, this
   stops being a gap and becomes something to delete.
