@@ -1,5 +1,79 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — v10: the numbers got bigger without the boxes moving
+
+"It's almost impossible to read the numbers, they're so small. Perhaps they can
+scale larger when we squeeze the spacing tighter?"
+
+### Squeezing the spacing buys nothing, and that was measured first
+
+Sweeping the requested spread on a five-slot face: 60, 70, 80 and 92 all give
+the same ceiling, complication size **31**. Past 100 it gets WORSE — 29, then
+28 — because a wider row pushes boxes toward the rim. The proposal was checked
+before anything was built, and it does not work.
+
+Neither does anything else structural. Turning off the bottom slot: still 31.
+The top slot: still 31. The date: still 31. Narrowing the row box from 3.9x the
+slot size to 3.2x moves the ceiling to 34 and the FONT only from 29 to 31 —
+two points of text in exchange for reflowing every stored face. Rejected.
+
+Only two things moved the number, and neither is the size control.
+
+### The font was filling two thirds of the space already reserved for it
+
+`fontSize` was 0.92x the slot size, inside a line box (`textHeight`) of 1.35x.
+So a third of the room set aside for the value was empty, and the size control
+had been asked to make up the difference by growing the whole box — which is
+the request the geometry cannot honour.
+
+1.10x takes the value from 29pt to 34 at the largest size, and the line box is
+still 1.24x the font, an ordinary line height. **No box changes size and no
+slot moves.** The thing that was measured as impossible was making the boxes
+bigger; making better use of the boxes was never tried.
+
+### Shorten before shrinking
+
+"71° Cloudy" is ten characters in a 121px row box. `drawnFontSize` shrank the
+font until it fit — 19pt beside neighbours at 29 — which is not clipped and is
+also not readable. That is the wrong lever: the box is about four characters
+wide, so the font has to fall by a third to buy room for a word you can get by
+looking out of the window.
+
+A drawn source now declares a `compact` form — the same reading with the
+droppable part dropped, "72° Cloudy" to "72°" and "78° / 61°" to "78/61". The
+order is: full wording at full size; if that does not fit, the compact wording
+at full size; only then does the font come down, and it comes down on the
+shorter string so it falls as little as possible.
+
+**A little smaller beats a word missing**, so shortening needs a threshold
+rather than a yes/no. `LEGIBLE_SHRINK` is 0.85: in the 121px row slots the full
+string fits only at 56% of its neighbours and the condition goes, but in the
+206px TOP and BOTTOM slots it fits at 97% and is KEPT at 33pt. Deleting a word
+the wearer chose, to save one point of size, would be the fix overshooting.
+
+`WffSchemaTest` asserts both halves — the expressions of whichever wording was
+chosen do reach the XML, and the full form still reaches a slot somewhere. A
+shortened form that still emitted the dropped expression would be reading a
+sensor in order to display nothing.
+
+### Not version-gated, for the second time today
+
+Same reasoning as the seconds this morning, and it should be recorded as a
+pattern rather than rediscovered a third time: the rule protecting stored faces
+exists to protect OTHER PEOPLE's, the published catalog contains zero of them,
+and every face the operator owns is v9. Gating on v10 would freeze the defect
+into the only faces that exist in order to protect faces that do not.
+
+The version still moved to 10, and `PatternEngines` gets a v10 branch
+delegating to v4 — no engine changed, and saying so in the dispatch is how that
+stays provable.
+
+### Three preview goldens moved, and this time all five fixtures did
+
+Including the glyph-less one, which is correct: every fixture draws at least one
+value and every value grew. It moved by the same amount at v6 and v7, which is
+the check that this was text and not geometry.
+
 ## 2026-08-31 — The seconds follow the clock, and the heart stopped being an outline
 
 Two things came back from the wrist after the last build, on a photo showing

@@ -180,23 +180,87 @@ object SlotGeometry {
     const val MIN_DATE_SIZE = 12
 
     /**
-     * A drawn value's font, shrunk if the box cannot hold it.
+     * What a drawn slot actually renders: which wording, and at what size.
+     *
+     * ## Shorten before shrinking
      *
      * A complication's text belongs to its provider, which shortens its own
      * value for a small slot. A DRAWN source has no provider to do that, so a
      * long one is simply clipped — "72° Cloudy" reached a watch as "° Unknow".
+     * The first fix was to shrink the font until it fit, and it worked in the
+     * sense that nothing was clipped: "71° Cloudy" rendered at 19pt beside
+     * neighbours at 29, and came back from a wrist as "almost impossible to
+     * read".
      *
-     * Never grows, only shrinks: matching the other slots is the point, and a
-     * short value should not be bigger than the number beside it.
+     * The order is now the other way round. Ask the full wording at full size;
+     * if it does not fit, ask [ComplicationSource.compact] — the same value
+     * with the droppable part dropped — at full size. Only when there is
+     * nothing shorter to say does the font come down.
+     *
+     * One function because the emitter and both previews all need the same
+     * answer, and a preview that shortened differently from the watch would be
+     * a preview of a different face.
      */
-    fun drawnFontSize(source: ComplicationSource, box: Box, base: Int): Int {
+    data class DrawnText(
+        val format: String,
+        val expressions: List<String>,
+        val fontSize: Int,
+        /** What a preview draws, when the shortened form was chosen. */
+        val sample: String?,
+        /** How wide this wording runs, so a caller can check it is not clipped. */
+        val widestValue: Int
+    )
+
+    fun drawnText(source: ComplicationSource, box: Box, base: Int): DrawnText {
         val chars = source.widestValue
-        if (chars <= 0) return base
-        // FLOOR, not round: rounding up overflows the box by a fraction of a
-        // character, which is a clipped last letter rather than a tight fit.
-        val fits = (box.w / (TEXT_ADVANCE * chars)).toInt()
-        return minOf(base, fits).coerceAtLeast(MIN_DRAWN_FONT)
+        val full = DrawnText(source.format, source.drawn.toList(), base, null, chars)
+        if (chars <= 0) return full
+
+        // A LITTLE smaller is cheaper than a word missing. Dropping the
+        // condition is a real loss -- the wearer asked for it -- so it is
+        // worth a point or two of size to keep. What is not worth it is the
+        // 19-against-29 the row slots were producing.
+        val fullSize = sizeThatFits(chars, box.w, base)
+        if (fullSize >= (base * LEGIBLE_SHRINK).roundToInt()) return full.copy(fontSize = fullSize)
+
+        val short = source.compact
+        if (short != null && fitsAt(short.widestValue, box.w, base))
+            return DrawnText(short.format, short.drawn, base, short.sample, short.widestValue)
+
+        // Nothing shorter, or the short form does not fit either. Shrink —
+        // but shrink the SHORTEST wording we have, so the font comes down as
+        // little as possible.
+        val use = short ?: return full.copy(fontSize = sizeThatFits(chars, box.w, base))
+        return DrawnText(
+            use.format, use.drawn,
+            sizeThatFits(use.widestValue, box.w, base), use.sample, use.widestValue
+        )
     }
+
+    /**
+     * FLOOR, not round: rounding up overflows the box by a fraction of a
+     * character, which is a clipped last letter rather than a tight fit.
+     */
+    private fun widestFitting(chars: Int, width: Int): Int =
+        (width / (TEXT_ADVANCE * chars)).toInt()
+
+    private fun fitsAt(chars: Int, width: Int, size: Int): Boolean =
+        size <= widestFitting(chars, width)
+
+    /**
+     * How far a value may be shrunk before dropping a word is the better deal.
+     *
+     * 0.85, and it is the line between the two failures. "71° Cloudy" in a row
+     * slot fits only at 56% of the others, which is what came back from a
+     * wrist as unreadable. In the wide TOP and BOTTOM slots the same string
+     * fits at 97%, and shortening THERE would delete a word the wearer chose
+     * for no benefit anyone could see.
+     */
+    private const val LEGIBLE_SHRINK = 0.85
+
+    /** Never grows, only shrinks: a short value should not out-shout its neighbour. */
+    private fun sizeThatFits(chars: Int, width: Int, base: Int): Int =
+        minOf(base, widestFitting(chars, width)).coerceAtLeast(MIN_DRAWN_FONT)
 
     /** Below this a value is not worth drawing; it would be a smudge. */
     const val MIN_DRAWN_FONT = 10
@@ -229,7 +293,30 @@ object SlotGeometry {
      */
     fun textHeight(size: Int, version: Int = CURRENT_GENERATOR_VERSION): Int =
         (size * if (version >= 6) 1.35 else 1.7).roundToInt()
-    fun fontSize(size: Int): Int = (size * 0.92).roundToInt()
+    /**
+     * The value's font.
+     *
+     * ## 1.10, and why it is bigger than the slot size
+     *
+     * It was 0.92, sitting in a line box of [textHeight] — 1.35x the slot
+     * size. So the text filled about two thirds of the room already reserved
+     * for it and the remaining third was empty, which on a wrist reads as
+     * numbers that are too small next to a 104pt clock: "it's almost
+     * impossible to read the numbers, they're so small".
+     *
+     * The obvious answer was to make the slots bigger, and it was measured and
+     * rejected. On a five-slot face the ceiling is size 31; tightening the
+     * spacing buys NOTHING (the ceiling is 31 at every spread from 60 to 92,
+     * and falls to 28 past 100), turning off the bottom slot, the top slot or
+     * the date each buy nothing, and narrowing the boxes from 3.9x to 3.2x
+     * buys three size points worth two points of font — while reflowing every
+     * stored face.
+     *
+     * Raising this factor costs none of that. 1.10 takes the value from 29pt
+     * to 34 at the largest size, and the line box is still 1.24x the font,
+     * which is an ordinary line height. No box changes size and no slot moves.
+     */
+    fun fontSize(size: Int): Int = (size * 1.10).roundToInt()
 
     /** The visual extent of the clock, which slots must not collide with. */
     private fun timeBand(l: Layout): Pair<Int, Int> {

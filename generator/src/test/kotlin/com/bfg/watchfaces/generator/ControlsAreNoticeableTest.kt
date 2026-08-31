@@ -1,5 +1,7 @@
 package com.bfg.watchfaces.generator
 
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -89,19 +91,52 @@ class ControlsAreNoticeableTest {
         }
     }
 
-    /** A drawn value is shrunk to fit rather than clipped. */
+    /** A drawn value is never clipped, whichever wording it ends up using. */
     @Test
     fun `a long drawn value fits inside its slot`() {
         val p = DialParams(complications = List(5) { ComplicationSource.WEATHER_TEMP_CONDITION })
         val fitted = SlotGeometry.fittedSize(p)
         val base = SlotGeometry.fontSize(fitted)
         for ((pos, box) in SlotGeometry.boxes(p)) {
-            val font = SlotGeometry.drawnFontSize(ComplicationSource.WEATHER_TEMP_CONDITION, box, base)
-            val width = font * 0.62 * ComplicationSource.WEATHER_TEMP_CONDITION.widestValue
+            val drawn = SlotGeometry.drawnText(ComplicationSource.WEATHER_TEMP_CONDITION, box, base)
+            val width = drawn.fontSize * 0.62 * drawn.widestValue
             assertTrue(width <= box.w) {
-                "$pos: \"72° Cloudy\" needs ${width.toInt()}px at ${font}pt in a ${box.w}px box, " +
-                    "so it would be clipped -- which reached a watch as \"° Unknow\""
+                "$pos: \"${drawn.format}\" needs ${width.toInt()}px at ${drawn.fontSize}pt in a " +
+                    "${box.w}px box, so it would be clipped -- which reached a watch as \"° Unknow\""
             }
         }
+    }
+
+    /**
+     * The long value is SHORTENED, not shrunk.
+     *
+     * This is the whole fix. "71° Cloudy" used to render at 19pt beside
+     * neighbours at 29 — reported from a wrist as almost impossible to read.
+     * Dropping the condition keeps the temperature at the size of the number
+     * next to it, which is what a complication is for.
+     */
+    @Test
+    fun `a long weather value drops the word rather than the point size`() {
+        val p = DialParams(complications = List(5) { ComplicationSource.WEATHER_TEMP_CONDITION })
+        val base = SlotGeometry.fontSize(SlotGeometry.fittedSize(p))
+        val row = SlotGeometry.boxes(p)[SlotPosition.LEFT]!!
+        val drawn = SlotGeometry.drawnText(ComplicationSource.WEATHER_TEMP_CONDITION, row, base)
+        assertEquals(base, drawn.fontSize) {
+            "the temperature came down to ${drawn.fontSize}pt from $base rather than dropping the word"
+        }
+        assertEquals("72°", drawn.sample)
+        assertEquals(listOf("[WEATHER.TEMPERATURE]"), drawn.expressions)
+    }
+
+    /** A value that already fits is left exactly as it was written. */
+    @Test
+    fun `a short drawn value keeps its full wording`() {
+        val p = DialParams(complications = List(5) { ComplicationSource.WEATHER_TEMPERATURE })
+        val base = SlotGeometry.fontSize(SlotGeometry.fittedSize(p))
+        val row = SlotGeometry.boxes(p)[SlotPosition.LEFT]!!
+        val drawn = SlotGeometry.drawnText(ComplicationSource.WEATHER_TEMPERATURE, row, base)
+        assertEquals(base, drawn.fontSize)
+        assertEquals(ComplicationSource.WEATHER_TEMPERATURE.format, drawn.format)
+        assertNull(drawn.sample) { "nothing was shortened, so a preview has no override to draw" }
     }
 }

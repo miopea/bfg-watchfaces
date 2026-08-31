@@ -96,8 +96,13 @@ object FacePreview {
                 ComplicationIcons.draw(g, source, box.x + (box.w - iconSize) / 2.0, box.y.toDouble(), iconSize, c)
             }
             val textY = SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)
-            drawCenteredIn(g, Complications.sample(source), box.x, box.y + textY, box.w, textH,
-                SlotGeometry.drawnFontSize(source, box, fontSize.toInt()).toDouble(), Font.PLAIN, c)
+            // The emitter asks SlotGeometry which wording fits and at what
+            // size; so does this. A preview that shortened differently from
+            // the watch would be a preview of a different face.
+            val drawn = SlotGeometry.drawnText(source, box, fontSize.toInt())
+            drawCenteredIn(g, drawn.sample ?: Complications.sample(source),
+                box.x, box.y + textY, box.w, textH,
+                drawn.fontSize.toDouble(), Font.PLAIN, c)
         }
 
         // The date the FACE draws, matching WffEmitter's PartText: centred at

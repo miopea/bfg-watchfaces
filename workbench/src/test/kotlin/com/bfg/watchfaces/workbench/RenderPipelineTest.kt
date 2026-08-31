@@ -261,14 +261,14 @@ class RenderPipelineTest {
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
         assertEquals(
-        // REPINNED 2026-08-31. The heart glyph was rebuilt -- an outline of
-        // arcs became two filled ellipses and a rotated square -- so every
-        // fixture that draws a MIDDLE complication changed. The one that does
-        // not (`iconSlots = emptySet()`) is byte-identical, which is the check
-        // that says this is the glyph and not the renderer.
+        // REPINNED 2026-08-31, second time today: the complication VALUE's
+        // font went from 0.92x the slot size to 1.10x, filling the line box it
+        // already had. Every fixture here draws at least one value, so all
+        // five move -- including the glyph-less one, which is the check that
+        // this was the text and not the glyph.
             listOf(
-                "e399add0110f2671", "8dd65fee08d6b914", "4119f771e59ac813",
-                "8fe29b9e032f3ce8", "e2e0a34c9684463b"
+                "02c2ddf3167b9ae7", "3179511aafde6012", "5a28005f816665b4",
+                "e8fb3d6686168253", "9589e36dead08381"
             ),
             actual
         ) { "the v7 preview changed; every face saved at v7 renders differently" }
@@ -340,14 +340,14 @@ class RenderPipelineTest {
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
         assertEquals(
-        // REPINNED 2026-08-31. The heart glyph was rebuilt -- an outline of
-        // arcs became two filled ellipses and a rotated square -- so every
-        // fixture that draws a MIDDLE complication changed. The one that does
-        // not (`iconSlots = emptySet()`) is byte-identical, which is the check
-        // that says this is the glyph and not the renderer.
+        // REPINNED 2026-08-31, second time today: the complication VALUE's
+        // font went from 0.92x the slot size to 1.10x, filling the line box it
+        // already had. Every fixture here draws at least one value, so all
+        // five move -- including the glyph-less one, which is the check that
+        // this was the text and not the glyph.
             listOf(
-                "0b0fd545f5edbccb", "27ed202eab006f44", "4119f771e59ac813",
-                "e66178bd81e220dc", "dcc85a0854b28101"
+                "5a6c31aba74aa625", "e32484504a769c8e", "5a28005f816665b4",
+                "c335878e7ee7ad5e", "133c9c19e167ae15"
             ),
             actual
         ) { "the v6 preview changed; every face saved at v6 renders differently" }
@@ -389,12 +389,12 @@ class RenderPipelineTest {
             }
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
-        // REPINNED 2026-08-31, for the rebuilt heart glyph. All five fixtures
-        // here draw a MIDDLE complication, so all five moved; the v6 and v7
-        // goldens carry the fixture that proves it is the glyph.
+        // REPINNED 2026-08-31, second time today, for the larger complication
+        // value font. The glyph-less v6/v7 fixture moved too, and by the same
+        // amount in both -- text, not geometry.
         assertEquals(listOf(
-                "8fdafa6eb69c8763", "b68f865a4709db1e", "bd2f8751ecd47afe",
-                "de9ed5d20b99fb2a", "2eb5721b3604716e"
+                "f5581defb01d49ff", "a3fd38e6967db2f4", "9503c0d6ad3bf925",
+                "8c39cef41335a92e", "0c4c8bc3f7447530"
             ), actual) {
             "the composite preview changed; every preview.png built after this differs"
         }

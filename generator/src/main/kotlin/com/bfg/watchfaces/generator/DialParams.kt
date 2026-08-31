@@ -210,10 +210,58 @@ enum class ComplicationSource(
             else -> 0
         }
 
+    /**
+     * A shorter way to say the same thing, when the box cannot hold the full
+     * form.
+     *
+     * ## Shorten before shrinking
+     *
+     * Without this, a value too wide for its box was made SMALLER until it fit,
+     * which is how "71° Cloudy" reached a wrist at 19pt beside neighbours at
+     * 29 — reported as "almost impossible to read". Shrinking is the wrong
+     * lever: the box is about four characters wide and the string is ten, so
+     * the font has to come down by a third to buy room for a word you can get
+     * by looking out of the window.
+     *
+     * The temperature is the part that is worth reading, so the condition is
+     * what goes. The result renders at the same size as the number beside it,
+     * which is the whole point.
+     *
+     * Null where there is nothing to drop: "Cloudy" is already one word, and a
+     * percentage is already three characters.
+     */
+    val compact: CompactForm?
+        get() = when (this) {
+            WEATHER_TEMP_CONDITION ->
+                CompactForm("%s°", listOf("[WEATHER.TEMPERATURE]"), 4, "72°")
+            // "78° / 61°" to "78/61". The slash still separates them and the
+            // degree signs are saying the same thing twice.
+            WEATHER_HIGH_LOW -> CompactForm(
+                "%s/%s",
+                listOf("[WEATHER.DAYS.0.TEMPERATURE_HIGH]", "[WEATHER.DAYS.0.TEMPERATURE_LOW]"),
+                7, "78/61"
+            )
+            else -> null
+        }
+
     /** A glyph you press, with no value to read. */
     val isShortcut: Boolean
         get() = (launch != null || this == SHORTCUT_APP) && drawn.isEmpty() && wff == null
 }
+
+/**
+ * The shortened rendering of a drawn value. See [ComplicationSource.compact].
+ *
+ * [sample] lives here rather than beside the full-length samples because the
+ * two previews keep their own tables of those, and a shortened form defined
+ * twice would be a shortened form that disagrees with itself.
+ */
+data class CompactForm(
+    val format: String,
+    val drawn: List<String>,
+    val widestValue: Int,
+    val sample: String
+)
 
 /**
  * Where a complication sits on the dial.
@@ -709,7 +757,7 @@ data class Layout(
  */
 val COMPONENT = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*/\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z0-9_$]+)*""")
 
-const val CURRENT_GENERATOR_VERSION = 9
+const val CURRENT_GENERATOR_VERSION = 10
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

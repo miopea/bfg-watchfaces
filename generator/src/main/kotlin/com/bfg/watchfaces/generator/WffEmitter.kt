@@ -338,15 +338,21 @@ object WffEmitter {
             // provider to fill it, so there is no ComplicationSlot and no
             // glyph. It is a PartText in the slot's own box, which is what puts
             // weather in the same list as Steps without a second layout.
-            if (source.isDrawn) return@map """
+            if (source.isDrawn) {
+                // Which wording and what size are ONE question, asked of
+                // SlotGeometry so the previews give the same answer. It
+                // shortens before it shrinks; see SlotGeometry.drawnText.
+                val drawn = SlotGeometry.drawnText(source, box, fontSize)
+                return@map """
     <PartText x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <Text align="CENTER">
-        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${SlotGeometry.drawnFontSize(source, box, fontSize)}" color="$ink">$ambientColorVariant
-          <Template><![CDATA[${source.format}]]>${source.drawn.joinToString("") { """<Parameter expression="$it"/>""" }}</Template>
+        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${drawn.fontSize}" color="$ink">$ambientColorVariant
+          <Template><![CDATA[${drawn.format}]]>${drawn.expressions.joinToString("") { """<Parameter expression="$it"/>""" }}</Template>
         </Font>
       </Text>
     </PartText>"""
+            }
 
             """
     <ComplicationSlot slotId="$id" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"

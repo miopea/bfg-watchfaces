@@ -401,16 +401,39 @@ class WffSchemaTest {
         }
     }
 
-    /** Every weather reading is drawn, valid, and names its own source. */
+    /**
+     * Every weather reading is drawn, valid, and names its own source.
+     *
+     * ## Why the expected expressions are asked for rather than assumed
+     *
+     * A value too wide for its box is SHORTENED before it is shrunk, so
+     * "72° Cloudy" in a row slot emits only `[WEATHER.TEMPERATURE]` — the
+     * condition is deliberately not there. Asserting the full list would fail
+     * on the feature working. What must stay true is that whatever wording the
+     * layout chose is what the XML actually asks the watch for; a shortened
+     * form that still emitted the dropped expression would be reading a sensor
+     * to display nothing.
+     */
     @ParameterizedTest
     @EnumSource(ComplicationSource::class)
     fun `every weather reading is schema-valid`(source: ComplicationSource) {
         if (!source.name.startsWith("WEATHER")) return
-        val xml = WffEmitter.emit(DialParams(complications = List(5) { source }))
+        val p = DialParams(complications = List(5) { source })
+        val xml = WffEmitter.emit(p)
         val errors = validate(xml)
         assertTrue(errors.isEmpty()) { "$source: " + errors.joinToString("\n") }
-        for (expression in source.drawn) {
-            assertTrue(xml.contains(expression)) { "$source is missing $expression" }
+        for ((pos, box) in SlotGeometry.boxes(p)) {
+            val drawn = SlotGeometry.drawnText(source, box, SlotGeometry.fontSize(SlotGeometry.sizeAt(p, pos)))
+            for (expression in drawn.expressions) {
+                assertTrue(xml.contains(expression)) { "$source at $pos is missing $expression" }
+            }
+        }
+        // The full form still has to reach a slot wide enough for it, or
+        // "shorten when it does not fit" has quietly become "always shorten".
+        if (source.compact != null) {
+            assertTrue(source.drawn.all { xml.contains(it) }) {
+                "$source was shortened in EVERY slot, including the wide ones"
+            }
         }
     }
 

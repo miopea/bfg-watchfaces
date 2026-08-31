@@ -40,6 +40,10 @@ object PatternEngines {
         // complication glyph to the ink. Neither is a dial pattern, so this
         // delegates rather than copying an engine.
         9 -> v4(p)
+        // v10 raised the complication VALUE's font inside the box it already
+        // had, and lets a long drawn value drop a word rather than shrink.
+        // Both are SlotGeometry; the dial pattern is untouched.
+        10 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 
