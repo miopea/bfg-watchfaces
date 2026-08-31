@@ -100,6 +100,11 @@ must not be retired before the replacement is live.
 
 ## 9. Imported images
 
+**Considered and left here on 2026-08-31.** Scoped out deliberately: it creates
+an un-shareable second class of face and an IP surface the parametric catalog
+exists to avoid. If it is ever built, `docs/specs/watch-app.md` §2 is the gate
+it has to pass first.
+
 `Engine.TEXTURE` needs a bitmap the face only references by id, and there is
 nowhere on the device to resolve that id from yet. Both previews fall back to a
 plain dial.
@@ -117,3 +122,8 @@ That is the single biggest gap in this project's ability to test itself.
 
 The store listing is saved and never submitted for review. Both apps are on
 internal testing only.
+
+**Scoped 2026-08-31 into `docs/specs/watch-app.md` §1**, with the Data Safety
+declaration named as the highest risk: it predates sign-in and the catalog, so
+it now understates what the app does, and Play refuses a declaration that does
+not match observed behaviour.
