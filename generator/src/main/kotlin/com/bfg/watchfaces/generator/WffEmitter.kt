@@ -79,10 +79,65 @@ object WffEmitter {
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>"""
         }
+        return GlyphWff.parts(shapes, x, 0, iconW, ink)
+    }
+
+    /** One seconds element, at a given left edge. */
+    private fun secondsText(p: DialParams, left: Int): String {
+        val l = p.layout
+        return """<TimeText format="ss" align="${SecondsBand.alignFor(p)}" alpha="255"
+                x="$left" y="${SecondsBand.offsetY(l)}" width="${SecondsBand.boxWidthFor(p)}" height="${SecondsBand.height(l)}">
+        <Variant mode="AMBIENT" target="alpha" value="0"/>
+        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${SecondsBand.fontSizeFor(p)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
+      </TimeText>"""
+    }
+
+    /**
+     * The seconds, in two positions, with the watch choosing between them.
+     *
+     * ## Why this is not just a number
+     *
+     * A 12-hour clock renders "7:56" for nine hours out of twelve and "12:56"
+     * for the other three. The clock is CENTRED, so its right edge moves by a
+     * whole character between those two cases — and Watch Face Format
+     * positions everything absolutely and cannot measure text. There is no
+     * arithmetic that puts a fixed gap beside a centred string of varying
+     * width. Sizing the gutter for the wide case is what left the seconds
+     * stranded most of the day; sizing it for the narrow case would run them
+     * into the time at ten, eleven and twelve.
+     *
+     * `Condition` is the format's answer: emit both, evaluate an expression,
+     * render the first branch that matches. `[HOUR_1_12] < 10` is the question,
+     * and it costs one duplicated element.
+     *
+     * Only 12-hour faces need it. A `hh:mm` clock is always five characters.
+     */
+    private fun secondsCondition(p: DialParams): String {
+        if (!p.showSeconds || !SecondsBand.twoPositions(p)) return ""
+        val narrow = secondsClock(p, SecondsBand.leftEdgeFor(p, SecondsBand.NARROW_TIME))
+        val wide = secondsClock(p, SecondsBand.leftEdgeFor(p, SecondsBand.WIDE_TIME))
         return """
-        <PartDraw x="$x" y="0" width="$iconW" height="$iconH">
-          ${GlyphWff.elements(shapes, iconW, ink)}
-        </PartDraw>"""
+    <Condition>
+      <Expressions>
+        <Expression name="shortHour">[HOUR_1_12] &lt; 10</Expression>
+      </Expressions>
+      <Compare expression="shortHour">$narrow
+      </Compare>
+      <Default>$wide
+      </Default>
+    </Condition>"""
+    }
+
+    private fun secondsClock(p: DialParams, left: Int): String {
+        val l = p.layout
+        return """
+        <DigitalClock x="0" y="${l.timeY - l.timeSize / 2}" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}">
+          <TimeText format="ss" align="START" alpha="255"
+                    x="$left" y="${SecondsBand.offsetY(l)}" width="${DIAL_SIZE - left}" height="${SecondsBand.height(l)}">
+            <Variant mode="AMBIENT" target="alpha" value="0"/>
+            <Font family="${XmlSafe.attr(l.fontFamily)}" size="${SecondsBand.fontSizeFor(p)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
+          </TimeText>
+        </DigitalClock>"""
     }
 
     private fun providerAttrs(p: DialParams, pos: SlotPosition): String {
@@ -368,7 +423,7 @@ $dateLine
                 x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="0">
         <Variant mode="AMBIENT" target="alpha" value="255"/>
         <Font family="${XmlSafe.attr(l.fontFamily)}" size="${l.timeSize}" weight="THIN" color="$inkDim"/>
-      </TimeText>${if (!p.showSeconds) "" else """
+      </TimeText>${if (!p.showSeconds || SecondsBand.twoPositions(p)) "" else """
       <!--
         Seconds sit in the right gutter beside the time, on the SAME line: they
         share the clock's element box, so both centre together. About a third of
@@ -384,12 +439,9 @@ $dateLine
         ambient updates once a minute, so a second digit there would be wrong
         for most of the minute it was shown.
       -->
-      <TimeText format="ss" align="${SecondsBand.alignFor(p)}" alpha="255"
-                x="${SecondsBand.boxLeftFor(p)}" y="${SecondsBand.offsetY(l)}" width="${SecondsBand.boxWidthFor(p)}" height="${SecondsBand.height(l)}">
-        <Variant mode="AMBIENT" target="alpha" value="0"/>
-        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${SecondsBand.fontSizeFor(p)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
-      </TimeText>"""}
+      ${secondsText(p, SecondsBand.boxLeftFor(p))}"""}
     </DigitalClock>
+${secondsCondition(p)}
 $slots
 
   </Scene>

@@ -261,9 +261,14 @@ class RenderPipelineTest {
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
         assertEquals(
+        // REPINNED 2026-08-31. The heart glyph was rebuilt -- an outline of
+        // arcs became two filled ellipses and a rotated square -- so every
+        // fixture that draws a MIDDLE complication changed. The one that does
+        // not (`iconSlots = emptySet()`) is byte-identical, which is the check
+        // that says this is the glyph and not the renderer.
             listOf(
-                "c803d71100d05458", "ba2bc99b4ef748bd", "4119f771e59ac813",
-                "60ef5c53e074ed40", "63d779d579f1e1fa"
+                "e399add0110f2671", "8dd65fee08d6b914", "4119f771e59ac813",
+                "8fe29b9e032f3ce8", "e2e0a34c9684463b"
             ),
             actual
         ) { "the v7 preview changed; every face saved at v7 renders differently" }
@@ -335,15 +340,20 @@ class RenderPipelineTest {
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
         assertEquals(
+        // REPINNED 2026-08-31. The heart glyph was rebuilt -- an outline of
+        // arcs became two filled ellipses and a rotated square -- so every
+        // fixture that draws a MIDDLE complication changed. The one that does
+        // not (`iconSlots = emptySet()`) is byte-identical, which is the check
+        // that says this is the glyph and not the renderer.
             listOf(
-                "afd31e56c331b936", "3f2addfb0c791f8d", "4119f771e59ac813",
-                "2f6629a2ca1503ac", "64226627da62f7c0"
+                "0b0fd545f5edbccb", "27ed202eab006f44", "4119f771e59ac813",
+                "e66178bd81e220dc", "dcc85a0854b28101"
             ),
             actual
         ) { "the v6 preview changed; every face saved at v6 renders differently" }
     }
 
-@Test
+    @Test
     fun `the composite preview is byte-for-byte what it has always been`() {
         // Pinned to v5 EXPLICITLY, not left on the default.
         //
@@ -379,9 +389,12 @@ class RenderPipelineTest {
             }
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
+        // REPINNED 2026-08-31, for the rebuilt heart glyph. All five fixtures
+        // here draw a MIDDLE complication, so all five moved; the v6 and v7
+        // goldens carry the fixture that proves it is the glyph.
         assertEquals(listOf(
-                "ea39732e6f19dc34", "207dc1efce09800c", "cfcc31814e6cd596",
-                "22b62290de64f497", "bad752ea78ef69f8"
+                "8fdafa6eb69c8763", "b68f865a4709db1e", "bd2f8751ecd47afe",
+                "de9ed5d20b99fb2a", "2eb5721b3604716e"
             ), actual) {
             "the composite preview changed; every preview.png built after this differs"
         }

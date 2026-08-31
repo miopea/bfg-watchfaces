@@ -23,9 +23,10 @@ import org.junit.jupiter.api.Test
  */
 class GlyphDrawableTest {
 
+    /** Counted across every part, since a rotated group becomes its own. */
     private fun elementCount(shapes: List<ComplicationGlyphs.Shape>): Int {
-        val drawn = GlyphWff.elements(shapes, 32, "#ffffffff")
-        return if (drawn.isBlank()) 0 else drawn.split("\n").count { it.isNotBlank() }
+        val drawn = GlyphWff.parts(shapes, 0, 0, 32, "#ffffffff")
+        return Regex("<(Line|Ellipse|RoundRectangle|Rectangle|Arc)\\b").findAll(drawn).count()
     }
 
     @Test
@@ -33,8 +34,11 @@ class GlyphDrawableTest {
         for (source in ComplicationSource.entries.filter { it.enabled }) {
             val shapes = ComplicationGlyphs.shapes(source)
             if (shapes.isEmpty()) continue          // weather draws its own text, no glyph
-            assertEquals(shapes.size, elementCount(shapes)) {
-                "${source.name}: ${shapes.size} shapes went in and ${elementCount(shapes)} came out. " +
+            val expected = shapes.sumOf { sh ->
+                if (sh is ComplicationGlyphs.Shape.Rotated) sh.of.size else 1
+            }
+            assertEquals(expected, elementCount(shapes)) {
+                "${source.name}: $expected shapes went in and ${elementCount(shapes)} came out. " +
                     "GlyphWff drops what it cannot express, so this glyph reaches the watch " +
                     "missing a stroke — or, at zero, as an empty PartDraw that fails the schema."
             }
@@ -49,7 +53,10 @@ class GlyphDrawableTest {
         for (source in listOf(ComplicationSource.STEP_COUNT, ComplicationSource.HEART_RATE)) {
             val shapes = ComplicationGlyphs.shapes(source)
             assertTrue(shapes.isNotEmpty()) { "${source.name} has no glyph at all" }
-            assertEquals(shapes.size, elementCount(shapes)) { "${source.name} is still not drawable" }
+            val expected = shapes.sumOf { sh ->
+                if (sh is ComplicationGlyphs.Shape.Rotated) sh.of.size else 1
+            }
+            assertEquals(expected, elementCount(shapes)) { "${source.name} is still not drawable" }
         }
     }
 
@@ -59,11 +66,14 @@ class GlyphDrawableTest {
         // cubic fails here rather than in a count that a reader has to decode.
         for (source in ComplicationSource.entries) {
             for (shape in ComplicationGlyphs.shapes(source)) {
-                assertTrue(
-                    shape !is ComplicationGlyphs.Shape.Curve && shape !is ComplicationGlyphs.Shape.Rotated
-                ) {
-                    "${source.name} uses ${shape.javaClass.simpleName}, which Watch Face Format " +
-                        "has no equivalent for. Draw it with Line, Oval, RoundRectangle or Arc."
+                // Rotated is fine now: it becomes its own part with an angle.
+                // A cubic still has no equivalent at all.
+                val offenders = if (shape is ComplicationGlyphs.Shape.Rotated) shape.of else listOf(shape)
+                for (inner in offenders) {
+                    assertTrue(inner !is ComplicationGlyphs.Shape.Curve) {
+                        "${source.name} uses a cubic curve, which Watch Face Format has no " +
+                            "equivalent for. Draw it with Line, Oval, RoundRectangle, Rectangle or Arc."
+                    }
                 }
             }
         }

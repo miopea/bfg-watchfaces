@@ -170,7 +170,7 @@ object FacePreview {
             // the ring.
             g.drawString(
                 secs,
-                if (SecondsBand.alignFor(p) == "START") SecondsBand.leftEdgeFor(p)
+                if (SecondsBand.alignFor(p) == "START") SecondsBand.leftEdgeFor(p, timeText.length)
                 else SecondsBand.rightEdgeFor(p) - fm.stringWidth(secs),
                 baseline
             )

@@ -153,14 +153,24 @@ object ComplicationGlyphs {
      * An outline rather than a fill, because an arc can only be stroked.
      */
     private fun heart(): List<Shape> = listOf(
-        // Each lobe sweeps 218 degrees, not 180: it has to come over the top
-        // AND wrap down the outside, or the sides read as straight walls and
-        // the whole thing looks like a shield. The two arcs meet at a SHALLOW
-        // dip near (12, 6.4) rather than plunging to the lobes' waist.
-        Shape.Arc(3.0, 4.0, 10.0, 10.0, 32.0, 218.0),
-        Shape.Arc(11.0, 4.0, 10.0, 10.0, 290.0, 218.0),
-        Shape.Line(6.3, 13.7, 12.0, 20.0),
-        Shape.Line(17.7, 13.7, 12.0, 20.0)
+        // THE CLASSIC CONSTRUCTION: a square turned 45 degrees, with a circle
+        // on each of its two upper edges. Filled, so there is no outline to go
+        // wrong.
+        //
+        // Three attempts at an outline made of arcs and lines came before this,
+        // and the last of them looked like a heart in the AWT preview and not
+        // on the watch. Arcs are the one shape whose geometry has to be
+        // CONVERTED for this format — AWT counts counter-clockwise from three
+        // o'clock, the format clockwise from twelve — so an arc-built glyph has
+        // a whole class of failure that a filled ellipse and a rectangle simply
+        // do not have.
+        //
+        // The square is centred on the pivot so the part rotates about it.
+        Shape.Oval(2.61, 2.61, 11.0, 11.0, fill = true),
+        Shape.Oval(10.39, 2.61, 11.0, 11.0, fill = true),
+        Shape.Rotated(12.0, 12.0, Math.PI / 4, listOf(
+            Shape.RoundRect(-5.5, -5.5, 11.0, 11.0, 0.6, 0.6, fill = true)
+        ))
     )
 
     private fun battery(): List<Shape> = listOf(

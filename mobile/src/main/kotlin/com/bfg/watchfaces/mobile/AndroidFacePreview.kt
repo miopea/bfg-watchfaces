@@ -185,8 +185,8 @@ object AndroidFacePreview {
             val startAligned = SecondsBand.alignFor(p) == "START"
             drawCenteredIn(
                 canvas, "%02d".format(SAMPLE_SECOND),
-                SecondsBand.boxLeftFor(p).toFloat(), SecondsBand.topInDial(l).toFloat(),
-                SecondsBand.boxWidthFor(p).toFloat(), SecondsBand.height(l).toFloat(),
+                SecondsBand.boxLeftFor(p, timeText.length).toFloat(), SecondsBand.topInDial(l).toFloat(),
+                SecondsBand.boxWidthFor(p, timeText.length).toFloat(), SecondsBand.height(l).toFloat(),
                 SecondsBand.fontSizeFor(p).toFloat(),
                 withAlpha(timeColor, SecondsBand.ALPHA), bold = false,
                 alignEnd = !startAligned,

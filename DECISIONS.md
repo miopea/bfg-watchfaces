@@ -1,5 +1,65 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — The seconds follow the clock, and the heart stopped being an outline
+
+Two things came back from the wrist after the last build, on a photo showing
+`7:56` with a character-wide hole before the seconds.
+
+### There is no number that puts a fixed gap beside a centred clock
+
+The gutter was arithmetic: measure the widest time, add a gap, put the seconds
+there. That is exactly right for three hours a day and wrong for the other
+nine — a 12-hour clock renders `7:56` from one o'clock to nine and `12:56`
+after, the clock is CENTRED, and so its right edge moves a whole character
+between those cases. Sizing for the wide one strands the seconds most of the
+day. Sizing for the narrow one runs them into the time at ten, eleven and
+twelve. There is no third number.
+
+Watch Face Format cannot help with this the way a layout engine would: it
+positions everything absolutely, cannot measure text, and `TimeText` takes only
+`Variant` children, so no transform and no relative placement. Looked up rather
+than tried: the format's answer is `Condition`, which holds an expression and a
+set of branches and renders the first that matches. The seconds are emitted
+TWICE, thirty points apart, and `[HOUR_1_12] < 10` picks. `HOUR_1_12` is in
+the schema's own `sourceType` enumeration, so this is the format's vocabulary
+rather than a guess at it.
+
+Only 12-hour faces pay for it. `hh:mm` zero-pads — a 24-hour face, and an
+automatic one on a 24-hour watch — so the width never changes and one element
+is emitted, which matters on a file that crosses by Bluetooth.
+
+The previews were the other half. They draw a specific time, so they KNOW the
+width, and they now pass its character count to the same `SecondsBand`
+function the `Condition` branches are built from. Before this they always asked
+for the wide position and so reproduced the bug they were supposed to catch.
+
+Rejected: shrinking the seconds further, which trades a visible gap for
+illegible digits; and padding the hour to `hh:mm` on a 12-hour face, which
+fixes the layout by changing the design the wearer chose.
+
+### The heart is a construction, not a drawing
+
+Three outline attempts, each rendered and looked at, and the third looked like a
+heart in AWT and not on the watch. Arcs are the one shape whose geometry has to
+be CONVERTED for this format — AWT counts counter-clockwise from three o'clock
+with a bounding box, the format clockwise from twelve with a centre — so an
+arc-built glyph carries a whole class of failure that nothing else does.
+
+So it is built the way a heart is constructed rather than traced: a square
+turned 45 degrees with a filled circle on each of its two upper edges. Two
+`Ellipse` fills and one `RoundRectangle` fill, and the rotation is a real
+attribute of the part (`angle` with `pivotX`/`pivotY` on `abstractPartType`)
+rather than something the emitter has to bake into coordinates. No arcs, no
+strokes, no joins to go wrong, and the same three shapes in both previews and
+on the watch.
+
+### Three preview goldens moved, and one deliberately did not
+
+Repinned for the heart. The fixture with `iconSlots = emptySet()` is
+byte-identical across the change, which is the thing that says this was the
+glyph and not the renderer — a golden set where everything moves together
+proves nothing.
+
 ## 2026-08-31 — The heart, and why the seconds drifted back
 
 The glyphs came back monochrome, so drawing our own was right. Two things it

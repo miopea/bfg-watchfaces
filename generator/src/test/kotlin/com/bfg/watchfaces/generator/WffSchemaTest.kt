@@ -458,6 +458,65 @@ class WffSchemaTest {
         assertTrue(xml.contains("<Variant mode=\"AMBIENT\""))
         assertTrue(xml.split("<Scene").size == 2) { "there must be exactly one Scene" }
     }
+
+    /**
+     * The seconds follow a 12-hour clock as it changes width.
+     *
+     * ## The bug this pins
+     *
+     * A `h:mm` clock is "7:56" for nine hours out of twelve and "12:56" for
+     * the other three, and it is CENTRED — so its right edge moves a whole
+     * character between those cases. The gutter was sized for the wide one,
+     * which stranded the seconds a character-width from the time for most of
+     * the day. Reported from a wrist, on a face showing 7:56.
+     *
+     * The format cannot measure text and cannot position relative to another
+     * element, so the only fix available is to emit BOTH positions and let the
+     * watch pick. That is what `Condition` is for, and this test is the only
+     * thing that says the emitted `Condition` is well-formed: a schema-invalid
+     * one does not fail on the watch, it makes the whole face never appear.
+     */
+    @Test
+    fun `a twelve-hour clock gets its seconds in two positions`() {
+        val p = DialParams(
+            showSeconds = true,
+            hourFormat = HourFormat.TWELVE,
+            ring = RingSource.STEPS
+        )
+        val xml = WffEmitter.emit(p)
+        val errors = validate(xml)
+        assertTrue(errors.isEmpty()) {
+            "the seconds Condition is not schema-valid:\n" + errors.joinToString("\n")
+        }
+
+        val narrow = SecondsBand.leftEdgeFor(p, SecondsBand.NARROW_TIME)
+        val wide = SecondsBand.leftEdgeFor(p, SecondsBand.WIDE_TIME)
+        assertTrue(narrow < wide) { "a shorter time should let the seconds sit further left" }
+        assertTrue(xml.contains("[HOUR_1_12]")) { "nothing chooses between the two positions" }
+        assertEquals(1, Regex("<Condition>").findAll(xml).count())
+        assertEquals(2, Regex("format=\"ss\"").findAll(xml).count()) {
+            "there should be exactly one seconds element per branch"
+        }
+        assertTrue(xml.contains("x=\"$narrow\"")) { "the short-hour branch is not at $narrow" }
+        assertTrue(xml.contains("x=\"$wide\"")) { "the long-hour branch is not at $wide" }
+    }
+
+    /**
+     * A clock that is always five characters wide does not pay for the
+     * Condition.
+     *
+     * `hh:mm` zero-pads, whether it is a 24-hour face or an automatic one on a
+     * 12-hour watch, so there is nothing to choose between and the second
+     * element would be pure weight on a file that crosses by Bluetooth.
+     */
+    @Test
+    fun `a fixed-width clock keeps a single seconds element`() {
+        val xml = WffEmitter.emit(
+            DialParams(showSeconds = true, hourFormat = HourFormat.DEVICE, ring = RingSource.STEPS)
+        )
+        assertTrue(!xml.contains("<Condition>")) { "a fixed-width clock does not need two positions" }
+        assertEquals(1, Regex("format=\"ss\"").findAll(xml).count())
+    }
 }
 
 /**
@@ -590,4 +649,5 @@ class ComplicationSchemaTest {
             ) { "turning $off off renumbered the others: $ids" }
         }
     }
+
 }

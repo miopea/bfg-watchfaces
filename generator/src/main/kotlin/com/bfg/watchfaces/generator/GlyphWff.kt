@@ -28,6 +28,55 @@ object GlyphWff {
      *
      * [color] is 8-digit AARRGGBB, as everywhere else in the emitted file.
      */
+    /**
+     * The whole glyph, as one or more `PartDraw` elements.
+     *
+     * Rotation lives on a PART in this format — `angle` with a normalized
+     * `pivotX`/`pivotY` — and not on a shape. So a [ComplicationGlyphs.Shape.Rotated]
+     * group becomes its own part, pivoted at the point it turns about, and
+     * everything else shares one part.
+     *
+     * That is the difference between a heart and a shield: the classic
+     * construction is two circles and a SQUARE TURNED 45 DEGREES, and without
+     * rotation there is no way to make a point at the bottom out of the five
+     * shapes this format has.
+     */
+    fun parts(shapes: List<ComplicationGlyphs.Shape>, x: Int, y: Int, size: Int, color: String): String {
+        val flat = shapes.filter { it !is ComplicationGlyphs.Shape.Rotated }
+        val turned = shapes.filterIsInstance<ComplicationGlyphs.Shape.Rotated>()
+        val out = StringBuilder()
+        if (flat.isNotEmpty()) {
+            out.append("""
+        <PartDraw x="$x" y="0" width="$size" height="$size">
+          ${elements(flat, size, color)}
+        </PartDraw>""")
+        }
+        for (group in turned) {
+            val degrees = Math.toDegrees(group.radians)
+            val pivotX = group.cx / ComplicationGlyphs.GRID
+            val pivotY = group.cy / ComplicationGlyphs.GRID
+            // Children are authored relative to the pivot, matching how the two
+            // preview renderers translate before rotating.
+            val moved = group.of.map { shift(it, group.cx, group.cy) }
+            out.append("""
+        <PartDraw x="$x" y="0" width="$size" height="$size" angle="${"%.1f".format(degrees)}" pivotX="${"%.4f".format(pivotX)}" pivotY="${"%.4f".format(pivotY)}">
+          ${elements(moved, size, color)}
+        </PartDraw>""")
+        }
+        return out.toString()
+    }
+
+    /** Move a shape into absolute grid space, so a part can draw it directly. */
+    private fun shift(shape: ComplicationGlyphs.Shape, dx: Double, dy: Double): ComplicationGlyphs.Shape =
+        when (shape) {
+            is ComplicationGlyphs.Shape.Oval -> shape.copy(x = shape.x + dx, y = shape.y + dy)
+            is ComplicationGlyphs.Shape.RoundRect -> shape.copy(x = shape.x + dx, y = shape.y + dy)
+            is ComplicationGlyphs.Shape.Line ->
+                shape.copy(x1 = shape.x1 + dx, y1 = shape.y1 + dy, x2 = shape.x2 + dx, y2 = shape.y2 + dy)
+            is ComplicationGlyphs.Shape.Arc -> shape.copy(x = shape.x + dx, y = shape.y + dy)
+            else -> shape
+        }
+
     fun elements(shapes: List<ComplicationGlyphs.Shape>, size: Int, color: String): String {
         val k = size / ComplicationGlyphs.GRID
         val thickness = ComplicationGlyphs.STROKE_WIDTH * k

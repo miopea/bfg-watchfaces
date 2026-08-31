@@ -187,7 +187,7 @@ object SecondsBand {
      */
     fun rightEdgeFor(p: DialParams): Int {
         if (!crowdedByRing(p)) return DIAL_SIZE - insetFor(p)
-        return (leftEdgeFor(p) + fontSizeFor(p) * DIGIT_ADVANCE * 2).toInt()
+        return (leftEdgeFor(p, WIDE_TIME) + fontSizeFor(p) * DIGIT_ADVANCE * 2).toInt()
     }
 
     /**
@@ -216,14 +216,22 @@ object SecondsBand {
      */
     fun alignFor(p: DialParams): String = if (crowdedByRing(p)) "START" else "END"
 
-    /** The box the seconds are laid out in: from the clock, or from x=0. */
-    fun boxLeftFor(p: DialParams): Int = if (crowdedByRing(p)) leftEdgeFor(p) else 0
+    /**
+     * The box the seconds are laid out in: from the clock, or from x=0.
+     *
+     * [chars] is how many characters the time is showing. A preview knows —
+     * it has just drawn the string. The emitter does not, which is what the
+     * `Condition` in [WffEmitter] is for.
+     */
+    fun boxLeftFor(p: DialParams, chars: Int = WIDE_TIME): Int =
+        if (crowdedByRing(p)) leftEdgeFor(p, chars) else 0
 
-    fun boxWidthFor(p: DialParams): Int =
-        if (crowdedByRing(p)) DIAL_SIZE - leftEdgeFor(p) else rightEdgeFor(p)
+    fun boxWidthFor(p: DialParams, chars: Int = WIDE_TIME): Int =
+        if (crowdedByRing(p)) DIAL_SIZE - leftEdgeFor(p, chars) else rightEdgeFor(p)
 
-    fun leftEdgeFor(p: DialParams): Int {
-        val clockRight = DIAL_CENTER + p.layout.timeSize * DIGIT_ADVANCE * WIDEST_TIME / 2
+    /** Where the seconds begin for a time of [chars] characters. */
+    fun leftEdgeFor(p: DialParams, chars: Int): Int {
+        val clockRight = DIAL_CENTER + p.layout.timeSize * DIGIT_ADVANCE * chars / 2
         return (clockRight + GAP_FROM_CLOCK).toInt()
     }
 
@@ -236,8 +244,34 @@ object SecondsBand {
      */
     private const val DIGIT_ADVANCE = 0.575
 
-    /** "HH:MM" — the widest the time gets, which is what has to be cleared. */
-    private const val WIDEST_TIME = 5
+    /**
+     * How many characters the time occupies.
+     *
+     * This is the whole reason the seconds looked stranded. A 12-hour clock
+     * renders "7:56" for nine hours out of twelve and "12:56" for the other
+     * three, and the gutter was always sized for the wide one — so most of the
+     * day the seconds sat a full character-width away from a time that had
+     * stopped short. Reported as "seconds still need to left", on a face
+     * showing 7:56.
+     *
+     * The format cannot measure text, so the fix is not arithmetic: it is to
+     * emit BOTH positions and let a `Condition` pick, which is what
+     * [WffEmitter] does. These two numbers are the widths it picks between.
+     */
+    const val WIDE_TIME = 5
+    const val NARROW_TIME = 4
+
+    /** Whether this face's clock can render a short hour, at 1 through 9. */
+    fun hourCanBeShort(p: DialParams): Boolean = p.hourFormat == HourFormat.TWELVE
+
+    /**
+     * Whether the seconds need two positions and a Condition to choose.
+     *
+     * Only when a ring is crowding them AND the hour can be one digit. Without
+     * the ring there is room for the gutter to be generous; without a short
+     * hour there is nothing to choose between.
+     */
+    fun twoPositions(p: DialParams): Boolean = crowdedByRing(p) && hourCanBeShort(p)
 
     /** Breathing room between the time and the seconds. */
     private const val GAP_FROM_CLOCK = 8
