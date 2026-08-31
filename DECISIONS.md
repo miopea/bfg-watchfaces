@@ -1,5 +1,55 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — renderMode="MASK" made complications vanish, and is reverted
+
+Reported from the wrist: the row of three complications was simply gone. Time,
+date, weather and battery still there; steps, heart rate and world clock
+missing.
+
+### Finding it took ruling out the obvious suspect first
+
+The previous change was per-slot complication sizing, which is exactly the kind
+of thing that loses a slot. It was not that. Emitting the operator's face at the
+commit before and after that change and stripping comments gave **byte-identical
+XML** — at a stored size of 19 the new sizing rule changes nothing, because
+nothing was being clamped.
+
+That left one candidate. `renderMode="MASK"` shipped one release earlier and
+this was the first face built with it.
+
+### What it does, and what nobody could have caught
+
+MASK is the schema's answer to tinting: SOURCE, the default, draws a
+complication's image in the provider's own colours and ignores `tintColor`. MASK
+should stencil it and fill with the tint.
+
+On a real watch it made the slots that HAVE a provider glyph render nothing at
+all. The battery slot survived, which fits — a slot whose provider supplies no
+monochromatic image has nothing for MASK to fail on.
+
+**Nothing here could have caught it.** The XSD validates that the attribute
+exists, not what a runtime does with it, and neither preview draws a provider's
+real icon — both draw their own glyph in the ink. The face validated, installed,
+and lost three complications.
+
+### Reverted, and the colour complaint stays open
+
+`tintColor` stays (it shipped in a working build and does nothing on its own);
+`renderMode` is gone. Verified the emitted XML now differs from the broken one
+by exactly that attribute and nothing else.
+
+So the glyphs are still the provider's colours. **A missing complication is
+worse than a green one**, and the trade is not close. Whatever fixes the colour
+next has to be tried on a watch before it ships — this is now the third
+wrist-only defect in a row, and the pattern is that anything about how a
+PROVIDER's content renders is unobservable from here.
+
+### The comment rule bit again
+
+Writing that explanation put `--` inside an emitted XML comment for the third
+time this session, and 93 tests went red instantly. The guard works; the habit
+is mine.
+
 ## 2026-08-31 — The date only constrains the slot it touches
 
 Approved from a rendered before/after rather than described: the operator saw

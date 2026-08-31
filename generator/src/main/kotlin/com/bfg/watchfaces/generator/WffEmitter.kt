@@ -247,13 +247,22 @@ object WffEmitter {
       <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
       <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">${if (!p.hasIcon(pos)) "" else """
-        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH" renderMode="MASK" tintColor="$ink">
+        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH" tintColor="$ink">
           <!--
-            renderMode="MASK" AND tintColor. The tint alone did nothing, and
-            the schema says why: renderMode defaults to SOURCE, which draws the
-            image in its own colours and ignores the tint entirely. MASK uses
-            the image as a stencil and fills it with tintColor, which is what
-            "make the glyph match the text" actually means.
+            renderMode="MASK" WAS TRIED HERE AND REVERTED. It is the schema's
+            answer to tinting. SOURCE, the default, draws the image in its own
+            colours and ignores tintColor entirely. But on a real watch it
+            made the complication slots with a provider glyph render NOTHING AT
+            ALL. Steps, heart rate and world clock vanished; the face kept its
+            time, date, weather and battery. Emitted XML byte-identical to the
+            build before it apart from that one attribute, so there is no other
+            candidate.
+
+            The glyph is therefore still the provider's colour, which is a
+            cosmetic complaint, and the slots are back, which is not. Whatever
+            fixes the colour has to be tried on a watch before it ships: neither
+            preview draws a provider's real icon, and the XSD validates that an
+            attribute exists rather than what the runtime does with it.
 
             MONOCHROMATIC_IMAGE is not monochrome.
             Reported from a real wrist: Google Fit ships a GREEN steps glyph and
