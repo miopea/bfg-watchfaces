@@ -17,13 +17,19 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -69,7 +75,7 @@ private const val TILE_PX = 220
 fun DesignsScreen(onPick: (DialParams) -> Unit, modifier: Modifier = Modifier) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     Column(modifier = modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = tab) {
+        SecondaryTabRow(selectedTabIndex = tab) {
             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Styles") })
             Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Community") })
         }
@@ -170,6 +176,13 @@ private fun CommunityGrid(onPick: (DialParams) -> Unit) {
     // to a tile must not fetch it again.
     val faceCache = remember { mutableStateMapOf<String, DialParams>() }
 
+    // Tapping a community face OPENS it rather than applying it. A stranger's
+    // face is not a preset: there is an author to credit and, because Play
+    // requires a reachable complaint path for user content, a way to report it.
+    // Silently replacing the studio with it would leave nowhere to put either.
+    var opened by remember { mutableStateOf<CatalogService.Face?>(null) }
+    var reporting by remember { mutableStateOf<CatalogService.Face?>(null) }
+
     val state by produceState<CatalogService.Result<CatalogService.Index>?>(initialValue = null) {
         value = withContext(Dispatchers.IO) { service.index() }
     }
@@ -227,10 +240,73 @@ private fun CommunityGrid(onPick: (DialParams) -> Unit) {
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(faces, key = { it.slug }) { face ->
-                            CommunityTile(face, service, faceCache, onPick)
+                            CommunityTile(face, service, faceCache) { opened = face }
                         }
                     }
                 }
+            }
+        }
+    }
+
+    opened?.let { face ->
+        CommunityFaceSheet(
+            face = face,
+            params = faceCache[face.slug],
+            onUse = {
+                // Counted here, where somebody has actually chosen the face.
+                // A bare increment: no account, no device, nothing
+                // correlatable -- one number per face, so the gallery can be
+                // ordered by what people use.
+                service.reportInstall(face.slug)
+                faceCache[face.slug]?.let(onPick)
+                opened = null
+            },
+            onReport = { reporting = face; opened = null },
+            onDismiss = { opened = null }
+        )
+    }
+
+    reporting?.let { face ->
+        ReportSheet(slug = face.slug, faceName = face.name, onDismiss = { reporting = null })
+    }
+}
+
+/**
+ * One community face, opened.
+ *
+ * Credit and a complaint path, which a tile has no room for. The report route
+ * needs no account — publishing a face does, complaining never does.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CommunityFaceSheet(
+    face: CatalogService.Face,
+    params: DialParams?,
+    onUse: () -> Unit,
+    onReport: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(face.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "by ${authorOf(face)}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onUse, enabled = params != null, modifier = Modifier.fillMaxWidth()) {
+                Text("Open in Studio")
+            }
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = onReport, modifier = Modifier.fillMaxWidth()) {
+                Text("Report this face")
             }
         }
     }
