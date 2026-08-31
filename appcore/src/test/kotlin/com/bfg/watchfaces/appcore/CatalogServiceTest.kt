@@ -240,7 +240,7 @@ class CatalogServiceTest {
     }
 
     /**
-     * An empty Turnstile site key means the service cannot accept anything, and
+     * An empty OAuth client id means the service cannot accept anything, and
      * the app should say so BEFORE someone designs, names and submits a face
      * into a 403.
      */

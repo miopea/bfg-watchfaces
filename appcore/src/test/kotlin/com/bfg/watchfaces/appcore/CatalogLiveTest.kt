@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test
  *
  * ## What it deliberately does NOT do
  *
- * It never submits or reports anything. Those need a Turnstile token, which
+ * It never submits anything. That needs a real Google sign-in, which
  * this cannot obtain and should not fake — and even with one, a test that
  * writes into the real moderation queue makes work for a person. The write path
  * is exercised only as far as the refusal, which is itself the thing worth

@@ -1,14 +1,15 @@
 # The catalog service
 
 Anonymous submit, anonymous report, and a moderation queue for the BFG Watch
-Faces community catalog. Cloudflare Workers, D1 and Turnstile.
+Faces community catalog. Cloudflare Workers and D1, with a Google sign-in
+required only to publish.
 
 **Deployed** 2026-08-30 to the BFG Solutions account:
 <https://bfg-catalog.bfg-solutions.workers.dev>
 
 Verified against the live service, not the upload's own output: reads answer,
 `/admin/*` refuses a missing and a wrong token with 401, and the write
-endpoints return 403 because `TURNSTILE_SECRET` is not set yet — the
+endpoints return 401 because `GOOGLE_CLIENT_ID` is not set yet — the
 fail-closed behaviour, working. Version `e8b13e72` is serving 100% of traffic.
 
 **Publishing needs a Google sign-in; reporting never does.** Submitting is off
@@ -93,7 +94,7 @@ GET  /faces/<slug>             one face        -> the catalog's on-disk shape
 GET  /submissions/<id>         what happened   -> state, and the reason if any
 POST /submissions/<id>/withdraw                -> needs the install id
 GET  /export                   R6              -> every published face, as files
-GET  /config                   public values   -> the Turnstile site key
+GET  /config                   public values   -> the OAuth client id
 
 GET  /admin/queue?state=pending                -> oldest first
 GET  /admin/reports                            -> open reports, oldest first
@@ -115,8 +116,9 @@ npm run typecheck
 The tests apply the real `schema.sql` rather than a copy — the partial unique
 index that enforces "byte-identical submissions are rejected" is exactly the
 kind of thing a hand-maintained test copy loses silently, and the test would
-then pass while the rule was gone. Turnstile uses Cloudflare's documented
-always-passes test keys, so nothing here touches the network.
+then pass while the rule was gone. The tests sign their own ID tokens with
+their own key and stand in for Google's key server, so nothing touches the
+network and the Worker still verifies signatures for real.
 
 ## Moderating
 

@@ -163,8 +163,9 @@ Installed and driven on emulators (2026-08-29):
   catalog format, the Fine tune bottom sheet, complication size and spacing, and
   a Material 3 `ExposedDropdownMenuBox` for each slot. Seen on an SDK 36 phone
   emulator; a face saved and came back on the list. The Community tab reads the
-  live catalog. Share, Report and imported images are still absent — Share and
-  Report because Turnstile is not configured yet.
+  live catalog and **Report works with no account** — verified onto the live
+  moderation queue. Share is still absent, because publishing needs a Google
+  OAuth client id that does not exist yet. Imported images are still absent.
 - `:wear` — installed on a Wear OS 6 emulator, and `addWatchFace` works from it.
   See below.
 
@@ -249,12 +250,14 @@ The community catalog is live (2026-08-30):
 
 Still never tested:
 
-- **Submitting or reporting, end to end.** `TURNSTILE_SECRET` is not set, so the
-  write endpoints fail closed with 403. That is the design working, and it is
-  also why nothing can be shared yet. A live test asserts submissions are off
-  and will FAIL when the widget lands.
-- **There is no submit or report UI**, deliberately — a share button that cannot
-  work is worse than no button.
+- **Submitting, end to end.** `GOOGLE_CLIENT_ID` is unset, so publishing fails
+  closed with 401. That is the design working, and it is why nothing can be
+  shared yet. A live test asserts submissions are off and will FAIL the day the
+  client id lands. **Reporting is NOT in this list any more** — it runs end to
+  end from the app, with no account, verified onto the live queue on
+  2026-08-31.
+- **There is no share UI**, deliberately — a share button that cannot work is
+  worse than no button. There IS a report UI.
 - **Imported images.** `Engine.TEXTURE` still has nowhere on the device to
   resolve an image id from.
 - **`reskin.sh`** — written and read, not exercised since the workbench landed.

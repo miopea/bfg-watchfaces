@@ -350,10 +350,9 @@ object Workbench {
                 val entries = CatalogStore.list(catalog).joinToString(",") { e ->
                     """{"slug":${jsonStr(e.slug)},"name":${jsonStr(e.name)},"author":${jsonStr(e.author)},""" +
                     """"engine":${jsonStr(e.params.engine.name)},"created":${jsonStr(e.created)},""" +
-                    """"query":${jsonStr(FaceCodec.toQuery(e.params))},""" +
-                    """"reportUrl":${jsonStr(CatalogStore.reportUrl(e.slug, e.name))}}"""
+                    """"query":${jsonStr(FaceCodec.toQuery(e.params))}}"""
                 }
-                json(ex, """{"cdn":${jsonStr(CatalogStore.CDN_URL)},"faces":[$entries]}""")
+                json(ex, """{"faces":[$entries]}""")
             }
         }
     }
@@ -470,9 +469,7 @@ object Workbench {
      * any local directory -- showing the user's private designs under
      * "Community" would be a privacy bug, not a graceful degradation.
      */
-    private fun noCatalogJson(): String =
-        """{"cdn":${jsonStr(CatalogStore.CDN_URL)},"repo":${jsonStr(CatalogStore.REPO_URL)},""" +
-        """"available":false,"faces":[]}"""
+    private fun noCatalogJson(): String = """{"available":false,"faces":[]}"""
 
     private fun textureJson(t: TextureStore.Texture): String =
         """{"id":${jsonStr(t.id)},"width":${t.width},"height":${t.height},""" +

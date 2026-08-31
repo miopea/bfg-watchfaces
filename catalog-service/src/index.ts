@@ -225,7 +225,7 @@ async function getExport(env: Env): Promise<Response> {
   return json({ count: results.length, files });
 }
 
-/** What a client needs to render the bot check. Public values only. */
+/** What a client needs to sign somebody in. Public values only. */
 function getConfig(env: Env): Response {
   return json({
     // Public by necessity: the app needs the same client id to ask Google for a

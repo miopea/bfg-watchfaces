@@ -446,7 +446,7 @@
         <div class="grid" id="presetGrid"></div>
       </div>
       <div id="communityPane" hidden>
-        <h2 class="sec">Made by the community</h2>
+        <h2 class="sec">Local catalog checkout</h2>
         <p class="microhint" id="catalogNote" style="margin:0 0 12px"></p>
         <div class="grid" id="catalogGrid"></div>
       </div>
@@ -616,24 +616,6 @@
     <div class="tunescroll" id="tuneRows"></div>
   </div>
 
-  <div class="sheet" id="sheetReport">
-    <div class="grab"></div>
-    <h3>Report this face</h3>
-    <p class="hint" id="reportWhat"></p>
-    <ul class="reasons">
-      <li>It copies someone's artwork, logo or brand</li>
-      <li>It pretends to be official, or from a company it is not from</li>
-      <li>It is offensive, or aimed at a particular person</li>
-    </ul>
-    <p class="hint">Every report is read. Copied artwork is taken down within three
-      days; anything abusive goes immediately.</p>
-    <p class="microhint">Opens a short form in your browser. You will need a GitHub
-      account to send it.</p>
-    <div class="btnrow">
-      <button class="btn ghost" id="reportCancel">Cancel</button>
-      <button class="btn primary" id="reportGo">Continue</button>
-    </div>
-  </div>
 
   <div class="sheet" id="sheetShare">
     <div class="grab"></div>
@@ -1013,7 +995,7 @@ async function loadPresets(){
 
 /* ---------------- community catalog ----------------
  * The gallery reads the LOCAL catalog through the workbench. In production the
- * same index is served from jsDelivr (not raw.githubusercontent.com, which is
+ * live catalog is the service (this pane reads a LOCAL checkout, which is
  * rate limited and not a CDN) -- the server reports that URL so the app never
  * has it hardcoded in two places.
  *
@@ -1037,9 +1019,14 @@ async function loadCatalog(){
   grid.innerHTML = `<p class="microhint" style="grid-column:1/-1">Loading…</p>`;
   const data = await fetch("/api/catalog").then(r=>r.json());
   catalogLoaded = true;
-  $("#catalogNote").textContent = data.faces.length === 1
-    ? "1 face shared by the community"
-    : `${data.faces.length} faces shared by the community`;
+  // Deliberately NOT "shared by the community". This pane reads a LOCAL
+  // directory on this machine. The live catalog is a service and the app is
+  // what browses it; calling these community faces made the workbench look
+  // like a window onto something it has never been connected to.
+  $("#catalogNote").textContent = (data.faces.length === 1
+    ? "1 face in the local checkout"
+    : `${data.faces.length} faces in the local checkout`) +
+    " — the live catalog is the service, browsed from the app.";
   grid.innerHTML = "";
   if (!data.faces.length){
     grid.innerHTML = `<p class="microhint" style="grid-column:1/-1">
@@ -1051,14 +1038,12 @@ async function loadCatalog(){
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `<img loading="lazy" alt="" src="/api/face.png?${f.query}&size=340">
-      <button class="report" title="Report this face" aria-label="Report this face">\u2691</button>
       <div class="nm"></div><div class="sub"></div>`;
     card.querySelector(".nm").textContent = f.name;
     card.querySelector(".sub").textContent = f.author ? `by ${f.author}` : "unattributed";
 
     card.querySelector(".report").addEventListener("click", e => {
       e.stopPropagation();          // reporting must not also open the face
-      openReport(f);
     });
     card.addEventListener("click", () => {
       applyQuery(f.query);
@@ -1146,25 +1131,7 @@ function renderDevicePicker(){
  * times are; the app's job is to get someone there with the face already
  * identified, so a reporter never has to know its internal name.
  */
-let reportTarget = null;
 
-function openReport(face){
-  reportTarget = face;
-  $("#reportWhat").textContent =
-    `Tell us what is wrong with “${face.name}”` +
-    (face.author ? `, shared by ${face.author}.` : ".");
-  openSheet("#sheetReport");
-}
-
-$("#reportCancel").addEventListener("click", closeSheets);
-$("#reportGo").addEventListener("click", () => {
-  if (!reportTarget) return;
-  // The server builds this so the URL and its field names live next to the
-  // issue template they have to match.
-  window.open(reportTarget.reportUrl, "_blank", "noopener");
-  closeSheets();
-  toast("Opening the report form");
-});
 
 /* ---------------- share to catalog ---------------- */
 let shareSlug = null, shareName = "";

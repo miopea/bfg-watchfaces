@@ -167,7 +167,7 @@ class CatalogStoreTest {
         val repo = repoRoot()
         val catalog = CatalogStore.resolveRoot(repo)
         org.junit.jupiter.api.Assumptions.assumeTrue(catalog != null) {
-            "no catalog checkout beside this repo -- clone ${CatalogStore.REPO_URL} to include it"
+            "no catalog checkout beside this repo -- set BFG_CATALOG_DIR to include it"
         }
         val problems = CatalogStore.validateAll(repo, catalog!!)
         assertTrue(problems.isEmpty()) { "catalog is invalid:\n" + problems.joinToString("\n") }

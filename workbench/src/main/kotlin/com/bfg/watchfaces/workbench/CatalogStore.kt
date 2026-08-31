@@ -30,59 +30,22 @@ import com.bfg.watchfaces.appcore.PublishedSlug
  * usual here because a schema-invalid face installs cleanly and then never
  * appears in the carousel -- there is nothing for a reviewer to notice.
  *
- * Served in production from jsDelivr, NOT raw.githubusercontent.com, which is
- * rate limited and not a CDN. See [CDN_URL].
  *
- * ## This whole file is on its way out
+ * ## The GitHub parts are gone
  *
- * Operator decision `01a049a3-0a0c-7521-a6f3-f40510b81cf7` moves the catalog off
- * GitHub entirely, because GitHub has no anonymous write path of any kind and
- * the aim is that anyone can share a face and anyone can report one without an
- * account. `docs/specs/catalog-service.md` is the contract for the replacement.
+ * `CDN_URL`, `REPO_URL` and `reportUrl` were removed on 2026-08-31, once the
+ * catalog service was deployed and the app's own report path was observed
+ * reaching it. They were kept until then because deleting a complaint path
+ * before its replacement works is worse than one that needs an account.
  *
- * The GitHub-shaped parts below are still here ON PURPOSE, not by oversight.
- * [reportUrl] is the app's Play-required complaint path, and deleting it before
- * the replacement is deployed would leave the app with none at all — strictly
- * worse than one that needs an account. The spec's sequencing section says the
- * same thing in as many words.
+ * What is left is the FORMAT and the VALIDATOR, which outlived the transport:
+ * `Entry` is still the face record, `toJson` still writes the shape `/export`
+ * emits, and `validateDocument` is still the only place a face meets Google's
+ * XSD. `docs/specs/catalog-service.md` is the contract.
+ *
+ * Served in production by the service now, not by jsDelivr.
  */
 object CatalogStore {
-
-    /**
-     * jsDelivr, per docs/SPEC.md. Pinned to a ref so a bad main cannot break
-     * clients.
-     *
-     * INTERIM — becomes the service's index endpoint. Nothing fetches this
-     * today: it is reported in JSON and printed by the catalog task, and the
-     * Community tab reads the local catalog directory. The network read path
-     * was never built, which is why moving off GitHub costs less than it looks.
-     */
-    const val CDN_URL = "https://cdn.jsdelivr.net/gh/miopea/bfg-watchfaces-catalog@main/index.json"
-
-    /** Where submissions are opened, and where a face is reported. INTERIM. */
-    const val REPO_URL = "https://github.com/miopea/bfg-watchfaces-catalog"
-
-    /**
-     * The report form for one face.
-     *
-     * Google Play requires a working in-app complaint path for any app showing
-     * user content, so this is not decoration -- without a reachable route to
-     * it, the app cannot ship. The slug and title are prefilled so a reporter
-     * does not have to know what a face is called internally.
-     *
-     * Field ids match .github/ISSUE_TEMPLATE/report-a-face.yml in the catalog.
-     *
-     * INTERIM, and the highest-risk thing to replace. It requires a GitHub
-     * account, which was tolerable while submitting needed one too and stops
-     * being tolerable the moment submitting does not: anyone could publish and
-     * only developers could complain. Replaced by the service's report endpoint
-     * once that exists — and not one moment before, per the note on this object.
-     */
-    fun reportUrl(slug: String, name: String): String {
-        fun enc(s: String) = java.net.URLEncoder.encode(s, Charsets.UTF_8)
-        return "$REPO_URL/issues/new?template=report-a-face.yml" +
-               "&slug=${enc(slug)}&title=${enc("report: $name")}"
-    }
 
     /**
      * A face is parameters. Anything much larger than this is not a face.
