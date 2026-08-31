@@ -63,11 +63,9 @@ object AndroidFacePreview {
         val l = p.layout
         val ink = EngravedStroke.withAlpha(EngravedStroke.rgb(p.inkColor), 255)
 
-        // The FITTED size, matching the emitter: the boxes come from it too.
-        val fitted = SlotGeometry.fittedSize(p)
-        val iconSize = SlotGeometry.iconHeight(fitted, p.generatorVersion).toFloat()
-        val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
-        val fontSize = SlotGeometry.fontSize(fitted).toFloat()
+        // Sizes are PER SLOT and computed inside the loop below, matching the
+        // emitter: the top slot can be smaller than the row when a drawn date
+        // is in its way.
 
         // From v3 a complication carries an ambient colour Variant when the ink
         // would be unreadable on black. Mirror it, or the preview would show a
@@ -79,6 +77,10 @@ object AndroidFacePreview {
             else ink
 
         for ((pos, box) in SlotGeometry.boxes(p)) {
+            val fitted = SlotGeometry.sizeAt(p, pos)
+            val iconSize = SlotGeometry.iconHeight(fitted, p.generatorVersion).toFloat()
+            val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
+            val fontSize = SlotGeometry.fontSize(fitted).toFloat()
             val source = p.slot(pos)
             val a = if (ambient) (if (pos == SlotPosition.TOP) 140 else 0) else 255
             if (a <= 0) continue

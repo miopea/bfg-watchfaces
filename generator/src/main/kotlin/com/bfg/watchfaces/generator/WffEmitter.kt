@@ -160,11 +160,10 @@ object WffEmitter {
         // clamped size the glyph and the text were drawn to a scale their own
         // box was never built for -- at "Large" a font of 26 inside a box laid
         // out for 25.
-        val fitted = SlotGeometry.fittedSize(p)
-        val iconH = SlotGeometry.iconHeight(fitted, p.generatorVersion)
-        val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
-        val fontSize = SlotGeometry.fontSize(fitted)
-        val iconW = iconH
+        // PER SLOT, not once for the face. The top slot can now be smaller
+        // than the row when a drawn date is in its way, and hoisting these out
+        // of the loop would draw its text and glyph at the row's scale inside
+        // the smaller box it was actually given.
 
         // A complication has ONE Font colour for both modes, unlike the clock
         // which ships two TimeText elements. So the only way its ambient colour
@@ -182,6 +181,11 @@ object WffEmitter {
 
         val slots = boxes.entries.map { (pos, box) ->
             val source = p.slot(pos)
+            val fitted = SlotGeometry.sizeAt(p, pos)
+            val iconH = SlotGeometry.iconHeight(fitted, p.generatorVersion)
+            val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
+            val fontSize = SlotGeometry.fontSize(fitted)
+            val iconW = iconH
             // The slot id is the POSITION, not a running count of the enabled
             // ones. Wear stores the wearer's complication choice against the
             // slot id and that choice OVERRIDES DefaultProviderPolicy for good

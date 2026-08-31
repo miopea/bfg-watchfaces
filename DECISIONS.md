@@ -1,5 +1,50 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — The date only constrains the slot it touches
+
+Approved from a rendered before/after rather than described: the operator saw
+both cases and said go.
+
+### What was wrong
+
+The top slot has to sit above the drawn date. When it could not, `fittedSize`
+shrank EVERY slot until it did — so a date squeezed three row slots and a bottom
+slot that are nowhere near it. Measured ceiling for a five-slot face:
+
+```text
+date LARGE   23        no TOP slot, date NORMAL   31
+date NORMAL  27
+date SMALL   30
+date OFF     31
+```
+
+The last line is the tell. Remove the ONE slot the date touches and the ceiling
+comes back — so the other four were being shrunk by a constraint that never
+applied to them.
+
+### What it does now
+
+`fittedSize` answers for the row and the bottom; `fittedTopSize` answers
+separately for the top and is never larger. On the operator's face the row goes
+27 to 31; with a large date, 23 to 31.
+
+All three renderers ask one question, `SlotGeometry.sizeAt(p, pos)`, inside
+their own per-slot loops. They previously hoisted a single size out of the loop,
+which would have drawn the top slot's text at the row's scale inside the smaller
+box it was given — the emitter and both previews would have disagreed in exactly
+the way this project keeps being bitten by.
+
+### The trade, which was shown before it was taken
+
+The top complication now renders SMALLER than the row when a date is in its way
+— 21 against 31 at a large date, which is visible. It reads as hierarchy:
+weather above, the row you scan below. The previous behaviour expressed the same
+constraint by making everything small instead, which is not obviously better and
+was never a choice anybody made.
+
+Capped at the row's size. A bigger complication above three smaller ones would
+read as a mistake rather than a hierarchy.
+
 ## 2026-08-31 — Two of those four fixes did not work, and why
 
 Both were reported back from the wrist. Neither had failed a test.

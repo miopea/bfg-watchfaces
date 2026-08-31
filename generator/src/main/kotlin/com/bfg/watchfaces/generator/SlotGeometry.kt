@@ -285,7 +285,10 @@ object SlotGeometry {
      * for; overlapping is not a layout. The step-down is bounded and the result
      * is reported by [fittedSize] so the UI can say what it actually used.
      */
-    fun boxes(p: DialParams): LinkedHashMap<SlotPosition, Box> = layoutAt(p, fittedSize(p))
+    fun boxes(p: DialParams): LinkedHashMap<SlotPosition, Box> {
+        val row = fittedSize(p)
+        return layoutAt(p, row, topSize = fittedTopSize(p, row))
+    }
 
     /**
      * What the layout actually used, versus what was asked for.
@@ -357,22 +360,63 @@ object SlotGeometry {
         )
     }
 
-    /** The size actually used, which is [Layout.complicationSize] unless it did not fit. */
+    /**
+     * The size actually used, which is [Layout.complicationSize] unless it did
+     * not fit.
+     *
+     * ## The top slot no longer drags the other four down
+     *
+     * The drawn date sits where the top slot wants to be, so the top slot has
+     * to go above it. This used to shrink EVERY slot until it did, which is a
+     * measured and expensive mistake: for a five-slot face the ceiling was 23
+     * with a large date, 27 with a normal one, 31 with no date at all — and 31
+     * with a normal date if the top slot happened to be empty. Slots at the
+     * bottom of the dial were being shrunk by a date they are nowhere near.
+     *
+     * Now the date constrains only the slot it touches. This returns the size
+     * for the row and the bottom; [fittedTopSize] answers separately for the
+     * top, and is never larger. On a face where the date is what binds, the
+     * top complication renders a little smaller than the row — which is what
+     * the geometry has been saying all along, and was previously expressed by
+     * making everything small instead.
+     */
     fun fittedSize(p: DialParams): Int {
         val requested = p.layout.complicationSize.coerceIn(MIN_SIZE, MAX_SIZE)
         var size = requested
-        // The drawn date is part of the budget. It sits against the clock and
-        // the top slot goes above it, so a big date leaves less room -- and
-        // since the date is sized to the CLOCK rather than to what is left,
-        // the complications are what give way. Without this the top slot was
-        // clamped to the rim and drawn straight through the date.
-        val band = dateBand(p)
         while (size > MIN_SIZE) {
-            val boxes = layoutAt(p, size)
-            val clearOfDate = band == null || boxes[SlotPosition.TOP]?.let {
-                it.y + it.h <= band.y
-            } ?: true
-            if (clearOfDate && fits(boxes.values)) return size
+            if (fits(layoutAt(p, size, topSize = fittedTopSize(p, size)).values)) return size
+            size -= 1
+        }
+        return MIN_SIZE
+    }
+
+    /**
+     * The size THIS slot is drawn at.
+     *
+     * One question, asked the same way by the emitter and both previews. The
+     * top slot can be smaller than the row when a drawn date is in its way, and
+     * a renderer that used the row's size for every slot would draw the top
+     * one's text too large for the box it was given.
+     */
+    fun sizeAt(p: DialParams, pos: SlotPosition): Int {
+        val row = fittedSize(p)
+        return if (pos == SlotPosition.TOP) fittedTopSize(p, row) else row
+    }
+
+    /**
+     * The size the TOP slot can take, given the row is at [rowSize].
+     *
+     * Never larger than the row: a top complication bigger than the three below
+     * it reads as a mistake rather than a hierarchy. Smaller is fine and is the
+     * whole point.
+     */
+    fun fittedTopSize(p: DialParams, rowSize: Int): Int {
+        if (!p.slot(SlotPosition.TOP).enabled) return rowSize
+        val band = dateBand(p) ?: return rowSize
+        var size = rowSize
+        while (size > MIN_SIZE) {
+            val top = layoutAt(p, rowSize, topSize = size)[SlotPosition.TOP]
+            if (top == null || top.y + top.h <= band.y) return size
             size -= 1
         }
         return MIN_SIZE
@@ -503,12 +547,21 @@ object SlotGeometry {
     }
 
     /** [airOverride] exists so [effective] can compare against the no-air layout. */
-    private fun layoutAt(p: DialParams, size: Int, airOverride: Int? = null): LinkedHashMap<SlotPosition, Box> {
+    private fun layoutAt(
+        p: DialParams,
+        size: Int,
+        airOverride: Int? = null,
+        topSize: Int = size
+    ): LinkedHashMap<SlotPosition, Box> {
         val l = p.layout
         val w = boxWidth(size)
         // Per slot: a glyph-less slot is shorter, which is what frees the
         // vertical room the size control was running out of.
-        fun hFor(pos: SlotPosition) = boxHeight(size, pos in p.iconSlots, p.generatorVersion)
+        fun hFor(pos: SlotPosition) = boxHeight(
+            if (pos == SlotPosition.TOP) topSize else size,
+            pos in p.iconSlots,
+            p.generatorVersion
+        )
 
         /**
          * TOP and BOTTOM are alone on their rows, so they are not held to a
@@ -524,9 +577,11 @@ object SlotGeometry {
          * Capped rather than given the whole chord: a slot that ran the width
          * of the dial would stop reading as one of a set.
          */
-        fun wFor(pos: SlotPosition): Int =
-            if (pos == SlotPosition.TOP || pos == SlotPosition.BOTTOM) (w * 1.7).roundToInt()
-            else w
+        fun wFor(pos: SlotPosition): Int = when (pos) {
+            SlotPosition.TOP -> (boxWidth(topSize) * 1.7).roundToInt()
+            SlotPosition.BOTTOM -> (w * 1.7).roundToInt()
+            else -> w
+        }
         val anchor = (size * 1.2).roundToInt()
         val (timeTop, timeBottom) = timeBand(l)
         val air = airOverride ?: verticalAir(p)
