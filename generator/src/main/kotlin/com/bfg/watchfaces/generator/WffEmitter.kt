@@ -218,7 +218,16 @@ object WffEmitter {
                 val g = (minOf(box.w, box.h) * 0.78).toInt()
                 return@map """
     <PartDraw x="${box.x + (box.w - g) / 2}" y="${box.y + (box.h - g) / 2}" width="$g" height="$g" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
+      <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>${
+            // The tint follows the ink into ambient for the same reason the
+            // text's colour does. From v3 a dark ink is lifted so it clears a
+            // contrast floor against black; a tint pinned to the AWAKE ink
+            // would drag the glyph back down to the colour the lift exists to
+            // avoid, and only on the faces that need it most.
+            if (p.generatorVersion >= 3 && inkNeedsLift)
+                "\n      <Variant mode=\"AMBIENT\" target=\"tintColor\" value=\"$inkDim\"/>"
+            else ""
+        }
       <Launch target="${XmlSafe.attr(target)}"/>
           ${GlyphWff.elements(ComplicationGlyphs.shapes(source), g, ink)}
     </PartDraw>"""
@@ -240,6 +249,7 @@ object WffEmitter {
 
             """
     <ComplicationSlot slotId="$id" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"
+                      tintColor="$ink"
                       displayName="@string/${pos.resource}"
                       supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255"
                       isCustomizable="FALSE">
@@ -247,8 +257,20 @@ object WffEmitter {
       <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
       <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">${if (!p.hasIcon(pos)) "" else """
-        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH" tintColor="$ink">
+        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
           <!--
+            THE TINT IS ON THE ComplicationSlot ABOVE, not here.
+
+            tintColor on this PartImage did nothing, because renderMode
+            defaults to SOURCE and SOURCE ignores it. The documented place for
+            the attribute is the ComplicationSlot element, which is where it now
+            sits.
+
+            One limit that belongs to the provider rather than to us: a tint can
+            only recolour an image the provider ships WHITE-FILLED. A
+            black-filled icon cannot be changed by a watch face at all, and the
+            fix for that would be in the provider's app.
+
             renderMode="MASK" WAS TRIED HERE AND REVERTED. It is the schema's
             answer to tinting. SOURCE, the default, draws the image in its own
             colours and ignores tintColor entirely. But on a real watch it

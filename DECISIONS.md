@@ -1,5 +1,54 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — The tint belongs on the ComplicationSlot
+
+Fourth attempt at the glyph colour, and the first one grounded in documentation
+rather than in reading the schema and guessing.
+
+The operator settled it by observation: "I see this on other faces so I know it
+is possible." That is worth more than three failed hypotheses — it turns "is
+this achievable" into "where does the attribute go", which is answerable.
+
+`tintColor` is on `ComplicationSlot`, and that is the documented place for it.
+Everything tried before was on the wrong element:
+
+| Where | What happened |
+| --- | --- |
+| `tintColor` on `PartImage` | Ignored. `renderMode` defaults to SOURCE. |
+| `renderMode="MASK"` on `PartImage` | Slots with a provider glyph rendered NOTHING |
+| Our own glyph instead | Impossible — see below |
+| **`tintColor` on `ComplicationSlot`** | This |
+
+### Why drawing our own glyph is not an option
+
+It was the attractive fix — both previews already draw our shapes, so it would
+have made the watch match the preview at the root instead of patching the
+symptom. `GlyphWff` can only emit `Line`, `Oval`, `RoundRectangle` and `Arc`.
+**Steps is a `Rotated` pair and heart rate is a `Curve`** — cubic béziers, which
+Watch Face Format has no equivalent for. They produce an empty `PartDraw`, and
+77 tests said so immediately.
+
+That is also why the emitter reaches for the provider's image for these slots in
+the first place. It was never a shortcut.
+
+### The limit that is not ours
+
+A tint can only recolour an image the provider ships WHITE-FILLED. A
+black-filled icon cannot be changed by a watch face at all, and the fix for that
+would be in the provider's app. Fit's glyphs are green and red rather than
+black, so this should reach them.
+
+### Why this one is safe in a way MASK was not
+
+MASK changed a render MODE, and the failure took the whole slot's content with
+it. This adds a colour attribute to an element that already renders correctly.
+Verified the emitted face differs from the working build by exactly that
+attribute moving, and nothing else. The worst realistic outcome is that the
+glyphs stay coloured.
+
+The tint follows the ink into ambient when a dark ink is being lifted for
+contrast, for the same reason the text's colour does.
+
 ## 2026-08-31 — renderMode="MASK" made complications vanish, and is reverted
 
 Reported from the wrist: the row of three complications was simply gone. Time,
