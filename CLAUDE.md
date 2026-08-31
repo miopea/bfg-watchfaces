@@ -138,14 +138,14 @@ scripts/deploy.sh                      # build and install to whatever adb sees
 
 Verified — built and run, not assumed:
 
-- `:generator` — 343 tests green, including validation against Google's official
+- `:generator` — 455 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
-- `:appcore` — 38 tests green. Rules and words the shipped apps share, pure
+- `:appcore` — 102 tests green. Rules and words the shipped apps share, pure
   JVM. Not `:generator` (that is the file format) and not `:workbench` (never
   shipped). Holds `ActivationConsent`, whose one-shot rule guards the only
   unrecoverable action in the system.
-- `:workbench` — 118 tests green. Serves the app at localhost:7777; bakes
+- `:workbench` — 135 tests green. Serves the app at localhost:7777; bakes
   `dial_bg.png`, `preview.png`, `watchface.xml`, `strings.xml` and the manifest
   package from parameters. Quantization measured at 64 colours, mean error
   0.51/255. Saves designs to `faces/<slug>.json`, the catalog format.
@@ -246,16 +246,29 @@ The community catalog is live (2026-08-30):
   test asserts the URL appears in exactly one file.
 - **Moderation is `./gradlew :workbench:moderate`.** It is the only place a face
   meets Google's XSD — a Worker cannot run Xerces — so if it does not run before
-  publication, nothing does.
+  publication, nothing does. A console UI for it is filed as swarm task
+  `01a05888` against `bfg-ops-console`; it leads with a design question rather
+  than a panel, because a watch face cannot be judged from a text row.
+- **The report loop CLOSES.** Filed anonymously, appears in `/admin/reports`,
+  resolved with a required outcome, queue back to zero — driven against the
+  live service on 2026-08-31. `POST /admin/reports/:id/resolve` has always
+  existed; it is easy to miss because the route regex escapes its slashes.
+- **The Worker's contract must be redeployed after a generator version bump.**
+  `params-contract.json` is bundled at build time and `validate.ts` rejects any
+  face above `currentGeneratorVersion`. v10 shipped in the app while the Worker
+  still said 9, which would have refused every submission the day sharing
+  opened. Deployed 2026-08-31; `curl .../config` is how you check.
 
 Still never tested:
 
 - **Submitting, end to end.** `GOOGLE_CLIENT_ID` is unset, so publishing fails
   closed with 401. That is the design working, and it is why nothing can be
   shared yet. A live test asserts submissions are off and will FAIL the day the
-  client id lands. **Reporting is NOT in this list any more** — it runs end to
-  end from the app, with no account, verified onto the live queue on
-  2026-08-31.
+  client id lands. **It is the only thing left blocking sharing**, and it is
+  not something this repo can fix: it needs an OAuth client created in the
+  Google Cloud Console. **Reporting is NOT in this list any more** — it runs
+  end to end from the app, with no account, verified onto the live queue on
+  2026-08-31, and resolving one is verified too.
 - **There is no share UI**, deliberately — a share button that cannot work is
   worse than no button. There IS a report UI.
 - **Imported images.** `Engine.TEXTURE` still has nowhere on the device to
