@@ -153,10 +153,14 @@ object ComplicationGlyphs {
      * An outline rather than a fill, because an arc can only be stroked.
      */
     private fun heart(): List<Shape> = listOf(
-        Shape.Arc(3.8, 5.2, 8.6, 9.0, 0.0, 180.0),
-        Shape.Arc(11.6, 5.2, 8.6, 9.0, 0.0, 180.0),
-        Shape.Line(3.8, 9.7, 12.0, 19.6),
-        Shape.Line(20.2, 9.7, 12.0, 19.6)
+        // Each lobe sweeps 218 degrees, not 180: it has to come over the top
+        // AND wrap down the outside, or the sides read as straight walls and
+        // the whole thing looks like a shield. The two arcs meet at a SHALLOW
+        // dip near (12, 6.4) rather than plunging to the lobes' waist.
+        Shape.Arc(3.0, 4.0, 10.0, 10.0, 32.0, 218.0),
+        Shape.Arc(11.0, 4.0, 10.0, 10.0, 290.0, 218.0),
+        Shape.Line(6.3, 13.7, 12.0, 20.0),
+        Shape.Line(17.7, 13.7, 12.0, 20.0)
     )
 
     private fun battery(): List<Shape> = listOf(

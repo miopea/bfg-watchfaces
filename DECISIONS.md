@@ -1,5 +1,45 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — The heart, and why the seconds drifted back
+
+The glyphs came back monochrome, so drawing our own was right. Two things it
+left behind, both reported from the wrist.
+
+### An end-aligned run hangs its left edge off an estimate
+
+The seconds were moved left by computing a RIGHT edge and letting the text be
+`align="END"` to it. That reads as equivalent to moving them and is not: the
+right edge was derived from an ESTIMATE of how wide two digits are, so every
+pixel the estimate was wrong by pushed the text away from the clock and toward
+the ring. "The seconds slipped back to the right" — after a change whose entire
+purpose was to move them left.
+
+They are anchored by their LEFT edge now, `align="START"` at a fixed gap past
+the widest time. The gap to the clock is exact because it is the thing being
+set rather than the thing being inferred, and any error in the width estimate
+lands on the ring side, which has room for it.
+
+### The heart took three attempts and a render each time
+
+Approximating a cubic outline with arcs and lines is not arithmetic, it is
+drawing, and it cannot be reasoned about from coordinates:
+
+1. Two half-ellipses side by side. They OVERLAPPED and crossed, leaving a notch
+   and a stray mark where the strokes met.
+2. Made to meet exactly. Now a clean shape and still not a heart — a shield,
+   because a 180 degree lobe leaves the sides as straight walls.
+3. Lobes sweeping 218 degrees, so each comes over the top AND wraps down the
+   outside, meeting at a shallow dip rather than plunging to the waist.
+
+Each version was rendered at 160px and looked at. There was no version of this
+that could have been got right by thinking harder about the numbers.
+
+### Three preview goldens moved again
+
+Deliberately, and for the second time today: the heart really did change. That
+is what a golden is for — it made a change to a glyph shape impossible to ship
+without noticing.
+
 ## 2026-08-31 — We draw the complication glyph ourselves now
 
 Fifth and last attempt at the glyph colour, and the first that does not depend

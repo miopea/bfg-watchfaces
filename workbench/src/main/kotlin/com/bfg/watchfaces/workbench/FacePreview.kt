@@ -164,7 +164,16 @@ object FacePreview {
             // line rather than under it.
             val top = SecondsBand.topInDial(l)
             val baseline = top + (SecondsBand.height(l) + fm.ascent - fm.descent) / 2
-            g.drawString(secs, SecondsBand.rightEdgeFor(p) - fm.stringWidth(secs), baseline)
+            // Left-anchored when a ring crowds them, matching the emitter: an
+            // end-aligned run hangs its left edge off a width ESTIMATE, and
+            // that estimate being wrong is what pushed the seconds back toward
+            // the ring.
+            g.drawString(
+                secs,
+                if (SecondsBand.alignFor(p) == "START") SecondsBand.leftEdgeFor(p)
+                else SecondsBand.rightEdgeFor(p) - fm.stringWidth(secs),
+                baseline
+            )
         }
 
         g.dispose()

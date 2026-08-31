@@ -174,16 +174,23 @@ object AndroidFacePreview {
         )
 
         // Seconds in the right gutter, matching WffEmitter: just under half the
-        // clock, lightest weight, awake only. Right-aligned rather than centred,
-        // because the clock is centred and this sits in the space it leaves.
+        // clock, lightest weight, awake only.
+        //
+        // The BOX and the alignment both come from SecondsBand, because with a
+        // ring drawn they are anchored to the clock rather than to the rim. An
+        // end-aligned run hangs its left edge off a width estimate, and that is
+        // what pushed the seconds back toward the ring after a change meant to
+        // move them away from it.
         if (p.showSeconds && !ambient) {
+            val startAligned = SecondsBand.alignFor(p) == "START"
             drawCenteredIn(
                 canvas, "%02d".format(SAMPLE_SECOND),
-                0f, SecondsBand.topInDial(l).toFloat(),
-                SecondsBand.rightEdgeFor(p).toFloat(), SecondsBand.height(l).toFloat(),
+                SecondsBand.boxLeftFor(p).toFloat(), SecondsBand.topInDial(l).toFloat(),
+                SecondsBand.boxWidthFor(p).toFloat(), SecondsBand.height(l).toFloat(),
                 SecondsBand.fontSizeFor(p).toFloat(),
                 withAlpha(timeColor, SecondsBand.ALPHA), bold = false,
-                alignEnd = true
+                alignEnd = !startAligned,
+                alignStart = startAligned
             )
         }
         return bitmap
@@ -197,7 +204,9 @@ object AndroidFacePreview {
         x: Float, y: Float, w: Float, h: Float,
         size: Float, color: Int, bold: Boolean,
         /** Right-align inside the box instead of centring. Used by the seconds. */
-        alignEnd: Boolean = false
+        alignEnd: Boolean = false,
+        /** Left-align instead. The seconds use this when a ring crowds them. */
+        alignStart: Boolean = false
     ) {
         if (text.isEmpty()) return
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -206,8 +215,11 @@ object AndroidFacePreview {
             typeface = Typeface.create(Typeface.SANS_SERIF, if (bold) Typeface.BOLD else Typeface.NORMAL)
         }
         val fm = paint.fontMetrics
-        val tx = if (alignEnd) x + w - paint.measureText(text)
-                 else x + (w - paint.measureText(text)) / 2f
+        val tx = when {
+            alignStart -> x
+            alignEnd -> x + w - paint.measureText(text)
+            else -> x + (w - paint.measureText(text)) / 2f
+        }
         // WFF centres text vertically within the element box.
         val ty = y + (h - (fm.descent - fm.ascent)) / 2f - fm.ascent
         canvas.drawText(text, tx, ty, paint)

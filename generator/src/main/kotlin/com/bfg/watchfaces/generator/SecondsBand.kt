@@ -187,9 +187,44 @@ object SecondsBand {
      */
     fun rightEdgeFor(p: DialParams): Int {
         if (!crowdedByRing(p)) return DIAL_SIZE - insetFor(p)
+        return (leftEdgeFor(p) + fontSizeFor(p) * DIGIT_ADVANCE * 2).toInt()
+    }
+
+    /**
+     * Where the seconds BEGIN, when a ring is drawn.
+     *
+     * ## Anchor the left edge, not the right
+     *
+     * This used to compute a right edge and let the text be END-aligned to it.
+     * That looks equivalent and is not: the right edge was derived from an
+     * ESTIMATE of how wide two digits are, and an end-aligned run of text hangs
+     * its LEFT edge off that estimate. Every pixel the estimate was wrong by
+     * moved the seconds away from the clock and toward the ring — which is
+     * exactly what came back from the wrist, "the seconds slipped back to the
+     * right", after a change whose whole purpose was to move them left.
+     *
+     * Anchoring the left edge instead makes the gap to the time EXACT, because
+     * it is the thing being set rather than the thing being inferred. Any error
+     * in the width estimate now lands on the ring side, which has room for it.
+     */
+    /**
+     * How the seconds sit in their box.
+     *
+     * START when a ring crowds them, so the gap to the clock is exact. END
+     * otherwise, which is the older behaviour and correct when the only thing
+     * to clear is the rim.
+     */
+    fun alignFor(p: DialParams): String = if (crowdedByRing(p)) "START" else "END"
+
+    /** The box the seconds are laid out in: from the clock, or from x=0. */
+    fun boxLeftFor(p: DialParams): Int = if (crowdedByRing(p)) leftEdgeFor(p) else 0
+
+    fun boxWidthFor(p: DialParams): Int =
+        if (crowdedByRing(p)) DIAL_SIZE - leftEdgeFor(p) else rightEdgeFor(p)
+
+    fun leftEdgeFor(p: DialParams): Int {
         val clockRight = DIAL_CENTER + p.layout.timeSize * DIGIT_ADVANCE * WIDEST_TIME / 2
-        val secondsWidth = fontSizeFor(p) * DIGIT_ADVANCE * 2
-        return (clockRight + GAP_FROM_CLOCK + secondsWidth).toInt()
+        return (clockRight + GAP_FROM_CLOCK).toInt()
     }
 
     /**

@@ -384,8 +384,8 @@ $dateLine
         ambient updates once a minute, so a second digit there would be wrong
         for most of the minute it was shown.
       -->
-      <TimeText format="ss" align="END" alpha="255"
-                x="0" y="${SecondsBand.offsetY(l)}" width="${SecondsBand.rightEdgeFor(p)}" height="${SecondsBand.height(l)}">
+      <TimeText format="ss" align="${SecondsBand.alignFor(p)}" alpha="255"
+                x="${SecondsBand.boxLeftFor(p)}" y="${SecondsBand.offsetY(l)}" width="${SecondsBand.boxWidthFor(p)}" height="${SecondsBand.height(l)}">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
         <Font family="${XmlSafe.attr(l.fontFamily)}" size="${SecondsBand.fontSizeFor(p)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
       </TimeText>"""}
