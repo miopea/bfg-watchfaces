@@ -1,5 +1,65 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — We draw the complication glyph ourselves now
+
+Fifth and last attempt at the glyph colour, and the first that does not depend
+on a provider behaving.
+
+### The tint was correct and could never have worked
+
+`tintColor` on `ComplicationSlot` IS the documented mechanism, and the previous
+build had it in the right place. It still did nothing, and the documentation
+says why: a tint can only recolour an image the provider ships WHITE-FILLED.
+Google Fit sends a green steps glyph and a red heart. No watch face can override
+that; the fix would be in Fit.
+
+So the question stopped being "how do we tint their icon" and became "why are we
+drawing their icon at all".
+
+### We were never meant to be drawing it
+
+Both previews have always drawn [ComplicationGlyphs] — our own shapes, in the
+wearer's ink. That is why the preview showed a monochrome glyph while the watch
+showed a green one. The emitter was the odd one out.
+
+The reason it was the odd one out is now fixed rather than worked around: **two
+glyphs could not be expressed in Watch Face Format at all.** Steps was a
+`Rotated` pair and heart rate a cubic `Curve`, and `GlyphWff` drops what it
+cannot express, so both produced an empty `PartDraw`. Falling back to the
+provider's image was the only thing that could work.
+
+- Steps is two footprints without the lean. A rotated ellipse is not an
+  axis-aligned one and the format has no primitive for it.
+- Heart rate is two half-ellipses and two lines. An outline rather than a fill,
+  because an arc can only be stroked.
+
+### And one that was quietly broken
+
+The notification bell's dome was a `Curve` too. That glyph rendered — it just
+rendered WITHOUT ITS DOME, and nothing failed. It had never been drawn on a
+watch because that slot also fell back to the provider's icon, so the defect was
+waiting rather than absent.
+
+`GlyphDrawableTest` now asserts every enabled source's shapes survive the trip
+into the format, counted in and counted out, and that no glyph uses a shape the
+format cannot express. A glyph that loses a stroke on the way to the watch looks
+right everywhere it is checked and wrong where it is worn.
+
+### What this costs
+
+A third-party provider's distinctive icon is replaced by ours. For a slot
+pointed at an app, our shape still describes the SOURCE behind it, which is what
+the wearer chose. The three preview goldens moved, deliberately, because the
+glyphs really did change.
+
+### The one thing still unproven
+
+`PartDraw` inside a `Complication` element. `PartImage` and `PartText` render
+there today and `PartDraw` is the same element family, which is a much better
+footing than `renderMode="MASK"` ever had — that was a mode flag whose runtime
+behaviour was opaque. If it fails, the glyph moves to scene level, where the
+step ring already proves `PartDraw` renders.
+
 ## 2026-08-31 — The tint belongs on the ComplicationSlot
 
 Fourth attempt at the glyph colour, and the first one grounded in documentation

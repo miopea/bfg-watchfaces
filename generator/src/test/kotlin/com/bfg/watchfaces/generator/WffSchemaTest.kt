@@ -369,7 +369,18 @@ class WffSchemaTest {
         }
         // A faint track and a bright arc: without the track a part-finished
         // goal reads as a broken circle rather than progress.
-        assertEquals(2, Regex("<Arc ").findAll(xml).count())
+        //
+        // Counted INSIDE THE RING'S OWN ELEMENT, not across the document. It
+        // used to count every <Arc> in the face, which worked only while the
+        // ring was the sole thing using one — the heart and the bell are drawn
+        // with arcs now, and the count jumped to six without anything about the
+        // ring changing. A proxy that broad is measuring the wrong thing.
+        val ring = xml.substringAfter("<PartDraw", "")
+            .let { rest -> rest.split("<PartDraw").first { it.contains("STEP_PERCENT") } }
+            .substringBefore("</PartDraw>")
+        assertEquals(2, Regex("<Arc ").findAll(ring).count()) {
+            "the ring should be exactly a track and a progress arc"
+        }
     }
 
     @Test

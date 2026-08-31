@@ -123,30 +123,40 @@ object ComplicationGlyphs {
     }
 
     /** Two footprints, offset, like the Wear steps glyph. */
-    private fun steps(): List<Shape> = listOf(
-        foot(8.0, 8.5, -0.18),
-        foot(16.0, 14.0, 0.18)
+    /**
+     * Two footprints, and deliberately UNROTATED.
+     *
+     * They used to lean via [Shape.Rotated], which Watch Face Format cannot
+     * express: a rotated ellipse is not an axis-aligned one, and there is no
+     * primitive for it. That made this glyph undrawable on a watch, which is
+     * why the emitter had to fall back to the provider's own icon — and the
+     * provider's icon is green.
+     *
+     * Losing the lean costs a little character and buys a glyph that renders
+     * identically in both previews and on the watch, in the wearer's ink.
+     */
+    private fun steps(): List<Shape> = foot(8.0, 8.5) + foot(16.0, 14.0)
+
+    private fun foot(cx: Double, cy: Double) = listOf(
+        Shape.Oval(cx - 2.6, cy - 4.0, 5.2, 7.2, fill = true),
+        Shape.Oval(cx - 2.2, cy + 3.0, 4.4, 3.0, fill = true)
     )
 
-    private fun foot(cx: Double, cy: Double, lean: Double) = Shape.Rotated(
-        cx, cy, lean,
-        listOf(
-            Shape.Oval(-2.6, -4.0, 5.2, 7.2, fill = true),
-            Shape.Oval(-2.2, 3.0, 4.4, 3.0, fill = true)
-        )
-    )
-
+    /**
+     * A heart as two lobes and two strokes, rather than one cubic outline.
+     *
+     * The cubic version was prettier and could not be drawn on a watch — Watch
+     * Face Format has no bézier — so this glyph fell back to the provider's
+     * icon, which Google Fit ships in red.
+     *
+     * Two half-ellipses meeting at the centre, and two lines down to the point.
+     * An outline rather than a fill, because an arc can only be stroked.
+     */
     private fun heart(): List<Shape> = listOf(
-        Shape.Curve(
-            start = Pt(12.0, 20.0),
-            segments = listOf(
-                Cubic(Pt(2.0, 13.5), Pt(3.0, 6.0), Pt(7.8, 5.0)),
-                Cubic(Pt(10.2, 4.5), Pt(11.6, 6.2), Pt(12.0, 7.4)),
-                Cubic(Pt(12.4, 6.2), Pt(13.8, 4.5), Pt(16.2, 5.0)),
-                Cubic(Pt(21.0, 6.0), Pt(22.0, 13.5), Pt(12.0, 20.0))
-            ),
-            closed = true, fill = true
-        )
+        Shape.Arc(3.8, 5.2, 8.6, 9.0, 0.0, 180.0),
+        Shape.Arc(11.6, 5.2, 8.6, 9.0, 0.0, 180.0),
+        Shape.Line(3.8, 9.7, 12.0, 19.6),
+        Shape.Line(20.2, 9.7, 12.0, 19.6)
     )
 
     private fun battery(): List<Shape> = listOf(
@@ -179,14 +189,10 @@ object ComplicationGlyphs {
     )
 
     private fun bell(): List<Shape> = listOf(
-        Shape.Curve(
-            start = Pt(6.0, 16.5),
-            segments = listOf(
-                Cubic(Pt(6.0, 12.0), Pt(6.2, 7.0), Pt(12.0, 7.0)),
-                Cubic(Pt(17.8, 7.0), Pt(18.0, 12.0), Pt(18.0, 16.5))
-            ),
-            closed = true, fill = false
-        ),
+        // The dome, as half an ellipse rather than two cubics. It was being
+        // DROPPED silently by the WFF writer, which would have shipped a bell
+        // with no bell in it the moment this glyph was drawn on a watch.
+        Shape.Arc(6.0, 7.0, 12.0, 19.0, 0.0, 180.0),
         Shape.Line(4.4, 16.5, 19.6, 16.5),
         Shape.Line(12.0, 4.4, 12.0, 6.6),
         Shape.Arc(10.0, 17.2, 4.0, 3.4, 200.0, 140.0)

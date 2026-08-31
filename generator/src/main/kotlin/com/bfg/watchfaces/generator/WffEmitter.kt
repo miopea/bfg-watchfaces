@@ -39,6 +39,52 @@ object WffEmitter {
      * installed. That ordering is the whole reason a face can name a weather
      * app and still render something sensible on a watch that lacks it.
      */
+    /**
+     * The glyph above a complication's value: OURS, not the provider's.
+     *
+     * ## Why this stopped being `[COMPLICATION.MONOCHROMATIC_IMAGE]`
+     *
+     * A monochromatic image is supposed to be a single colour the watch face
+     * tints. Google Fit ships a GREEN steps glyph and a RED heart, and no watch
+     * face can override that: a tint can only recolour an image the provider
+     * ships white-filled. Four attempts confirmed it, one of them destructively
+     * — see `DECISIONS.md` 2026-08-31.
+     *
+     * The provider's icon was never the design anyway. Both previews have
+     * always drawn [ComplicationGlyphs], which is why they showed a monochrome
+     * glyph while the watch showed a green one. Drawing the same shapes here
+     * makes the three renderers agree, and puts the colour under our control by
+     * construction rather than by asking a runtime nicely.
+     *
+     * What it costs: a third-party provider's distinctive icon is replaced by
+     * ours. For a slot pointed at an app, the shape still describes the SOURCE
+     * behind it, which is what the wearer picked.
+     *
+     * A source with no shapes of ours keeps the provider's image rather than
+     * losing its glyph. `GlyphDrawableTest` is what guarantees the shapes
+     * actually survive into the format; two of them did not until today.
+     */
+    private fun glyphElement(
+        source: ComplicationSource,
+        box: SlotGeometry.Box,
+        iconW: Int,
+        iconH: Int,
+        ink: String
+    ): String {
+        val shapes = ComplicationGlyphs.shapes(source)
+        val x = (box.w - iconW) / 2
+        if (shapes.isEmpty()) {
+            return """
+        <PartImage x="$x" y="0" width="$iconW" height="$iconH">
+          <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
+        </PartImage>"""
+        }
+        return """
+        <PartDraw x="$x" y="0" width="$iconW" height="$iconH">
+          ${GlyphWff.elements(shapes, iconW, ink)}
+        </PartDraw>"""
+    }
+
     private fun providerAttrs(p: DialParams, pos: SlotPosition): String {
         val component = p.providers[pos]?.trim().orEmpty()
         if (component.isEmpty()) return ""
@@ -256,46 +302,7 @@ object WffEmitter {
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
       <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
-      <Complication type="SHORT_TEXT">${if (!p.hasIcon(pos)) "" else """
-        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
-          <!--
-            THE TINT IS ON THE ComplicationSlot ABOVE, not here.
-
-            tintColor on this PartImage did nothing, because renderMode
-            defaults to SOURCE and SOURCE ignores it. The documented place for
-            the attribute is the ComplicationSlot element, which is where it now
-            sits.
-
-            One limit that belongs to the provider rather than to us: a tint can
-            only recolour an image the provider ships WHITE-FILLED. A
-            black-filled icon cannot be changed by a watch face at all, and the
-            fix for that would be in the provider's app.
-
-            renderMode="MASK" WAS TRIED HERE AND REVERTED. It is the schema's
-            answer to tinting. SOURCE, the default, draws the image in its own
-            colours and ignores tintColor entirely. But on a real watch it
-            made the complication slots with a provider glyph render NOTHING AT
-            ALL. Steps, heart rate and world clock vanished; the face kept its
-            time, date, weather and battery. Emitted XML byte-identical to the
-            build before it apart from that one attribute, so there is no other
-            candidate.
-
-            The glyph is therefore still the provider's colour, which is a
-            cosmetic complaint, and the slots are back, which is not. Whatever
-            fixes the colour has to be tried on a watch before it ships: neither
-            preview draws a provider's real icon, and the XSD validates that an
-            attribute exists rather than what the runtime does with it.
-
-            MONOCHROMATIC_IMAGE is not monochrome.
-            Reported from a real wrist: Google Fit ships a GREEN steps glyph and
-            a RED heart, and the watch drew them in the provider's own colours
-            beside ink-coloured text. Both previews draw them in the ink, so
-            nothing here disagreed and nothing failed. The built face simply
-            looked different from the thing that designed it.
-            The name says what the provider is asked for, not what it sends.
-          -->
-          <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
-        </PartImage>"""}
+      <Complication type="SHORT_TEXT">${if (!p.hasIcon(pos)) "" else glyphElement(source, box, iconW, iconH, ink)}
         <PartText x="0" y="${SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)}" width="${box.w}" height="$textH">$ambientColorVariant
           <Text align="CENTER">
             <Font family="${XmlSafe.attr(l.fontFamily)}" size="$fontSize" color="$ink">

@@ -261,8 +261,8 @@ class RenderPipelineTest {
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
         assertEquals(
-            listOf("80afb3ad447a5859", "308db7e8ad0700db", "4119f771e59ac813",
-                   "653e267cb29671f0", "1bb9074443345b74"),
+            listOf("f4dfde8268329dfb", "186da058a38a11a7", "4119f771e59ac813",
+                   "a9876cc2616fd876", "137f5f6eca274aa6"),
             actual
         ) { "the v7 preview changed; every face saved at v7 renders differently" }
     }
@@ -333,8 +333,8 @@ class RenderPipelineTest {
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
         assertEquals(
-            listOf("f23d4b152ec5f454", "7aa269aa5965891c", "4119f771e59ac813",
-                   "52231f488a043c73", "f529289c34ab34db"),
+            listOf("454e7e23ef730943", "15e982d3de3a5295", "4119f771e59ac813",
+                   "c4ba7231fef1d63f", "35d6ee1f46e19957"),
             actual
         ) { "the v6 preview changed; every face saved at v6 renders differently" }
     }
@@ -375,7 +375,10 @@ class RenderPipelineTest {
             }
             md.digest().joinToString("") { "%02x".format(it) }.take(16)
         }
-        assertEquals(listOf("f161fc20d0acadfc", "00d9ca560ad79da1", "d8df01efa40bfedc", "0f4b86e7c410afaf", "eaa62fd3f6ee8016"), actual) {
+        assertEquals(listOf(
+                "22f61efc45cc2591", "7ce59dbfe755af8e", "8581b99943158e36",
+                "1dce460c4b46e3dc", "971ab3cd22749212"
+            ), actual) {
             "the composite preview changed; every preview.png built after this differs"
         }
     }
