@@ -261,16 +261,30 @@ The community catalog is live (2026-08-30):
 
 Still never tested:
 
-- **Submitting, end to end.** `GOOGLE_CLIENT_ID` is unset, so publishing fails
-  closed with 401. That is the design working, and it is why nothing can be
-  shared yet. A live test asserts submissions are off and will FAIL the day the
-  client id lands. **It is the only thing left blocking sharing**, and it is
-  not something this repo can fix: it needs an OAuth client created in the
-  Google Cloud Console. **Reporting is NOT in this list any more** — it runs
-  end to end from the app, with no account, verified onto the live queue on
-  2026-08-31, and resolving one is verified too.
-- **There is no share UI**, deliberately — a share button that cannot work is
-  worse than no button. There IS a report UI.
+- **Submitting, end to end.** Nobody has ever signed in and published a face.
+  What is no longer in the way: `GOOGLE_CLIENT_ID` is set and deployed, the
+  consent screen is IN PRODUCTION, and a bogus token now reaches real JWT
+  verification. **Reporting is NOT in this list** — it runs end to end from
+  the app with no account, and resolving one is verified too (2026-08-31).
+- **There is no share UI yet.** Deliberate until now — a share button that
+  cannot work is worse than no button — and now the next thing to build,
+  because it finally CAN work and can be verified rather than shipped blind.
+  There IS a report UI.
+
+Google sign-in, ready but never exercised (2026-08-31):
+
+- Project `bfg-watch-faces`, its own, because the consent screen is user-facing
+  branding. External, in production, no verification required — it requests no
+  sensitive or restricted scopes.
+- **Four OAuth clients, and the count is not padding.** An Android client is one
+  package plus ONE SHA-1, so debug, upload and Play App Signing each need their
+  own; the Web client is the `serverClientId` and the audience the Worker
+  checks. Miss the Play one and sign-in works for whoever built the APK and
+  fails for everyone who installed it.
+- The client id lives in `catalog-service/wrangler.toml`, not 1Password. It
+  ships inside every APK. No client secret was kept — this flow verifies a
+  signature against Google's JWKS and never exchanges one.
+
 - **Imported images.** `Engine.TEXTURE` still has nowhere on the device to
   resolve an image id from.
 - **`reskin.sh`** — written and read, not exercised since the workbench landed.

@@ -27,9 +27,18 @@ the last one and sign-in works on the developer's own build and fails for every
 tester — the worst shape of bug, because the person who could debug it is the
 one person who cannot reproduce it.
 
-Three are registered. The Play App Signing fingerprint is not: the Play Console
-only offers it through a copy-to-clipboard chip, and reading a clipboard from
-automation kept hanging. Left for the operator rather than fought.
+All four are registered. The Play App Signing fingerprint took a detour worth
+recording: the Play Console only offers it through a copy-to-clipboard chip,
+and both reading the clipboard and pasting into a field hung the renderer. The
+answer was to stop trying to read the clipboard and instead WRAP
+`navigator.clipboard.writeText` before clicking the chip, so the value was
+caught on its way out. Its ancestor was checked for "Classical key" rather than
+assumed, because the same card also carries a post-quantum key whose SHA-1
+would have been silently wrong.
+
+It differs from the upload key, which is the proof Play re-signs: registering
+only the upload key would have given sign-in that works for the developer and
+fails for every tester.
 
 ### No client secret was kept
 
@@ -41,6 +50,20 @@ ever needed it can be reset.
 
 The client id itself is NOT a secret and lives in `wrangler.toml` rather than
 1Password — it ships inside every APK, so hiding it would be theatre.
+
+### Published to production, which needed a privacy policy and a domain
+
+"Publish app" was disabled until Branding carried an application home page, a
+privacy policy link, and the matching domain in Authorized domains —
+`bfgsolutions.net`, `/privacy`, both checked for a 200 and a real heading
+rather than pasted in hopefully. Terms of service was left blank because it is
+optional, and the logo was left blank because it is worse than optional:
+uploading one FORCES a verification review.
+
+The result is an app in production with no verification requirement, because
+it asks for no sensitive or restricted scopes at all — the Data Access page
+lists none, and `openid`/`email`/`profile` are implicit. The 100-user cap that
+applies in Testing does not apply here for the same reason.
 
 ### A test that was written to fail, and did
 
