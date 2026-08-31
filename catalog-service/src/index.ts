@@ -1,3 +1,4 @@
+import { ops } from "./ops";
 import { CONTRACT } from "./contract";
 import type { Env } from "./env";
 import { paramsHash } from "./hash";
@@ -98,6 +99,15 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
   const withdraw = /^\/submissions\/([0-9a-f-]{36})\/withdraw$/.exec(path);
   if (method === "POST" && withdraw?.[1]) return postWithdraw(request, env, withdraw[1]);
+
+  // ---- the ops contract ---------------------------------------------------
+  //
+  // Before /admin, because it is a different caller with different credentials:
+  // the console presents an ops token, never MODERATOR_TOKEN directly.
+  if (path.startsWith("/api/ops/")) {
+    const handled = await ops(request, env, path, method);
+    if (handled) return handled;
+  }
 
   // ---- moderation ---------------------------------------------------------
 

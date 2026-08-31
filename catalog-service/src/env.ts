@@ -29,4 +29,17 @@ export interface Env {
    * reversed into an address by trying all four billion of them.
    */
   readonly IP_SALT?: string;
+
+  /**
+   * Scope-split credentials for the ops console.
+   *
+   * Both optional and both fall back to MODERATOR_TOKEN, so the console works
+   * before these exist. Setting them takes precedence, which makes adopting the
+   * split a secrets change rather than a code change.
+   */
+  readonly OPS_TOKEN_READ?: string;
+  readonly OPS_TOKEN_WRITE?: string;
+
+  /** The SHA being served, so a stale deploy is observable. */
+  readonly BUILD_SHA?: string;
 }

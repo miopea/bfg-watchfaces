@@ -44,7 +44,7 @@ database_id = "9fa40371-9cfe-4fc8-a8f5-9592c447deb4"
 # the app needs the same value to ask Google for a token. Empty means publishing
 # is switched off, and the write endpoints fail closed rather than accepting
 # anybody.
-GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_ID = "819189022552-gll7rn5ic7f6ruo6oj5ii684945ke35g.apps.googleusercontent.com"
 
 # Secrets, set with `wrangler secret put <name>` and never written here:
 #
@@ -52,3 +52,4 @@ GOOGLE_CLIENT_ID = ""
 #   IP_SALT            salts the hashed IP used for rate limiting AND the hashed
 #                      Google subject id stored as author_key, so neither a raw
 #                      address nor a raw subject id is ever written down
+BUILD_SHA = "5bbed9c"
