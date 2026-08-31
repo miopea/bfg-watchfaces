@@ -295,7 +295,12 @@ enum class RingSource(val label: String, val expression: String?) {
 }
 
 enum class HourFormat(val label: String, val wff: String, val pattern: String) {
-    DEVICE("Match my watch", "SYNC_TO_DEVICE", "hh:mm"),
+    // "Automatic", not "Match my watch". Three segments share one row and this
+    // was the only label needing two lines, so its button grew taller than the
+    // other two and the control looked broken. Seen on a phone, not reasoned
+    // about. The row is labelled "Time", which supplies the context the longer
+    // wording was carrying.
+    DEVICE("Automatic", "SYNC_TO_DEVICE", "hh:mm"),
     TWELVE("12-hour", "12", "h:mm"),
     TWENTY_FOUR("24-hour", "24", "hh:mm")
 }
@@ -704,7 +709,7 @@ data class Layout(
  */
 val COMPONENT = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*/\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z0-9_$]+)*""")
 
-const val CURRENT_GENERATOR_VERSION = 8
+const val CURRENT_GENERATOR_VERSION = 9
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

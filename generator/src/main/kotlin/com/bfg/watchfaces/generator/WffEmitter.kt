@@ -243,7 +243,16 @@ object WffEmitter {
       <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
       <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
       <Complication type="SHORT_TEXT">${if (!p.hasIcon(pos)) "" else """
-        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH">
+        <PartImage x="${(box.w - iconW) / 2}" y="0" width="$iconW" height="$iconH" tintColor="$ink">
+          <!--
+            tintColor, because MONOCHROMATIC_IMAGE is not monochrome.
+            Reported from a real wrist: Google Fit ships a GREEN steps glyph and
+            a RED heart, and the watch drew them in the provider's own colours
+            beside ink-coloured text. Both previews draw them in the ink, so
+            nothing here disagreed and nothing failed. The built face simply
+            looked different from the thing that designed it.
+            The name says what the provider is asked for, not what it sends.
+          -->
           <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
         </PartImage>"""}
         <PartText x="0" y="${SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)}" width="${box.w}" height="$textH">$ambientColorVariant
@@ -328,9 +337,9 @@ $dateLine
         for most of the minute it was shown.
       -->
       <TimeText format="ss" align="END" alpha="255"
-                x="0" y="${SecondsBand.offsetY(l)}" width="${SecondsBand.rightEdge()}" height="${SecondsBand.height(l)}">
+                x="0" y="${SecondsBand.offsetY(l)}" width="${SecondsBand.rightEdgeFor(p)}" height="${SecondsBand.height(l)}">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
-        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${SecondsBand.fontSize(l)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
+        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${SecondsBand.fontSizeFor(p)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
       </TimeText>"""}
     </DigitalClock>
 $slots

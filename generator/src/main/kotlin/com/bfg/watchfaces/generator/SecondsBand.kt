@@ -97,4 +97,66 @@ object SecondsBand {
 
     /** Right edge, held in from the rim by [INSET]. */
     fun rightEdge(): Int = DIAL_SIZE - INSET
+
+    /**
+     * How far in the seconds sit WHEN A RING IS DRAWN.
+     *
+     * 34, and it is wedged between two measured things rather than chosen:
+     *
+     *   the ring   its centreline is at radius 218 and it is 9 thick, so its
+     *              inner edge is radius 213.5. At the seconds' height — the
+     *              clock's centre, 32 above the dial's — that inner edge is at
+     *              x = 439. At the old inset of 24 the seconds ended at 432,
+     *              SEVEN pixels clear. Reported from a wrist as "very tight to
+     *              the ring", and the arithmetic agrees.
+     *
+     *   the clock  the widest time at full size ends at x = 377.5, and the
+     *              seconds are about 41 wide. At an inset of 34 they start at
+     *              381 — three and a half clear. Any further left and they run
+     *              into the time.
+     *
+     * MOVING ALONE WAS NOT ENOUGH, and rendering it showed why: at an inset of
+     * 34 with full-size seconds the gap to the CLOCK closes to about three
+     * pixels, and the picture just trades one crowded side for the other. With
+     * a ring drawn there is simply not room in the gutter for seconds at
+     * [SCALE] beside a full-size clock.
+     *
+     * So they also shrink, to [SCALE_WITH_RING]. At 32 in and 0.30 of the
+     * clock they span roughly x=388..424: about ten clear of the time on one
+     * side and fifteen clear of the ring on the other. Both gaps visible,
+     * neither side crowded.
+     *
+     * Faces WITHOUT a ring keep the old inset: there is nothing to crowd them,
+     * and the value was measured against the clock in the first place.
+     */
+    const val INSET_WITH_RING = 32
+
+    /**
+     * How big the seconds are when a ring is drawn.
+     *
+     * 0.30 rather than [SCALE]'s 0.35. The gutter between the clock and the
+     * ring is not wide enough for both, and the seconds are the thing the
+     * design already calls "the least worth reading".
+     */
+    const val SCALE_WITH_RING = 0.30
+
+    /**
+     * The inset this face actually uses.
+     *
+     * Version-gated because it MOVES A RENDERED ELEMENT. A face saved at v8
+     * with a ring must keep drawing its seconds where its author saw them;
+     * only v9 and later get the correction. `DECISIONS.md` is explicit that
+     * changing this in place silently rewrites every stored face.
+     */
+    private fun crowdedByRing(p: DialParams): Boolean =
+        p.generatorVersion >= 9 && p.ring.enabled
+
+    fun insetFor(p: DialParams): Int =
+        if (crowdedByRing(p)) INSET_WITH_RING else INSET
+
+    /** Font size for this face's seconds. Smaller when a ring crowds them. */
+    fun fontSizeFor(p: DialParams): Int =
+        (p.layout.timeSize * if (crowdedByRing(p)) SCALE_WITH_RING else SCALE).toInt()
+
+    fun rightEdgeFor(p: DialParams): Int = DIAL_SIZE - insetFor(p)
 }

@@ -415,8 +415,32 @@ object SlotGeometry {
      */
     fun sizeOptions(p: DialParams): List<Int> {
         val max = maxSize(p)
-        return listOf((max * 0.60).roundToInt(), (max * 0.79).roundToInt(), max)
+        // 0.70/0.85/1.00, not 0.60/0.79/1.00.
+        //
+        // From a wrist: "Small is still way too small." So every option moves
+        // up. On the face that prompted it the three go from 18/24/30 to
+        // 21/26/30.
+        //
+        // THE ASK WAS FOR MORE THAN THIS and it could not be met. "Large
+        // should be medium and medium small" wants the whole scale to shift up
+        // a notch, which needs a bigger Large to shift into. 0.80/0.90/1.00
+        // was tried first and `ControlsAreNoticeableTest` refused it: three
+        // options between 24 and 30 differ by about 2pt of text, and the
+        // operator's own earlier instruction was that changing size must be
+        // noticeable. A scale where every step is invisible is worse than one
+        // that starts lower.
+        //
+        // THE TOP OF THE RANGE DID NOT MOVE, and cannot without changing
+        // geometry. `max` is not `MAX_SIZE` (40); it is the largest size whose
+        // boxes still fit, and measurement puts that at 30 for a five-slot
+        // face. It is the dial being ROUND that binds: `fits` requires every
+        // box corner inside the circle. Turning the date off buys 1. Widening
+        // the spread makes it WORSE, 28, because it pushes boxes toward the
+        // rim. So a genuinely larger Large is a geometry change and a version
+        // bump, not a number here.
+        return listOf((max * 0.70).roundToInt(), (max * 0.85).roundToInt(), max)
             .map { it.coerceAtLeast(MIN_SIZE) }
+            .distinct()
     }
 
     /** The three spacings to offer, narrowest first. See [sizeOptions]. */

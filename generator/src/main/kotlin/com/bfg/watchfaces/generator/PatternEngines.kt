@@ -36,6 +36,10 @@ object PatternEngines {
         7 -> v4(p)
         // v8 made the definition authoritative and added drawn sources.
         8 -> v4(p)
+        // v9 moved the SECONDS left to clear the step ring, and tinted the
+        // complication glyph to the ink. Neither is a dial pattern, so this
+        // delegates rather than copying an engine.
+        9 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

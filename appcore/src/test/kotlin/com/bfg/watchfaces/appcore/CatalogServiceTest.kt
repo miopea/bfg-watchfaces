@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.appcore
 
+import com.bfg.watchfaces.generator.CURRENT_GENERATOR_VERSION
 import com.bfg.watchfaces.generator.DialParams
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -178,7 +179,12 @@ class CatalogServiceTest {
         // The stem, not a slug this layer invented: PublishedSlug is the one
         // implementation, and the service appends the short id.
         assertTrue(body.contains(""""slug": "${PublishedSlug.stemFor("Midnight Blue")}""""))
-        assertTrue(body.contains(""""generatorVersion": 8""")) { "the params did not round-trip" }
+        // Not a literal 8: this asserts the params round-trip, not what the
+        // format version happens to be, and hardcoding it makes every version
+        // bump look like a client bug.
+        assertTrue(body.contains(""""generatorVersion": $CURRENT_GENERATOR_VERSION""")) {
+            "the params did not round-trip"
+        }
         // The identity travels in the Authorization header, never in the body.
         assertEquals("google-id-token", fake.bearers.single())
         assertFalse(body.contains("google-id-token")) { "the token was put in the body as well" }

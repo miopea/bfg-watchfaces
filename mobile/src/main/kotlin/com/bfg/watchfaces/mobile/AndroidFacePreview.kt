@@ -178,8 +178,8 @@ object AndroidFacePreview {
             drawCenteredIn(
                 canvas, "%02d".format(SAMPLE_SECOND),
                 0f, SecondsBand.topInDial(l).toFloat(),
-                SecondsBand.rightEdge().toFloat(), SecondsBand.height(l).toFloat(),
-                SecondsBand.fontSize(l).toFloat(),
+                SecondsBand.rightEdgeFor(p).toFloat(), SecondsBand.height(l).toFloat(),
+                SecondsBand.fontSizeFor(p).toFloat(),
                 withAlpha(timeColor, SecondsBand.ALPHA), bold = false,
                 alignEnd = true
             )

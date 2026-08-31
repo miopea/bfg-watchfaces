@@ -1,5 +1,79 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — Four things a wrist found, and generatorVersion 9
+
+All four came from the operator wearing it. None could have been found any other
+way, and two of them the previews actively hid.
+
+### The glyphs were the provider's colours, not the ink
+
+Reported: "steps are green and heart rate red" on the watch, monochrome in the
+preview. The emitter asks for `[COMPLICATION.MONOCHROMATIC_IMAGE]`, and **that
+name describes what is REQUESTED, not what arrives** — Google Fit ships a green
+steps glyph and a red heart, and Watch Face Format drew them as sent.
+
+Both previews draw the glyph in the ink, so nothing disagreed and nothing
+failed. The built face simply looked different from the tool that designed it,
+which is the failure mode this project keeps meeting.
+
+Fixed with `tintColor` on the `PartImage`, which `abstractPartType` has carried
+all along.
+
+### The seconds could not simply move
+
+Reported as "very tight to the ring", and the arithmetic agreed: the ring's
+inner edge sits at x=439 at the seconds' height, and they ended at 432. Seven
+pixels.
+
+Moving them left to an inset of 34 was the first fix and **rendering it showed
+it was wrong** — the gap to the CLOCK closed to about three pixels and the
+picture just traded one crowded side for the other. There is not room in that
+gutter for seconds at 0.35 of the clock beside a full-size time.
+
+So with a ring they also shrink, to 0.30, at an inset of 32: about ten clear of
+the time, fifteen clear of the ring. Faces with no ring are untouched — nothing
+crowds them, and the old inset was measured against the clock in the first
+place.
+
+The lesson is the loop rather than the numbers: the first version passed every
+test and looked wrong the moment it was drawn.
+
+### Complication sizes went up, but not as far as asked
+
+"Small is still way too small. Large should be medium and medium small" wants
+the whole scale to shift up a notch, which needs a bigger Large to shift into.
+
+**There is no bigger Large.** `sizeOptions` is a fraction of `maxSize`, which is
+not the `MAX_SIZE` constant (40) but the largest size whose boxes still fit —
+measured at 30 for a five-slot face. It is the dial being ROUND that binds:
+`fits` requires every box corner inside the circle. Turning the date off buys
+one pixel. Widening the spread makes it WORSE, 28, because it pushes boxes
+toward the rim.
+
+0.80/0.90/1.00 was tried and `ControlsAreNoticeableTest` refused it: three
+options between 24 and 30 differ by about 2pt of text, and the operator's own
+earlier instruction was that a size change must be noticeable. So the range is
+0.70/0.85/1.00 — 21/26/30 instead of 18/24/30 — and a genuinely larger Large is
+a geometry change with its own decision, not a number here.
+
+### The hour picker had one label that wrapped
+
+Three segments share a row and "Match my watch" was the only one needing two
+lines, so its button grew taller than the others. It is "Automatic" now; the row
+is labelled "Time", which carries the context the longer wording did.
+
+### Version 9, and what it does NOT change
+
+The seconds move and the glyph tint both alter how a stored face renders, so the
+version bumped and `PatternEngines` gained a `9 -> v4(p)` branch — no engine
+changed, so it delegates rather than copying. A v8 face keeps its seconds where
+its author saw them.
+
+Two guards fired on their own and both were right to: `GeneratorVersionTest`
+refused the bump until the branch existed, and `ContractFileTest` caught that
+the deployed catalog validator would have rejected v9 faces until the generated
+contract was regenerated and the Worker redeployed.
+
 ## 2026-08-31 — A preview drew today's date beside a clock fixed at 10:10
 
 `RenderPipelineTest`'s pinned preview hashes went red mid-session, on code that

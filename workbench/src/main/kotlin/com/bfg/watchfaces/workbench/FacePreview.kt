@@ -155,14 +155,14 @@ object FacePreview {
         // the empty dial it leaves rather than widening the time itself.
         if (p.showSeconds && !ambient) {
             val secs = "%02d".format(now.second)
-            g.font = Font(Font.SANS_SERIF, Font.PLAIN, SecondsBand.fontSize(l))
+            g.font = Font(Font.SANS_SERIF, Font.PLAIN, SecondsBand.fontSizeFor(p))
             g.color = withAlpha(ink, SecondsBand.ALPHA)
             val fm = g.fontMetrics
             // Centred in the clock's own band, so the seconds sit ON the time's
             // line rather than under it.
             val top = SecondsBand.topInDial(l)
             val baseline = top + (SecondsBand.height(l) + fm.ascent - fm.descent) / 2
-            g.drawString(secs, SecondsBand.rightEdge() - fm.stringWidth(secs), baseline)
+            g.drawString(secs, SecondsBand.rightEdgeFor(p) - fm.stringWidth(secs), baseline)
         }
 
         g.dispose()
