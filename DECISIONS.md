@@ -1,5 +1,65 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-01 — Spending the activation on sends that did not need it
+
+With the watch on adb for the first time — Wi-Fi debugging, once the operator
+was home — the watch's own log answered in one send what the reply line could
+not:
+
+```text
+Caused by: WatchFacePushManager$SetActiveException:
+    Failed to set watch face as active with error code 2
+...
+I/BfgFaceReceiver: face installed in slot 55c1e952-... (replaced=true)
+I/BfgFaceReceiver: free=0 ours=1 pkgs=[...default] apk=512630 push=true activate=true
+```
+
+Code 2 was read out of `wear-sdk.jar`'s constant pool rather than assumed:
+
+```text
+SET_ACTIVE_UNKNOWN_ERROR              = 1
+SET_ACTIVE_MAXIMUM_ATTEMPTS_REACHED_ERROR = 2   <- this one
+SET_ACTIVE_INVALID_SLOT_ID_ERROR      = 3
+```
+
+### The bug
+
+`setWatchFaceAsActive` has a hard attempt limit per app install, and
+`onFaceInstalled` called it on EVERY send — including the overwhelming majority
+where our face was already on the wrist and the call could not change anything.
+
+A scarce, non-renewable resource was spent once per send until it ran out. After
+that no face this install pushed could be switched on again. The face installed
+correctly every time, the send reported success, and the watch stayed on a
+Google face. From the wrist: **"I send it from my phone and nothing happens."**
+
+**The limit is not the problem. Spending it with nothing to buy is.** The call is
+now made only when `isWatchFaceActive` says our face is not the one being worn.
+
+### What the same log ruled out
+
+`ours=1` killed the orphaned-slot theory that the previous entry's reinstall
+advice was built on — the app sees its slot perfectly. And `pm list packages`
+showed `...watchfacepush.botanic_bravo` present at `versionCode=1788303545`, so
+the epoch-versioning fix works and faces really are installing. Two things were
+wrong at once, and the visible symptom belonged entirely to the second.
+
+### Why the recommended recovery had not been tried
+
+`firstInstallTime=2026-08-30`, `lastUpdateTime` today: the watch app had been
+UPDATED, never uninstalled. Play offers no uninstall in the update flow, so
+"reinstall it" quietly became "update it" and the attempt counter was never
+reset. A recovery instruction whose success cannot be verified from this side is
+not a recovery instruction — which is why the next attempt is driven over adb,
+where the install time can be read back.
+
+### The diagnostic that should have existed
+
+The activation failure went to `Log.e` on a device with no reachable log. It is
+now named on the reply line beside the slot picture. Every diagnostic added this
+week has paid for itself within one send; this one was missing for days while
+five theories were argued in its absence.
+
 ## 2026-09-01 — Never destroy the face somebody is wearing
 
 The fallback shipped in watch 1.27 cost the operator his watch face. He was left

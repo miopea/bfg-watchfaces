@@ -82,6 +82,7 @@ object FaceInstaller {
         val context = caller.applicationContext
         // Filled in once the slots are read; empty if we never got that far.
         var slotPicture = ""
+        activationNote = ""
         // Non-empty only if the in-place update was refused and the fallback ran.
         var fallback = ""
 
@@ -197,7 +198,7 @@ object FaceInstaller {
                     // Still ask to activate. Dropping this was a regression:
                     // before, EVERY install tried, and a face sent to a watch
                     // wearing something else silently stopped switching.
-                    val asked = onFaceInstalled(context, details.slotId)
+                    val asked = onFaceInstalled(context, details.slotId, details.packageName)
                     // ASK THE WATCH, rather than believing the call that failed.
                     //
                     // `setWatchFaceAsActive` works ONCE per install -- Google's
@@ -222,7 +223,7 @@ object FaceInstaller {
                         // diagnostic in this file so far was reachable only by
                         // failing, so the healthy shape was never once observed
                         // and there was nothing to compare a failure against.
-                        note = listOf(fallback, slotPicture)
+                        note = listOf(fallback, activationNote, slotPicture)
                             .filter { it.isNotEmpty() }.joinToString(" | ")
                     )
                 } else if (ours != null) {
@@ -251,7 +252,7 @@ object FaceInstaller {
                     // setWatchFaceAsActive has an undocumented attempt limit
                     // this project has already hit, so it is not spent on a
                     // face that was sitting in the picker anyway.
-                    val asked = if (wasActive) onFaceInstalled(context, details.slotId) else false
+                    val asked = if (wasActive) onFaceInstalled(context, details.slotId, details.packageName) else false
                     // Same as the update branch: the activation call is not the
                     // authority on whether the face is on the wrist.
                     val active = asked || runCatching {
@@ -260,7 +261,7 @@ object FaceInstaller {
                     Result.Installed(details.slotId, replaced = true, active = active)
                 } else if (existing.remainingSlotCount > 0) {
                     val details = manager.addWatchFace(fd, token)
-                    val asked = onFaceInstalled(context, details.slotId)
+                    val asked = onFaceInstalled(context, details.slotId, details.packageName)
                     val active = asked || runCatching {
                         manager.isWatchFaceActive(details.packageName)
                     }.getOrElse { false }
@@ -326,8 +327,47 @@ object FaceInstaller {
     private fun short(cause: Throwable): String =
         "${cause.javaClass.simpleName}: ${cause.message ?: "(no message)"}"
 
-    private fun onFaceInstalled(context: Context, slotId: String): Boolean {
+    /**
+     * Why the last activation attempt failed, for the reply line.
+     *
+     * Set by [onFaceInstalled] and read by [install] on the same call, which is
+     * serialised by the channel -- one face is handled at a time.
+     */
+    private var activationNote = ""
+
+    private fun onFaceInstalled(
+        context: Context,
+        slotId: String,
+        packageName: String
+    ): Boolean {
         val state = Activation.state(context)
+
+        // ALREADY WEARING IT? Then there is nothing to switch, and switching is
+        // not free.
+        //
+        // This is the bug behind "I send a face and nothing happens".
+        // `setWatchFaceAsActive` has a hard attempt limit per app install --
+        // `SET_ACTIVE_MAXIMUM_ATTEMPTS_REACHED_ERROR`, read out of wear-sdk.jar
+        // as code 2 -- and this was calling it on EVERY send, including the
+        // overwhelming majority where our face was already on the wrist and the
+        // call could not change anything.
+        //
+        // So a scarce, non-renewable resource was spent once per send until it
+        // ran out, after which no face this install pushed could be switched on
+        // again. Measured on the operator's Pixel Watch 5, 2026-09-01: the face
+        // installed correctly every time and the watch stayed on a Google face,
+        // because the only call that could move it had been exhausted days
+        // earlier by sends that never needed it.
+        //
+        // The limit is not the problem. Spending it with nothing to buy is.
+        val manager = WatchFacePushManagerFactory.createWatchFacePushManager(context)
+        val worn = runCatching {
+            kotlinx.coroutines.runBlocking { manager.isWatchFaceActive(packageName) }
+        }.getOrElse { false }
+        if (worn) {
+            Log.i(TAG, "already wearing $packageName; not spending an activation attempt")
+            return true
+        }
 
         // Already granted: switch to it. This was the gap.
         //
@@ -340,11 +380,18 @@ object FaceInstaller {
         // finally worked.
         if (ActivationConsent.canActivate(state)) {
             return runCatching {
-                val manager = WatchFacePushManagerFactory.createWatchFacePushManager(context)
                 kotlinx.coroutines.runBlocking { manager.setWatchFaceAsActive(slotId) }
             }
                 .onSuccess { Log.i(TAG, "switched to the new face (slot $slotId)") }
-                .onFailure { Log.e(TAG, "installed, but could not switch to it", it) }
+                .onFailure {
+                    // NAMED on the reply line, not just in a log nobody could
+                    // reach. This failure was invisible for days: the face
+                    // installed, the send reported success, and the only
+                    // evidence that activation had died was the watch quietly
+                    // staying on somebody else's face.
+                    activationNote = "setWatchFaceAsActive: ${short(it)}"
+                    Log.e(TAG, "installed, but could not switch to it", it)
+                }
                 .isSuccess
         }
 
