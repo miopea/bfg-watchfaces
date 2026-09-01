@@ -133,13 +133,17 @@ object Presentation {
     val PICKER_REST: List<ComplicationSource> =
         ComplicationSource.entries.filter { it !in PICKER_COMMON && !it.isShortcut }
 
-    fun label(pos: SlotPosition): String = when (pos) {
-        SlotPosition.TOP -> "Top"
-        SlotPosition.LEFT -> "Left"
-        SlotPosition.MIDDLE -> "Middle"
-        SlotPosition.RIGHT -> "Right"
-        SlotPosition.BOTTOM -> "Bottom"
-    }
+    /**
+     * Slot labels are NOT here either. They are [Complications.slotLabel].
+     *
+     * That one is written into the built face's `strings.xml` as each slot's
+     * `displayName`, so it is what the WATCH's own editor calls a slot. A
+     * second table here let the phone's picker and the watch disagree about
+     * the name of the same thing — the same bug as the source label and sample
+     * tables, one enum over, and it survived their removal because
+     * `OneVocabularyTest` only guarded `ComplicationSource`. It guards
+     * `SlotPosition` now too.
+     */
 
     /** The swatches, exactly as the localhost app offers them. */
     val DIALS = listOf(

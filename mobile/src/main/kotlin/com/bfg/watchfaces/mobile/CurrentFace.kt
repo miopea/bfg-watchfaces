@@ -36,7 +36,7 @@ object CurrentFace {
         runCatching {
             val body = FaceCodec.toJson(params)
             File(context.filesDir, FILE).writeText(
-                """{"name":${quote(name)},"params":$body}"""
+                """{"name":${Json.quote(name)},"params":$body}"""
             )
         }
     }
@@ -50,6 +50,4 @@ object CurrentFace {
         Sent(name, params)
     }.getOrNull()
 
-    private fun quote(s: String): String =
-        "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 }

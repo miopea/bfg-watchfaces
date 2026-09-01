@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.wear
 
+import com.bfg.watchfaces.appcore.Json
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -127,9 +128,7 @@ object ProviderCatalog {
     /** The catalog as JSON, for the message the phone asks for. */
     fun toJson(providers: List<Provider>): String =
         providers.joinToString(",", prefix = "[", postfix = "]") {
-            """{"component":${q(it.component)},"label":${q(it.label)},"app":${q(it.app)}}"""
+            """{"component":${Json.quote(it.component)},"label":${Json.quote(it.label)},"app":${Json.quote(it.app)}}"""
         }
 
-    private fun q(s: String): String =
-        "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ") + "\""
 }

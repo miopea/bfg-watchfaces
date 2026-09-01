@@ -33,6 +33,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -42,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import com.bfg.watchfaces.appcore.ActivationConsent
 import com.bfg.watchfaces.appcore.WatchLink
 import com.bfg.watchfaces.appcore.FaceLibrary
+import com.bfg.watchfaces.appcore.FaceCodec
+import com.bfg.watchfaces.appcore.Json
 import com.bfg.watchfaces.appcore.CatalogService
 import com.bfg.watchfaces.appcore.Presets
 import com.bfg.watchfaces.generator.DialParams
@@ -84,7 +88,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             BfgTheme {
-                val scope = rememberCoroutineScopeCompat()
+                val scope = rememberCoroutineScope()
                 val context = LocalContext.current
                 val consent = remember { ActivationConsent.load(filesDir) }
                 val snackbar = remember { SnackbarHostState() }
@@ -94,10 +98,26 @@ class MainActivity : ComponentActivity() {
                 // preset nobody chose. CurrentFace is a record of what this
                 // phone last sent -- see the note there about when it is right.
                 val onWatch = remember { CurrentFace.load(context) }
-                var engineName by rememberSaveable {
-                    mutableStateOf((onWatch?.params ?: Presets.OPENING).engine.name)
+                /**
+                 * The whole design, and it SURVIVES the Activity restarting.
+                 *
+                 * It did not. The comment above promised "rememberSaveable so a
+                 * rotation does not throw away a design" and only `engineName`
+                 * was saveable — so a rotation, or the system reclaiming a
+                 * backgrounded process, reverted every slider, both colours,
+                 * the layout, the ring and the seconds back to the opening
+                 * face, restoring nothing but the engine. Silently: no error,
+                 * no message, just somebody's work gone.
+                 *
+                 * `DialParams` is not Parcelable and should not become it —
+                 * that would put an Android type in the way of a class
+                 * `:generator` owns. It does not need to be: `FaceCodec` already
+                 * round-trips it to JSON, because that is the stored file
+                 * format, so the saver is the format the app already trusts.
+                 */
+                var params by rememberSaveable(stateSaver = FaceParamsSaver) {
+                    mutableStateOf(onWatch?.params ?: Presets.OPENING)
                 }
-                var params by remember { mutableStateOf(onWatch?.params ?: Presets.OPENING) }
                 /**
                  * The saved face being edited, if any.
                  *
@@ -124,7 +144,6 @@ class MainActivity : ComponentActivity() {
                 // acquires an identity, and this remembers what the person was
                 // trying to do when they were asked for one.
                 var nameThenSend by remember { mutableStateOf(false) }
-                var status by remember { mutableStateOf<String?>(null) }
                 var faces by remember { mutableStateOf(FaceStorage.list(context)) }
                 // What has been shared, and whether sharing is possible at all.
                 //
@@ -135,17 +154,44 @@ class MainActivity : ComponentActivity() {
                 // existed, and it stays true if the id is ever lost.
                 var shared by remember { mutableStateOf(SubmissionStore.all(context).associateBy { it.slug }) }
                 var canShare by remember { mutableStateOf(false) }
-                var sharing by remember { mutableStateOf<FaceLibrary.StoredFace?>(null) }
-                // Sharing state lives HERE, not in the sheet.
+                // WHICH face is being shared, by slug, so it SURVIVES the
+                // Activity being recreated.
                 //
-                // Signing in opens Google's own activity, which takes focus,
+                // Sharing state lives here rather than in the sheet because
+                // signing in opens Google's own activity, which takes focus,
                 // which makes the sheet fire onDismissRequest -- and a sheet
                 // that removes itself cancels the coroutine doing the work.
-                // Measured on an emulator: the account was chosen and nothing
-                // ever reached the catalog. No crash, no error, empty queue.
+                // That was measured and fixed.
+                //
+                // It was only HALF the bug. Moving the state out of the sheet
+                // saves it from a sheet dismissal, because the caller's
+                // composition outlives the sheet. It does NOT save it from the
+                // ACTIVITY being recreated, which Android does under memory
+                // pressure while another app's activity -- like Google's
+                // account picker -- is in front. Then `remember` resets, the
+                // sheet reopens on nothing, and the person is back where they
+                // started. Reported from a phone: "I select an account, it goes
+                // back to the share, click on share it shows account again."
+                //
+                // A slug is a String, so it survives. The face is looked up
+                // from it, the same idiom `openSlug` already uses.
+                var sharingSlug by rememberSaveable { mutableStateOf<String?>(null) }
+                val sharing = sharingSlug?.let { slug -> faces.firstOrNull { it.slug == slug } }
+                var shareError by rememberSaveable { mutableStateOf<String?>(null) }
+                var shareOutcomeName by rememberSaveable { mutableStateOf<String?>(null) }
+                val shareOutcome = shareOutcomeName?.let { ShareOutcome.valueOf(it) }
+                // NOT saved, deliberately.
+                //
+                // The coroutine doing the work does not survive the Activity, so
+                // restoring `busy = true` would show a spinner that can never
+                // finish. False is the honest restored value: the work is gone,
+                // and the sheet comes back on the right face ready to try again.
+                //
+                // Nothing is lost by retrying, because SubmissionStore is on
+                // DISK: if the submit did land before the process died, the row
+                // already reads "Shared" and the sheet opens on the taken-back
+                // state rather than offering to send it twice.
                 var shareBusy by remember { mutableStateOf(false) }
-                var shareError by remember { mutableStateOf<String?>(null) }
-                var shareOutcome by remember { mutableStateOf<ShareOutcome?>(null) }
                 LaunchedEffect(Unit) {
                     val config = withContext(Dispatchers.IO) { CatalogAccess.service(context).config() }
                     canShare = (config as? CatalogService.Result.Ok)?.value?.acceptsSubmissions == true
@@ -233,7 +279,7 @@ class MainActivity : ComponentActivity() {
                         Tab.DESIGNS -> DesignsScreen(
                             // A style is a starting point, not a face: it has
                             // no identity yet, so Save must ask for a name.
-                            onPick = { params = it; engineName = it.engine.name; openSlug = null; tab = Tab.STUDIO },
+                            onPick = { params = it; openSlug = null; tab = Tab.STUDIO },
                             modifier = Modifier.padding(inner)
                         )
 
@@ -243,7 +289,7 @@ class MainActivity : ComponentActivity() {
                         // (a scrollable measured with infinite height).
                         Tab.STUDIO -> StudioScreen(
                             params = params,
-                            onParams = { params = it; engineName = it.engine.name },
+                            onParams = { params = it },
                             ambient = ambient,
                             onAmbient = { ambient = it },
                             onTune = { tuning = true },
@@ -333,12 +379,11 @@ class MainActivity : ComponentActivity() {
                             faces = faces,
                             onOpen = {
                                 params = it.params
-                                engineName = it.params.engine.name
                                 openSlug = it.slug
                                 tab = Tab.STUDIO
                             },
                             onSend = { requestSend(it.name, it.params) },
-                            onShare = { sharing = it },
+                            onShare = { sharingSlug = it.slug },
                             shared = shared,
                             canShare = canShare,
                             onDelete = { FaceStorage.delete(context, it.slug); faces = FaceStorage.list(context) },
@@ -352,7 +397,7 @@ class MainActivity : ComponentActivity() {
                 if (tuning) {
                     TuneSheet(
                         params = params,
-                        onParams = { params = it; engineName = it.engine.name },
+                        onParams = { params = it },
                         sheetState = tuneState,
                         onDismiss = { tuning = false }
                     )
@@ -462,7 +507,7 @@ class MainActivity : ComponentActivity() {
                                         // a second opinion here is how the row and the
                                         // sheet end up describing one state two ways.
                                         shared = SubmissionStore.all(context).associateBy { it.slug }
-                                        shareOutcome = ShareOutcome.SENT
+                                        shareOutcomeName = ShareOutcome.SENT.name
                                     }
                                     is CatalogService.Result.Failed -> shareError = result.message
                                 }
@@ -478,28 +523,20 @@ class MainActivity : ComponentActivity() {
                                     is CatalogService.Result.Ok -> {
                                         SubmissionStore.forget(context, record.id)
                                         shared = SubmissionStore.all(context).associateBy { it.slug }
-                                        shareOutcome = ShareOutcome.WITHDRAWN
+                                        shareOutcomeName = ShareOutcome.WITHDRAWN.name
                                     }
                                     is CatalogService.Result.Failed -> shareError = result.message
                                 }
                             }
                         },
                         onDismiss = {
-                            sharing = null
-                            shareOutcome = null
+                            sharingSlug = null
+                            shareOutcomeName = null
                             shareError = null
                         }
                     )
                 }
 
-                // Keep the engine choice across a rotation. params itself is not
-                // Saveable -- DialParams is a plain data class, not Parcelable --
-                // so the engine is the one thing worth restoring cheaply.
-                LaunchedEffect(engineName) {
-                    if (params.engine.name != engineName) {
-                        params = params.copy(engine = enumValueOf(engineName))
-                    }
-                }
             }
         }
     }
@@ -633,5 +670,20 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-private fun rememberCoroutineScopeCompat() = androidx.compose.runtime.rememberCoroutineScope()
+/**
+ * How a design survives the Activity being recreated.
+ *
+ * `DialParams` is not `Parcelable` and should not become it: that would put an
+ * Android type in the way of a class `:generator` owns, and `:generator` is
+ * deliberately free of Android so the file format can be tested on the JVM.
+ *
+ * It does not need to be. `FaceCodec` already round-trips `DialParams` to JSON,
+ * because that IS the stored file format — the same bytes a saved face and a
+ * catalog submission are made of. Saving the edit in progress is therefore the
+ * format the app already trusts, not a second serialisation invented for the
+ * UI, and `FaceCodecTest` already covers it.
+ */
+private val FaceParamsSaver: Saver<DialParams, String> = Saver(
+    save = { FaceCodec.toJson(it) },
+    restore = { runCatching { FaceCodec.fromJson(Json.obj(Json.parse(it))) }.getOrNull() }
+)

@@ -416,7 +416,7 @@ private fun SlotPicker(
         Spacer(Modifier.size(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                Presentation.label(pos),
+                Complications.slotLabel(pos),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -429,7 +429,7 @@ private fun SlotPicker(
     if (open) {
         AlertDialog(
             onDismissRequest = { open = false },
-            title = { Text("${Presentation.label(pos)} complication") },
+            title = { Text("${Complications.slotLabel(pos)} complication") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     // Per slot, and inside the slot's own dialog: the reason to

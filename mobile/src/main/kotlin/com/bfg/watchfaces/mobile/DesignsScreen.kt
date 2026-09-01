@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +51,7 @@ import com.bfg.watchfaces.appcore.Presets
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.EngravedStroke
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -171,6 +173,7 @@ private fun PresetTile(name: String, params: DialParams, onClick: () -> Unit) {
 private fun CommunityGrid(onPick: (DialParams) -> Unit) {
     val context = LocalContext.current
     val service = remember { CatalogAccess.service(context) }
+    val scope = rememberCoroutineScope()
 
     // Parameters, once per face, for as long as the tab is open. Scrolling back
     // to a tile must not fetch it again.
@@ -257,7 +260,13 @@ private fun CommunityGrid(onPick: (DialParams) -> Unit) {
                 // A bare increment: no account, no device, nothing
                 // correlatable -- one number per face, so the gallery can be
                 // ordered by what people use.
-                service.reportInstall(face.slug)
+                // OFF the main thread. HttpTransport is blocking
+                // HttpURLConnection, so calling it from onClick throws
+                // NetworkOnMainThreadException on a real device -- which
+                // reportInstall's own runCatching then swallows. The counter
+                // has never incremented on hardware, and it is what orders
+                // the gallery.
+                scope.launch { withContext(Dispatchers.IO) { service.reportInstall(face.slug) } }
                 faceCache[face.slug]?.let(onPick)
                 opened = null
             },

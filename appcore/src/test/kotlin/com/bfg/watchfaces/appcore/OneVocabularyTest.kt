@@ -75,6 +75,49 @@ class OneVocabularyTest {
         }
     }
 
+    /**
+     * The slot labels too, and this one was MISSED the first time.
+     *
+     * `ComplicationSource`'s two tables were removed from `:mobile` and guarded
+     * — and the identical duplicate over `SlotPosition` was left behind,
+     * because the guard named one enum instead of the shape. `slotLabel` is
+     * written into the built face's `strings.xml` as each slot's
+     * `displayName`, so a second copy lets the phone's picker and the WATCH's
+     * own editor call one slot two different things.
+     */
+    @Test
+    fun `nothing else declares its own slot label table`() {
+        val offenders = otherModuleSources().filter {
+            Regex("""fun\s+\w*[lL]abel\s*\(\s*\w+\s*:\s*SlotPosition""").containsMatchIn(it.readText())
+        }
+        assertEquals(emptyList<String>(), offenders.map { it.name }) {
+            "a second slot label table lets the phone and the watch disagree about " +
+                "what a slot is called. Use Complications.slotLabel."
+        }
+    }
+
+    /**
+     * And the escaping, which is the same failure one layer down.
+     *
+     * Three hand-rolled JSON string escapers existed at once and all three
+     * behaved differently: `Json.quote` handled control characters, the
+     * phone's copy escaped only quote and backslash, and the watch's turned a
+     * newline into a space. A face name or provider label containing a tab
+     * produced INVALID JSON from two of the three.
+     */
+    @Test
+    fun `nothing else hand-rolls JSON string escaping`() {
+        val offenders = otherModuleSources().filter { f ->
+            val text = f.readText()
+            Regex("""fun\s+\w+\s*\(\s*\w+\s*:\s*String\s*\)\s*:\s*String\s*=\s*\n?\s*"\\""""")
+                .containsMatchIn(text)
+        }
+        assertEquals(emptyList<String>(), offenders.map { it.name }) {
+            "a second JSON escaper. Use Json.quote — the three that existed all " +
+                "disagreed, and two produced invalid JSON for a tab or a newline."
+        }
+    }
+
     @Test
     fun `nothing else declares its own complication label table`() {
         val offenders = otherModuleSources().filter {
