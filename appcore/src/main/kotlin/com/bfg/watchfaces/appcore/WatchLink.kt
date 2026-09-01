@@ -217,12 +217,34 @@ object WatchLink {
          * it is genuinely unknown, and claiming either way is how this went
          * wrong in the first place.
          */
+        /**
+         * Did the face actually reach the watch?
+         *
+         * Separate from [describe] because the caller needs the ANSWER, not the
+         * sentence. The phone used to decide by testing whether the sentence
+         * started with "Sent " -- which was true only in the one case where the
+         * watch did NOT confirm, and false on both real successes. So the
+         * "what is on the watch" record was written exactly when it was least
+         * certain and skipped when it was known. Prose is not a return value.
+         */
+        fun landed(raw: String?): Boolean =
+            verdictIn(raw).orEmpty().let { it == OK || it == OK_NOT_ACTIVE }
+
         fun describe(faceName: String, watchName: String, raw: String?): String {
             val line = verdictIn(raw).orEmpty()
             return when {
-                line == OK -> "“$faceName” is on ${watchName} and switched on."
+                line == OK -> "“$faceName” is on your $watchName."
+                // NO "long-press your watch face and pick it".
+                //
+                // It was reported from a wrist as simply untrue -- the face had
+                // already switched -- and it is instruction for a machine, not
+                // an answer for a person. Someone who sent a watch face wants
+                // to know it arrived; if it is not the one showing, the thing
+                // they do is choose it, in whatever way their watch chooses
+                // things. That is their gesture to know, not ours to dictate.
                 line == OK_NOT_ACTIVE ->
-                    "“$faceName” is on ${watchName}. Long-press your watch face and pick it."
+                    "“$faceName” is on your $watchName. " +
+                        "Choose it from your watch faces to wear it."
                 line.startsWith(FAILED) -> {
                     val why = line.removePrefix(FAILED).trim()
                     if (why.isEmpty()) "${watchName} could not install “$faceName”."

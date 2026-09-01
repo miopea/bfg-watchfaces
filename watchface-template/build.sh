@@ -82,7 +82,7 @@ rm -rf build && mkdir -p build/compiled
 "$BT/aapt2" link -o build/unsigned.apk -I "$PLATFORM" \
   --manifest AndroidManifest.xml \
   --min-sdk-version 33 --target-sdk-version 34 \
-  --version-code "${VERSION_CODE:-1}" --version-name "${VERSION_NAME:-1.0}" \
+  --version-code "${VERSION_CODE:-$(date +%s)}" --version-name "${VERSION_NAME:-1.0}" \
   build/compiled/res.zip
 
 # Throwaway dev key. Keep it: same key means `adb install -r` upgrades in place,

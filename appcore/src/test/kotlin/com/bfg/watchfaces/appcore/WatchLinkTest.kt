@@ -152,14 +152,14 @@ class WatchLinkTest {
 
     @Test
     fun `the watch's verdict becomes a sentence a person can act on`() {
+        // Success says the thing somebody actually wanted to know: it arrived,
+        // and it is on THEIR watch, named.
         val ok = WatchLink.Report.describe("My Face", "Pixel Watch", WatchLink.Report.OK)
-        assertTrue(ok.contains("switched on")) { ok }
+        assertTrue(ok.contains("“My Face”")) { ok }
+        assertTrue(ok.contains("your Pixel Watch")) { ok }
 
-        // The common case after the first send: installed, but the watch will
-        // not switch, because setWatchFaceAsActive succeeds once per install.
-        // It must name the action that works and must NOT read as a failure.
         val notActive = WatchLink.Report.describe("My Face", "Pixel Watch", WatchLink.Report.OK_NOT_ACTIVE)
-        assertTrue(notActive.contains("Long-press")) { notActive }
+        assertTrue(notActive.contains("your Pixel Watch")) { notActive }
         assertFalse(notActive.lowercase().contains("could not")) { notActive }
 
         val failed = WatchLink.Report.describe(
@@ -167,6 +167,48 @@ class WatchLinkTest {
         )
         assertTrue(failed.contains("could not install")) { failed }
         assertTrue(failed.contains("no free watch face slot")) { failed }
+    }
+
+    /**
+     * NO gesture instructions, in any outcome.
+     *
+     * "Long-press your watch face and pick it" was reported from a wrist as
+     * untrue -- the face had already switched -- and it is a machine
+     * instruction standing in for an answer. Whatever the outcome, this is a
+     * person being told about a thing they made, not an operator being given a
+     * procedure.
+     */
+    @Test
+    fun `no outcome tells somebody which gesture to perform`() {
+        val outcomes = listOf(
+            WatchLink.Report.OK,
+            WatchLink.Report.OK_NOT_ACTIVE,
+            WatchLink.Report.failed("something"),
+            null
+        )
+        for (raw in outcomes) {
+            val words = WatchLink.Report.describe("My Face", "Pixel Watch", raw).lowercase()
+            for (gesture in listOf("long-press", "long press", "swipe", "tap and hold", "press and hold")) {
+                assertFalse(words.contains(gesture)) { "$raw says '$gesture': $words" }
+            }
+        }
+    }
+
+    /**
+     * Whether it landed is ANSWERED, not inferred from the sentence.
+     *
+     * The phone decided this by testing whether the message started with
+     * "Sent " -- true only when the watch did NOT confirm, and false on both
+     * real successes. So the record of what is on the watch was written in
+     * exactly the one case nobody could be sure of.
+     */
+    @Test
+    fun `landing is a verdict, not a prefix of the prose`() {
+        assertTrue(WatchLink.Report.landed(WatchLink.Report.OK))
+        assertTrue(WatchLink.Report.landed(WatchLink.Report.OK_NOT_ACTIVE))
+        assertFalse(WatchLink.Report.landed(WatchLink.Report.failed("no slot")))
+        assertFalse(WatchLink.Report.landed(null)) { "silence is not a landing" }
+        assertFalse(WatchLink.Report.landed("")) { "silence is not a landing" }
     }
 
     @Test

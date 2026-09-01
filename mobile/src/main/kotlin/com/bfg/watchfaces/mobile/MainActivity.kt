@@ -264,16 +264,30 @@ class MainActivity : ComponentActivity() {
                         return
                     }
                     scope.launch {
+                        // Three beats, in the words somebody would use: what is
+                        // happening now, who it is going to, and whether it
+                        // arrived. Building and sending are genuinely different
+                        // waits -- packing is on this phone, the transfer is
+                        // Bluetooth -- and a single "Sending..." covering both
+                        // is why a slow build read as a stalled watch.
                         snackbar.showSnackbar("Building “$name”…", duration = SnackbarDuration.Short)
                     }
                     scope.launch {
                         // Off the main thread: packing walks the resource table
                         // and the Data Layer calls block.
-                        val result = withContext(Dispatchers.IO) { buildThenSend(context, name, face) }
+                        val report = withContext(Dispatchers.IO) {
+                            buildThenSend(context, name, face) { stage ->
+                                scope.launch {
+                                    snackbar.showSnackbar(stage, duration = SnackbarDuration.Short)
+                                }
+                            }
+                        }
                         // Only a send that actually landed changes what Studio
-                        // opens on next time.
-                        if (result.startsWith("Sent ")) CurrentFace.record(context, name, face)
-                        snackbar.showSnackbar(result, duration = SnackbarDuration.Long)
+                        // opens on next time -- and "landed" is now the watch's
+                        // answer rather than a prefix match on the sentence
+                        // shown to the user. See WatchLink.Report.landed.
+                        if (report.landed) CurrentFace.record(context, name, face)
+                        snackbar.showSnackbar(report.message, duration = SnackbarDuration.Long)
                     }
                 }
 
@@ -617,17 +631,28 @@ class MainActivity : ComponentActivity() {
      * the real problem is that this build cannot pack a face would send them
      * looking at their Bluetooth settings for an hour.
      */
+    /**
+     * What happened, and whether the face is actually on the watch.
+     *
+     * [landed] is not derivable from [message]: the same sentence shape is used
+     * for "it is there but not showing" and "it never confirmed", and those are
+     * opposite answers to "should this become the current face".
+     */
+    private data class SendReport(val message: String, val landed: Boolean)
+
     private fun buildThenSend(
         context: android.content.Context,
         name: String,
-        params: DialParams
-    ): String {
-        if (!PackBridge.isAvailable) return PackBridge.UNAVAILABLE
+        params: DialParams,
+        /** Called as each stage begins, so the wait is narrated rather than silent. */
+        onStage: (String) -> Unit
+    ): SendReport {
+        if (!PackBridge.isAvailable) return SendReport(PackBridge.UNAVAILABLE, landed = false)
 
         val built = runCatching { FaceBuilder.build(context, name, params) }
             .getOrElse {
                 Log.e(TAG, "build failed for “$name”", it)
-                return ours(name)
+                return SendReport(ours(name), landed = false)
             }
 
         // Validate BEFORE looking for a watch. A schema-invalid face installs
@@ -637,15 +662,21 @@ class MainActivity : ComponentActivity() {
         val token = runCatching { FaceBuilder.validate(context, built.apk) }
             .getOrElse {
                 Log.e(TAG, "validation failed for “$name”", it)
-                return ours(name)
+                return SendReport(ours(name), landed = false)
             }
 
         val target = runCatching { FaceSender.findTarget(context) }
             .getOrElse {
                 Log.e(TAG, "could not look for a watch", it)
-                return "Couldn’t reach your watch. Check it’s nearby and connected, then try again."
+                return SendReport(
+                    "Couldn’t reach your watch. Check it’s nearby and connected, then try again.",
+                    landed = false
+                )
             }
-        if (target !is FaceSender.Target.Ready) return describe(target)
+        if (target !is FaceSender.Target.Ready) return SendReport(describe(target), landed = false)
+        // The watch's name is only known now, which is why this is the second
+        // beat and not part of the first.
+        onStage("Sending to ${target.name}…")
 
         // NEVER ask the watch to rebuild the slots.
         //
@@ -692,13 +723,19 @@ class MainActivity : ComponentActivity() {
                         context, previouslySent?.generatorVersion
                     )
                     if (moved) Onboarding.markComplicationsExplained(context)
-                    WatchLink.Report.describe(name, target.name, report) +
-                        if (moved) " Complications are chosen here now, not on the watch." else ""
+                    SendReport(
+                        WatchLink.Report.describe(name, target.name, report) +
+                            if (moved) " Complications are chosen here now, not on the watch." else "",
+                        landed = WatchLink.Report.landed(report)
+                    )
                 },
                 onFailure = {
                     Log.e(TAG, "transfer to ${target.name} failed", it)
-                    "“$name” didn’t make it to ${target.name}. " +
-                        "Check the watch is nearby, then try again."
+                    SendReport(
+                        "“$name” didn’t make it to ${target.name}. " +
+                            "Check the watch is nearby, then try again.",
+                        landed = false
+                    )
                 }
             )
     }

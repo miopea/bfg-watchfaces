@@ -1,5 +1,78 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-01 — `versionCode="1"`, and the message that blamed the wrong thing
+
+Driven from adb against a Pixel Watch 5, the fallback shipped in watch 1.27
+returned the whole answer in one send:
+
+```text
+updateWatchFace refused (UpdateWatchFaceException: Unknown error while updating
+a watch face. Typically this means that the Watch Face Push service on the watch
+could not be accessed.); removed and re-added
+ | free=0 ours=1 pkgs=[com.bfg.watchfaces.watchfacepush.default]
+ | apk=524918 push=true activate=true
+```
+
+**`push=true activate=true`.** Both permissions held. The service was reachable —
+`listWatchFaces` had just succeeded on the same manager. And remove-and-add
+worked immediately afterwards, on the same APK, the same token, the same slot.
+
+So the only thing left that distinguishes the two calls is what an UPDATE
+requires that an ADD does not: something to update to. The APK's manifest said
+`android:versionCode="1"`, hardcoded, every build, and the slot already held
+`...watchfacepush.default` at version 1. Android does not install a package over
+itself at an equal version. Watch Face Push reports that through its catch-all,
+code 1, whose message names the service being unreachable.
+
+It was reachable. **Five explanations were argued from that sentence and all
+five were wrong.** Not one of them would have been proposed if the error had
+said "same version". The lesson is not about watch faces: a catch-all error
+whose text asserts a specific cause is worse than one that says nothing, because
+it recruits everyone who reads it into the same wrong search.
+
+`versionCode` is now seconds since the epoch — monotonic, stateless, inside the
+2100000000 ceiling until 2038, and invisible to the wearer, whose face is
+identified by its package and its name.
+
+### The regression this created, and why it is the same bug
+
+Watch 1.27's fallback fixed sending and brought back the message the operator
+had already rejected: "Long-press your watch face and pick it."
+
+That was not bad luck. Remove-and-add **deactivates** the face — it deletes the
+one on the wrist before adding its replacement — and `setWatchFaceAsActive` is
+spent, once per install, so nothing can switch it back. The in-place update kept
+the slot and the face never stopped being active.
+
+So the message was previously a LIE that did no harm, and the fallback made it
+true. Fixing `versionCode` removes both: the update path works, the face stays
+on, and the sentence is never reached.
+
+### The words, which were the operator's actual complaint
+
+"This is developer speak and not what a normal user should understand."
+
+Gone: `Long-press your watch face and pick it`. A person who sent a watch face
+wants to know it arrived. If it is not the one showing, what they do is choose
+it — in whatever way their watch chooses things, which is theirs to know and not
+ours to dictate. A test now asserts that NO outcome names a gesture.
+
+The send narrates three beats in the words somebody would use — building,
+sending to the named watch, and whether it arrived — because packing on the
+phone and a Bluetooth transfer are genuinely different waits, and one
+"Sending..." covering both is why a slow build read as a stalled watch.
+
+### And a bug found by changing the wording
+
+The phone decided whether to record the face as current by testing whether the
+message `startsWith("Sent ")`. That was true only in the branch where the watch
+did NOT confirm, and false on both real successes — so the record of what is on
+the watch was written in exactly the one case nobody could be sure of, and
+skipped whenever it was known.
+
+`Report.landed` now answers it. **Prose is not a return value**, and a wording
+change should never have been able to alter behaviour.
+
 ## 2026-09-01 — Correcting the entry below it, and instrumenting instead
 
 The entry dated the same day is **wrong about the cause**, and it was written

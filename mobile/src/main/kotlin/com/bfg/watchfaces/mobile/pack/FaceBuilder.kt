@@ -172,6 +172,27 @@ object FaceBuilder {
 """
 
     /**
+     * A version that goes UP on every build. This is not cosmetic.
+     *
+     * It was hardcoded to 1, and that is what made `updateWatchFace` fail with
+     * `ERROR_UNKNOWN` on a Pixel Watch 5 — measured 2026-09-01, with both
+     * permissions held and `listWatchFaces` succeeding on the same manager
+     * moments earlier. Same package, same versionCode, so there was nothing to
+     * update TO: Android will not install a package over itself at an equal
+     * version, and Watch Face Push surfaces that as its catch-all code 1,
+     * whose message blames the service being unreachable. It was reachable.
+     *
+     * Five explanations were argued from that message and all five were wrong.
+     * None of them would have been proposed if the error had said "same
+     * version".
+     *
+     * Seconds since the epoch: monotonic, needs nothing stored between builds,
+     * and stays inside `versionCode`'s 2100000000 ceiling until 2038. The
+     * wearer never sees it — the face's identity is its package and its name.
+     */
+    private fun versionCode(): Long = System.currentTimeMillis() / 1000
+
+    /**
      * The manifest, matching `watchface-template/AndroidManifest.xml`.
      *
      * `uses-sdk` is here rather than passed as a flag because pack reads the
@@ -182,7 +203,7 @@ object FaceBuilder {
     private fun manifest(packageName: String): String = """
         |<?xml version="1.0" encoding="utf-8"?>
         |<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-        |    android:versionCode="1"
+        |    android:versionCode="${versionCode()}"
         |    android:versionName="1.0"
         |    package="$packageName">
         |  <uses-sdk android:minSdkVersion="33" android:targetSdkVersion="34" />
