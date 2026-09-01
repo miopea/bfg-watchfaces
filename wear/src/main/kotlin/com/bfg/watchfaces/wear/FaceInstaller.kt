@@ -226,7 +226,7 @@ object FaceInstaller {
      * Android will not let this context open anything: see [ActivationPrompt].
      */
     private fun onFaceInstalled(context: Context, slotId: String): Boolean {
-        val state = ActivationConsent.load(context.filesDir)
+        val state = Activation.state(context)
 
         // Already granted: switch to it. This was the gap.
         //

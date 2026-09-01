@@ -96,7 +96,7 @@ class WatchActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (!notificationsGranted()) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         setContent {
-            var consent by remember { mutableStateOf(ActivationConsent.load(filesDir)) }
+            var consent by remember { mutableStateOf(Activation.state(this)) }
             var notifications by remember { mutableStateOf(notificationsGranted()) }
 
             // The permission may be granted or refused in another activity, so
@@ -104,7 +104,7 @@ class WatchActivity : ComponentActivity() {
             // with -- otherwise the screen keeps offering a button for a dialog
             // that has already been answered.
             LaunchedOnResume {
-                consent = ActivationConsent.load(filesDir)
+                consent = Activation.state(this)
                 notifications = notificationsGranted()
             }
 

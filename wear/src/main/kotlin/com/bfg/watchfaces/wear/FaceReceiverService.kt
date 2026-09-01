@@ -121,7 +121,7 @@ class FaceReceiverService : WearableListenerService() {
                         // only this device writes, so it always read UNASKED
                         // and could never explain a denial.
                         WatchLink.Report.SEPARATOR +
-                        ActivationConsent.load(filesDir).name
+                        Activation.state(applicationContext).name
                 )
             }.onFailure {
                 Log.e(TAG, "face did not arrive or would not install", it)

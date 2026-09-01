@@ -58,7 +58,7 @@ class ActivationRequestActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val state = ActivationConsent.load(filesDir)
+        val state = Activation.state(this)
 
         if (ActivationConsent.isInterrupted(state)) {
             // A previous attempt put the dialog up and never heard back. The
@@ -82,7 +82,7 @@ class ActivationRequestActivity : ComponentActivity() {
     }
 
     private fun record(granted: Boolean) {
-        val state = ActivationConsent.load(filesDir)
+        val state = Activation.state(this)
         // ASKING is the expected state here; UNASKED would mean the write above
         // did not land. Anything already answered is left alone.
         if (state == ActivationConsent.State.GRANTED || state == ActivationConsent.State.DENIED) return

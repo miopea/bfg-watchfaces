@@ -301,4 +301,59 @@ class ActivationConsentTest {
         assertTrue("once" in body) { "does not warn it is one-shot: ${ActivationConsent.NOTIFY_BODY}" }
     }
 
+    /**
+     * A GRANTED record without the permission is void, not authoritative.
+     *
+     * `activation.txt` is restored by Android Auto Backup on reinstall; the
+     * permission is not. So a fresh install could read GRANTED from a file
+     * written by an install that no longer exists, hold no permission, and —
+     * because the one shot was recorded as spent — never be able to ask again.
+     * Measured on a Pixel Watch 5: the watch reported GRANTED and failed to
+     * reach Watch Face Push in the same reply.
+     */
+    @Test
+    fun `granted without the permission reads as unasked`() {
+        assertEquals(
+            ActivationConsent.State.UNASKED,
+            ActivationConsent.reconcile(ActivationConsent.State.GRANTED, permissionHeld = false)
+        )
+        assertTrue(ActivationConsent.canAsk(
+            ActivationConsent.reconcile(ActivationConsent.State.GRANTED, permissionHeld = false)
+        )) { "the wearer must be able to grant it again; nothing else can unstick them" }
+    }
+
+    @Test
+    fun `granted with the permission is left alone`() {
+        assertEquals(
+            ActivationConsent.State.GRANTED,
+            ActivationConsent.reconcile(ActivationConsent.State.GRANTED, permissionHeld = true)
+        )
+    }
+
+    /**
+     * A DENIAL does not depend on holding anything, so it is never re-opened.
+     *
+     * Reconciling it away would hand the app a second ask it was refused, which
+     * is the exact thing the one-shot exists to prevent.
+     */
+    @Test
+    fun `a denial survives, with or without the permission`() {
+        for (held in listOf(true, false)) {
+            assertEquals(
+                ActivationConsent.State.DENIED,
+                ActivationConsent.reconcile(ActivationConsent.State.DENIED, held)
+            )
+        }
+    }
+
+    @Test
+    fun `unasked stays unasked`() {
+        for (held in listOf(true, false)) {
+            assertEquals(
+                ActivationConsent.State.UNASKED,
+                ActivationConsent.reconcile(ActivationConsent.State.UNASKED, held)
+            )
+        }
+    }
+
 }

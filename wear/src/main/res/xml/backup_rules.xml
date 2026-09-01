@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  activation.txt must NOT survive a reinstall.
+
+  It records a ONE-SHOT permission ask. The permission is revoked when the app
+  is uninstalled, but Android Auto Backup restores files under filesDir — so a
+  fresh install read GRANTED from an install that no longer existed, held no
+  permission, and could never ask again because the record said the one shot was
+  spent. Every send then failed to bind to Watch Face Push.
+
+  Measured on a Pixel Watch 5, 2026-09-01: one reply carried GRANTED and a bind
+  failure together.
+
+  Excluding it means a reinstall starts UNASKED, which is the truth.
+-->
+<full-backup-content>
+  <exclude domain="file" path="activation.txt" />
+</full-backup-content>

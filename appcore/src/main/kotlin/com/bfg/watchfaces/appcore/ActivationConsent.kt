@@ -133,6 +133,35 @@ object ActivationConsent {
     /** Can the app switch a face on for them, or must they do it themselves? */
     fun canActivate(state: State): Boolean = state == State.GRANTED
 
+    /**
+     * The stored answer, checked against the permission it claims to record.
+     *
+     * ## The bug this exists because of
+     *
+     * `activation.txt` lives in `filesDir`, and the watch app does not declare
+     * `android:allowBackup`, so it defaults to true and Android Auto Backup
+     * RESTORES that file on reinstall. The OS permission is not restored — a
+     * fresh install has none.
+     *
+     * So after an uninstall/reinstall the app read GRANTED from a file written
+     * by the PREVIOUS install, while holding no permission at all. `canActivate`
+     * said yes, `canAsk` said no — the one shot was already spent, by an install
+     * that no longer existed — and every send failed to bind to Watch Face Push
+     * with `ERROR_UNKNOWN`, which renders as "the service could not be
+     * accessed". Measured on a Pixel Watch 5: the watch reported GRANTED and
+     * could not reach the service in the same reply.
+     *
+     * A one-shot that outlives the thing it records is worse than no record: it
+     * locks the wearer out of the only action that would fix the problem.
+     *
+     * GRANTED without the permission is therefore read as UNASKED — the state
+     * that lets the app ask again. That is not losing an answer; the answer was
+     * already void. Every other state is returned unchanged: DENIED still means
+     * denied, because a denial does not depend on holding anything.
+     */
+    fun reconcile(stored: State, permissionHeld: Boolean): State =
+        if (stored == State.GRANTED && !permissionHeld) State.UNASKED else stored
+
     // ---- what the person is actually told ------------------------------------
     //
     // The operator asked for two things, and named the second because it is the

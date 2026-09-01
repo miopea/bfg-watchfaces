@@ -1,5 +1,76 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-01 — A one-shot that outlived the permission it recorded
+
+Every send began failing after the watch app was reinstalled:
+
+```text
+FAILED UpdateWatchFaceException
+ | Unknown error while updating a watch face...
+ | <- UpdateException: Failed to update watch face with error code 1
+ | slots{free=0 ours=1 pkgs=[com.bfg.watchfaces.watchfacepush.default]}
+```
+
+### Reading it, rather than guessing at it
+
+`slots{ours=1}` killed the leading hypothesis immediately: this was NOT the
+orphaned slot of `backlog.md` #5, which the reinstall would plausibly have
+caused. The slot is ours. That hypothesis was never acted on, only tested.
+
+`error code 1` was decided by reading the constants out of the AAR rather than
+assuming they were zero-based — they are not:
+
+```text
+ERROR_UNKNOWN = 1          <- this one
+ERROR_UNEXPECTED_CONTENT = 2
+ERROR_INVALID_PACKAGE_NAME = 3
+ERROR_MALFORMED_WATCHFACE_APK = 4
+ERROR_INVALID_SLOT_ID = 5
+ERROR_INVALID_VALIDATION_TOKEN = 6
+```
+
+Zero-based would have made it `ERROR_UNEXPECTED_CONTENT` and sent the whole
+investigation into the APK contents, which are fine.
+
+### The contradiction that named the bug
+
+The same reply carried `GRANTED` and a bind failure. Both cannot be true, and
+the manifest says why: the watch app never declared `android:allowBackup`, so
+it defaults to true, and `activation.txt` lives in `filesDir` — which Android
+Auto Backup **restores on reinstall**. The permission is not restored.
+
+So a fresh install read GRANTED from a file written by an install that no
+longer existed, held no permission, and could never ask for one, because the
+record said the single ask was already spent.
+
+**A one-shot that outlives the thing it records is worse than no record**: it
+locks the wearer out of the only action that would fix their problem, and the
+failure it produces names neither the permission nor the cause.
+
+### Two fixes, because one of them cannot reach this watch
+
+`ActivationConsent.reconcile` reads GRANTED-without-the-permission as UNASKED —
+the state that allows asking again. Nothing is lost: that answer was void.
+DENIED is returned unchanged, because a denial does not depend on holding
+anything, and re-opening it would hand the app a second ask it was refused.
+
+The manifest also excludes `activation.txt` from cloud backup and device
+transfer, so this stops happening to new installs. That does not help an install
+that has ALREADY restored the file, which is why the reconciliation exists and
+why it is the fix that matters.
+
+### On the method
+
+The watch's reply used to be `cause.message ?: cause.javaClass.simpleName` —
+one or the other, never both, never the cause chain. It produced "Unknown
+error", which names nothing. The phone had the identical bug and it cost a day.
+
+There is no second place to look on a Pixel Watch: Bluetooth debugging was
+removed in Wear OS 3, there is no data port, and Wi-Fi debugging needs a network
+the operator did not have. The reply line IS the log, and it was summarising.
+
+Fixing that took one release and produced the answer in one send.
+
 ## 2026-09-01 — Five wrong diagnoses, and the one measurement that ended it
 
 Sign-in from the Play build failed for a day. Five causes were proposed and
