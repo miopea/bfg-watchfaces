@@ -155,7 +155,34 @@ class FaceReceiverService : WearableListenerService() {
         is FaceInstaller.Result.Unsupported ->
             WatchLink.Report.failed("this watch does not support Watch Face Push")
         is FaceInstaller.Result.Failed ->
-            WatchLink.Report.failed(result.cause.message ?: result.cause.javaClass.simpleName)
+            // CLASS, message, cause chain AND the slot picture.
+            //
+            // This used to send `message ?: simpleName` -- one or the other,
+            // never both, and never the cause. It produced "Unknown error while
+            // updating a watch face", which named nothing and could not be
+            // followed, and there is no second channel to go and look: Bluetooth
+            // debugging was removed in Wear OS 3, the Pixel Watch has no data
+            // port, and Wi-Fi debugging needs a network. This line IS the log.
+            //
+            // The phone spent a day in exactly this position for exactly this
+            // reason. Same fix, same reason: report, do not summarise.
+            WatchLink.Report.failed(detail(result))
+    }
+
+    /** Everything a failure actually carried, for a device nothing can attach to. */
+    private fun detail(result: FaceInstaller.Result.Failed): String {
+        val parts = mutableListOf<String>()
+        parts += result.cause.javaClass.simpleName
+        result.cause.message?.takeIf { it.isNotBlank() }?.let { parts += it }
+        var cause = result.cause.cause
+        var depth = 0
+        while (cause != null && depth < 3) {
+            parts += "<- ${cause.javaClass.simpleName}: ${cause.message ?: "(no message)"}"
+            cause = cause.cause
+            depth++
+        }
+        if (result.slots.isNotBlank()) parts += "slots{${result.slots}}"
+        return parts.joinToString(" | ")
     }
 
     private fun report(result: FaceInstaller.Result) = when (result) {

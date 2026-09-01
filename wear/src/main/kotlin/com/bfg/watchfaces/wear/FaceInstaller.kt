@@ -36,7 +36,15 @@ object FaceInstaller {
             val active: Boolean
         ) : Result
         data object Unsupported : Result
-        data class Failed(val cause: Throwable) : Result
+        /**
+         * @param slots what `listWatchFaces` saw when the attempt began.
+         *   Carried because the phone is the ONLY place this can be read from —
+         *   Bluetooth debugging was removed in Wear OS 3, the Pixel Watch has no
+         *   data port, and Wi-Fi debugging needs a network the operator may not
+         *   have. Without it, "it failed" is the whole of what the watch can say,
+         *   which is exactly the position the PHONE was in for a full day.
+         */
+        data class Failed(val cause: Throwable, val slots: String = "") : Result
     }
 
     /**
@@ -63,6 +71,8 @@ object FaceInstaller {
         // 6 emulator, 2026-08-29: the failure names bindService and not Push, so
         // it reads like a bug in the caller rather than a context requirement.
         val context = caller.applicationContext
+        // Filled in once the slots are read; empty if we never got that far.
+        var slotPicture = ""
 
         if (!WatchFacePushManagerFactory.isSupported()) {
             // Wear OS 6 is a hard floor. Saying so here is cheap; discovering it
@@ -76,6 +86,11 @@ object FaceInstaller {
             ParcelFileDescriptor.open(apk, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
                 val existing = manager.listWatchFaces()
                 Log.i(TAG, "slots: ${existing.remainingSlotCount} free, ${existing.installedWatchFaceDetails.size} used")
+                // Held so a FAILURE can carry it back to the phone. The phone is
+                // the only place this is readable from -- see Result.Failed.
+                slotPicture = "free=${existing.remainingSlotCount} " +
+                    "ours=${existing.installedWatchFaceDetails.size} " +
+                    "pkgs=[${existing.installedWatchFaceDetails.joinToString(",") { it.packageName }}]"
                 // Slots are finite. Replacing our own oldest face is better than
                 // failing with ERROR_SLOT_LIMIT_REACHED, which the user cannot act
                 // on and which reads as "the app is broken".
@@ -199,7 +214,7 @@ object FaceInstaller {
                     )
                 }
             }
-        }.getOrElse { Result.Failed(it) }
+        }.getOrElse { Result.Failed(it, slotPicture) }
     }
 
     /**
