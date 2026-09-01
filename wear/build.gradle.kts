@@ -19,8 +19,8 @@ android {
         // the phone and watch apps ship as two artefacts under one listing. The
         // scheme is "wear = phone + 1000", so the two never collide and it stays
         // obvious which is which in the console.
-        versionCode = 1019
-        versionName = "1.26"
+        versionCode = 1020
+        versionName = "1.27"
     }
     /**
      * Release signing. Identical to `:mobile`'s and deliberately so: both

@@ -121,7 +121,15 @@ class FaceReceiverService : WearableListenerService() {
                         // only this device writes, so it always read UNASKED
                         // and could never explain a denial.
                         WatchLink.Report.SEPARATOR +
-                        Activation.state(applicationContext).name
+                        Activation.state(applicationContext).name +
+                        // FOURTH line: how the install actually went, when
+                        // there is anything to say. Additive on purpose --
+                        // every existing reader takes lines 0..2 and a phone
+                        // that has never heard of this one is unaffected, so
+                        // the watch can be instrumented WITHOUT shipping a
+                        // phone build to read it. FaceSender logs the whole
+                        // reply verbatim, so adb on the phone is the readout.
+                        noteFor(result)
                 )
             }.onFailure {
                 Log.e(TAG, "face did not arrive or would not install", it)
@@ -148,6 +156,14 @@ class FaceReceiverService : WearableListenerService() {
             Log.i(TAG, "reported to the phone: $line")
         }.onFailure { Log.w(TAG, "could not report back; the face is installed regardless", it) }
     }
+
+    /** The fourth line, or nothing at all when there is nothing to add. */
+    private fun noteFor(result: FaceInstaller.Result): String =
+        if (result is FaceInstaller.Result.Installed && result.note.isNotEmpty()) {
+            WatchLink.Report.SEPARATOR + result.note
+        } else {
+            ""
+        }
 
     private fun lineFor(result: FaceInstaller.Result): String = when (result) {
         is FaceInstaller.Result.Installed ->

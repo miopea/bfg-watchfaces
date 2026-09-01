@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.wear
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.wear.watchfacepush.WatchFacePushManagerFactory
@@ -33,7 +34,15 @@ object FaceInstaller {
         data class Installed(
             val slotId: String,
             val replaced: Boolean,
-            val active: Boolean
+            val active: Boolean,
+            /**
+             * Anything unusual about HOW it installed, for the phone to relay.
+             *
+             * Empty on the ordinary path. Non-empty when the in-place update
+             * failed and the remove-and-add fallback carried it — which is a
+             * success the wearer should not notice and an engineer must.
+             */
+            val note: String = ""
         ) : Result
         data object Unsupported : Result
         /**
@@ -73,6 +82,8 @@ object FaceInstaller {
         val context = caller.applicationContext
         // Filled in once the slots are read; empty if we never got that far.
         var slotPicture = ""
+        // Non-empty only if the in-place update was refused and the fallback ran.
+        var fallback = ""
 
         if (!WatchFacePushManagerFactory.isSupported()) {
             // Wear OS 6 is a hard floor. Saying so here is cheap; discovering it
@@ -90,7 +101,14 @@ object FaceInstaller {
                 // the only place this is readable from -- see Result.Failed.
                 slotPicture = "free=${existing.remainingSlotCount} " +
                     "ours=${existing.installedWatchFaceDetails.size} " +
-                    "pkgs=[${existing.installedWatchFaceDetails.joinToString(",") { it.packageName }}]"
+                    "pkgs=[${existing.installedWatchFaceDetails.joinToString(",") { it.packageName }}] " +
+                    // Everything a failure needs, gathered BEFORE the call that
+                    // might fail. listWatchFaces having got this far already
+                    // proves the service is reachable and the push permission
+                    // is held, so a later "could not access the service" is
+                    // about something else -- which is exactly the reading that
+                    // cost a release.
+                    "apk=${apk.length()} " + permissions(context)
                 // Slots are finite. Replacing our own oldest face is better than
                 // failing with ERROR_SLOT_LIMIT_REACHED, which the user cannot act
                 // on and which reads as "the app is broken".
@@ -118,8 +136,35 @@ object FaceInstaller {
                     // This preserves anything the wearer picked on the watch
                     // AND costs no activation call, because the face is never
                     // deactivated.
-                    val details = manager.updateWatchFace(ours.slotId, fd, token)
-                    Log.i(TAG, "updated slot ${ours.slotId} in place")
+                    // FALL BACK rather than fail.
+                    //
+                    // updateWatchFace returned ERROR_UNKNOWN on a Pixel Watch 5
+                    // on 2026-09-01 while listWatchFaces on the same manager
+                    // had just succeeded -- so the service was reachable and
+                    // the permission held, and "could not be accessed", which
+                    // is how the library words code 1, was not what happened.
+                    //
+                    // Remove-and-add is not a guess at the cause: it is the
+                    // path the operator already chose on 2026-08-30 for the
+                    // complication-assignment problem, reachable today only
+                    // when the sender asks for it. Trying it here answers
+                    // which of the two calls is refused AND gets the wearer
+                    // their face, instead of spending another release to learn
+                    // one fact.
+                    val updated = runCatching { manager.updateWatchFace(ours.slotId, fd, token) }
+                    val details = updated.getOrElse { cause ->
+                        fallback = "updateWatchFace refused (${short(cause)}); removed and re-added"
+                        Log.w(TAG, "updateWatchFace failed; falling back to remove+add", cause)
+                        runCatching { manager.removeWatchFace(ours.slotId) }
+                            .onFailure { Log.w(TAG, "could not remove the old face", it) }
+                        // A FRESH descriptor. The failed call may have consumed
+                        // the offset on this one, and an add reading from the
+                        // middle of an APK is a malformed-package error that
+                        // would look like a second, unrelated bug.
+                        ParcelFileDescriptor.open(apk, ParcelFileDescriptor.MODE_READ_ONLY)
+                            .use { fresh -> manager.addWatchFace(fresh, token) }
+                    }
+                    Log.i(TAG, "updated slot ${ours.slotId}${if (fallback.isEmpty()) " in place" else " via remove+add"}")
                     // Still ask to activate. Dropping this was a regression:
                     // before, EVERY install tried, and a face sent to a watch
                     // wearing something else silently stopped switching.
@@ -142,7 +187,15 @@ object FaceInstaller {
                     val active = asked || runCatching {
                         manager.isWatchFaceActive(details.packageName)
                     }.getOrElse { false }
-                    Result.Installed(details.slotId, replaced = true, active = active)
+                    Result.Installed(
+                        details.slotId, replaced = true, active = active,
+                        // The picture rides back on a SUCCESS too. Every
+                        // diagnostic in this file so far was reachable only by
+                        // failing, so the healthy shape was never once observed
+                        // and there was nothing to compare a failure against.
+                        note = listOf(fallback, slotPicture)
+                            .filter { it.isNotEmpty() }.joinToString(" | ")
+                    )
                 } else if (ours != null) {
                     // Whether OUR face is the one on the wrist decides if the
                     // new one has to be activated. Ask BEFORE removing it,
@@ -225,6 +278,25 @@ object FaceInstaller {
      * It posts a notification rather than opening the dialog directly, because
      * Android will not let this context open anything: see [ActivationPrompt].
      */
+    /**
+     * Both permissions, named separately, because conflating them cost a release.
+     *
+     * `PUSH_WATCH_FACES` is install-time and gates putting a face on the watch.
+     * `SET_PUSHED_WATCH_FACE_AS_ACTIVE` is the runtime, ask-once one and gates
+     * switching to it. A build shipped reading the first where it meant the
+     * second, and the check silently answered true forever.
+     */
+    private fun permissions(context: Context): String {
+        fun held(name: String) =
+            context.checkSelfPermission(name) == PackageManager.PERMISSION_GRANTED
+        return "push=${held("com.google.wear.permission.PUSH_WATCH_FACES")} " +
+            "activate=${held(ActivationConsent.PERMISSION)}"
+    }
+
+    /** Class and message, short enough to ride back on a channel reply. */
+    private fun short(cause: Throwable): String =
+        "${cause.javaClass.simpleName}: ${cause.message ?: "(no message)"}"
+
     private fun onFaceInstalled(context: Context, slotId: String): Boolean {
         val state = Activation.state(context)
 

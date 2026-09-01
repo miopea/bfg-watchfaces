@@ -1,5 +1,65 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-01 — Correcting the entry below it, and instrumenting instead
+
+The entry dated the same day is **wrong about the cause**, and it was written
+confidently enough to be worth correcting in place rather than quietly editing.
+
+### What it got wrong
+
+It claimed the restored `activation.txt` explained `updateWatchFace` failing
+with `ERROR_UNKNOWN`. It cannot:
+
+- **Binding demonstrably worked.** `slots{free=0 ours=1 ...}` is assigned only
+  after `manager.listWatchFaces()` RETURNS — same manager, same service, same
+  bind. A non-empty slot picture in a failure reply is proof the service was
+  reachable. "Could not be accessed", which is how the library words code 1, is
+  not what happened.
+- **The two permissions are different things.** `PUSH_WATCH_FACES` is normal and
+  install-time; it gates PUTTING a face on the watch and is held from the moment
+  the app installs. `SET_PUSHED_WATCH_FACE_AS_ACTIVE` is the runtime, ask-once
+  one; it gates SWITCHING to a face and is all `ActivationConsent` records.
+  Stale activation consent cannot stop an install.
+- **And the fix shipped inert.** `Activation.permissionHeld` read
+  `PUSH_WATCH_FACES` — the always-granted one — so `reconcile` was handed `true`
+  on every call and returned the stored state unchanged. Watch 1.26 changed
+  nothing. The unit tests could not have caught it: they call `reconcile` with a
+  boolean and never see which permission the caller asks about.
+
+### What survives
+
+The backup mechanism is real, and so is the bug — but it is a NARROWER bug than
+claimed. A restored `activation.txt` leaves the app unable to ask for the
+activation permission, so a face **installs and the watch never switches to it**.
+From the wrist that is "I sent it and nothing happened" — which is what made it
+so easy to mistake for the send failing. The manifest backup exclusion stands.
+
+### Why the fix is a fallback and not another theory
+
+The failing call is `updateWatchFace`, on the in-place branch. Rather than
+propose a sixth cause, 1.27 tries the OTHER call when that one is refused.
+
+That is not a guess dressed as a fix: remove-and-add is the path the operator
+already chose on 2026-08-30, for the complication-assignment problem, and it has
+been unreachable in practice ever since because no caller passes
+`resetComplications = true`. Trying it on refusal gets the wearer their face AND
+says which of the two calls is refused — one send instead of one release.
+
+### The method note, which is the actual lesson
+
+Five explanations were offered for this symptom and all five were wrong. Every
+one was argued from a short string, and every one was cheaper to argue than to
+measure.
+
+What finally narrowed it was not a new theory. It was reading what the existing
+reply already proved — that `listWatchFaces` had succeeded — which had been
+sitting in the operator's message, unread, the whole time.
+
+So 1.27 reports on SUCCESS as well as failure. Every diagnostic in `FaceInstaller`
+so far was reachable only by failing, which means the healthy shape has never
+once been observed and there has never been anything to compare a failure
+against. That is the condition that made five guesses possible.
+
 ## 2026-09-01 — A one-shot that outlived the permission it recorded
 
 Every send began failing after the watch app was reinstalled:

@@ -11,29 +11,57 @@ import com.bfg.watchfaces.appcore.ActivationConsent
  * Every read of [ActivationConsent] on the watch goes through here, because the
  * stored answer can outlive the permission it records.
  *
- * `activation.txt` lives in `filesDir` and the app does not opt out of Android
+ * `activation.txt` lives in `filesDir` and the app did not opt out of Android
  * Auto Backup, so the file is restored on reinstall. The permission is not — a
- * fresh install holds none. That left the app reading GRANTED from a file
- * written by an install that no longer existed, unable to ask again because the
- * one shot was recorded as spent, and unable to bind to Watch Face Push. Every
- * send failed with `ERROR_UNKNOWN`, which reads as "the service could not be
- * accessed" and names nothing.
+ * fresh install holds none. That leaves the app reading GRANTED from a file
+ * written by an install that no longer exists, and unable to ask again because
+ * the one shot is recorded as spent.
  *
- * Measured on a Pixel Watch 5, 2026-09-01: the same reply carried GRANTED and a
- * bind failure.
+ * ## What that actually breaks, stated narrowly
  *
- * The manifest now also excludes the file from backup, so this stops happening
- * to new installs. This exists for the ones it already happened to — including
- * the operator's watch, which cannot be fixed by a manifest change it has
- * already restored past.
+ * The face still INSTALLS. `SET_PUSHED_WATCH_FACE_AS_ACTIVE` gates switching to
+ * a face, not putting one there, so what is lost is the switch: the face lands
+ * in the picker and the watch never moves to it. From the wearer's side that is
+ * "I sent a face and nothing happened".
+ *
+ * It does **not** explain a failure to bind to Watch Face Push. This file said
+ * for one release that it did — that `updateWatchFace`'s `ERROR_UNKNOWN` came
+ * from the stale GRANTED — and that was wrong twice over: binding needs
+ * `PUSH_WATCH_FACES`, which is an install-time permission this app declares and
+ * therefore always holds; and the check below was reading that permission
+ * rather than the activation one, so the reconciliation could never fire at
+ * all. The install failure is a separate, still-open question.
+ *
+ * The manifest also excludes the file from backup, so this stops happening to
+ * new installs. This exists for the ones it already happened to.
  */
 object Activation {
 
     private const val TAG = "Activation"
 
-    /** The Watch Face Push permission, held or not. */
+    /**
+     * The ACTIVATION permission, held or not.
+     *
+     * [ActivationConsent.PERMISSION] and not a literal, and specifically not
+     * `PUSH_WATCH_FACES` — which is what the first version of this file
+     * checked, and which made the whole reconciliation INERT.
+     *
+     * The two are not interchangeable and confusing them is silent:
+     *
+     * - `PUSH_WATCH_FACES` is a normal, install-time permission. It is declared
+     *   in the manifest, so it is granted the moment the app installs and this
+     *   check would return true forever. It gates PUTTING a face on the watch.
+     * - `SET_PUSHED_WATCH_FACE_AS_ACTIVE` is the runtime one, asked for with a
+     *   dialog, revocable, not restored by backup, and askable ONCE. It gates
+     *   SWITCHING to a face. It is the only thing [ActivationConsent] records.
+     *
+     * With the wrong constant `reconcile` was handed `true` on every call and
+     * returned the stored state unchanged, so shipping it changed nothing. The
+     * unit tests could not catch that: they call `reconcile` with a boolean
+     * directly and never see which permission this asks about.
+     */
     fun permissionHeld(context: Context): Boolean =
-        context.checkSelfPermission("com.google.wear.permission.PUSH_WATCH_FACES") ==
+        context.checkSelfPermission(ActivationConsent.PERMISSION) ==
             PackageManager.PERMISSION_GRANTED
 
     /** The stored state, reconciled against the permission it claims. */
