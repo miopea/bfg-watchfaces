@@ -99,7 +99,7 @@ object AndroidFacePreview {
             }
             // Which wording and what size both come from SlotGeometry, the
             // same call the emitter makes. It shortens before it shrinks.
-            val drawn = SlotGeometry.drawnText(source, box, fontSize.toInt())
+            val drawn = SlotGeometry.drawnText(source, box, fontSize.toInt(), p.generatorVersion)
             drawCenteredIn(
                 canvas, drawn.sample ?: Complications.sample(source),
                 box.x.toFloat(),

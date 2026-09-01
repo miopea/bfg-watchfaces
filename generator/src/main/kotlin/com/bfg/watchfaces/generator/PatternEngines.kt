@@ -44,6 +44,10 @@ object PatternEngines {
         // had, and lets a long drawn value drop a word rather than shrink.
         // Both are SlotGeometry; the dial pattern is untouched.
         10 -> v4(p)
+        // v11 widened the TOP complication box to the room the dial actually
+        // offers there, and corrected how wide a weather value is measured to
+        // be. Both are SlotGeometry; no engine changed.
+        11 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

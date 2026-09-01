@@ -1,5 +1,7 @@
 package com.bfg.watchfaces.generator
 
+import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -211,8 +213,13 @@ object SlotGeometry {
         val widestValue: Int
     )
 
-    fun drawnText(source: ComplicationSource, box: Box, base: Int): DrawnText {
-        val chars = source.widestValue
+    fun drawnText(
+        source: ComplicationSource,
+        box: Box,
+        base: Int,
+        version: Int = CURRENT_GENERATOR_VERSION
+    ): DrawnText {
+        val chars = source.widestValueFor(version)
         val full = DrawnText(source.format, source.drawn.toList(), base, null, chars)
         if (chars <= 0) return full
 
@@ -669,6 +676,40 @@ object SlotGeometry {
             SlotPosition.BOTTOM -> (w * 1.7).roundToInt()
             else -> w
         }
+
+        /**
+         * From v11: as wide as this slot's own value NEEDS, up to the circle.
+         *
+         * 1.7x was a guess at "wider than a third", and for a drawn value it
+         * was too small by more than half. Measured at the default size: the
+         * top box came out 126px while the dial offers 339px at that height,
+         * and "4° Partly cloudy" needs 208px to draw at the same size as its
+         * neighbours. So it was drawn at 20pt into a 126px box and clipped —
+         * from a wrist, "4° Partly cloud".
+         *
+         * Demand-driven rather than a bigger constant, because the cap was
+         * there for a reason: a slot that always ran the width of the dial
+         * would stop reading as one of a set. A short value keeps the old
+         * width and only a long one takes the room, so nothing moves that did
+         * not have to.
+         *
+         * The chord is the hard limit, at 92% so the text does not touch the
+         * rim. If even that is too narrow, [drawnText] shortens or shrinks as
+         * before — this widens the box, it does not remove the fallback.
+         */
+        fun wantedWidth(pos: SlotPosition, y: Int, h: Int, fallback: Int): Int {
+            if (p.generatorVersion < 11) return fallback
+            val source = p.slot(pos)
+            val chars = source.widestValueFor(p.generatorVersion)
+            if (chars <= 0) return fallback
+            val font = fontSize(if (pos == SlotPosition.TOP) topSize else size)
+            val needed = ceil(TEXT_ADVANCE * chars * font).toInt()
+            // Widest point of the box is whichever edge sits nearer the rim.
+            val dy = maxOf(abs(y - DIAL_CENTER), abs(y + h - DIAL_CENTER))
+            val room = if (dy >= DIAL_RADIUS) 0.0
+                else 2 * sqrt(DIAL_RADIUS * DIAL_RADIUS - dy * dy) * 0.92
+            return maxOf(fallback, minOf(needed, room.toInt()))
+        }
         val anchor = (size * 1.2).roundToInt()
         val (timeTop, timeBottom) = timeBand(l)
         val air = airOverride ?: verticalAir(p)
@@ -691,7 +732,7 @@ object SlotGeometry {
             // printed straight through the top complication's own text.
             dateBand(p)?.let { y = min(y, it.y - GAP - h) }
             y = max(y, highestY)                   // and never leave the circle
-            val tw = wFor(SlotPosition.TOP)
+            val tw = wantedWidth(SlotPosition.TOP, y, h, wFor(SlotPosition.TOP))
             out[SlotPosition.TOP] = Box(DIAL_SIZE / 2 - tw / 2, y, tw, h)
             topBottom = y + h
         }

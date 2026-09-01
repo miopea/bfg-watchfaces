@@ -1,5 +1,65 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-01 — v11: the top slot takes the room the dial already had
+
+Reported from a wrist, with a photo: the weather at the top read
+**"4° Partly cloud"**. The last letter was gone.
+
+### Measured before touching anything
+
+```text
+TOP box=(x=165 y=76 w=126 h=47)  base font=21
+chord available at that height   = 339px
+"4° Partly cloudy" at 21pt needs = 208px
+```
+
+The box was using **126 of 339 available pixels** — 37% of the room the circle
+offers at that height — while the value needed 208. So it was drawn at full size
+into a box a third too small and clipped.
+
+Two separate errors, both of them under-measurement:
+
+- **`widestValue` was 10**, taken from "72° Cloudy". Real
+  `[WEATHER.CONDITION_NAME]` values are longer: "Partly cloudy" is thirteen on
+  its own, seventeen with a temperature in front. The fitting logic was sound
+  and was being fed a lie, so it concluded the string fit at 20pt.
+- **The box was 1.7x a row slot**, a guess at "wider than a third" made when the
+  top slot stopped being held to the middle row's width. Nobody checked it
+  against the chord.
+
+Under-measuring is the worst of the three possible errors. Too wide only wastes
+space; too narrow silently removes a letter, and **a reader cannot tell a
+clipped word from a short one** — which is why this shipped and was only caught
+by someone looking at their own wrist.
+
+### The fix is room, not shrinking
+
+The operator asked whether it could scale in the space. It turns out it does not
+have to: given the room that was already there, the full wording renders at 21pt
+— the same size as its neighbours. The box now widens to what its own value
+needs, capped by the chord at 92% so text never touches the rim.
+
+Demand-driven rather than simply a bigger constant, because the old cap existed
+for a reason recorded at the time: *a slot that ran the width of the dial would
+stop reading as one of a set.* A short value keeps the old width; only a long
+one takes the room. Measured: 126px to 222px for weather, unchanged for
+everything else.
+
+`drawnText` still shortens and then shrinks. That fallback is untouched — this
+widens the box before any of it is needed.
+
+### Gated at v11, and what that costs
+
+Both changes move text on faces people already have, so `widestValueFor(version)`
+and the widening are gated, and a test walks every source in every slot asserting
+v10 boxes are identical. `PatternEngines` gains `11 -> v4(p)`: no engine changed.
+
+The version bump also stales `params-contract.json`, which the catalog Worker
+bundles at build time and uses to reject faces above `currentGeneratorVersion`.
+Regenerated here; **the Worker must be redeployed or every v11 face is refused
+on submit.** This is the second time a version bump has carried that
+consequence, and it is now the second entry saying so.
+
 ## 2026-09-01 — The phone opens the watch app, because the watch cannot ask
 
 A fresh install could not ask for activation AT ALL, and nothing anywhere said

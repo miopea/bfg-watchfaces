@@ -99,7 +99,7 @@ object FacePreview {
             // The emitter asks SlotGeometry which wording fits and at what
             // size; so does this. A preview that shortened differently from
             // the watch would be a preview of a different face.
-            val drawn = SlotGeometry.drawnText(source, box, fontSize.toInt())
+            val drawn = SlotGeometry.drawnText(source, box, fontSize.toInt(), p.generatorVersion)
             drawCenteredIn(g, drawn.sample ?: Complications.sample(source),
                 box.x, box.y + textY, box.w, textH,
                 drawn.fontSize.toDouble(), Font.PLAIN, c)

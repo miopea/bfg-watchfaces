@@ -211,6 +211,28 @@ enum class ComplicationSource(
         }
 
     /**
+     * The same measure, corrected — and version-gated, because correcting it
+     * moves text on faces people already have.
+     *
+     * The v10 numbers were taken from "72° Cloudy" and "Cloudy". Real
+     * `[WEATHER.CONDITION_NAME]` values are longer than that: "Partly cloudy"
+     * is thirteen characters on its own, and with a temperature in front the
+     * whole string runs to seventeen. So the box was built for ten characters,
+     * the watch drew seventeen into it, and the end was clipped — reported
+     * from a wrist as "4° Partly cloud".
+     *
+     * Under-measuring is the worst of the three options. Too WIDE only wastes
+     * space; too narrow silently removes a letter, and the reader cannot tell
+     * a clipped word from a short one.
+     */
+    fun widestValueFor(version: Int): Int =
+        if (version < 11) widestValue else when (this) {
+            WEATHER_TEMP_CONDITION -> 17   // "-12° Partly cloudy"
+            WEATHER_CONDITION -> 13        // "Partly cloudy"
+            else -> widestValue
+        }
+
+    /**
      * A shorter way to say the same thing, when the box cannot hold the full
      * form.
      *
@@ -757,7 +779,7 @@ data class Layout(
  */
 val COMPONENT = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*/\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z0-9_$]+)*""")
 
-const val CURRENT_GENERATOR_VERSION = 10
+const val CURRENT_GENERATOR_VERSION = 11
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

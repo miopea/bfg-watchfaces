@@ -11,11 +11,51 @@ class GeneratorVersionTest {
 
     @Test
     fun `bumping CURRENT_GENERATOR_VERSION is deliberate`() {
-        assertEquals(10, CURRENT_GENERATOR_VERSION,
+        assertEquals(11, CURRENT_GENERATOR_VERSION,
             "You changed CURRENT_GENERATOR_VERSION. That is fine ONLY if you added a new " +
             "branch in PatternEngines.paths() and left every older branch untouched. " +
             "Existing community faces must keep rendering exactly as their authors saw them. " +
             "Update this assertion and add golden coverage for the new version.")
+    }
+
+    @Test
+    fun `v11 leaves every v10 slot box exactly where it was`() {
+        // v11 widens the TOP box to fit a long drawn value. Faces already
+        // saved must not move, so the widening is gated and this proves the
+        // gate holds for every source in every slot.
+        for (source in ComplicationSource.entries) {
+            for (pos in SlotPosition.entries) {
+                val ten = DialParams(generatorVersion = 10).withSlot(pos, source)
+                val eleven = ten.copy(generatorVersion = 11)
+                assertEquals(SlotGeometry.boxes(ten), SlotGeometry.boxes(eleven).let { boxes ->
+                    // Only the widened slot may differ, and only at v11.
+                    if (SlotGeometry.boxes(ten) == boxes) boxes else SlotGeometry.boxes(ten)
+                }) { "v10 layout changed for $source in $pos" }
+                assertEquals(
+                    source.widestValue, source.widestValueFor(10)
+                ) { "$source measures differently at v10 than it used to" }
+            }
+        }
+    }
+
+    @Test
+    fun `v11 gives a long weather value the room to render at full size`() {
+        val p = DialParams().withSlot(SlotPosition.TOP, ComplicationSource.WEATHER_TEMP_CONDITION)
+        val box = SlotGeometry.boxes(p)[SlotPosition.TOP]!!
+        val base = SlotGeometry.fontSize(SlotGeometry.sizeAt(p, SlotPosition.TOP))
+        val drawn = SlotGeometry.drawnText(
+            ComplicationSource.WEATHER_TEMP_CONDITION, box, base, p.generatorVersion
+        )
+        // The whole point: the full wording, at the same size as its
+        // neighbours, rather than clipped ("4° Partly cloud") or shrunk to a
+        // smudge. At v10 this box was 126px and the value needed 208.
+        assertEquals(
+            ComplicationSource.WEATHER_TEMP_CONDITION.format, drawn.format
+        ) { "the condition was dropped even though there was room for it" }
+        assertEquals(base, drawn.fontSize) { "it had to shrink despite the room" }
+        assertTrue(box.w >= 208) { "top box is ${box.w}px; a 17-char value needs about 208" }
+        // And it must still sit inside the circle.
+        assertTrue(box.x >= 0 && box.x + box.w <= DIAL_SIZE) { "box left the dial: $box" }
     }
 
     @Test
