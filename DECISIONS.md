@@ -1,5 +1,54 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-01 — Landscape, and a branch that said nothing three times
+
+### The preview was measured against the wrong edge
+
+Studio's dial was `fillMaxWidth(0.62f)` with `aspectRatio(1f)`, so its HEIGHT
+was 62% of the screen's WIDTH. Portrait, that is a pleasant two-thirds square.
+Landscape, the width is the LONG edge, so the square grew taller than the
+screen, the scrolling controls got what was left of the height, and there was
+nothing left. Reported from a phone: "you cannot see past the watch face
+preview."
+
+Two changes. The preview is now bounded by the SHORT edge, so it can never
+exceed the screen whichever way the phone is held. And landscape puts it BESIDE
+the controls rather than above them, which is what the extra width is for.
+
+Rotation itself already held, because `params` became saveable yesterday — the
+operator confirmed "turn sideways and back, everything holds". Worth noting
+that the two bugs looked identical from outside and were not related at all.
+
+### A silent branch cost three diagnoses
+
+Sign-in has now been reported broken three times with the same words: pick an
+account, land back on the Share button. Three fixes shipped. The first was the
+wrong flow (sheet instead of button). The second was two flows racing. The
+third was Activity recreation. **Two of those three were diagnosed by reasoning
+rather than evidence, and both were wrong.**
+
+The reason the same wrong method kept getting used is in the code:
+`Outcome.Cancelled` did nothing and said nothing. So a sign-in the person
+cancelled, a sign-in that returned no token, and a sign-in that never ran all
+looked identical from outside — which leaves reasoning as the only available
+tool, and reasoning has now been wrong twice.
+
+`Cancelled` carries a reason now, and the UI shows it. Not as an error, because
+dismissing a picker on purpose is not one, but as a line that says something.
+Failures name the Credential Manager `type` as well as the message, because
+those messages are frequently null and the type is the part that distinguishes
+an unregistered signing certificate from a misconfigured client id — two causes
+that currently produce identical, empty text.
+
+This is not a fix. It is the instrument that should have been fitted before the
+first guess.
+
+### Not verified
+
+The landscape layout compiles and the arithmetic that caused the bug is
+unambiguous, but it has not been SEEN: both emulators went away with the bridge
+to the operator's laptop. Said plainly rather than implied.
+
 ## 2026-08-31 — The audit, and the shape the bugs kept taking
 
 Three parallel audits of `:mobile` and the module boundaries, after "we're

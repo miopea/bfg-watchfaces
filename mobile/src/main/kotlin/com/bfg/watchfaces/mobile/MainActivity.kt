@@ -518,8 +518,22 @@ class MainActivity : ComponentActivity() {
                                 (config as? CatalogService.Result.Ok)?.value?.googleClientId.orEmpty()
                             when (val outcome = GoogleSignIn.idToken(this@MainActivity, clientId)) {
                                 is GoogleSignIn.Outcome.Ok -> action(outcome.idToken)
-                                // Changing your mind is not an error and must not look like one.
-                                GoogleSignIn.Outcome.Cancelled -> Unit
+                                is GoogleSignIn.Outcome.Cancelled ->
+                                    // NOT silent any more, and that is the point.
+                                    //
+                                    // "Pick an account, land back on the Share
+                                    // button" was reported three times. Twice it
+                                    // was diagnosed by reasoning and twice the
+                                    // reasoning was wrong, because this branch
+                                    // did nothing and said nothing — so a
+                                    // cancelled sign-in and a sign-in that never
+                                    // ran looked identical from outside.
+                                    //
+                                    // Dismissing a picker on purpose is still not
+                                    // an error, so this is a plain line rather
+                                    // than a red one. But it says SOMETHING, and
+                                    // it carries what Credential Manager said.
+                                    shareError = "Sign-in did not finish: ${outcome.why}"
                                 is GoogleSignIn.Outcome.Failed -> shareError = outcome.message
                             }
                         } finally {

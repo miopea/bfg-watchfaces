@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.mobile
 
 import android.content.Context
+import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
@@ -38,6 +39,8 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
  */
 object GoogleSignIn {
 
+    private const val TAG = "GoogleSignIn"
+
     /**
      * What happened, in terms the UI can act on.
      *
@@ -47,7 +50,17 @@ object GoogleSignIn {
      */
     sealed interface Outcome {
         data class Ok(val idToken: String, val displayName: String?) : Outcome
-        data object Cancelled : Outcome
+        /**
+         * The flow ended without a token and without an error.
+         *
+         * [why] exists because this branch was SILENT and that hid a bug
+         * twice. The first two attempts at the loop reported from a phone —
+         * pick an account, land back on the Share button — were both diagnosed
+         * from reasoning rather than evidence, and both were wrong. A branch
+         * that does nothing and says nothing cannot be told apart from a branch
+         * that never ran.
+         */
+        data class Cancelled(val why: String) : Outcome
         data class Failed(val message: String) : Outcome
     }
 
@@ -98,20 +111,35 @@ object GoogleSignIn {
         val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
         return try {
             val credential = manager.getCredential(context, request).credential
+            Log.i(TAG, "credential returned, type=${credential.type}")
             if (credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                return Outcome.Failed("that sign-in was not a Google account")
+                // NAMES the type. "That sign-in was not a Google account" told
+                // somebody nothing they could act on and nothing anyone could
+                // debug from.
+                return Outcome.Failed("sign-in returned a ${credential.type}, not a Google account")
             }
             val google = GoogleIdTokenCredential.createFrom(credential.data)
+            if (google.idToken.isBlank()) {
+                return Outcome.Failed("Google returned a sign-in with no token in it")
+            }
+            Log.i(TAG, "got an ID token for ${google.displayName ?: "an account"}")
             Outcome.Ok(google.idToken, google.displayName)
-        } catch (_: GetCredentialCancellationException) {
-            Outcome.Cancelled
-        } catch (_: NoCredentialException) {
+        } catch (e: GetCredentialCancellationException) {
+            Log.i(TAG, "sign-in cancelled: ${e.type} ${e.message}", e)
+            Outcome.Cancelled(e.message ?: e.type)
+        } catch (e: NoCredentialException) {
             // The button flow can ADD an account, so reaching here really does
             // mean there was nothing to sign in with -- unlike the sheet, where
             // this exception meant far less than it appeared to.
+            Log.w(TAG, "no credential: ${e.type} ${e.message}", e)
             Outcome.Failed("no Google account on this phone could be used to sign in")
         } catch (e: GetCredentialException) {
-            Outcome.Failed(e.message ?: "that sign-in did not complete")
+            // The TYPE, not just the message. Credential Manager's messages are
+            // often null, and the type is the part that names the cause -- an
+            // unregistered signing certificate and a misconfigured client id
+            // produce different types and identical (empty) messages.
+            Log.e(TAG, "sign-in failed: ${e.type} ${e.message}", e)
+            Outcome.Failed(e.message?.takeIf { it.isNotBlank() } ?: "Sign-in failed: ${e.type}")
         }
     }
 }

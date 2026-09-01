@@ -7,7 +7,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -107,29 +110,39 @@ fun StudioScreen(
      */
     footer: @Composable () -> Unit = {}
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        // PINNED. Every control below changes the dial, and judging a change
-        // meant scrolling up to look and back down to adjust -- on a phone
-        // that is most of the interaction. The preview stays put and only the
-        // controls move.
-        //
-        // Smaller than it was, deliberately: at full width the dial and one
-        // toggle filled the screen, which is what made the scrolling so
-        // costly in the first place.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(Modifier.fillMaxWidth(0.62f)) { DialPreview(params, ambient) }
+    // The preview is PINNED and the controls scroll past it. Every control
+    // changes the dial, and judging a change meant scrolling up to look and
+    // back down to adjust -- on a phone that is most of the interaction.
+    //
+    // WHICH WAY it is pinned depends on the shape of the screen, and it used to
+    // not. The preview was `fillMaxWidth(0.62f)` with `aspectRatio(1f)`, so its
+    // HEIGHT was 62% of the screen's WIDTH. Portrait: fine. Landscape: the
+    // width is the long edge, so the square grew TALLER THAN THE SCREEN, the
+    // scrolling column below got what was left of the height, and there was
+    // nothing left. Reported from a phone: "you cannot see past the watch face
+    // preview".
+    //
+    // So landscape puts the preview beside the controls rather than above
+    // them, which is what the extra width is for, and bounds it by the short
+    // edge in both orientations.
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val landscape = maxWidth > maxHeight
+        val shortEdge = minOf(maxWidth, maxHeight)
+        val preview: @Composable () -> Unit = {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // Bounded by the SHORT edge, so the square can never exceed
+                // the screen whichever way round it is held.
+                Box(Modifier.widthIn(max = shortEdge * 0.62f)) {
+                    DialPreview(params, ambient)
+                }
+            }
         }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-        ) {
+        val controls: @Composable ColumnScope.() -> Unit = {
         AmbientToggle(ambient, onAmbient)
         ChoiceRow(
             label = "Time",
@@ -269,6 +282,33 @@ fun StudioScreen(
         Spacer(Modifier.height(16.dp))
             footer()
             Spacer(Modifier.height(24.dp))
+        }
+
+        if (landscape) {
+            // Side by side. The preview takes the left, bounded by height, and
+            // the controls take the rest -- which is what the extra width in
+            // landscape is actually for.
+            Row(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(0.42f), contentAlignment = Alignment.Center) { preview() }
+                Column(
+                    modifier = Modifier
+                        .weight(0.58f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp),
+                    content = controls
+                )
+            }
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                preview()
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp),
+                    content = controls
+                )
+            }
         }
     }
 }
