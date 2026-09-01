@@ -233,18 +233,25 @@ object WatchLink {
         fun describe(faceName: String, watchName: String, raw: String?): String {
             val line = verdictIn(raw).orEmpty()
             return when {
-                line == OK -> "“$faceName” is on your $watchName."
-                // NO "long-press your watch face and pick it".
+                // BOTH say the same thing, and that is deliberate.
                 //
-                // It was reported from a wrist as simply untrue -- the face had
-                // already switched -- and it is instruction for a machine, not
-                // an answer for a person. Someone who sent a watch face wants
-                // to know it arrived; if it is not the one showing, the thing
-                // they do is choose it, in whatever way their watch chooses
-                // things. That is their gesture to know, not ours to dictate.
-                line == OK_NOT_ACTIVE ->
-                    "“$faceName” is on your $watchName. " +
-                        "Choose it from your watch faces to wear it."
+                // "Long-press your watch face and pick it" was rejected twice,
+                // and the second version -- "Choose it from your watch faces to
+                // wear it" -- was the same instruction in politer words, which
+                // is why it was rejected again. The operator's answer both
+                // times was that the face is SUPPOSED to appear on its own:
+                // "It should be appearing automatically. That's the whole point
+                // of what we're doing."
+                //
+                // He is right, and that makes a face that installed without
+                // switching a BUG in this app, not a state to narrate. Text
+                // asking someone to finish the job by hand is this app failing
+                // and then delegating the failure. Watch Face Push preserves
+                // active status across an in-place update, so the only way to
+                // land here is if something deactivated the face -- which is
+                // now prevented in FaceInstaller rather than described here.
+                line == OK || line == OK_NOT_ACTIVE ->
+                    "“$faceName” is on your $watchName."
                 line.startsWith(FAILED) -> {
                     val why = line.removePrefix(FAILED).trim()
                     if (why.isEmpty()) "${watchName} could not install “$faceName”."

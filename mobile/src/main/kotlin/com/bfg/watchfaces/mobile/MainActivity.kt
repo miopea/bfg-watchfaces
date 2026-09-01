@@ -53,6 +53,7 @@ import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.mobile.pack.FaceBuilder
 import com.bfg.watchfaces.mobile.pack.PackBridge
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material3.ModalBottomSheet
@@ -264,24 +265,41 @@ class MainActivity : ComponentActivity() {
                         return
                     }
                     scope.launch {
+                        // The progress message STAYS UP until there is an
+                        // outcome. It used to be Short, so it vanished after a
+                        // few seconds while the build and the Bluetooth
+                        // transfer carried on -- leaving somebody watching an
+                        // idle screen with no idea whether anything was
+                        // happening, which is indistinguishable from the send
+                        // having silently failed.
+                        //
+                        // Indefinite plus an explicit cancel: showSnackbar
+                        // suspends for the life of the message, so each stage
+                        // replaces the one before it and the result replaces
+                        // the last of them.
+                        var progress: Job? = null
+                        fun stage(text: String) {
+                            progress?.cancel()
+                            progress = scope.launch {
+                                snackbar.showSnackbar(text, duration = SnackbarDuration.Indefinite)
+                            }
+                        }
                         // Three beats, in the words somebody would use: what is
                         // happening now, who it is going to, and whether it
                         // arrived. Building and sending are genuinely different
                         // waits -- packing is on this phone, the transfer is
                         // Bluetooth -- and a single "Sending..." covering both
                         // is why a slow build read as a stalled watch.
-                        snackbar.showSnackbar("Building “$name”…", duration = SnackbarDuration.Short)
-                    }
-                    scope.launch {
+                        stage("Building “$name”…")
                         // Off the main thread: packing walks the resource table
                         // and the Data Layer calls block.
                         val report = withContext(Dispatchers.IO) {
-                            buildThenSend(context, name, face) { stage ->
-                                scope.launch {
-                                    snackbar.showSnackbar(stage, duration = SnackbarDuration.Short)
-                                }
+                            // Back onto the main thread to touch `progress`.
+                            buildThenSend(context, name, face) { text ->
+                                scope.launch { stage(text) }
                             }
                         }
+                        progress?.cancel()
                         // Only a send that actually landed changes what Studio
                         // opens on next time -- and "landed" is now the watch's
                         // answer rather than a prefix match on the sentence

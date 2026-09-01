@@ -195,6 +195,26 @@ class WatchLinkTest {
     }
 
     /**
+     * Arriving and arriving-and-showing read the SAME.
+     *
+     * Not laziness: a face that installed without switching is a bug in this
+     * app, because Watch Face Push preserves active status across an in-place
+     * update. Two rejected attempts at wording it ("Long-press your watch face
+     * and pick it", then "Choose it from your watch faces to wear it") were the
+     * same instruction twice, and the operator's answer both times was that the
+     * face is supposed to appear on its own. Text asking somebody to finish the
+     * job by hand is this app failing and delegating the failure.
+     */
+    @Test
+    fun `arriving reads the same whether or not it switched`() {
+        val ok = WatchLink.Report.describe("My Face", "Pixel Watch", WatchLink.Report.OK)
+        val notActive = WatchLink.Report.describe("My Face", "Pixel Watch", WatchLink.Report.OK_NOT_ACTIVE)
+        assertEquals(ok, notActive) {
+            "one of these tells somebody to go and finish the install by hand"
+        }
+    }
+
+    /**
      * Whether it landed is ANSWERED, not inferred from the sentence.
      *
      * The phone decided this by testing whether the message started with

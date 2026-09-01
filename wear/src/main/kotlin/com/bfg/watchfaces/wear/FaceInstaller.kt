@@ -153,6 +153,35 @@ object FaceInstaller {
                     // one fact.
                     val updated = runCatching { manager.updateWatchFace(ours.slotId, fd, token) }
                     val details = updated.getOrElse { cause ->
+                        // NEVER destroy the face somebody is WEARING to work
+                        // around a failure.
+                        //
+                        // This is the invariant the first version of this
+                        // fallback broke. Remove-and-add deletes the installed
+                        // face before adding its replacement, and deleting the
+                        // ACTIVE one deactivates it -- while
+                        // `setWatchFaceAsActive` is spendable once per app
+                        // install, so once it has been used there is nothing
+                        // that can switch it back. The wearer is left on the
+                        // system default with no way back except reinstalling
+                        // the watch app.
+                        //
+                        // That trades a recoverable failure (a send that did
+                        // not land; try again) for an unrecoverable one (the
+                        // face is gone and the app cannot restore it). Measured
+                        // on the operator's Pixel Watch 5, 2026-09-01: the
+                        // fallback "worked" and cost him his watch face.
+                        //
+                        // So the fallback is only safe on a face nobody is
+                        // wearing. If ours is on the wrist, report the refusal
+                        // and leave it alone.
+                        val wearingOurs = runCatching { manager.isWatchFaceActive(ours.packageName) }
+                            .getOrElse { false }
+                        if (wearingOurs) {
+                            Log.e(TAG, "updateWatchFace failed and ours is the active face; " +
+                                "refusing to remove it", cause)
+                            throw cause
+                        }
                         fallback = "updateWatchFace refused (${short(cause)}); removed and re-added"
                         Log.w(TAG, "updateWatchFace failed; falling back to remove+add", cause)
                         runCatching { manager.removeWatchFace(ours.slotId) }

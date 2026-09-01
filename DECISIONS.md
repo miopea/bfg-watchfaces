@@ -1,5 +1,58 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-01 — Never destroy the face somebody is wearing
+
+The fallback shipped in watch 1.27 cost the operator his watch face. He was left
+on the system default, and the app could not put it back.
+
+### Why it was unrecoverable rather than merely wrong
+
+`updateWatchFace` refused, so the fallback removed the installed face and added
+the new one. Removing the ACTIVE face deactivates it — and
+`setWatchFaceAsActive` is spendable once per app install, so once it has been
+used there is nothing left that can switch anything back on. The app had
+destroyed the only thing it was allowed to fix.
+
+**That trade is the bug**: a send that does not land is recoverable — try again.
+A deleted active face with the one-shot spent is not, short of reinstalling the
+watch app. A fallback that turns the first into the second is worse than no
+fallback, and it looked like a success while doing it.
+
+So the rule is now explicit: **if our face is the one on the wrist, the update
+failing is reported and the face is left alone.** Remove-and-add stays, for a
+face nobody is wearing, where the worst case is a face missing from a list.
+
+### The text, rejected twice, now gone
+
+"Long-press your watch face and pick it" was rejected. It was replaced with
+"Choose it from your watch faces to wear it", which is the same instruction in
+politer words, and was rejected again — correctly:
+
+> "It should be appearing automatically. That's the whole point of what we're
+> doing. We don't need that text. You keep bringing back stupid text."
+
+He is right, and the reason is not tone. Watch Face Push preserves active status
+across an in-place update, so a face that installs without switching is a **bug
+in this app**. Describing it politely is the app failing and then delegating the
+failure to the person who asked for it. Both outcomes now read
+`"<face>" is on your <watch>.` and a test asserts the two strings are identical,
+so the instruction cannot come back a third time by being reworded.
+
+### The progress message stays up
+
+It was `SnackbarDuration.Short`, so it vanished after a few seconds while the
+build and the Bluetooth transfer carried on. Somebody was left watching an idle
+screen, which is indistinguishable from a send that silently failed. Each stage
+is now `Indefinite` and is replaced by the next, and the outcome replaces the
+last of them.
+
+### Recovery for an install that already lost it
+
+Nothing in the app can restore a spent one-shot. Reinstalling the watch app can:
+a fresh install holds neither the permission nor — since 1.26 excluded
+`activation.txt` from backup — a stored answer claiming it was already asked. The
+next face to land prompts, and switches on.
+
 ## 2026-09-01 — `versionCode="1"`, and the message that blamed the wrong thing
 
 Driven from adb against a Pixel Watch 5, the fallback shipped in watch 1.27
