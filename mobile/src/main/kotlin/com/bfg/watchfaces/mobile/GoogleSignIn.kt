@@ -104,37 +104,36 @@ object GoogleSignIn {
     }
 
     /**
-     * Credential Manager's own words, turned into somebody's.
+     * Everything the failure actually carried, verbatim.
      *
-     * The instrument added to diagnose a three-times-reported loop worked: it
-     * returned `[16] Account reauth failed`. Verified afterwards that the
-     * config was NOT at fault — the Play App Signing certificate registered
-     * for this app matches Play's own Classical signing key exactly, the
-     * package matches, and the consent screen is External and in production.
+     * This replaced a function that TRANSLATED the error into a friendly
+     * sentence naming a cause. That sentence was a guess, it was wrong, and
+     * putting a guess in the UI made it look like a finding — the operator
+     * reasonably believed the app had diagnosed something and it had not.
      *
-     * So the message means what it says: the Google account on the device
-     * needs re-authentication, and the attempt to do it inside the picker
-     * failed. That is a real and common state, it is the PERSON's to clear,
-     * and nothing in this app can clear it for them.
+     * Four causes were proposed for one symptom and all four were wrong: the
+     * wrong sign-in flow, two flows racing, Activity recreation, and the Play
+     * App Signing certificate. Each was argued from a plausible reading of one
+     * short string, because one short string was all there was.
      *
-     * Which makes the wording the whole of what this app can contribute.
-     * "[16] Account reauth failed" tells somebody they did something wrong and
-     * gives them nowhere to go. Naming the actual remedy is the difference
-     * between a dead end and a thirty-second fix.
-     *
-     * The raw text is kept on the end, because the next person debugging this
-     * needs it and burying it would be repeating the mistake that made this
-     * take three attempts.
+     * So this stops interpreting and starts reporting. Type, message, and the
+     * whole cause chain — which is where a wrapped GMS status actually lives,
+     * and which nothing has looked at yet because nothing surfaced it.
      */
-    private fun explain(raw: String): String = when {
-        raw.contains("reauth", ignoreCase = true) ->
-            "Your Google account needs to be re-verified on this phone. Open the " +
-                "Google or Gmail app and finish any \"verify it's you\" prompt, then " +
-                "try again. ($raw)"
-        raw.contains("no credential", ignoreCase = true) ->
-            "No Google account on this phone could be used. Add one in Settings, " +
-                "then try again. ($raw)"
-        else -> raw
+    private fun detail(e: Throwable, type: String?): String {
+        val parts = mutableListOf<String>()
+        type?.let { parts += "type=$it" }
+        e.message?.takeIf { it.isNotBlank() }?.let { parts += it }
+        // The cause chain. A Credential Manager failure usually WRAPS the real
+        // one, and the wrapper is the part that says nothing useful.
+        var cause = e.cause
+        var depth = 0
+        while (cause != null && depth < 4) {
+            parts += "caused by ${cause.javaClass.simpleName}: ${cause.message ?: "(no message)"}"
+            cause = cause.cause
+            depth++
+        }
+        return parts.joinToString(" | ")
     }
 
     private suspend fun attempt(
@@ -160,20 +159,20 @@ object GoogleSignIn {
             Outcome.Ok(google.idToken, google.displayName)
         } catch (e: GetCredentialCancellationException) {
             Log.i(TAG, "sign-in cancelled: ${e.type} ${e.message}", e)
-            Outcome.Cancelled(explain(e.message ?: e.type))
+            Outcome.Cancelled(detail(e, e.type))
         } catch (e: NoCredentialException) {
             // The button flow can ADD an account, so reaching here really does
             // mean there was nothing to sign in with -- unlike the sheet, where
             // this exception meant far less than it appeared to.
             Log.w(TAG, "no credential: ${e.type} ${e.message}", e)
-            Outcome.Failed("no Google account on this phone could be used to sign in")
+            Outcome.Failed(detail(e, e.type))
         } catch (e: GetCredentialException) {
             // The TYPE, not just the message. Credential Manager's messages are
             // often null, and the type is the part that names the cause -- an
             // unregistered signing certificate and a misconfigured client id
             // produce different types and identical (empty) messages.
             Log.e(TAG, "sign-in failed: ${e.type} ${e.message}", e)
-            Outcome.Failed(e.message?.takeIf { it.isNotBlank() } ?: "Sign-in failed: ${e.type}")
+            Outcome.Failed(detail(e, e.type))
         }
     }
 }
