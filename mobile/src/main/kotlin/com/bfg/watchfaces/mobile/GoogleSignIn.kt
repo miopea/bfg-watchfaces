@@ -103,6 +103,40 @@ object GoogleSignIn {
         return attempt(manager, context, button)
     }
 
+    /**
+     * Credential Manager's own words, turned into somebody's.
+     *
+     * The instrument added to diagnose a three-times-reported loop worked: it
+     * returned `[16] Account reauth failed`. Verified afterwards that the
+     * config was NOT at fault — the Play App Signing certificate registered
+     * for this app matches Play's own Classical signing key exactly, the
+     * package matches, and the consent screen is External and in production.
+     *
+     * So the message means what it says: the Google account on the device
+     * needs re-authentication, and the attempt to do it inside the picker
+     * failed. That is a real and common state, it is the PERSON's to clear,
+     * and nothing in this app can clear it for them.
+     *
+     * Which makes the wording the whole of what this app can contribute.
+     * "[16] Account reauth failed" tells somebody they did something wrong and
+     * gives them nowhere to go. Naming the actual remedy is the difference
+     * between a dead end and a thirty-second fix.
+     *
+     * The raw text is kept on the end, because the next person debugging this
+     * needs it and burying it would be repeating the mistake that made this
+     * take three attempts.
+     */
+    private fun explain(raw: String): String = when {
+        raw.contains("reauth", ignoreCase = true) ->
+            "Your Google account needs to be re-verified on this phone. Open the " +
+                "Google or Gmail app and finish any \"verify it's you\" prompt, then " +
+                "try again. ($raw)"
+        raw.contains("no credential", ignoreCase = true) ->
+            "No Google account on this phone could be used. Add one in Settings, " +
+                "then try again. ($raw)"
+        else -> raw
+    }
+
     private suspend fun attempt(
         manager: CredentialManager,
         context: Context,
@@ -126,7 +160,7 @@ object GoogleSignIn {
             Outcome.Ok(google.idToken, google.displayName)
         } catch (e: GetCredentialCancellationException) {
             Log.i(TAG, "sign-in cancelled: ${e.type} ${e.message}", e)
-            Outcome.Cancelled(e.message ?: e.type)
+            Outcome.Cancelled(explain(e.message ?: e.type))
         } catch (e: NoCredentialException) {
             // The button flow can ADD an account, so reaching here really does
             // mean there was nothing to sign in with -- unlike the sheet, where

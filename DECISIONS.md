@@ -1,5 +1,54 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-01 — The instrument worked, and the answer was not the app
+
+`[16] Account reauth failed`, read off a phone, after three failed diagnoses of
+the same symptom.
+
+### What it was not
+
+The obvious suspect was the Play App Signing certificate — Google's own
+guidance names that mismatch as the usual cause of this exact error, and this
+project had a KNOWN open gap there: the release build is signed by a key whose
+fingerprint was registered but never exercised, and that was said out loud when
+1.37 shipped.
+
+Checked instead of assumed, both ends:
+
+| | |
+| --- | --- |
+| Play's Classical app signing key | `EE:97:08:66:…:01:F7` |
+| The registered Android OAuth client | `EE:97:08:66:…:01:F7` |
+
+Package matches, consent screen is External and in production, and the client's
+own "last used" shows Google matching it. **The config was right.** The most
+plausible suspect, with documentation behind it and a standing admission of
+risk, was still not the cause.
+
+### What it was
+
+The message means what it says. The Google account on the device needs
+re-authentication, the picker's attempt at it failed, and nothing in this app
+can clear that — it is the person's own account state.
+
+### So the only useful thing this app can do is say so properly
+
+`[16] Account reauth failed` tells somebody they did something wrong and gives
+them nowhere to go. It now says which app to open and what prompt to finish,
+and keeps the raw text in parentheses, because the next person debugging this
+needs it and burying it would repeat the mistake that made this take three
+attempts.
+
+### The lesson is about the method, not the bug
+
+Three diagnoses, two of them reasoned rather than measured, both wrong. The
+fourth attempt started by fitting an instrument, and the instrument answered in
+one round — then pointed away from the theory everybody, including the
+documentation, would have bet on.
+
+The instrument should have come first. It cost one release to fit and would
+have saved two.
+
 ## 2026-09-01 — Landscape, and a branch that said nothing three times
 
 ### The preview was measured against the wrong edge
