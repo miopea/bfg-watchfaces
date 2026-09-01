@@ -27,11 +27,18 @@ class MissingAppsRuleTest {
         launchers = mapOf(SlotPosition.RIGHT to "com.example.player/.Main")
     )
 
-    /** What the screen does: everything named, minus everything known. */
+    /**
+     * THE REAL FUNCTION, not a copy of it.
+     *
+     * This test used to declare its own private `missing()` with the same
+     * shape and assert on that, because the real one lived in `:mobile` where
+     * `:appcore` cannot reach it. So the rule that decides what warning a
+     * person sees had no test touching it, while a test named after it passed
+     * — two implementations agreeing until they don't, with the drift hidden
+     * inside the assertion.
+     */
     private fun missing(known: Set<String>): List<String> =
-        (face.providers.values + face.launchers.values).distinct()
-            .filter { it !in known }
-            .map { it.substringBefore('/') }
+        MissingAppsRule.namesOf(face, known)
 
     @Test
     fun `an app the watch never reported is named`() {

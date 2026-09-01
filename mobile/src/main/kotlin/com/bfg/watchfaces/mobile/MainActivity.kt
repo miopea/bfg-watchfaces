@@ -48,6 +48,7 @@ import com.bfg.watchfaces.appcore.FaceCodec
 import com.bfg.watchfaces.appcore.Json
 import com.bfg.watchfaces.appcore.CatalogService
 import com.bfg.watchfaces.appcore.Presets
+import com.bfg.watchfaces.appcore.SubmissionLog
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.mobile.pack.FaceBuilder
 import com.bfg.watchfaces.mobile.pack.PackBridge
@@ -90,7 +91,7 @@ class MainActivity : ComponentActivity() {
             BfgTheme {
                 val scope = rememberCoroutineScope()
                 val context = LocalContext.current
-                val consent = remember { ActivationConsent.load(filesDir) }
+                val consent = remember { WatchConsent.load(context) }
                 val snackbar = remember { SnackbarHostState() }
 
                 // rememberSaveable so a rotation does not throw away a design.
@@ -192,6 +193,47 @@ class MainActivity : ComponentActivity() {
                 // already reads "Shared" and the sheet opens on the taken-back
                 // state rather than offering to send it twice.
                 var shareBusy by remember { mutableStateOf(false) }
+                /**
+                 * Ask the catalog what happened to anything still waiting.
+                 *
+                 * `SubmissionLog` has always documented its `state` as a CACHE
+                 * "refreshed from CatalogService.submissionState" — and nothing
+                 * refreshed it. `submissionState` existed and was called only
+                 * by tests, so a shared face read "Waiting for someone to check
+                 * it" FOREVER, including long after a moderator published it.
+                 * The author would have no way to learn their face was live.
+                 *
+                 * Once per app start, and only for records still unsettled: a
+                 * published or refused face is not going to change again, so
+                 * asking about it is a request per face per launch buying
+                 * nothing. That is also why this is not a poll — the answer
+                 * changes about once a week.
+                 */
+                LaunchedEffect(Unit) {
+                    val waiting = withContext(Dispatchers.IO) {
+                        SubmissionStore.all(context).filterNot { it.settled }
+                    }
+                    if (waiting.isNotEmpty()) {
+                        val service = CatalogAccess.service(context)
+                        withContext(Dispatchers.IO) {
+                            for (record in waiting) {
+                                val answer = service.submissionState(record.id)
+                                if (answer is CatalogService.Result.Ok) {
+                                    SubmissionStore.setState(
+                                        context, record.id,
+                                        SubmissionLog.State.of(answer.value.state)
+                                    )
+                                }
+                                // A failure is left alone on purpose. Unreachable
+                                // means unknown, and overwriting a real state with
+                                // a guess is how the app would start lying about
+                                // somebody's face.
+                            }
+                        }
+                        shared = SubmissionStore.all(context).associateBy { it.slug }
+                    }
+                }
+
                 LaunchedEffect(Unit) {
                     val config = withContext(Dispatchers.IO) { CatalogAccess.service(context).config() }
                     canShare = (config as? CatalogService.Result.Ok)?.value?.acceptsSubmissions == true
@@ -621,6 +663,11 @@ class MainActivity : ComponentActivity() {
                     // actually installed rather than only what this build knows.
                     WatchLink.Report.catalogIn(report)?.let { ProviderCache.save(context, it) }
                     WatchLink.Report.launchersIn(report)?.let { ProviderCache.saveLaunchers(context, it) }
+                    // What the WATCH said about the activation permission. The
+                    // phone used to read its own copy of a file only the watch
+                    // writes, so it always saw UNASKED and could never explain
+                    // a denial to the person who made it.
+                    WatchLink.Report.consentIn(report)?.let { WatchConsent.record(context, it) }
                     // Said ONCE, and only to someone who had a face from before
                     // the definition became authoritative: their on-watch
                     // complication picks have just been replaced by the design,

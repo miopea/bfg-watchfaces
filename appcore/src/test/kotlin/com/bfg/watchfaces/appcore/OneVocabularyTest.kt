@@ -128,4 +128,30 @@ class OneVocabularyTest {
                 "which gets Complications.label in its strings.xml, call it another."
         }
     }
+    /**
+     * Every engine is either offered or deliberately withheld.
+     *
+     * `Presentation.ENGINE_ORDER` is a hand-written list, so adding an engine to
+     * `Engine` does NOT add it to the picker — it silently never appears, which
+     * is a feature shipped and then hidden. `UNOFFERED` makes withholding an
+     * explicit act, and this asserts the two lists together cover the enum, so
+     * a new engine forces a decision instead of defaulting to invisible.
+     *
+     * Scans source because `:appcore` cannot import `:mobile`.
+     */
+    @Test
+    fun `every engine is either offered or explicitly withheld`() {
+        val presentation = otherModuleSources().firstOrNull { it.name == "Presentation.kt" }
+        assertTrue(presentation != null) { "Presentation.kt was not found by the scan" }
+        val text = presentation!!.readText()
+        val named = Regex("""Engine\.(\w+)""").findAll(text).map { it.groupValues[1] }.toSet()
+        val missing = com.bfg.watchfaces.generator.Engine.entries
+            .map { it.name }
+            .filterNot { it in named }
+        assertEquals(emptyList<String>(), missing) {
+            "these engines appear in neither ENGINE_ORDER nor UNOFFERED, so the phone " +
+                "silently never offers them: $missing"
+        }
+    }
+
 }

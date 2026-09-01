@@ -169,6 +169,34 @@ object WatchLink {
         /** The launchable-app catalog, or null when the watch sent none. */
         fun launchersIn(raw: String?): String? = lineAfterVerdict(raw, 1)
 
+        /**
+         * What the WATCH says about the activation permission.
+         *
+         * The phone cannot know this any other way, and it used to pretend it
+         * could: it read `ActivationConsent` from its OWN `filesDir`, which
+         * only the watch ever writes. So the phone's copy was permanently
+         * UNASKED, `persistentNote` could never return anything, and the
+         * "you already said no" note — a screen that exists specifically to
+         * explain why nothing happened — was unreachable. Somebody who denied
+         * the one-shot got silence from both devices.
+         *
+         * A third line on a reply that already carries two, for the same
+         * reason as the other two: the channel is open and already correlated
+         * with this send. A watch that sends nothing here is not broken; the
+         * phone keeps what it had, which is how the other lines already behave.
+         *
+         * Deliberately NOT written into the phone's own `ActivationConsent`
+         * store. That state machine guards a one-shot, unrecoverable action on
+         * the WATCH; giving it a second writer that means something subtly
+         * different is how a guard stops guarding.
+         */
+        fun consentIn(raw: String?): String? =
+            raw?.substringAfter(SEPARATOR, "")
+                ?.split(SEPARATOR)
+                ?.getOrNull(2)
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() && it.none { c -> c == '[' } }
+
         private fun lineAfterVerdict(raw: String?, index: Int): String? =
             raw?.substringAfter(SEPARATOR, "")
                 ?.split(SEPARATOR)

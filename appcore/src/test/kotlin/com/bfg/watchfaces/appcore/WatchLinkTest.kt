@@ -186,4 +186,70 @@ class WatchLinkTest {
         assertFalse(huge.contains("\n")) { "a newline would truncate the read at the phone" }
     }
 
+    /**
+     * The multi-line reply, which decides whether the phone's caches update.
+     *
+     * `verdictIn` was tested; the lines behind it were not — and they are what
+     * carry the watch's provider catalog, its launchable apps, and now the
+     * wearer's answer to the activation permission. A parser that silently
+     * returned null here would leave the phone's picker permanently empty with
+     * nothing to say why.
+     */
+    @Test
+    fun `a full report yields the verdict and all three lines`() {
+        val raw = listOf(
+            WatchLink.Report.OK,
+            """[{"component":"a/.B"}]""",
+            """[{"component":"c/.D"}]""",
+            "DENIED"
+        ).joinToString(WatchLink.Report.SEPARATOR)
+
+        assertEquals(WatchLink.Report.OK, WatchLink.Report.verdictIn(raw))
+        assertEquals("""[{"component":"a/.B"}]""", WatchLink.Report.catalogIn(raw))
+        assertEquals("""[{"component":"c/.D"}]""", WatchLink.Report.launchersIn(raw))
+        assertEquals("DENIED", WatchLink.Report.consentIn(raw))
+    }
+
+    /**
+     * AN OLDER WATCH IS NOT A BROKEN ONE.
+     *
+     * A watch running a build that predates each line sends fewer of them. Every
+     * absent line must read as "kept what we had", never as an empty catalog —
+     * the phone would otherwise wipe its provider list on the first send from an
+     * older watch and show an empty picker.
+     */
+    @Test
+    fun `a watch that sends fewer lines degrades rather than clearing anything`() {
+        val verdictOnly = WatchLink.Report.OK
+        assertEquals(WatchLink.Report.OK, WatchLink.Report.verdictIn(verdictOnly))
+        assertNull(WatchLink.Report.catalogIn(verdictOnly))
+        assertNull(WatchLink.Report.launchersIn(verdictOnly))
+        assertNull(WatchLink.Report.consentIn(verdictOnly))
+
+        val withProviders = WatchLink.Report.OK + WatchLink.Report.SEPARATOR + """[{"component":"a/.B"}]"""
+        assertEquals("""[{"component":"a/.B"}]""", WatchLink.Report.catalogIn(withProviders))
+        assertNull(WatchLink.Report.launchersIn(withProviders))
+        assertNull(WatchLink.Report.consentIn(withProviders))
+
+        assertNull(WatchLink.Report.verdictIn(null))
+        assertNull(WatchLink.Report.catalogIn(null))
+        assertNull(WatchLink.Report.consentIn(null))
+    }
+
+    /**
+     * A catalog line is never mistaken for a consent state.
+     *
+     * The two are told apart by shape: a catalog starts with `[`. Without that
+     * check, a two-line reply from an older watch would hand its provider JSON
+     * to the consent reader, which would then discard it as an unknown state —
+     * silently, and only on the builds that need it most.
+     */
+    @Test
+    fun `a catalog in the consent position is not read as a state`() {
+        val raw = listOf(
+            WatchLink.Report.OK, "[]", "[]", """[{"component":"a/.B"}]"""
+        ).joinToString(WatchLink.Report.SEPARATOR)
+        assertNull(WatchLink.Report.consentIn(raw))
+    }
+
 }

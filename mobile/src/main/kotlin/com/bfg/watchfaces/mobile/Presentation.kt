@@ -34,8 +34,27 @@ object Presentation {
         // Generated surfaces. Unlike "Your image" these are parameters, so a
         // face using one can still be shared to the community.
         Engine.GRAIN, Engine.BRUSHED, Engine.CARBON, Engine.LINEN,
-        Engine.TEXTURE, Engine.NONE
+        Engine.NONE
     )
+
+    /**
+     * `Engine.TEXTURE` is NOT offered, and that is the honest state of it.
+     *
+     * It was in the list above, labelled "Your image", rendered as an ordinary
+     * selectable chip and indistinguishable from every engine that works.
+     * Choosing it draws a plain dial, because there is no image picker anywhere
+     * in this app and nothing on the device that can resolve an image id —
+     * `backlog.md` #9 records it as deliberately out of scope.
+     *
+     * So the chip promised a feature that does not exist and then failed
+     * silently, which is the shape this project keeps calling out: a difference
+     * nobody can see. A chip that is absent asks no questions; a chip that does
+     * nothing makes somebody wonder whether their phone is broken.
+     *
+     * It stays in [Engine] because the FILE FORMAT still has to read a stored
+     * face that names it. This list is the phone's offer, not the format.
+     */
+    val UNOFFERED: Set<Engine> = setOf(Engine.TEXTURE)
 
     fun label(engine: Engine): String = when (engine) {
         Engine.KNOTWORK -> "Knotwork"

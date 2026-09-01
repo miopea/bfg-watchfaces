@@ -84,6 +84,15 @@ fun MyFacesScreen(
     modifier: Modifier = Modifier
 ) {
     var confirming by remember { mutableStateOf<FaceLibrary.StoredFace?>(null) }
+    // ONCE for the list, not once per row per recomposition.
+    //
+    // This was `MissingApps.note(LocalContext.current, face.params)` in the row
+    // body — two file reads and a JSON parse, per visible row, every time the
+    // list recomposed. The doc on `shared` above says the rule out loud ("so
+    // the list does not hit the disk once per row per recomposition") and the
+    // row broke it four lines later.
+    val context = LocalContext.current
+    val knownApps = remember(faces) { MissingApps.known(context) }
 
     if (faces.isEmpty()) {
         Box(
@@ -108,6 +117,7 @@ fun MyFacesScreen(
         items(faces, key = { it.slug }) { face ->
             FaceRow(
                 face,
+                knownApps = knownApps,
                 shared = shared[face.slug],
                 canShare = canShare,
                 onOpen = { onOpen(face) },
@@ -137,6 +147,7 @@ fun MyFacesScreen(
 @Composable
 private fun FaceRow(
     face: FaceLibrary.StoredFace,
+    knownApps: Set<String>,
     shared: SubmissionLog.Record?,
     canShare: Boolean,
     onOpen: () -> Unit,
@@ -146,7 +157,7 @@ private fun FaceRow(
 ) {
     // A face can name an app this watch does not have. It still renders, just
     // differently from its preview, and nothing else would say so.
-    val missing = MissingApps.note(LocalContext.current, face.params)
+    val missing = MissingApps.note(face.params, knownApps)
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = face.slug) {
         value = withContext(Dispatchers.Default) {
             runCatching { AndroidFacePreview.render(face.params, ambient = false, size = ROW_PX) }.getOrNull()
@@ -200,7 +211,7 @@ private fun FaceRow(
             shared?.let {
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    statusOf(it.state),
+                    SubmissionLog.describe(it.state),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

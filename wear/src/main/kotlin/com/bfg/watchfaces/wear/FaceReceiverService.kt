@@ -2,6 +2,7 @@ package com.bfg.watchfaces.wear
 
 import android.util.Log
 import androidx.wear.watchfacepush.WatchFacePushManager
+import com.bfg.watchfaces.appcore.ActivationConsent
 import com.bfg.watchfaces.appcore.WatchLink
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.ChannelClient
@@ -113,7 +114,14 @@ class FaceReceiverService : WearableListenerService() {
                 reply(
                     client, channel,
                     lineFor(result) + WatchLink.Report.SEPARATOR + providers +
-                        WatchLink.Report.SEPARATOR + launchable
+                        WatchLink.Report.SEPARATOR + launchable +
+                        // Third line: what this watch's wearer said about the
+                        // activation permission. The phone has no other way to
+                        // find out -- it was reading its OWN copy of a file
+                        // only this device writes, so it always read UNASKED
+                        // and could never explain a denial.
+                        WatchLink.Report.SEPARATOR +
+                        ActivationConsent.load(filesDir).name
                 )
             }.onFailure {
                 Log.e(TAG, "face did not arrive or would not install", it)

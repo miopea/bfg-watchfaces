@@ -1,5 +1,108 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-08-31 — The audit, and the shape the bugs kept taking
+
+Three parallel audits of `:mobile` and the module boundaries, after "we're
+making a mobile app larger and more complex than it needs to be". Twelve
+findings fixed. They were not twelve different mistakes; they were four, each
+made more than once.
+
+### The measurement that explains the rest
+
+| module | main | test |
+| --- | ---: | ---: |
+| `:generator` | 4,305 | 2,815 |
+| `:appcore` | 1,957 | 1,768 |
+| `:workbench` | 3,393 | 1,936 |
+| **`:mobile`** | **5,285** | **0** |
+| **`:wear`** | **1,001** | **0** |
+
+`:mobile` is the largest module and one of two with no test wiring at all — not
+zero tests, zero ABILITY to have them. Everything with a `Context` in reach
+lands there, and then everything near it does too. Both bugs found earlier the
+same day lived in that region, and so did most of what the audit turned up.
+
+### Shape 1 — state that does not survive what it is used for
+
+`ShareSheet` had already been rebuilt so its work outlived the SHEET, because
+Google's account picker takes focus and a dismissed sheet cancels its own
+coroutine. That fix was half of one. The state moved to the Activity, and the
+ACTIVITY is what Android recreates under memory pressure while another app is
+in front — which is exactly what the account picker is. Everything reset, the
+sheet reopened on nothing, and tapping Share asked again. Reported from a
+phone; never reproducible on an emulator, which had no reason to recreate
+anything.
+
+`params` was worse, because the comment above it promised the fix: *"rememberSaveable
+so a rotation does not throw away a design"* — over a plain `remember`. Only the
+engine name survived. Every slider, both colours, the layout, the ring and the
+seconds reverted on rotation, silently.
+
+Both now survive, through the format the app already trusts: a slug for the
+face, and `FaceCodec`'s JSON for the design. `DialParams` does not become
+`Parcelable`; that would drag Android into a class `:generator` owns, and
+`:generator` is Android-free so the file format can be tested on the JVM.
+
+`shareBusy` deliberately does NOT survive. The coroutine dies with the Activity,
+so restoring `true` would show a spinner that can never finish, and
+`SubmissionStore` is on disk — a retry cannot double-submit.
+
+### Shape 2 — one thing, written twice, agreeing until it doesn't
+
+The complication label and sample tables were deduplicated in the morning and
+guarded. The audit found the identical duplicate over `SlotPosition` still
+there, **because the guard named an enum instead of the shape.** And a layer
+down, three hand-rolled JSON escapers with three behaviours — a tab produced
+invalid JSON from two of them.
+
+Worst of the three: `MissingAppsRuleTest` declared its own private copy of the
+filter and asserted on THAT, because the real function lived in `:mobile` where
+`:appcore` cannot reach it. So the rule deciding what warning appears on every
+face row had no test touching it, under a test named after it. That is the
+`SlotGeometry` failure — two implementations that matched while both were
+wrong — with the drift hidden inside the assertion.
+
+`OneVocabularyTest` now guards the SHAPE: source labels, samples, slot labels,
+hand-rolled escaping, and that every engine is either offered or explicitly
+withheld. Every red path was executed rather than assumed.
+
+### Shape 3 — asserting what was never checked
+
+`reportInstall` called blocking `HttpURLConnection` from `onClick`. On a device
+that is `NetworkOnMainThreadException`, swallowed by its own `runCatching`, so
+**the install counter has never incremented on real hardware** — and it is what
+orders the gallery.
+
+`SubmissionLog` documented its state as "a CACHE, refreshed from
+`CatalogService.submissionState`". Nothing refreshed it; that function was
+called only by tests. A shared face read "Waiting for someone to check it"
+forever, including long after a moderator published it.
+
+The phone read `ActivationConsent` from its own `filesDir` — a file only the
+WATCH writes. Permanently `UNASKED`, so the screen built to explain a denial
+was unreachable. The watch now reports its answer on the reply that already
+carries two other lines, into a SEPARATE record: that state machine guards a
+one-shot unrecoverable action, and a second writer meaning something subtly
+different is how a guard stops guarding.
+
+### Shape 4 — offering what does not work
+
+`Engine.TEXTURE` was an ordinary chip labelled "Your image" that drew a plain
+dial, because no image picker exists and `backlog.md` #9 scoped it out. Removed
+from the offer, with `UNOFFERED` making the withholding explicit and a test
+asserting the two lists cover the enum — so a new engine forces a decision
+instead of defaulting to invisible.
+
+### What moved to `:appcore`
+
+`MissingAppsRule`, and `SubmissionLog.describe` — the sentences somebody is
+told about their own work. Both now have tests, including one asserting a
+refusal does not invent a reason it cannot give, which `MODERATION.md` says
+does not exist.
+
+`:appcore` grew 1,957 → about 2,100 lines and 121 → 128 tests. The app did not
+get smaller by much. It got smaller in the place that could not be tested.
+
 ## 2026-08-31 — "Where else are we not following basic principles?"
 
 Asked after noticing that sending from My faces behaved differently from

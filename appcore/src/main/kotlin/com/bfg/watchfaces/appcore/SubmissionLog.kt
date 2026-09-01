@@ -76,6 +76,29 @@ object SubmissionLog {
         val settled: Boolean get() = state != State.PENDING
     }
 
+    /**
+     * What a person is told about a submission, in words they would use.
+     *
+     * Here rather than in the phone's share sheet because it is a RULE about
+     * the states this file defines, and because it decides what somebody is
+     * told about work they made — which is exactly the kind of thing that
+     * should not live in the one module with no tests. The face row and the
+     * share sheet both read it, so the two cannot describe one state
+     * differently.
+     *
+     * [State.REJECTED] deliberately does NOT say why. The service records a
+     * reason for the moderator and there is no route to deliver it to the
+     * author yet; `MODERATION.md` says that gap exists in as many words.
+     * Inventing a reason here would be worse than admitting there is not one.
+     */
+    fun describe(state: State): String = when (state) {
+        State.PENDING -> "Waiting for someone to check it. That can take a while."
+        State.PUBLISHED -> "It is in the gallery for other people to find."
+        State.REJECTED -> "It was not added to the gallery."
+        State.REMOVED -> "It was taken out of the gallery."
+        State.WITHDRAWN -> "You took this one back."
+    }
+
     private fun file(root: File): File = File(root, "submissions.json")
 
     /**

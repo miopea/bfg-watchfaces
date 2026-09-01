@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.mobile
 
 import android.content.Context
+import com.bfg.watchfaces.appcore.MissingAppsRule
 import com.bfg.watchfaces.generator.DialParams
 
 /**
@@ -24,27 +25,20 @@ object MissingApps {
      * case: an empty cache means "we do not know", and answering "everything is
      * missing" would put a warning on every face someone owns.
      */
-    fun of(context: Context, params: DialParams): List<String> {
-        val known = ProviderCache.load(context) + ProviderCache.launchers(context)
-        if (known.isEmpty()) return emptyList()
+    /**
+     * Everything the watch has told us about, providers and launchable apps.
+     *
+     * The only part of this that needs a `Context`. The RULE — which of a
+     * face's apps are missing, and what to say about it — is
+     * [MissingAppsRule], in `:appcore`, where it can be tested without an
+     * emulator.
+     */
+    fun known(context: Context): Set<String> =
+        (ProviderCache.load(context) + ProviderCache.launchers(context))
+            .map { it.component }
+            .toSet()
 
-        val byComponent = known.associateBy { it.component }
-        val needed = params.providers.values + params.launchers.values
-        return needed.distinct()
-            .filter { it !in byComponent }
-            // No label to show, since the watch has never mentioned it. The
-            // package is the honest fallback: it is what the face actually
-            // names, and it is usually recognisable.
-            .map { it.substringBefore('/') }
-    }
-
-    /** One line for a face row, or null when nothing is missing. */
-    fun note(context: Context, params: DialParams): String? {
-        val missing = of(context, params)
-        return when {
-            missing.isEmpty() -> null
-            missing.size == 1 -> "Uses ${missing.first()}, which isn’t on your watch"
-            else -> "Uses ${missing.size} apps that aren’t on your watch"
-        }
-    }
+    /** One line for a face row, or null. [known] is read once by the caller. */
+    fun note(params: DialParams, known: Set<String>): String? =
+        MissingAppsRule.note(MissingAppsRule.namesOf(params, known))
 }

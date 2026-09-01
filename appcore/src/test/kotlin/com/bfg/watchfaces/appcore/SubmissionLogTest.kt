@@ -124,4 +124,49 @@ class SubmissionLogTest {
         assertEquals("quote_\"slug\"", back.slug)
         assertEquals("id\\1", back.id)
     }
+    /**
+     * Every state says something, and PENDING never sounds like bad news.
+     *
+     * This moved out of the phone's share sheet, where it could not be tested
+     * at all. It decides what somebody is told about work they made, which is
+     * the last thing that should live in the one module with no tests.
+     */
+    @Test
+    fun `every state has words, and none of them are empty`() {
+        for (state in SubmissionLog.State.entries) {
+            val words = SubmissionLog.describe(state)
+            assertTrue(words.isNotBlank()) { "$state has nothing to say" }
+            assertTrue(words.trim().endsWith(".")) { "$state: '$words' is not a sentence" }
+        }
+    }
+
+    /**
+     * REJECTED must not invent a reason.
+     *
+     * The service records one for the moderator and there is NO route to
+     * deliver it to the author — `MODERATION.md` admits that gap in writing.
+     * A sentence here that implies a reason was given would be the app
+     * inventing an explanation for somebody's work being refused.
+     */
+    @Test
+    fun `a refusal does not pretend to explain itself`() {
+        val words = SubmissionLog.describe(SubmissionLog.State.REJECTED)
+        for (leak in listOf("because", "reason", "why", "violat", "breach")) {
+            assertTrue(!words.lowercase().contains(leak)) {
+                "the refusal implies an explanation the app cannot give: '$words'"
+            }
+        }
+    }
+
+    /** Waiting reads as waiting, not as a refusal. */
+    @Test
+    fun `waiting does not read as bad news`() {
+        val words = SubmissionLog.describe(SubmissionLog.State.PENDING).lowercase()
+        for (bad in listOf("not", "refus", "reject", "fail")) {
+            assertTrue(!words.contains(bad)) {
+                "a face still in the queue is described as a failure: '$words'"
+            }
+        }
+    }
+
 }

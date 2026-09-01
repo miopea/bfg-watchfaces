@@ -232,7 +232,7 @@ private fun Shared(
     Text("“$faceName” is shared", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(8.dp))
     Text(
-        statusOf(record.state),
+        SubmissionLog.describe(record.state),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -262,28 +262,4 @@ private fun Shared(
         TextButton(onClick = onDismiss, enabled = !busy) { Text("Close") }
         Button(enabled = !busy, onClick = onTakeBack) { Text("Take it back") }
     }
-}
-
-/**
- * The state, in words somebody would use.
- *
- * Public because the face list says the same thing in one line and the two must
- * not drift into describing the same state differently.
- *
- * REJECTED deliberately does not say why: the service records a reason for the
- * moderator, and there is no route to deliver it to the author yet.
- * `MODERATION.md` is explicit that this gap exists, and inventing a reason here
- * would be worse than admitting there is not one.
- */
-fun statusOf(state: SubmissionLog.State): String = when (state) {
-    SubmissionLog.State.PENDING ->
-        "Waiting for someone to check it. That can take a while."
-    SubmissionLog.State.PUBLISHED ->
-        "It is in the gallery for other people to find."
-    SubmissionLog.State.REJECTED ->
-        "It was not added to the gallery."
-    SubmissionLog.State.REMOVED ->
-        "It was taken out of the gallery."
-    SubmissionLog.State.WITHDRAWN ->
-        "You took this one back."
 }
