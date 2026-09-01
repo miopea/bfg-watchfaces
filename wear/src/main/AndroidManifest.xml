@@ -115,7 +115,7 @@
         Without this the wearer had to know, unprompted, to open an app on
         their watch. The permission can only be requested on the watch, the ask
         is a notification, and a fresh install holds no notification permission
-        either -- so the first face installed, nothing switched, and no prompt
+        either — so the first face installed, nothing switched, and no prompt
         of any kind could appear. Measured on a Pixel Watch 5, 2026-09-01:
         "notifications are not enabled; the activation ask cannot be shown".
 
