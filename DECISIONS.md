@@ -1,5 +1,65 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-01 — Five wrong diagnoses, and the one measurement that ended it
+
+Sign-in from the Play build failed for a day. Five causes were proposed and
+four were wrong. The fifth was right only because it stopped being a proposal.
+
+### What was wrong, in order
+
+1. **The wrong sign-in flow.** Swapped the bottom sheet for the button flow.
+2. **Two flows racing.** Collapsed them to one.
+3. **Activity recreation.** Made the share state survivable — a real bug, fixed,
+   and not this one.
+4. **The Play App Signing certificate.** Checked the registered fingerprint
+   against Play's current key, found them equal, and declared signing exonerated.
+5. **The account needing re-verification.** Written into the UI as a sentence
+   naming a cause. The operator did not believe it and was right not to.
+
+Every one was argued from a plausible reading of `[16] Account reauth failed`.
+Fixes 1–3 were improvements shipped for the wrong reason. Fix 4 was the worst
+kind of wrong: a real check that answered a question narrower than the one
+being asked.
+
+### The measurement
+
+With the phone on adb:
+
+```text
+adb shell pm path com.bfg.watchfaces
+adb pull .../base.apk
+apksigner verify --print-certs base.apk
+  Signer #1 certificate SHA-1 digest: a6bf4178c352a4edeb9b868912a3558a38d1b9cb
+```
+
+That is the **previous** Play app signing key. Play was still serving
+previous-key artifacts, so no Android OAuth client matched the app GMS actually
+saw. Registering that fingerprint fixed it on the first attempt, verified on the
+device and then in the live moderation queue.
+
+### Why check 4 failed
+
+It compared the registered client against **Play's current key** and stopped.
+The question that mattered was "what certificate is on the APK THIS PHONE IS
+RUNNING", and those are only the same thing if Play is serving the current key —
+which it was not. Two of the three certificates on that page were never
+registered, and "the fingerprint matches" was reported as though all of them had
+been.
+
+A check that answers a narrower question than the one asked is worse than no
+check, because it retires a hypothesis that is still true.
+
+### The rule this earns
+
+**Read the artifact, not the console.** The console describes what Play intends
+to sign with. `apksigner` on the APK pulled off the device says what it did.
+Every claim about signing goes through the second one now.
+
+And: an instrument beats an argument. The diagnostic build that printed the full
+exception took twenty minutes to write and should have been the first thing
+built, not the fifth. It did not find the answer by itself — but it ended the
+supply of plausible stories, which is what kept the wrong method alive.
+
 ## 2026-09-01 — The instrument worked, and the answer was not the app
 
 `[16] Account reauth failed`, read off a phone, after three failed diagnoses of
