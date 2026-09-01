@@ -133,6 +133,29 @@ object FaceInstaller {
                 // addWatchFace call every time.
                 val ours = existing.installedWatchFaceDetails.firstOrNull()
                 if (ours != null && !resetComplications) {
+                    // ASK BEFORE, because afterwards the answer is wrong.
+                    //
+                    // `isWatchFaceActive` returns FALSE in the moments after
+                    // `updateWatchFace`, even when the face is demonstrably on
+                    // the wrist -- measured on a Pixel Watch 5, 2026-09-01,
+                    // with `dumpsys wallpaper` showing
+                    // `DeclarativeWatchFaceRuntime0` rendering our face while
+                    // this same call reported it inactive. The runtime is still
+                    // reloading and has not re-pointed yet.
+                    //
+                    // Believing it cost twice over: an activation attempt spent
+                    // on a face already being worn, out of a limit of roughly
+                    // one per install; and OK_NOT_ACTIVE reported to somebody
+                    // whose watch was at that moment showing the face they had
+                    // just sent.
+                    //
+                    // Before the update there is no race, and it is the
+                    // question that matters anyway: `updateWatchFace` INHERITS
+                    // active status, so a face already on the wrist stays there
+                    // and needs no activation call at all.
+                    val wasWorn = runCatching {
+                        manager.isWatchFaceActive(ours.packageName)
+                    }.getOrElse { false }
                     // Nothing about the complications changed, so keep the slot.
                     // This preserves anything the wearer picked on the watch
                     // AND costs no activation call, because the face is never
@@ -198,7 +221,13 @@ object FaceInstaller {
                     // Still ask to activate. Dropping this was a regression:
                     // before, EVERY install tried, and a face sent to a watch
                     // wearing something else silently stopped switching.
-                    val asked = onFaceInstalled(context, details.slotId, details.packageName)
+                    // Already worn means already done: no call, nothing spent.
+                    val asked = if (wasWorn) {
+                        Log.i(TAG, "ours was already on the wrist; the update keeps it there")
+                        true
+                    } else {
+                        onFaceInstalled(context, details.slotId, details.packageName)
+                    }
                     // ASK THE WATCH, rather than believing the call that failed.
                     //
                     // `setWatchFaceAsActive` works ONCE per install -- Google's
