@@ -24,8 +24,8 @@ android {
         // so anything lower fails the manifest merge. Android 9 and up.
         minSdk = 28
         targetSdk = 36
-        versionCode = 46
-        versionName = "1.45"
+        versionCode = 47
+        versionName = "1.46"
         // pack ships as native libs; limit ABIs to what you actually ship
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
@@ -103,6 +103,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.core.ktx)
     implementation(libs.play.services.wearable)   // Data Layer: Channel/Message/Capability
+    // Lets the phone OPEN the watch app. The activation permission can only be
+    // asked for on the watch, and a wearer has no reason to know that.
+    implementation(libs.wear.remote.interactions)
     implementation(libs.wfp.validator.android)    // local token generation, no network
 
     // Google sign-in, used for ONE thing: publishing a face to the community

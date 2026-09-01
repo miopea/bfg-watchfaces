@@ -1,5 +1,54 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-01 — The phone opens the watch app, because the watch cannot ask
+
+A fresh install could not ask for activation AT ALL, and nothing anywhere said
+so. The chain dead-ends in one line from the watch's own log:
+
+```text
+W/BfgActivationPrompt: notifications are not enabled;
+                       the activation ask cannot be shown
+```
+
+`SET_PUSHED_WATCH_FACE_AS_ACTIVE` can only be requested by the app on the watch.
+The way that request reaches a wearer is a notification. A fresh install holds
+no notification permission. So the first face installed, the send reported
+success, the watch went on showing something else, and there was **no prompt, no
+error, and nothing on either device suggesting an action**.
+
+The only way through was to know, unprompted, to open an app on a watch. That is
+not a thing to expect of anybody, and it is why this only ever worked for
+installs that had been hand-driven over adb.
+
+### The phone is the right side to fix it from
+
+It is where the person already is — they just pressed Send — and it is told what
+it needs to know, because the watch reports its consent state back on the reply.
+So `WatchLink.Report.needsActivation` decides, and the phone uses
+`RemoteActivityHelper` to open `bfgwatchfaces://setup` on the watch.
+`WatchActivity` then requests notifications and offers the activation route, as
+it already did for anyone who found it by hand.
+
+`needsActivation` is deliberately two conditions, both required. A face already
+on the wrist needs nothing. And a wearer who said **no** must never be asked
+again — Android will not carry a second request, and re-opening a refusal is
+exactly how the one shot gets spent on somebody who already answered. A test
+pins all four cases.
+
+### It fails quietly, on purpose
+
+This is a convenience over a path that still works by hand. Out of range, or a
+refused launch, must never turn a successful send into a reported failure — a
+mistake this project has already made in both directions.
+
+### The one sentence added
+
+"Your watch is asking permission to switch to it." That is what is HAPPENING,
+not a chore being delegated: a dialog has just appeared on their wrist and this
+is what makes it make sense. It is shown only when the launch actually
+succeeded, which is the difference between this and the instruction text that
+was rightly rejected twice.
+
 ## 2026-09-01 — Spending the activation on sends that did not need it
 
 With the watch on adb for the first time — Wi-Fi debugging, once the operator

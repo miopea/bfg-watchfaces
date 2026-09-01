@@ -215,6 +215,27 @@ class WatchLinkTest {
     }
 
     /**
+     * The watch is asked to prompt only when a prompt is both needed and allowed.
+     */
+    @Test
+    fun `activation is offered only when it is needed and still permitted`() {
+        val sep = WatchLink.Report.SEPARATOR
+        fun reply(verdict: String, consent: String) =
+            verdict + sep + "[]" + sep + "[]" + sep + consent
+
+        assertTrue(WatchLink.Report.needsActivation(reply(WatchLink.Report.OK_NOT_ACTIVE, "UNASKED")))
+        // Already worn: nothing to ask for.
+        assertFalse(WatchLink.Report.needsActivation(reply(WatchLink.Report.OK, "UNASKED")))
+        // They said no. Android carries no second request, and re-asking spends
+        // the one shot on somebody who already answered.
+        assertFalse(WatchLink.Report.needsActivation(reply(WatchLink.Report.OK_NOT_ACTIVE, "DENIED")))
+        assertFalse(WatchLink.Report.needsActivation(reply(WatchLink.Report.OK_NOT_ACTIVE, "GRANTED")))
+        // A watch that said nothing is not an invitation to act.
+        assertFalse(WatchLink.Report.needsActivation(null))
+        assertFalse(WatchLink.Report.needsActivation(WatchLink.Report.OK_NOT_ACTIVE))
+    }
+
+    /**
      * Whether it landed is ANSWERED, not inferred from the sentence.
      *
      * The phone decided this by testing whether the message started with

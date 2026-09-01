@@ -737,12 +737,24 @@ class MainActivity : ComponentActivity() {
                     // and that change with no explanation is indistinguishable
                     // from a bug. Appended to the result rather than shown
                     // separately, because that is what they are already reading.
+                    // The watch cannot ask on its own -- see WatchSetup. If it
+                    // says the wearer has never been asked and the face is not
+                    // on the wrist, open the watch app now, while they are
+                    // still looking at the phone they pressed Send on.
+                    val opening = WatchLink.Report.needsActivation(report) &&
+                        WatchSetup.openOnWatch(context, target.nodeId)
+
                     val moved = Onboarding.shouldExplainComplications(
                         context, previouslySent?.generatorVersion
                     )
                     if (moved) Onboarding.markComplicationsExplained(context)
                     SendReport(
                         WatchLink.Report.describe(name, target.name, report) +
+                            // Says what is HAPPENING, not what to go and do.
+                            // The watch has just put a permission dialog in
+                            // front of them; this is the sentence that makes
+                            // that make sense.
+                            (if (opening) " Your watch is asking permission to switch to it." else "") +
                             if (moved) " Complications are chosen here now, not on the watch." else "",
                         landed = WatchLink.Report.landed(report)
                     )

@@ -230,6 +230,27 @@ object WatchLink {
         fun landed(raw: String?): Boolean =
             verdictIn(raw).orEmpty().let { it == OK || it == OK_NOT_ACTIVE }
 
+        /**
+         * Does the watch still need to ASK its wearer for activation?
+         *
+         * True only when the face landed but is not being worn AND the watch
+         * says nobody has been asked yet. Both halves matter:
+         *
+         * - a face already on the wrist needs nothing;
+         * - a wearer who said NO must not be asked again, because Android will
+         *   not carry a second request and re-opening a refusal is how the one
+         *   shot gets spent on somebody who already answered.
+         *
+         * The phone acts on this by opening the watch app, which is the only
+         * place the permission can be requested from. Before that existed, a
+         * fresh install could not ask at all: the ask is a notification and a
+         * fresh install holds no notification permission, so the first face
+         * installed and nothing whatsoever appeared on either device.
+         */
+        fun needsActivation(raw: String?): Boolean =
+            verdictIn(raw) == OK_NOT_ACTIVE &&
+                consentIn(raw) == "UNASKED"
+
         fun describe(faceName: String, watchName: String, raw: String?): String {
             val line = verdictIn(raw).orEmpty()
             return when {

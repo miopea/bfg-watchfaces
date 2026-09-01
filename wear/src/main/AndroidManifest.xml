@@ -107,6 +107,27 @@
         android:exported="true"
         android:label="BFG Watch Faces"
         android:taskAffinity="">
+      <!--
+        Opened BY THE PHONE, through RemoteActivityHelper, at the one moment it
+        matters: a face has landed and the activation permission has not been
+        asked for.
+
+        Without this the wearer had to know, unprompted, to open an app on
+        their watch. The permission can only be requested on the watch, the ask
+        is a notification, and a fresh install holds no notification permission
+        either -- so the first face installed, nothing switched, and no prompt
+        of any kind could appear. Measured on a Pixel Watch 5, 2026-09-01:
+        "notifications are not enabled; the activation ask cannot be shown".
+
+        RemoteActivityHelper requires ACTION_VIEW with BROWSABLE and a data
+        URI, which is what this filter is.
+      -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="bfgwatchfaces" android:host="setup" />
+      </intent-filter>
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
