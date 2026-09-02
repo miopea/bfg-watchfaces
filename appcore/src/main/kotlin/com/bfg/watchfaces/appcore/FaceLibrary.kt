@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.appcore
 
+import com.bfg.watchfaces.generator.CURRENT_GENERATOR_VERSION
 import com.bfg.watchfaces.generator.DialParams
 import java.io.File
 import java.time.Instant
@@ -53,10 +54,30 @@ object FaceLibrary {
         return safe.take(40).trim('_')
     }
 
+    /**
+     * Saving is what moves a face to the CURRENT generator version.
+     *
+     * A stored face keeps the version it was written with, so its geometry
+     * never changes under somebody — which is right for a face you installed
+     * from the gallery, and wrong for your own.
+     *
+     * It bit exactly that way. v11 widened the top complication box because a
+     * long weather value was being clipped, and the fix could not reach the
+     * face the operator was actually wearing: it had been saved at v10 and
+     * every send rebuilt it at v10, faithfully reproducing the bug. There was
+     * no way forward short of building the design again from scratch.
+     *
+     * So the rule is: saving is a deliberate act on your own design, and it
+     * takes the current version with it. Reading, sending and installing all
+     * leave the stored version alone. That keeps the guarantee where it earns
+     * its keep — a face you did not make does not change on its own — without
+     * freezing people out of fixes to their own work.
+     */
     fun save(root: File, name: String, params: DialParams): StoredFace {
         require(name.isNotBlank()) { "a face needs a name" }
         val slug = slugify(name)
-        val face = StoredFace(slug, name.trim(), Instant.now().toString(), params)
+        val current = params.copy(generatorVersion = CURRENT_GENERATOR_VERSION)
+        val face = StoredFace(slug, name.trim(), Instant.now().toString(), current)
         File(dir(root), "$slug.json").writeText(toJson(face))
         return face
     }

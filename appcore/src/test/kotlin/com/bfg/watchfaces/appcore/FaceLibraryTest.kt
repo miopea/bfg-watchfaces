@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.appcore
 
+import com.bfg.watchfaces.generator.CURRENT_GENERATOR_VERSION
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.WffEmitter
@@ -29,6 +30,38 @@ class FaceLibraryTest {
         engine = Engine.KNOTWORK, scale = 26.0, depth = 3.0, freq = 7,
         dialColor = "#2B2E33", inkColor = "#FCF9F1", lens = false, lensAmount = 12.5
     )
+
+    /**
+     * Saving your own face brings it up to date; nothing else does.
+     *
+     * The v11 fix for clipped weather text could not reach a face saved at
+     * v10 — every send rebuilt it at v10 and reproduced the bug faithfully.
+     * Freezing a stored face is the right default for one you installed from
+     * the gallery and the wrong one for your own work.
+     */
+    @Test
+    fun `saving stamps the face with the current generator version`(@TempDir tmp: File) {
+        val old = DialParams(generatorVersion = 10)
+        val saved = FaceLibrary.save(tmp, "Old Face", old)
+        assertEquals(CURRENT_GENERATOR_VERSION, saved.params.generatorVersion)
+        assertEquals(
+            CURRENT_GENERATOR_VERSION,
+            FaceLibrary.load(tmp, "old_face")!!.params.generatorVersion
+        ) { "the stamp did not survive the round trip to disk" }
+    }
+
+    /** Everything else leaves a stored version alone. */
+    @Test
+    fun `reading a face does not move its version`() {
+        val json = FaceLibrary.toJson(
+            FaceLibrary.StoredFace(
+                "kept", "Kept", "2026-01-01T00:00:00Z", DialParams(generatorVersion = 10)
+            )
+        )
+        assertEquals(10, FaceLibrary.fromJson(json).params.generatorVersion) {
+            "reading a face silently upgraded it; only saving may do that"
+        }
+    }
 
     @Test
     fun `a saved face round trips through the catalog format`(@TempDir tmp: File) {
