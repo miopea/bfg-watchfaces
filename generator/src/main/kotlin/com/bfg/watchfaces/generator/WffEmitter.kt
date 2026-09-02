@@ -342,7 +342,7 @@ object WffEmitter {
                 // Which wording and what size are ONE question, asked of
                 // SlotGeometry so the previews give the same answer. It
                 // shortens before it shrinks; see SlotGeometry.drawnText.
-                val drawn = SlotGeometry.drawnText(source, box, fontSize, p.generatorVersion)
+                val drawn = SlotGeometry.drawnText(source, box, fontSize, p.generatorVersion, pos)
                 return@map """
     <PartText x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>

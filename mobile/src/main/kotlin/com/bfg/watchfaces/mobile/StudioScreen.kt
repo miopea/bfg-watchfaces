@@ -227,18 +227,44 @@ fun StudioScreen(
         // the boxes grew: at complication size 27, Tight 84, Normal 92 and Wide
         // 110 all came out as 115, because the layout's own minimum had passed
         // all three. Three controls, one result.
-        val spreadOptions = listOf("Tight", "Normal", "Wide")
-            .zip(SlotGeometry.spreadOptions(params))
-        ChoiceRow(
-            label = "Spacing",
-            options = spreadOptions,
-            // The stored value is a REQUEST and rarely equals an option, so
-            // match the nearest -- otherwise nothing looks selected and the
-            // control reads as broken.
-            selected = spreadOptions.minByOrNull {
-                kotlin.math.abs(it.second - params.layout.complicationSpread)
-            }?.second ?: params.layout.complicationSpread
-        ) { onParams(params.copy(layout = params.layout.copy(complicationSpread = it))) }
+        val spreads = SlotGeometry.spreadOptions(params)
+        if (spreads.size < 2) {
+            // ONE spacing means there is no choice, and a row of buttons that
+            // cannot change anything reads as a broken control -- which is how
+            // it was reported: "the spacing option no longer works and the UI
+            // has all three selected". Three buttons carrying the same number
+            // all matched the current value, so all three drew as selected.
+            //
+            // Say what is true instead. The geometry is right: at this size the
+            // complications fill the row and there is nowhere to spread them.
+            // Naming the cause makes it obvious what to change, and it is a
+            // control they already have, right above this one.
+            Text(
+                "Spacing",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Your complications are too big to space apart. Make them smaller " +
+                    "to get the spacing back.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(6.dp))
+        } else {
+            val spreadOptions = listOf("Tight", "Normal", "Wide").zip(spreads)
+            ChoiceRow(
+                label = "Spacing",
+                options = spreadOptions,
+                // The stored value is a REQUEST and rarely equals an option, so
+                // match the nearest -- otherwise nothing looks selected and the
+                // control reads as broken.
+                selected = spreadOptions.minByOrNull {
+                    kotlin.math.abs(it.second - params.layout.complicationSpread)
+                }?.second ?: params.layout.complicationSpread
+            ) { onParams(params.copy(layout = params.layout.copy(complicationSpread = it))) }
+        }
 
         Spacer(Modifier.height(8.dp))
         for (pos in SlotPosition.entries) {

@@ -217,7 +217,14 @@ object SlotGeometry {
         source: ComplicationSource,
         box: Box,
         base: Int,
-        version: Int = CURRENT_GENERATOR_VERSION
+        version: Int = CURRENT_GENERATOR_VERSION,
+        /**
+         * The slot this is for, when the caller knows it.
+         *
+         * TOP and BOTTOM sit alone on their rows, and that changes the answer:
+         * see [shrinkFloorFor].
+         */
+        pos: SlotPosition? = null
     ): DrawnText {
         val chars = source.widestValueFor(version)
         val full = DrawnText(source.format, source.drawn.toList(), base, null, chars)
@@ -228,7 +235,7 @@ object SlotGeometry {
         // worth a point or two of size to keep. What is not worth it is the
         // 19-against-29 the row slots were producing.
         val fullSize = sizeThatFits(chars, box.w, base)
-        if (fullSize >= (base * LEGIBLE_SHRINK).roundToInt()) return full.copy(fontSize = fullSize)
+        if (fullSize >= (base * shrinkFloorFor(pos)).roundToInt()) return full.copy(fontSize = fullSize)
 
         val short = source.compact
         if (short != null && fitsAt(short.widestValue, box.w, base))
@@ -264,6 +271,30 @@ object SlotGeometry {
      * for no benefit anyone could see.
      */
     private const val LEGIBLE_SHRINK = 0.85
+
+    /**
+     * How far THIS slot may shrink before dropping a word is the better deal.
+     *
+     * 0.85 is the row-slot number, and it is about comparison: three slots side
+     * by side, and one of them at 56% of the others reads as broken, which is
+     * what came back from a wrist as unreadable.
+     *
+     * TOP and BOTTOM have no neighbour on their row, so there is nothing to be
+     * out-shouted by, and the comparison the 0.85 was protecting does not
+     * exist. Holding them to it deletes a word for a benefit nobody can see.
+     *
+     * It did exactly that. Once v11 measured a weather value honestly at
+     * seventeen characters, "4° Partly cloudy" no longer cleared 85% in the top
+     * slot and was replaced by "4°" — reported as "weather and conditions now
+     * just shows weather by itself". Measured across sizes, the full wording
+     * fits there at about 79% of base, which is entirely readable on its own
+     * line.
+     *
+     * 0.7, so the word survives wherever it is legible, and the floor still
+     * exists: below it, [MIN_DRAWN_FONT] and the compact form take over.
+     */
+    private fun shrinkFloorFor(pos: SlotPosition?): Double =
+        if (pos == SlotPosition.TOP || pos == SlotPosition.BOTTOM) 0.70 else LEGIBLE_SHRINK
 
     /** Never grows, only shrinks: a short value should not out-shout its neighbour. */
     private fun sizeThatFits(chars: Int, width: Int, base: Int): Int =
@@ -582,9 +613,28 @@ object SlotGeometry {
     }
 
     /** The three spacings to offer, narrowest first. See [sizeOptions]. */
+    /**
+     * The spacings actually on offer — DISTINCT, however few that leaves.
+     *
+     * This returned three values unconditionally, and at a large complication
+     * size the range collapses: measured at size 31 and above, `spreadRange` is
+     * 121..121, so the UI was handed [121, 121, 121]. Three buttons, all the
+     * same number, all matching the current value — so all three drew as
+     * selected and none of them changed anything. Reported from a phone as
+     * "the spacing option no longer works and the UI has all three selected".
+     *
+     * It reads as a broken control, but the geometry is right: at that size the
+     * complications fill the row and there is no room to spread them. The fault
+     * is offering a choice that does not exist. One option, honestly, is better
+     * than three that are the same — and `Effective.spreadClamped` is there for
+     * a UI that wants to say why.
+     *
+     * NOT a v11 change: this behaved identically at v10, and was found while
+     * looking for a regression that turned out not to be one.
+     */
     fun spreadOptions(p: DialParams): List<Int> {
         val r = spreadRange(p)
-        return listOf(r.first, (r.first + r.last) / 2, r.last)
+        return listOf(r.first, (r.first + r.last) / 2, r.last).distinct()
     }
 
     fun spreadRange(p: DialParams): IntRange {

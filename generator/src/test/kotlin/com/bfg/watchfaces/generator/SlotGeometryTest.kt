@@ -67,6 +67,59 @@ class SlotGeometryTest {
         }
     }
 
+    /**
+     * A control never offers the same value twice.
+     *
+     * At complication size 31 and above the spread range collapses to a single
+     * value, and this returned it three times. The UI zipped that to
+     * Tight/Normal/Wide, all three matched the current value, so all three drew
+     * as selected and none of them did anything — reported from a phone as
+     * "the spacing option no longer works and the UI has all three selected".
+     *
+     * The geometry was right; the offer was the lie.
+     */
+    @Test
+    fun `spacing never offers the same value more than once`() {
+        for (size in 14..40) {
+            val p = DialParams().let {
+                it.copy(layout = it.layout.copy(complicationSize = size))
+            }
+            val opts = SlotGeometry.spreadOptions(p)
+            assertEquals(opts.distinct(), opts) { "duplicate spacing offered at size $size: $opts" }
+            assertTrue(opts.isNotEmpty()) { "no spacing at all at size $size" }
+        }
+    }
+
+    /**
+     * A slot alone on its row keeps the word and shrinks instead.
+     *
+     * Once v11 measured a weather value honestly at seventeen characters,
+     * "4° Partly cloudy" stopped clearing the row-slot 85% floor in the TOP
+     * slot and was replaced by "4°" — "weather and conditions now just shows
+     * weather by itself". TOP has no neighbour to be out-shouted by, so the
+     * comparison that floor protects does not exist there.
+     */
+    @Test
+    fun `the top slot keeps the whole reading rather than dropping a word`() {
+        for (size in listOf(22, 26, 31, 36)) {
+            val p = DialParams()
+                .withSlot(SlotPosition.TOP, ComplicationSource.WEATHER_TEMP_CONDITION)
+                .let { it.copy(layout = it.layout.copy(complicationSize = size)) }
+            val box = SlotGeometry.boxes(p)[SlotPosition.TOP]!!
+            val base = SlotGeometry.fontSize(SlotGeometry.sizeAt(p, SlotPosition.TOP))
+            val drawn = SlotGeometry.drawnText(
+                ComplicationSource.WEATHER_TEMP_CONDITION, box, base,
+                p.generatorVersion, SlotPosition.TOP
+            )
+            assertEquals(
+                ComplicationSource.WEATHER_TEMP_CONDITION.format, drawn.format
+            ) { "the condition was dropped at complication size $size" }
+            assertTrue(drawn.fontSize >= (base * 0.7).toInt()) {
+                "kept the word but shrank it to ${drawn.fontSize} against a base of $base"
+            }
+        }
+    }
+
     @Test
     fun `disabled slots are absent and the row re-centres`() {
         val N = ComplicationSource.NONE

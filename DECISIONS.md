@@ -1,5 +1,62 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — Two reports, and only one of them was a regression
+
+Both arrived together after re-saving a face at v11: **"the spacing option no
+longer works and the UI has all three selected"**, and **"weather and conditions
+now just shows weather by itself"**. It was tempting to treat them as one thing
+the version bump had broken. They are not related, and one of them is years
+older than the other.
+
+### The spacing control — NOT a v11 change
+
+Measured at both versions before touching anything:
+
+```text
+size=26 v10 spreadRange=111..128   size=26 v11 spreadRange=111..128
+size=31 v10 spreadRange=121..121   size=31 v11 spreadRange=121..121
+size=36 v10 spreadRange=121..121   size=36 v11 spreadRange=121..121
+```
+
+Identical. At complication size 31 and above the range genuinely collapses:
+the complications fill the row and there is nowhere to spread them. The geometry
+was right the whole time.
+
+The fault was `spreadOptions` returning `listOf(first, mid, last)`
+unconditionally, so the UI was handed `[121, 121, 121]`, zipped it to
+Tight/Normal/Wide, and every one of them matched the current value — three
+buttons, all drawn as selected, none of them able to change anything.
+
+`.distinct()` now, and where that leaves fewer than two the Studio drops the
+button row and says why: *"Your complications are too big to space apart. Make
+them smaller to get the spacing back."* The cause is named, and the control that
+fixes it is the one directly above.
+
+This was found only because the report was checked against v10 instead of
+assumed to be the new thing. The re-save was a coincidence of timing.
+
+### The dropped condition — this one was v11's doing
+
+v11 measures a weather value honestly at seventeen characters. In the top slot
+that no longer clears `LEGIBLE_SHRINK`, so `drawnText` did what it is designed to
+do and dropped the word: "4° Partly cloudy" became "4°".
+
+The 0.85 floor is about COMPARISON — three slots side by side, one at 56% of the
+others reads as broken, which is what came back from a wrist as unreadable. TOP
+and BOTTOM sit alone on their rows. There is no neighbour to be out-shouted by,
+so the comparison that floor protects does not exist there, and holding them to
+it deletes a word for a benefit nobody can see.
+
+The floor is now 0.70 for a slot alone on its row. Measured across sizes, the
+full wording survives at 100%, 96%, 79% and 79% of base — legible on its own
+line, and the whole reading is there.
+
+### What ties them together
+
+Neither was a geometry error. Both were a control or a rule applying a
+comparison that did not exist in the case at hand — three choices where there
+was one, and a side-by-side legibility floor on a slot with nothing beside it.
+
 ## 2026-09-02 — Saving is what moves a face forward
 
 v11 widened the top complication box because a long weather value was clipped
