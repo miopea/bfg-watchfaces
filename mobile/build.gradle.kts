@@ -24,8 +24,8 @@ android {
         // so anything lower fails the manifest merge. Android 9 and up.
         minSdk = 28
         targetSdk = 36
-        versionCode = 56
-        versionName = "1.55"
+        versionCode = 57
+        versionName = "1.56"
         // pack ships as native libs; limit ABIs to what you actually ship
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }

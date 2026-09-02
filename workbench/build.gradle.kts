@@ -57,6 +57,21 @@ tasks.register<JavaExec>("bake") {
 }
 
 /**
+ * Turn device captures into images the Play Console accepts.
+ *
+ * A Pixel capture is 9:20 and Play's limit is 9:16, so a raw screenshot is
+ * rejected outright. This scales to fit and pads rather than cropping, because
+ * cropping a list of watch faces crops the watch faces.
+ */
+tasks.register<JavaExec>("storeshots") {
+    group = "bfg"
+    description = "Pad device captures to Play's aspect ratio, into build/store"
+    mainClass.set("com.bfg.watchfaces.workbench.StoreShots")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
+/**
  * Draw the hands, so geometry is judged on screen rather than on a wrist.
  *
  * Writes each hand, the hub, and a composite at 10:10:30 -- the time that makes

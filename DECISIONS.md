@@ -1,5 +1,44 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — Store screenshots, and what one of them showed
+
+`./gradlew :workbench:storeshots` turns device captures into images the Play
+Console will accept.
+
+### Why a raw capture is rejected
+
+Play requires an aspect ratio between 16:9 and 9:16. A Pixel 11 Pro XL is
+1080x2404 — **9:20**, taller than the limit. Cropping to 9:16 would remove a
+third of the screen, and on a scrolling list of watch faces the part removed is
+the watch faces. So it scales to fit and pads with the app's own background.
+
+The status bar is cropped, because a store screenshot carrying somebody's
+notification icons and battery level is a picture of their phone rather than of
+the app. The crop height was **measured from the output, not guessed** — the
+first attempt left a sliver of icons along the top, which is invisible in the
+source and only appears once scaled.
+
+Output goes to `build/store/` and is deliberately not checked in: these captures
+contain whatever was on the device, including a face made from a personal photo.
+
+### The screenshot found a bug
+
+"My faces" showed **Share** on a photo face.
+
+`CatalogService.submit` already refuses one, so the guarantee held — but the
+button would have walked somebody through a Google sign-in and only then told
+them no. The app knew the answer before they tapped. That is the courtesy half
+of a decision written in `imported-images.md` and only half built: the guarantee
+shipped, the affordance did not.
+
+The row now says "On this phone" where the button was. A control disappearing
+with no account of itself is the same failure as one that does nothing — which
+is the third time that rule has come up, and the reason it is written as a rule.
+
+**Neither the tests nor the device run found this. Looking at a picture of the
+screen did**, which is the same way the oversized analog date and the unreadable
+skeleton hands turned up.
+
 ## 2026-09-02 — Photo dials, and a guarantee rather than a hidden button
 
 `docs/specs/imported-images.md`, built. A launch gate from `launch-scope.md`

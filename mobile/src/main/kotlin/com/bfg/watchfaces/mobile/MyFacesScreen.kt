@@ -227,7 +227,24 @@ private fun FaceRow(
         // "Shared" rather than "Share" once it is: the button still opens the
         // same sheet, but it is now the way back to taking it down, and
         // labelling that "Share" would invite somebody to send it twice.
-        if (canShare) TextButton(onClick = onShare) { Text(if (shared == null) "Share" else "Shared") }
+        // NO SHARE ON A PHOTO FACE.
+        //
+        // `CatalogService.submit` already refuses one, so the guarantee holds
+        // either way — but leaving the button here would walk somebody through a
+        // Google sign-in and THEN tell them no, which is the app wasting their
+        // time to enforce a rule it knew before they tapped.
+        //
+        // The row says why instead of just going quiet. A missing control with
+        // no account of itself is the same failure as one that does nothing.
+        if (face.params.isLocalOnly) {
+            Text(
+                "On this phone",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else if (canShare) {
+            TextButton(onClick = onShare) { Text(if (shared == null) "Share" else "Shared") }
+        }
         TextButton(onClick = onDelete) { Text("Delete") }
     }
 }
