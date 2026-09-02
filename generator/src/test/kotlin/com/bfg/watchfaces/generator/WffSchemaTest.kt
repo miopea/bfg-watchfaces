@@ -190,14 +190,31 @@ class WffSchemaTest {
     @Test
     fun `every hand pivots on the centre of the image`() {
         val xml = WffEmitter.emit(DialParams(clockMode = ClockMode.ANALOG, showSeconds = true))
-        // Counted rather than matched with a regex: the first version of this
-        // used a pattern whose own quoting was ambiguous inside a Kotlin raw
-        // string, and it failed against correct XML. Counting says the same
-        // thing and cannot be read two ways.
+        // FIVE, not three: hour and minute each ship twice — one awake, one
+        // ambient with outline artwork — because a hand carries a single
+        // `resource` and swapping it between modes needs a second element. The
+        // schema allows exactly two of each, which is what that is for. The
+        // second hand is hidden in ambient, so it needs only one.
         val hands = Regex("<(Hour|Minute|Second)Hand").findAll(xml).count()
-        assertEquals(3, hands) { "expected three hands, found $hands" }
-        assertEquals(3, xml.split("pivotX=\"0.5\"").size - 1) { "not every hand pivots on centre X" }
-        assertEquals(3, xml.split("pivotY=\"0.5\"").size - 1) { "not every hand pivots on centre Y" }
+        assertEquals(5, hands) { "expected five hand elements, found $hands" }
+        assertEquals(hands, xml.split("pivotX=\"0.5\"").size - 1) { "not every hand pivots on centre X" }
+        assertEquals(hands, xml.split("pivotY=\"0.5\"").size - 1) { "not every hand pivots on centre Y" }
+    }
+
+    /**
+     * Awake and ambient artwork are BOTH referenced, and they differ.
+     *
+     * If the ambient element pointed at the awake resource the face would look
+     * right in every screenshot and light a filled slab of ink on the wrist,
+     * which is the one place nobody checks often.
+     */
+    @Test
+    fun `ambient hands reference their own outline artwork`() {
+        val xml = WffEmitter.emit(DialParams(clockMode = ClockMode.ANALOG))
+        for (base in listOf("hand_hour", "hand_minute", "hand_hub")) {
+            assertTrue(xml.contains("\"$base\"")) { "$base is not referenced" }
+            assertTrue(xml.contains("\"${base}_ambient\"")) { "${base}_ambient is not referenced" }
+        }
     }
 
     /** A digital face is untouched by any of this. */

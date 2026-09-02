@@ -1,5 +1,7 @@
 package com.bfg.watchfaces.appcore
 
+import com.bfg.watchfaces.generator.ClockMode
+import com.bfg.watchfaces.generator.HandStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 
@@ -42,6 +44,34 @@ object Presets {
             dialColor = "#26282B", inkColor = "#E8E6E1"
         ),
         "Botanical Sand" to DialParams(engine = Engine.BOTANICAL),
+
+        // HANDS. Here rather than behind a settings toggle because presets are
+        // how this app has always introduced a look, and a feature reachable
+        // only from a control screen is one most people never learn exists.
+        //
+        // Each pairs a style with a dial that suits it: a dress hand on a fine
+        // pattern, an open hand on a busy one it can show through.
+        "Dauphine Ivory" to DialParams(
+            clockMode = ClockMode.ANALOG, handStyle = HandStyle.DAUPHINE,
+            engine = Engine.ROSETTE, scale = 18.0, depth = 5.0, freq = 9,
+            contrast = 24.0, relief = 1.3, vignette = 22.0, sheen = 22.0,
+            dialColor = "#6B655C", inkColor = "#FBF7EE"
+        ),
+        "Baton Steel" to DialParams(
+            clockMode = ClockMode.ANALOG, handStyle = HandStyle.BATON,
+            engine = Engine.BRUSHED, scale = 20.0, contrast = 34.0, relief = 2.2,
+            rotate = 20.0, vignette = 22.0, sheen = 24.0,
+            dialColor = "#6E7378", inkColor = "#FCFCFA",
+            // The one place the red seconds hand earns its keep: a steel dial
+            // is where a watch traditionally puts one.
+            showSeconds = true, secondHandColor = "#C2452D"
+        ),
+        "Skeleton Knot" to DialParams(
+            clockMode = ClockMode.ANALOG, handStyle = HandStyle.SKELETON,
+            engine = Engine.KNOTWORK, scale = 26.0, depth = 3.0, freq = 7, stroke = 1.05,
+            relief = 1.5, contrast = 36.0, rotate = 45.0, vignette = 20.0,
+            dialColor = "#7D7369", inkColor = "#FCF9F1", sheen = 28.0
+        ),
         "Clous de Paris" to DialParams(
             engine = Engine.CLOUS, scale = 22.0, depth = 4.0, contrast = 34.0,
             dialColor = "#6E6A66", inkColor = "#F5F2EC", rotate = 45.0, vignette = 22.0

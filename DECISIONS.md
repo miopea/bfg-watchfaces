@@ -1,5 +1,57 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — Four styles, ambient outlines, and the second element the schema was for
+
+Steps 6 to 9 of `docs/specs/analog-hands.md`. Dauphine and Syringe drawn,
+ambient handled properly, three analog presets in the gallery.
+
+### `maxOccurs="2"` finally made sense
+
+A hand carries exactly ONE `resource`, so ambient artwork cannot be swapped with
+a `Variant` the way a colour or an alpha can. The schema allows two of each
+hand:
+
+```xml
+<xs:element ref="HourHand" minOccurs="0" maxOccurs="2"/>
+```
+
+That is what the second one is for. Two elements, one fading out as the other
+fades in — **identical in shape to the two `TimeText` elements the digital clock
+has always shipped.** Same problem, same answer, already proven on a wrist.
+
+`Hands.ambientShapes` is the awake geometry with the fill turned off, deliberately
+one call rather than a second set of coordinates. A separate ambient outline
+would drift quietly, because ambient is the state nobody looks at often.
+
+### The undrawn-style throw is gone, and that is an improvement
+
+`Hands.shapes` used to `error()` for a style with no geometry, so an undrawn one
+failed loudly instead of silently rendering a baton. With all four drawn it is
+an exhaustive `when` over the enum with no `else` — **a fifth style now fails to
+COMPILE**, which is strictly better than failing at runtime.
+
+What replaced the test is worth more: no two styles may draw the same hand. Four
+names mapping to one shape would pass a compile check and disappoint everybody.
+
+### A comment that was wrong in a way code review would not catch
+
+Syringe's inner lozenge outline was documented as letting the dial show through.
+It does not. An unfilled shape here is STROKED over the fill beneath it, not
+subtracted from it — a real cutout needs an even-odd winding rule applied to a
+combined path in both renderers, which is a change to `HandShape`, not to a
+drawing function.
+
+The code was right and the sentence about it was not, which is the harder kind
+to catch: it looked plausible in the diff and only the render disagreed. The
+comment now says facet, and says why a cutout was not worth it.
+
+### The presets exist so the feature does
+
+Three analog entries in the Designs gallery, each pairing a style with a dial
+that suits it. A feature reachable only from a control screen is one most people
+never find, and this project has now twice shipped hand work that changed
+nothing the operator could see.
+
 ## 2026-09-02 — Sub-dials, and a date window that was shouting
 
 `SlotGeometry` has an analog branch. Complications sit at nine and three, with

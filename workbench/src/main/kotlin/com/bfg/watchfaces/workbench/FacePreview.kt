@@ -154,8 +154,8 @@ object FacePreview {
             DialRenderer.drawIndices(g, p, p.handStyle)
             val hourDeg = (hh + now.minute / 60.0 + now.second / 3600.0) / 12.0 * 360.0
             val minuteDeg = (now.minute + now.second / 60.0) / 60.0 * 360.0
-            drawRotated(g, DialRenderer.renderHand(p, p.handStyle, Hands.Hand.HOUR, DIAL_SIZE), hourDeg)
-            drawRotated(g, DialRenderer.renderHand(p, p.handStyle, Hands.Hand.MINUTE, DIAL_SIZE), minuteDeg)
+            drawRotated(g, DialRenderer.renderHand(p, p.handStyle, Hands.Hand.HOUR, DIAL_SIZE, p.inkColor, ambient), hourDeg)
+            drawRotated(g, DialRenderer.renderHand(p, p.handStyle, Hands.Hand.MINUTE, DIAL_SIZE, p.inkColor, ambient), minuteDeg)
             // Seconds are awake-only, exactly as the emitter has them.
             if (p.showSeconds && !ambient) {
                 drawRotated(
@@ -167,7 +167,7 @@ object FacePreview {
                     now.second / 60.0 * 360.0
                 )
             }
-            drawRotated(g, DialRenderer.renderHub(p, p.handStyle, DIAL_SIZE), 0.0)
+            drawRotated(g, DialRenderer.renderHub(p, p.handStyle, DIAL_SIZE, ambient), 0.0)
             // The small readout under the twelve, from the SAME box the emitter
             // uses. Hidden in ambient, like every other numeral on the face.
             SlotGeometry.analogDigitalBand(p)?.takeIf { !ambient }?.let { band ->

@@ -213,25 +213,49 @@ ${secondsCondition(p)}"""
       </SecondHand>"""
         return """
     <AnalogClock x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE">
-      <HourHand resource="hand_hour" x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE"
-                pivotX="0.5" pivotY="0.5" alpha="255">
-        <Variant mode="AMBIENT" target="alpha" value="140"/>
-      </HourHand>
-      <MinuteHand resource="hand_minute" x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE"
-                  pivotX="0.5" pivotY="0.5" alpha="255">
-        <Variant mode="AMBIENT" target="alpha" value="140"/>
-      </MinuteHand>$second
-    </AnalogClock>${analogReadout(p)}
+${handPair("HourHand", "hand_hour")}
+${handPair("MinuteHand", "hand_minute")}$second
+    </AnalogClock>
     <!--
       The hub goes AFTER the clock so it covers the hands' pivots, which is
       where a real watch puts it. It does not rotate, so it is a plain image
       rather than a fourth hand.
     -->
     <PartImage x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="140"/>
+      <Variant mode="AMBIENT" target="alpha" value="0"/>
       <Image resource="hand_hub"/>
-    </PartImage>"""
+    </PartImage>
+    <PartImage x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE" alpha="0">
+      <Variant mode="AMBIENT" target="alpha" value="255"/>
+      <Image resource="hand_hub_ambient"/>
+    </PartImage>${analogReadout(p)}"""
     }
+
+    /**
+     * TWO of each hand: one awake, one ambient.
+     *
+     * The schema allows exactly this — `<xs:element ref="HourHand" minOccurs="0"
+     * maxOccurs="2"/>` — and this is what the second one is FOR. A hand carries
+     * a single `resource`, so swapping artwork between modes cannot be done with
+     * a `Variant`; it needs a second element that is invisible until ambient.
+     *
+     * Identical in shape to how the digital clock ships two `TimeText`
+     * elements, one fading out as the other fades in. Same problem, same answer,
+     * already proven on a wrist.
+     *
+     * The ambient artwork is an OUTLINE. Ambient is a black low-power screen and
+     * a filled hand there is a slab of ink where a watch should show a line —
+     * and it lights far fewer pixels, which is the point of the mode.
+     */
+    private fun handPair(element: String, resource: String): String = """
+      <$element resource="$resource" x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE"
+                pivotX="0.5" pivotY="0.5" alpha="255">
+        <Variant mode="AMBIENT" target="alpha" value="0"/>
+      </$element>
+      <$element resource="${resource}_ambient" x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE"
+                pivotX="0.5" pivotY="0.5" alpha="0">
+        <Variant mode="AMBIENT" target="alpha" value="255"/>
+      </$element>"""
 
     /**
      * The small digital time under the twelve, when an analog face asks for one.

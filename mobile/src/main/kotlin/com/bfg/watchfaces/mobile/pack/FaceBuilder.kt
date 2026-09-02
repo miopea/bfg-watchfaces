@@ -108,6 +108,14 @@ object FaceBuilder {
             if (params.clockMode == ClockMode.ANALOG) {
                 add(PackBridge.Resource.of("drawable-nodpi", "hand_hour.png", handPng(params, Hands.Hand.HOUR)))
                 add(PackBridge.Resource.of("drawable-nodpi", "hand_minute.png", handPng(params, Hands.Hand.MINUTE)))
+                // The ambient pair. Outline artwork, referenced by the second
+                // HourHand/MinuteHand element -- a hand carries ONE resource,
+                // so swapping it between modes needs a second element and a
+                // second image. WffEmitter names these; if the names drift the
+                // face installs and renders nothing when the wrist drops.
+                add(PackBridge.Resource.of("drawable-nodpi", "hand_hour_ambient.png", handPng(params, Hands.Hand.HOUR, ambient = true)))
+                add(PackBridge.Resource.of("drawable-nodpi", "hand_minute_ambient.png", handPng(params, Hands.Hand.MINUTE, ambient = true)))
+                add(PackBridge.Resource.of("drawable-nodpi", "hand_hub_ambient.png", hubPng(params, ambient = true)))
                 // Emitted only when seconds are on; WffEmitter agrees, and a
                 // resource the XML never names is dead weight on the wire.
                 if (params.showSeconds) {
@@ -155,21 +163,21 @@ object FaceBuilder {
      * turn the empty canvas into an opaque black square rotating over the face.
      * These compress well anyway — almost all of the image is nothing.
      */
-    private fun handPng(params: DialParams, hand: Hands.Hand): ByteArray {
+    private fun handPng(params: DialParams, hand: Hands.Hand, ambient: Boolean = false): ByteArray {
         val color = if (hand == Hands.Hand.SECOND) {
             params.secondHandColor ?: params.inkColor
         } else {
             params.inkColor
         }
-        val bmp = AndroidDialRenderer.renderHand(params, params.handStyle, hand, DIAL_SIZE, color)
+        val bmp = AndroidDialRenderer.renderHand(params, params.handStyle, hand, DIAL_SIZE, color, ambient)
         return ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()
         }.also { bmp.recycle() }
     }
 
-    private fun hubPng(params: DialParams): ByteArray {
-        val bmp = AndroidDialRenderer.renderHub(params, params.handStyle, DIAL_SIZE)
+    private fun hubPng(params: DialParams, ambient: Boolean = false): ByteArray {
+        val bmp = AndroidDialRenderer.renderHub(params, params.handStyle, DIAL_SIZE, ambient)
         return ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()

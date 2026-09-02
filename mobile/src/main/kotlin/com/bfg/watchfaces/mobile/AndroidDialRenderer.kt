@@ -196,12 +196,22 @@ object AndroidDialRenderer {
         style: HandStyle,
         hand: Hands.Hand,
         size: Int = DIAL_SIZE,
-        color: String = p.inkColor
-    ): Bitmap = renderShapes(p, Hands.shapes(style, hand), size, color)
+        color: String = p.inkColor,
+        /** Ambient draws the same hand as an outline; see [Hands.ambientShapes]. */
+        ambient: Boolean = false
+    ): Bitmap = renderShapes(
+        p,
+        if (ambient) Hands.ambientShapes(style, hand) else Hands.shapes(style, hand),
+        size, color
+    )
 
     /** The hub the hands turn on. Static; it does not rotate with anything. */
-    fun renderHub(p: DialParams, style: HandStyle, size: Int = DIAL_SIZE): Bitmap =
-        renderShapes(p, listOf(Hands.hub(style)), size, p.inkColor)
+    fun renderHub(p: DialParams, style: HandStyle, size: Int = DIAL_SIZE, ambient: Boolean = false): Bitmap =
+        renderShapes(
+            p,
+            listOf(Hands.hub(style).let { if (ambient) it.copy(filled = false) else it }),
+            size, p.inkColor
+        )
 
     private fun renderShapes(
         p: DialParams,

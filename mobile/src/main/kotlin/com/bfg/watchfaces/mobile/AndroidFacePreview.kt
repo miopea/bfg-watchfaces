@@ -175,8 +175,8 @@ object AndroidFacePreview {
             AndroidDialRenderer.drawIndices(canvas, p, p.handStyle)
             val hourDeg = (hh + SAMPLE_MINUTE / 60.0 + SAMPLE_SECOND / 3600.0) / 12.0 * 360.0
             val minuteDeg = (SAMPLE_MINUTE + SAMPLE_SECOND / 60.0) / 60.0 * 360.0
-            drawRotated(canvas, AndroidDialRenderer.renderHand(p, p.handStyle, Hands.Hand.HOUR), hourDeg)
-            drawRotated(canvas, AndroidDialRenderer.renderHand(p, p.handStyle, Hands.Hand.MINUTE), minuteDeg)
+            drawRotated(canvas, AndroidDialRenderer.renderHand(p, p.handStyle, Hands.Hand.HOUR, DIAL_SIZE, p.inkColor, ambient), hourDeg)
+            drawRotated(canvas, AndroidDialRenderer.renderHand(p, p.handStyle, Hands.Hand.MINUTE, DIAL_SIZE, p.inkColor, ambient), minuteDeg)
             if (p.showSeconds && !ambient && !analog) {
                 drawRotated(
                     canvas,
@@ -187,7 +187,7 @@ object AndroidFacePreview {
                     SAMPLE_SECOND / 60.0 * 360.0
                 )
             }
-            drawRotated(canvas, AndroidDialRenderer.renderHub(p, p.handStyle), 0.0)
+            drawRotated(canvas, AndroidDialRenderer.renderHub(p, p.handStyle, DIAL_SIZE, ambient), 0.0)
             // The same box the emitter and the workbench preview use.
             SlotGeometry.analogDigitalBand(p)?.takeIf { !ambient }?.let { band ->
                 drawCenteredIn(

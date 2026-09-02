@@ -143,8 +143,14 @@ object DialRenderer {
         hand: Hands.Hand,
         size: Int = DIAL_SIZE,
         /** The hand's own colour, for a second hand that differs from the ink. */
-        color: String = p.inkColor
-    ): BufferedImage = renderShapes(p, Hands.shapes(style, hand), size, color)
+        color: String = p.inkColor,
+        /** Ambient draws the same hand as an outline; see [Hands.ambientShapes]. */
+        ambient: Boolean = false
+    ): BufferedImage = renderShapes(
+        p,
+        if (ambient) Hands.ambientShapes(style, hand) else Hands.shapes(style, hand),
+        size, color
+    )
 
     /**
      * How heavy an unfilled hand's edge is drawn, in dial units.
@@ -155,8 +161,12 @@ object DialRenderer {
     private const val OUTLINE_WIDTH = 3.0f
 
     /** The hub the hands turn on. Static: it does not rotate with anything. */
-    fun renderHub(p: DialParams, style: HandStyle, size: Int = DIAL_SIZE): BufferedImage =
-        renderShapes(p, listOf(Hands.hub(style)), size, p.inkColor)
+    fun renderHub(p: DialParams, style: HandStyle, size: Int = DIAL_SIZE, ambient: Boolean = false): BufferedImage =
+        renderShapes(
+            p,
+            listOf(Hands.hub(style).let { if (ambient) it.copy(filled = false) else it }),
+            size, p.inkColor
+        )
 
     /**
      * Shared by every hand, the hub and the indices, so all four are cut the

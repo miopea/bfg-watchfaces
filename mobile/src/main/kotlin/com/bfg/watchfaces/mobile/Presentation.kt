@@ -72,11 +72,17 @@ object Presentation {
      */
     val OFFERED_HANDS: List<HandStyle> = listOf(
         HandStyle.BATON,
+        HandStyle.DAUPHINE,
+        HandStyle.SYRINGE,
         HandStyle.SKELETON
     )
 
-    /** Named, not defaulted: these are drawn but not finished. See analog-hands.md step 8. */
-    val UNOFFERED_HANDS: Set<HandStyle> = setOf(HandStyle.DAUPHINE, HandStyle.SYRINGE)
+    /**
+     * Nothing withheld today, and the empty set is deliberate rather than
+     * missing: it is what `OneVocabularyTest` reads to tell "decided against"
+     * from "forgot".
+     */
+    val UNOFFERED_HANDS: Set<HandStyle> = emptySet()
 
     fun label(engine: Engine): String = when (engine) {
         Engine.KNOTWORK -> "Knotwork"

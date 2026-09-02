@@ -1,7 +1,6 @@
 package com.bfg.watchfaces.generator
 
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import kotlin.math.abs
@@ -17,7 +16,8 @@ import kotlin.math.hypot
  */
 class HandsTest {
 
-    private val drawn = listOf(HandStyle.BATON, HandStyle.SKELETON)
+    /** All of them now. Kept as a list so a style in progress can be excluded. */
+    private val drawn = HandStyle.entries
 
     /**
      * THE ONE THAT MAKES IT A WATCH.
@@ -178,29 +178,35 @@ class HandsTest {
     }
 
     /**
-     * A style with no geometry FAILS rather than quietly drawing a baton.
+     * EVERY style has geometry, and the compiler is what enforces it.
      *
-     * `Presentation.UNOFFERED` exists because adding an engine without adding it
-     * to the picker shipped a hidden feature. This is the same trap one layer
-     * down: a style in the enum with no shapes would render as something else
-     * entirely, and look like a drawing mistake rather than a missing branch.
+     * This used to assert that an undrawn style THREW rather than quietly
+     * rendering a baton. Now that all four are drawn, `shapes` is an exhaustive
+     * `when` over the enum with no else branch — so adding a fifth style fails
+     * to COMPILE, which is strictly better than failing at runtime and is why
+     * the throw is gone rather than kept as ceremony.
+     *
+     * What is still worth asserting is that each style produces something, and
+     * something DIFFERENT: four names mapping to one shape would pass a
+     * compile-time check and disappoint everybody.
      */
     @Test
-    fun `an undrawn style fails loudly instead of substituting`() {
-        for (style in listOf(HandStyle.DAUPHINE, HandStyle.SYRINGE)) {
-            assertThrows(IllegalStateException::class.java) {
-                Hands.shapes(style, Hands.Hand.HOUR)
-            }
+    fun `every style draws, and no two styles draw the same hand`() {
+        val seen = mutableMapOf<List<Hands.HandShape>, HandStyle>()
+        for (style in HandStyle.entries) {
+            val shapes = Hands.shapes(style, Hands.Hand.MINUTE)
+            assertTrue(shapes.isNotEmpty()) { "$style drew nothing" }
+            val clash = seen.put(shapes, style)
+            assertTrue(clash == null) { "$style draws the same minute hand as $clash" }
         }
     }
 
-    /** Every style in the enum is either drawn or explicitly not yet drawn. */
+    /** Every style is drawable and nameable, for every hand. */
     @Test
     fun `no style is silently unaccounted for`() {
         for (style in HandStyle.entries) {
-            val result = runCatching { Hands.shapes(style, Hands.Hand.HOUR) }
-            assertTrue(result.isSuccess || result.exceptionOrNull() is IllegalStateException) {
-                "$style failed in an unexpected way: ${result.exceptionOrNull()}"
+            for (hand in Hands.Hand.entries) {
+                assertTrue(Hands.shapes(style, hand).isNotEmpty()) { "$style has no $hand" }
             }
             assertTrue(style.label.isNotBlank()) { "$style has no label for the picker" }
         }
