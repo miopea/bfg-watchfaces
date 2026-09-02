@@ -59,6 +59,20 @@ object WatchLink {
     const val FACE_RESET_CHANNEL_PREFIX = "/bfg-watchfaces/face-reset/"
 
     /**
+     * A short note for the watch to show, sent as a MESSAGE rather than a file.
+     *
+     * A channel exists to move half a megabyte of APK. A note is twenty
+     * characters, and opening a channel for it would mean a handshake, a stream
+     * and a close to deliver less than this comment.
+     *
+     * `MessageClient` is the right size for it: one call, fire and forget, and
+     * the watch's listener already exists. See `PhoneNoteService` for why this
+     * path is worth having at all — it is the one thing that reaches the wrist
+     * without rebuilding a face.
+     */
+    const val NOTE_PATH = "/bfg-watchfaces/note"
+
+    /**
      * The token from a channel path, or null when the path is not one of ours.
      *
      * Undoes [channelPathFor]'s encoding. A segment that is not valid URL-safe

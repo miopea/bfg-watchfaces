@@ -32,6 +32,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -60,6 +61,10 @@ import com.bfg.watchfaces.generator.ControlInventory
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.DateStyle
+import com.bfg.watchfaces.appcore.PhoneNote
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.launch
 import com.bfg.watchfaces.appcore.Colourway
 import com.bfg.watchfaces.generator.ClockMode
 import com.bfg.watchfaces.generator.FaceFont
@@ -443,6 +448,20 @@ fun StudioScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 6.dp)
         )
+        Spacer(Modifier.height(16.dp))
+        // THE ONE VALUE THAT REACHES THE WATCH WITHOUT REBUILDING A FACE.
+        //
+        // Everything else here is baked into an APK and needs a send, which
+        // costs one of the watch's finite addWatchFace calls. A complication is
+        // the exception: the face names a provider and the watch asks it for a
+        // value whenever it likes. So this arrives on the wrist in a message,
+        // with no rebuild and no slot spent.
+        //
+        // Beside the complications on purpose -- it is only visible once a slot
+        // is pointed at "Note from your phone", and this is where somebody does
+        // that.
+        NoteField()
+
         Spacer(Modifier.height(16.dp))
             footer()
             Spacer(Modifier.height(24.dp))
@@ -882,6 +901,73 @@ private fun <T> ChoiceRow(
                     onClick = { onSelect(value) },
                     shape = SegmentedButtonDefaults.itemShape(index = i, count = options.size)
                 ) { Text(text) }
+            }
+        }
+    }
+}
+
+/**
+ * A short note, typed here and shown on the watch.
+ *
+ * Sent as a message rather than baked into a face, so it changes on the wrist
+ * immediately. The field opens on whatever was last sent, so reopening the app
+ * shows the truth rather than an empty box.
+ *
+ * The result line says what actually happened. A send with no watch connected
+ * stores the note and reports that plainly, because "saved but not delivered" is
+ * a real state and pretending otherwise is how somebody stares at an unchanged
+ * wrist.
+ */
+@Composable
+private fun NoteField() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var text by rememberSaveable { mutableStateOf(NoteSender.current(context)) }
+    var status by rememberSaveable { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+
+    Column {
+        SectionHeading("Note on your watch")
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = text,
+            onValueChange = {
+                text = it.take(PhoneNote.MAX_LENGTH)
+                status = null
+            },
+            label = { Text("A few words") },
+            supportingText = {
+                Text("Point a complication at \"Note from your phone\" to see it.")
+            },
+            singleLine = true,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(
+                enabled = !busy,
+                onClick = {
+                    busy = true
+                    scope.launch {
+                        val sent = withContext(Dispatchers.IO) { NoteSender.send(context, text) }
+                        busy = false
+                        status = when {
+                            sent == null -> "Couldn't reach your watch. The note is saved; try again when it's nearby."
+                            sent.isEmpty() -> "Cleared."
+                            else -> "Sent."
+                        }
+                    }
+                }
+            ) { Text(if (text.isBlank()) "Clear" else "Send note") }
+            val said = status
+            if (said != null) {
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    said,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

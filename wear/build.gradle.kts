@@ -19,8 +19,8 @@ android {
         // the phone and watch apps ship as two artefacts under one listing. The
         // scheme is "wear = phone + 1000", so the two never collide and it stays
         // obvious which is which in the console.
-        versionCode = 1024
-        versionName = "1.31"
+        versionCode = 1025
+        versionName = "1.32"
     }
     /**
      * Release signing. Identical to `:mobile`'s and deliberately so: both
@@ -74,6 +74,9 @@ dependencies {
     implementation(libs.androidx.fragment)
     implementation(libs.play.services.wearable)
     implementation(libs.wear.watchface.push)
+    // Lets THIS app answer a complication, so a value can reach the wrist
+    // without rebuilding and re-sending a face. See PhoneNoteService.
+    implementation(libs.wear.complications.data.source)
 
     // The watch app had no launcher activity at all: installed from Play it was
     // invisible, which makes it untestable by anyone in a testing ring. Wear

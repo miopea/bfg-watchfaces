@@ -165,10 +165,10 @@ flat-on-engraved inconsistency whether or not the tilt is ever noticed.
    a Pixel Watch 5's own `fonts.xml`. Found that `SYNC_TO_DEVICE` was being
    emitted as a typeface — it is the `hourFormat` value — so the attribute had
    never done anything.
-3. **A complication data source of our own.** The Watch Face Push guidance's real
-   trick: a face reads values the phone updates, so things can change *without* a
-   rebuild and a push — routing around both the slot limit and the activation
-   one-shot for anything that is a value rather than a shape.
+3. ~~**A complication data source of our own.**~~ **DONE 2026-09-02.**
+   `PhoneNoteService` on the watch answers a `SHORT_TEXT` complication from a
+   note the phone sends by message. It appeared in the existing slot picker with
+   no picker change, because `ProviderCatalog` already found providers by intent.
 4. **Weather beyond now.** Forecast strip, sunrise/sunset as a drawn arc.
 
 ## 6. Deliberately not doing

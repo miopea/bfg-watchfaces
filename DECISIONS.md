@@ -1,5 +1,66 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — A complication of our own: the first value that needs no rebuild
+
+Third off `launch-scope.md` §5, and the one with something to say about the
+architecture rather than the look.
+
+### The problem it solves
+
+Everything about a face is baked into an APK. Changing a colour, a layout, a
+complication choice means rebuilding, sending half a megabyte over Bluetooth,
+and spending one of the watch's finite `addWatchFace` calls. The slot limit is
+1 and activation is once per install, so every send is expensive in a way that
+has bitten this project repeatedly.
+
+**A complication is the exception.** The face names a provider and the watch
+asks it for a value whenever it likes, so anything delivered that way changes on
+the wrist with no rebuild, no send, and no slot spent. Google's Watch Face Push
+guidance recommends building a companion app around exactly this.
+
+A short note typed on the phone is the first thing on that path.
+
+### The seam was already in the right place
+
+`ProviderCatalog` finds complication sources by querying services for the
+provider intent and keeping the ones supporting `SHORT_TEXT`. Registering
+`PhoneNoteService` in the manifest was **all it took for the existing slot
+picker to offer it** — no picker change, no new `ComplicationSource`, no emitter
+change, because a face could already pin a slot to a `primaryProvider`
+component.
+
+That is the sign of a seam in the right place: the feature arrived by
+implementing an interface that already existed rather than by threading a new
+concept through five files.
+
+### A message, not a channel
+
+A channel exists to move an APK. A note is twenty characters, and opening a
+channel would mean a handshake, a stream and a close to deliver less than this
+paragraph. `MessageClient` is the right size.
+
+### The push matters as much as the storing
+
+`UPDATE_PERIOD_SECONDS` is 0 — the value changes when a person changes it and
+never on a timer, so polling would wake the watch to re-read a file that is
+almost always the same. `ComplicationDataSourceUpdateRequester` pushes instead,
+at the one moment there is something new. Without it the note would arrive at an
+unpredictable time or look like it never arrived.
+
+### Twenty characters, enforced on the phone
+
+The watch truncates a `SHORT_TEXT` complication regardless. Doing it where
+somebody is typing means the limit is visible rather than discovered on a wrist,
+and it keeps what is stored equal to what is shown.
+
+### And the same XML comment bug, again
+
+The manifest entry failed to parse because its comment contained `--`, which is
+illegal inside an XML comment. **That is the second time in this session.** The
+first is already recorded above. It is a two-second fix and a five-minute
+diagnosis, and the tell is always the same: `ManifestMerger2$MergeFailureException`
+with no line number.
+
 ## 2026-09-02 — Fonts, and the attribute that had never done anything
 
 Second item off `launch-scope.md` §5. It began as "add a typeface picker" and the

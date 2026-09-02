@@ -3,6 +3,7 @@ package com.bfg.watchfaces.wear
 import android.util.Log
 import androidx.wear.watchfacepush.WatchFacePushManager
 import com.bfg.watchfaces.appcore.ActivationConsent
+import com.bfg.watchfaces.appcore.PhoneNote
 import com.bfg.watchfaces.appcore.WatchLink
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.ChannelClient
@@ -50,6 +51,28 @@ class FaceReceiverService : WearableListenerService() {
     // returns -- so work launched into a scope here was being cancelled mid
     // install with "Job was cancelled". Doing it inline keeps the service alive
     // for exactly as long as the face takes to arrive and install.
+
+    /**
+     * A note from the phone: store it and tell the system to re-ask.
+     *
+     * A MESSAGE, not a channel — see [WatchLink.NOTE_PATH]. Twenty characters do
+     * not need a stream.
+     *
+     * The push matters as much as the storing. Without
+     * [PhoneNoteService.notifyChanged] the watch keeps whatever it last read
+     * until something else happens to ask, so a note typed on the phone would
+     * arrive at an unpredictable time or look like it never arrived.
+     */
+    override fun onMessageReceived(event: com.google.android.gms.wearable.MessageEvent) {
+        if (event.path != WatchLink.NOTE_PATH) {
+            super.onMessageReceived(event)
+            return
+        }
+        val text = runCatching { String(event.data, Charsets.UTF_8) }.getOrDefault("")
+        val stored = PhoneNote.save(applicationContext.filesDir, text)
+        Log.i(TAG, if (stored.isEmpty()) "note cleared" else "note set (${stored.length} chars)")
+        PhoneNoteService.notifyChanged(applicationContext)
+    }
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
         // Logged before anything can fail, because the report people actually

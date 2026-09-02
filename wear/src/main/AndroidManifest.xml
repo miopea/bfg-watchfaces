@@ -102,6 +102,33 @@
       was invisible and a tester had no way to open it or tell whether it
       worked. See WatchActivity.
     -->
+    <!--
+      THIS APP ANSWERING A COMPLICATION.
+      Registered exactly the way ProviderCatalog looks for one — the same intent
+      action and SUPPORTED_TYPES metadata it filters on — so the slot picker in
+      the phone app offers it with no change to the picker at all.
+
+      UPDATE_PERIOD_SECONDS is 0 on purpose. The value changes when a person
+      changes it and never on a timer, so polling would wake the watch to re-read
+      a file that is almost always the same. PhoneNoteService.notifyChanged
+      pushes instead, at the one moment there is something new.
+    -->
+    <service
+        android:name=".PhoneNoteService"
+        android:exported="true"
+        android:label="Note from your phone"
+        android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+      <intent-filter>
+        <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+      </intent-filter>
+      <meta-data
+          android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+          android:value="SHORT_TEXT" />
+      <meta-data
+          android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+          android:value="0" />
+    </service>
+
     <activity
         android:name=".WatchActivity"
         android:exported="true"
