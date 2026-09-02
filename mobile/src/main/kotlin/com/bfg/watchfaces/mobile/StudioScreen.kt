@@ -165,6 +165,14 @@ fun StudioScreen(
                 options = Presentation.OFFERED_HANDS.map { it.label to it },
                 selected = params.handStyle
             ) { onParams(params.copy(handStyle = it)) }
+            SwitchRow(
+                title = "Show the time as numbers too",
+                // Says the cost plainly. It was chosen knowing the hand crosses
+                // it, and somebody turning it on should hear that from the app
+                // rather than discover it on their wrist at noon.
+                detail = "A small clock under the 12. The hour hand passes over it around midday.",
+                checked = params.analogDigital
+            ) { onParams(params.copy(analogDigital = it)) }
         } else {
             ChoiceRow(
                 label = "Time",

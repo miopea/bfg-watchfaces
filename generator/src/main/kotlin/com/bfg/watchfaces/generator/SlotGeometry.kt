@@ -315,6 +315,26 @@ object SlotGeometry {
     /** Below this a value is not worth drawing; it would be a smudge. */
     const val MIN_DRAWN_FONT = 10
 
+    /**
+     * Where the small digital time sits on an analog face, or null.
+     *
+     * Here rather than in the emitter because the emitter, the workbench
+     * preview and the Android preview all need it — the same reason every other
+     * box in this file lives here. Three copies of a y coordinate is how a
+     * preview ends up being a picture of a different watch.
+     */
+    fun analogDigitalBand(p: DialParams): Box? {
+        if (p.clockMode != ClockMode.ANALOG || !p.analogDigital) return null
+        val h = (analogDigitalSize(p) * 1.6).roundToInt()
+        // Under the twelve: far enough down to clear the chapter ring, far
+        // enough up to stay out of the sub-dials at nine and three.
+        val cy = DIAL_CENTER - DIAL_RADIUS * 0.46
+        return Box(0, (cy - h / 2.0).roundToInt(), DIAL_SIZE, h)
+    }
+
+    /** Small: it is a readout beside hands, not the way the face tells the time. */
+    fun analogDigitalSize(p: DialParams): Int = fontSize(analogSize(p))
+
     fun dateBand(p: DialParams): Box? {
         if (p.dateStyle == DateStyle.NONE) return null
         // At six on an analog face, which is where a watch puts a date window

@@ -561,6 +561,25 @@ data class DialParams(
     val secondHandColor: String? = null,
 
     /**
+     * A small digital time under the twelve, on an analog face.
+     *
+     * ## The cost, stated rather than discovered
+     *
+     * The hour hand CROSSES this for roughly two hours in twelve, around eleven
+     * to one, and it sits near the twelve index. That was known when it was
+     * chosen — the alternative offered was to spend a sub-dial slot on it, where
+     * nothing can collide.
+     *
+     * If it reads badly on a wrist the fix is to move it to a sub-dial, not to
+     * add a placement control: a control would let somebody put it under the
+     * minute hand's own arc, which is worse in every position they could pick.
+     *
+     * Ignored unless [clockMode] is analog. Defaults to false, so every face
+     * emits exactly what it did before this existed.
+     */
+    val analogDigital: Boolean = false,
+
+    /**
      * Which slots draw the little icon above their value.
      *
      * Per slot rather than one switch for the face, because the reason to turn a

@@ -150,6 +150,36 @@ class OneVocabularyTest {
      *
      * Same trap as `ENGINE_ORDER`, one layer down, and the same guard.
      */
+    /**
+     * EVERY preview knows about the clock mode.
+     *
+     * There are two previews — one AWT, one Canvas — and hands were taught to
+     * the workbench one first. For a release, choosing Hands changed the face
+     * and not the picture of it, because Studio shows the Android one. Reported
+     * as "the preview still shows the digital face when I select the hands".
+     *
+     * The same shape as the `drawIndices` divergence, and the third time this
+     * project has paid for one definition executed in two places. Neither copy
+     * is wrong to exist; forgetting one of them is.
+     */
+    @Test
+    fun `every face preview handles the clock mode`() {
+        val previews = otherModuleSources().filter { it.name.endsWith("FacePreview.kt") }
+        assertTrue(previews.size >= 2) {
+            "expected both previews, found ${previews.map { it.name }}"
+        }
+        for (f in previews) {
+            val text = f.readText()
+            assertTrue(text.contains("ClockMode.ANALOG")) {
+                "${f.name} never mentions ClockMode.ANALOG, so it draws a digital " +
+                    "clock for a face wearing hands"
+            }
+            assertTrue(text.contains("Hands.Hand.HOUR") && text.contains("Hands.Hand.MINUTE")) {
+                "${f.name} does not draw the hands"
+            }
+        }
+    }
+
     @Test
     fun `every hand style is either offered or explicitly withheld`() {
         val presentation = otherModuleSources().firstOrNull { it.name == "Presentation.kt" }

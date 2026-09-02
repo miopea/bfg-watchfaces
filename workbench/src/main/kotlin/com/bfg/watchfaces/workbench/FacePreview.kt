@@ -168,6 +168,15 @@ object FacePreview {
                 )
             }
             drawRotated(g, DialRenderer.renderHub(p, p.handStyle, DIAL_SIZE), 0.0)
+            // The small readout under the twelve, from the SAME box the emitter
+            // uses. Hidden in ambient, like every other numeral on the face.
+            SlotGeometry.analogDigitalBand(p)?.takeIf { !ambient }?.let { band ->
+                drawCentered(
+                    g, timeText, band.y, band.h,
+                    SlotGeometry.analogDigitalSize(p).toDouble(),
+                    awtStyle(l.fontWeight), ink
+                )
+            }
         } else if (ambient) {
             // Mirror the emitter's version branch exactly. From v3 the ambient
             // ink clears a contrast floor against black; before that it is the

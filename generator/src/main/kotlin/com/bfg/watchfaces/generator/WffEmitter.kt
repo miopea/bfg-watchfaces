@@ -221,7 +221,7 @@ ${secondsCondition(p)}"""
                   pivotX="0.5" pivotY="0.5" alpha="255">
         <Variant mode="AMBIENT" target="alpha" value="140"/>
       </MinuteHand>$second
-    </AnalogClock>
+    </AnalogClock>${analogReadout(p)}
     <!--
       The hub goes AFTER the clock so it covers the hands' pivots, which is
       where a real watch puts it. It does not rotate, so it is a plain image
@@ -231,6 +231,27 @@ ${secondsCondition(p)}"""
       <Variant mode="AMBIENT" target="alpha" value="140"/>
       <Image resource="hand_hub"/>
     </PartImage>"""
+    }
+
+    /**
+     * The small digital time under the twelve, when an analog face asks for one.
+     *
+     * Its box comes from [SlotGeometry.analogDigitalBand] rather than being
+     * computed here, so the two previews cannot draw it anywhere else. Hidden
+     * in ambient like the rest of the numerals: ambient updates once a minute
+     * and the hands already say the time.
+     */
+    private fun analogReadout(p: DialParams): String {
+        val box = SlotGeometry.analogDigitalBand(p) ?: return ""
+        val size = SlotGeometry.analogDigitalSize(p)
+        return """
+    <DigitalClock x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}">
+      <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
+                x="0" y="0" width="${box.w}" height="${box.h}" alpha="255">
+        <Variant mode="AMBIENT" target="alpha" value="0"/>
+        <Font family="${XmlSafe.attr(p.layout.fontFamily)}" size="$size" weight="${XmlSafe.attr(p.layout.fontWeight)}" color="${argb(p.inkColor)}"/>
+      </TimeText>
+    </DigitalClock>"""
     }
 
     private fun secondsClock(p: DialParams, left: Int): String {

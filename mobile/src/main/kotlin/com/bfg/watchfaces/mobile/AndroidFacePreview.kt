@@ -10,6 +10,8 @@ import com.bfg.watchfaces.generator.AmbientPalette
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.ClockText
 import com.bfg.watchfaces.generator.DateStyle
+import com.bfg.watchfaces.generator.ClockMode
+import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.EngravedStroke
 import com.bfg.watchfaces.generator.SecondsBand
@@ -38,6 +40,15 @@ import com.bfg.watchfaces.generator.SlotPosition
 object AndroidFacePreview {
 
     /** A fixed time, so a preview does not change under the person mid-edit. */
+    /** Rotate a full-canvas hand about the dial centre, as WFF does with pivot 0.5. */
+    private fun drawRotated(canvas: android.graphics.Canvas, bmp: Bitmap, degrees: Double) {
+        canvas.save()
+        canvas.rotate(degrees.toFloat(), DIAL_SIZE / 2f, DIAL_SIZE / 2f)
+        canvas.drawBitmap(bmp, 0f, 0f, null)
+        canvas.restore()
+        bmp.recycle()
+    }
+
     private const val SAMPLE_HOUR = 10
     private const val SAMPLE_MINUTE = 10
     private const val SAMPLE_SECOND = 30
@@ -153,6 +164,43 @@ object AndroidFacePreview {
             )
         }
 
+        // HANDS INSTEAD OF NUMERALS — and this is the preview Studio shows.
+        //
+        // The workbench preview learned this first and this one did not, so
+        // choosing Hands changed the face and not the picture of it. Exactly
+        // the split that bit `drawIndices`: two executions of one definition,
+        // and only one of them updated.
+        val analog = p.clockMode == ClockMode.ANALOG
+        if (analog) {
+            AndroidDialRenderer.drawIndices(canvas, p, p.handStyle)
+            val hourDeg = (hh + SAMPLE_MINUTE / 60.0 + SAMPLE_SECOND / 3600.0) / 12.0 * 360.0
+            val minuteDeg = (SAMPLE_MINUTE + SAMPLE_SECOND / 60.0) / 60.0 * 360.0
+            drawRotated(canvas, AndroidDialRenderer.renderHand(p, p.handStyle, Hands.Hand.HOUR), hourDeg)
+            drawRotated(canvas, AndroidDialRenderer.renderHand(p, p.handStyle, Hands.Hand.MINUTE), minuteDeg)
+            if (p.showSeconds && !ambient && !analog) {
+                drawRotated(
+                    canvas,
+                    AndroidDialRenderer.renderHand(
+                        p, p.handStyle, Hands.Hand.SECOND, DIAL_SIZE,
+                        p.secondHandColor ?: p.inkColor
+                    ),
+                    SAMPLE_SECOND / 60.0 * 360.0
+                )
+            }
+            drawRotated(canvas, AndroidDialRenderer.renderHub(p, p.handStyle), 0.0)
+            // The same box the emitter and the workbench preview use.
+            SlotGeometry.analogDigitalBand(p)?.takeIf { !ambient }?.let { band ->
+                drawCenteredIn(
+                    canvas, timeText,
+                    band.x.toFloat(), band.y.toFloat(),
+                    band.w.toFloat(), band.h.toFloat(),
+                    SlotGeometry.analogDigitalSize(p).toFloat(),
+                    ink,
+                    bold = l.fontWeight.uppercase() == "BOLD"
+                )
+            }
+        }
+
         val timeColor = if (ambient) {
             // Mirror the emitter's version branch exactly. From v3 the ambient
             // ink clears a contrast floor against black; before that it is the
@@ -163,7 +211,7 @@ object AndroidFacePreview {
         } else {
             ink
         }
-        drawCenteredIn(
+        if (!analog) drawCenteredIn(
             canvas, timeText,
             0f, (l.timeY - l.timeSize / 2).toFloat(),
             DIAL_SIZE.toFloat(), (l.timeSize * 1.4).toFloat(),
@@ -185,7 +233,7 @@ object AndroidFacePreview {
         // end-aligned run hangs its left edge off a width estimate, and that is
         // what pushed the seconds back toward the ring after a change meant to
         // move them away from it.
-        if (p.showSeconds && !ambient) {
+        if (p.showSeconds && !ambient && !analog) {
             val startAligned = SecondsBand.alignFor(p) == "START"
             drawCenteredIn(
                 canvas, "%02d".format(SAMPLE_SECOND),

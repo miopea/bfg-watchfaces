@@ -56,6 +56,7 @@ object FaceCodec {
                 HandStyle.entries.firstOrNull { it.name == name }
             } ?: d.handStyle,
             secondHandColor = q["secondHandColor"]?.takeIf { it.isNotBlank() } ?: d.secondHandColor,
+            analogDigital = q["analogDigital"]?.let { it == "true" || it == "1" } ?: d.analogDigital,
             // `iconSlots` is the current form. `showComplicationIcons` was the
             // single switch that preceded it and is still read, because faces
             // were saved with it: false meant no glyph anywhere, true meant all
@@ -181,6 +182,7 @@ object FaceCodec {
   "clockMode": ${Json.quote(p.clockMode.name)},
   "handStyle": ${Json.quote(p.handStyle.name)},
   "secondHandColor": ${p.secondHandColor?.let { Json.quote(it) } ?: "null"},
+  "analogDigital": ${p.analogDigital},
   "providers": {${p.providers.entries.sortedBy { it.key.ordinal }
         .joinToString(", ") { "\"${it.key.name}\": \"${it.value}\"" }}},
   "iconSlots": [${p.iconSlots.sortedBy { it.ordinal }.joinToString(", ") { "\"${it.name}\"" }}],
@@ -217,6 +219,7 @@ object FaceCodec {
             "clockMode" to p.clockMode.name,
             "handStyle" to p.handStyle.name,
             "secondHandColor" to (p.secondHandColor ?: ""),
+            "analogDigital" to p.analogDigital,
             "iconSlots" to p.iconSlots.sortedBy { it.ordinal }.joinToString(",") { it.name },
             "providers" to p.providers.entries.sortedBy { it.key.ordinal }
                 .joinToString(",") { "${it.key.name}:${it.value}" },

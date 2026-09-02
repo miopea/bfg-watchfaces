@@ -118,15 +118,38 @@ class WffSchemaTest {
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.EnumSource(HandStyle::class)
     fun `hands emit schema-valid WFF`(style: HandStyle) {
-        for (seconds in listOf(false, true)) {
+        for (seconds in listOf(false, true)) for (readout in listOf(false, true)) {
             val p = DialParams(
                 clockMode = ClockMode.ANALOG,
                 handStyle = style,
-                showSeconds = seconds
+                showSeconds = seconds,
+                analogDigital = readout
             )
             val errors = validate(WffEmitter.emit(p))
-            assertTrue(errors.isEmpty()) { "$style seconds=$seconds: ${errors.joinToString("\n")}" }
+            assertTrue(errors.isEmpty()) {
+                "$style seconds=$seconds readout=$readout: ${errors.joinToString("\n")}"
+            }
         }
+    }
+
+    /**
+     * The readout appears only when asked for, and only on an analog face.
+     *
+     * A DigitalClock on a face wearing hands is deliberate here and a bug
+     * anywhere else, so both directions are worth pinning.
+     */
+    @Test
+    fun `the small readout is emitted only when an analog face asks for it`() {
+        val without = WffEmitter.emit(DialParams(clockMode = ClockMode.ANALOG))
+        assertTrue(!without.contains("<DigitalClock")) { "an unrequested readout was emitted" }
+
+        val with = WffEmitter.emit(DialParams(clockMode = ClockMode.ANALOG, analogDigital = true))
+        assertTrue(with.contains("<DigitalClock")) { "the readout is missing" }
+        assertTrue(with.contains("<AnalogClock")) { "the hands went away when the readout arrived" }
+
+        // Ignored on a digital face: it has a clock already.
+        val digital = WffEmitter.emit(DialParams(analogDigital = true))
+        assertEquals(1, digital.split("<DigitalClock").size - 1) { "a digital face grew a second clock" }
     }
 
     /**
