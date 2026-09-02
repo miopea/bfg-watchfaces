@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import com.bfg.watchfaces.appcore.FaceLibrary
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.appcore.Complications
+import com.bfg.watchfaces.generator.ClockMode
+import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.WffEmitter
 import com.bfg.watchfaces.mobile.AndroidDialRenderer
@@ -100,6 +102,19 @@ object FaceBuilder {
             // because of scripts/pack-qualifiers.patch -- see build-pack-android.sh.
             add(PackBridge.Resource.of("drawable-nodpi", "dial_bg.png", dialPng(params)))
             add(PackBridge.Resource.of("drawable-nodpi", "preview.png", previewPng(params)))
+            // Hands, only when the face wears them. A digital face must pack
+            // exactly the bytes it always did -- four unused PNGs would cross
+            // Bluetooth on every send for nothing.
+            if (params.clockMode == ClockMode.ANALOG) {
+                add(PackBridge.Resource.of("drawable-nodpi", "hand_hour.png", handPng(params, Hands.Hand.HOUR)))
+                add(PackBridge.Resource.of("drawable-nodpi", "hand_minute.png", handPng(params, Hands.Hand.MINUTE)))
+                // Emitted only when seconds are on; WffEmitter agrees, and a
+                // resource the XML never names is dead weight on the wire.
+                if (params.showSeconds) {
+                    add(PackBridge.Resource.of("drawable-nodpi", "hand_second.png", handPng(params, Hands.Hand.SECOND)))
+                }
+                add(PackBridge.Resource.of("drawable-nodpi", "hand_hub.png", hubPng(params)))
+            }
         }
 
         val unsigned = PackBridge.compileApk(manifest(packageName), resources)
@@ -132,6 +147,35 @@ object FaceBuilder {
     }
 
     /** The carousel thumbnail. Required: without it the face installs and never appears. */
+    /**
+     * One hand as a transparent PNG.
+     *
+     * ARGB_8888 and NOT the RGB_565 squeeze `dial_bg` gets: a hand is mostly
+     * transparent and 565 has no alpha channel at all, so the same trick would
+     * turn the empty canvas into an opaque black square rotating over the face.
+     * These compress well anyway — almost all of the image is nothing.
+     */
+    private fun handPng(params: DialParams, hand: Hands.Hand): ByteArray {
+        val color = if (hand == Hands.Hand.SECOND) {
+            params.secondHandColor ?: params.inkColor
+        } else {
+            params.inkColor
+        }
+        val bmp = AndroidDialRenderer.renderHand(params, params.handStyle, hand, DIAL_SIZE, color)
+        return ByteArrayOutputStream().use { out ->
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }.also { bmp.recycle() }
+    }
+
+    private fun hubPng(params: DialParams): ByteArray {
+        val bmp = AndroidDialRenderer.renderHub(params, params.handStyle, DIAL_SIZE)
+        return ByteArrayOutputStream().use { out ->
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }.also { bmp.recycle() }
+    }
+
     private fun previewPng(params: DialParams): ByteArray {
         val preview = AndroidFacePreview.render(params, ambient = false, size = DIAL_SIZE)
         return ByteArrayOutputStream().use { out ->

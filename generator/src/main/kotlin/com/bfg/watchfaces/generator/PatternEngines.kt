@@ -48,6 +48,10 @@ object PatternEngines {
         // offers there, and corrected how wide a weather value is measured to
         // be. Both are SlotGeometry; no engine changed.
         11 -> v4(p)
+        // v12 added ANALOG hands: a clock mode, a hand style and a second-hand
+        // colour. All of it is the clock and the complication layout; the dial
+        // pattern is untouched, so this delegates rather than copying an engine.
+        12 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

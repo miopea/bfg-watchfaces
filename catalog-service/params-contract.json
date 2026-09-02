@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "currentGeneratorVersion": 11,
+  "currentGeneratorVersion": 12,
   "maxFaceBytes": 8192,
   "maxNameChars": 40,
   "maxAuthorChars": 40,
@@ -46,6 +46,7 @@
   "unpublishableEngines": ["TEXTURE"],
   "fields": [
     "batteryY",
+    "clockMode",
     "complicationSize",
     "complicationSpread",
     "complicationY",
@@ -62,6 +63,7 @@
     "fontWeight",
     "freq",
     "generatorVersion",
+    "handStyle",
     "hourFormat",
     "iconSlots",
     "inkColor",
@@ -72,6 +74,7 @@
     "ring",
     "rotate",
     "scale",
+    "secondHandColor",
     "sheen",
     "showSeconds",
     "stroke",

@@ -12,6 +12,9 @@ import com.bfg.watchfaces.generator.DIAL_RADIUS
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.DialShading
+import com.bfg.watchfaces.generator.ClockMode
+import com.bfg.watchfaces.generator.HandStyle
+import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.EngravedStroke
 import com.bfg.watchfaces.generator.PatternEngines
 import com.bfg.watchfaces.generator.ProceduralDial
@@ -93,6 +96,10 @@ object AndroidDialRenderer {
         val procedural = TextureField.kindFor(p.engine)
         if (procedural != null) drawProcedural(canvas, procedural, p, size) else drawSheen(canvas, p)
         if (procedural == null) drawPattern(canvas, p)
+        // Indices belong to the DIAL: they do not rotate, so baking them here
+        // costs nothing extra over Bluetooth, where a separate PartImage would
+        // cost a second full-size PNG for something that never changes.
+        if (p.clockMode == ClockMode.ANALOG) drawIndices(canvas, p, p.handStyle)
         drawVignette(canvas, p)
         return bitmap
     }
@@ -172,6 +179,96 @@ object AndroidDialRenderer {
         }
         canvas.drawPaint(paint)
     }
+
+    /**
+     * One hand, alone on a transparent dial-sized bitmap, pointing at twelve.
+     *
+     * The mirror of `DialRenderer.renderHand` in `:workbench`. Two executions,
+     * one definition: the shape comes from [Hands] and the passes from
+     * [EngravedStroke], so neither renderer decides anything of its own. That
+     * is the same arrangement [PatternEngines] already has, and the reason a
+     * preview and a shipped face cannot drift apart.
+     *
+     * Full canvas so the pivot is 0.5/0.5 for every style, forever.
+     */
+    fun renderHand(
+        p: DialParams,
+        style: HandStyle,
+        hand: Hands.Hand,
+        size: Int = DIAL_SIZE,
+        color: String = p.inkColor
+    ): Bitmap = renderShapes(p, Hands.shapes(style, hand), size, color)
+
+    /** The hub the hands turn on. Static; it does not rotate with anything. */
+    fun renderHub(p: DialParams, style: HandStyle, size: Int = DIAL_SIZE): Bitmap =
+        renderShapes(p, listOf(Hands.hub(style)), size, p.inkColor)
+
+    private fun renderShapes(
+        p: DialParams,
+        shapes: List<Hands.HandShape>,
+        size: Int,
+        color: String
+    ): Bitmap {
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val scale = size.toFloat() / DIAL_SIZE
+        canvas.scale(scale, scale)
+        drawShapes(canvas, p, shapes, color)
+        return bitmap
+    }
+
+    /** The chapter ring, drawn into the dial rather than as a rotating overlay. */
+    fun drawIndices(canvas: Canvas, p: DialParams, style: HandStyle) =
+        drawShapes(canvas, p, Hands.indices(style), p.inkColor)
+
+    /**
+     * One way to cut a hand, an index or a hub — see the workbench twin.
+     *
+     * An UNFILLED shape still gets a real ink edge. The engraved passes alone
+     * are tuned for a dial pattern, where subtlety is the point; on a bare
+     * outline they produce a skeleton hand too faint to read the time from.
+     */
+    private fun drawShapes(
+        canvas: Canvas,
+        p: DialParams,
+        shapes: List<Hands.HandShape>,
+        color: String
+    ) {
+        val paths = shapes.map { it to toPath(it.outline) }
+        val ink = EngravedStroke.withAlpha(EngravedStroke.rgb(color), 255)
+
+        val solid = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            this.color = ink
+        }
+        val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            strokeWidth = OUTLINE_WIDTH
+            this.color = ink
+        }
+        for ((shape, path) in paths) {
+            canvas.drawPath(path, if (shape.filled) solid else edge)
+        }
+
+        val relief = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        for (pass in EngravedStroke.passes(p)) {
+            relief.color = pass.argb
+            relief.strokeWidth = pass.width.toFloat()
+            canvas.save()
+            canvas.translate(pass.dx.toFloat(), pass.dy.toFloat())
+            for ((_, path) in paths) canvas.drawPath(path, relief)
+            canvas.restore()
+        }
+    }
+
+    /** Matches the workbench renderer; see its note on why an outline needs an edge. */
+    private const val OUTLINE_WIDTH = 3.0f
 
     private fun toPath(polyline: Polyline): Path {
         val path = Path()

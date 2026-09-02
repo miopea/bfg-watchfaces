@@ -128,6 +128,111 @@ object WffEmitter {
     </Condition>"""
     }
 
+    /**
+     * The digital clock, byte for byte as it has always been emitted.
+     *
+     * Lifted out of the scene UNCHANGED when hands arrived, so the scene shows
+     * one decision -- numerals or hands -- rather than a conditional wrapped
+     * around forty lines of template. Moving it is the whole of the change
+     * here; if this ever renders differently from the version before v12, that
+     * is a bug in the move and not a deliberate restyling.
+     */
+    private fun digitalClock(p: DialParams): String {
+        val l = p.layout
+        val clockSize = l.timeSize
+        val ink = argb(p.inkColor)
+        // Identical to the scene's own expression, deliberately: v3 lifts the
+        // ambient ink to clear a contrast floor, and an older face must keep
+        // the flat alpha it was written with.
+        val inkDim = if (p.generatorVersion >= 3) argb(AmbientPalette.forAmbient(p.inkColor))
+                     else argb(p.inkColor, 160)
+        return """
+    <DigitalClock x="0" y="${l.timeY - l.timeSize / 2}" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}">
+      <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
+                x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="255">
+        <Variant mode="AMBIENT" target="alpha" value="0"/>
+        <Font family="${XmlSafe.attr(l.fontFamily)}" size="$clockSize" weight="${XmlSafe.attr(l.fontWeight)}" color="$ink"/>
+      </TimeText>
+      <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
+                x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="0">
+        <Variant mode="AMBIENT" target="alpha" value="255"/>
+        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${l.timeSize}" weight="THIN" color="$inkDim"/>
+      </TimeText>${if (!p.showSeconds || SecondsBand.twoPositions(p)) "" else """
+      <!--
+        Seconds sit in the right gutter beside the time, on the SAME line: they
+        share the clock's element box, so both centre together. About a third of
+        its size, in the lightest weight available.
+
+        Not "hh:mm:ss" on the clock itself: that makes every digit the same size,
+        so the seconds shout as loudly as the hour and the whole line grows wide
+        enough to crowd the rim. The clock is centred, which leaves roughly a
+        seventy-nine points of empty dial on each side at the widest time, and
+        this uses the right one. The clock does not shrink to make room.
+
+        Awake only. The ambient TimeText above deliberately has no seconds:
+        ambient updates once a minute, so a second digit there would be wrong
+        for most of the minute it was shown.
+      -->
+      ${secondsText(p, SecondsBand.boxLeftFor(p))}"""}
+    </DigitalClock>
+${secondsCondition(p)}"""
+    }
+
+    /**
+     * Hands, and the three images Watch Face Format rotates for them.
+     *
+     * ## Why this is short
+     *
+     * `clock/hourHand.xsd` requires a `resource` attribute and permits no
+     * `PartDraw` child, so a hand CANNOT be described as geometry here. The
+     * shape lives in `Hands` and is rasterized by `DialRenderer`; this only
+     * says where the pictures go. See `docs/specs/analog-hands.md`.
+     *
+     * ## The pivot is 0.5/0.5 on all three, always
+     *
+     * Every hand image is the full dial with the hand drawn in place, so the
+     * centre of the image IS the centre of the dial and there is no per-style
+     * pivot to get wrong. A wrong pivot is a hand that wobbles as it sweeps --
+     * subtle enough to ship, and very hard to see in a photograph of a wrist.
+     *
+     * ## Ambient
+     *
+     * The second hand goes to alpha 0. A hand moving once a second on an
+     * always-on display is the most expensive thing a watch face can draw, and
+     * it is exactly what `showSeconds` already means for the digital seconds.
+     * Hour and minute DIM rather than disappear, because a watch you cannot
+     * read with your wrist down is not a watch.
+     *
+     * Element order is fixed by the schema: hour, then minute, then second.
+     */
+    private fun analogClock(p: DialParams): String {
+        val second = if (!p.showSeconds) "" else """
+      <SecondHand resource="hand_second" x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE"
+                  pivotX="0.5" pivotY="0.5" alpha="255">
+        <Variant mode="AMBIENT" target="alpha" value="0"/>
+      </SecondHand>"""
+        return """
+    <AnalogClock x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE">
+      <HourHand resource="hand_hour" x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE"
+                pivotX="0.5" pivotY="0.5" alpha="255">
+        <Variant mode="AMBIENT" target="alpha" value="140"/>
+      </HourHand>
+      <MinuteHand resource="hand_minute" x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE"
+                  pivotX="0.5" pivotY="0.5" alpha="255">
+        <Variant mode="AMBIENT" target="alpha" value="140"/>
+      </MinuteHand>$second
+    </AnalogClock>
+    <!--
+      The hub goes AFTER the clock so it covers the hands' pivots, which is
+      where a real watch puts it. It does not rotate, so it is a plain image
+      rather than a fourth hand.
+    -->
+    <PartImage x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="140"/>
+      <Image resource="hand_hub"/>
+    </PartImage>"""
+    }
+
     private fun secondsClock(p: DialParams, left: Int): String {
         val l = p.layout
         return """
@@ -238,6 +343,12 @@ object WffEmitter {
         // complication, whose wording belongs to the system provider.
         val dateLine = dateElement(p)
         val ring = ringElement(p, ink)
+
+        // Numerals or hands. Exclusive: hands sweep the whole dial, so the two
+        // want genuinely different layouts and a face trying to be both would
+        // need a third. See docs/specs/analog-hands.md.
+        val clockBlock =
+            if (p.clockMode == ClockMode.ANALOG) analogClock(p) else digitalClock(p)
 
         // Ambient is a black screen. From v3 the ambient ink is lifted to clear
         // a contrast floor while keeping its hue, so a dark ink chosen for a
@@ -407,7 +518,7 @@ object WffEmitter {
   else, and it lives in the binary manifest, so only pack can vary it at runtime.
 -->
 <WatchFace width="$DIAL_SIZE" height="$DIAL_SIZE">
-  <Metadata key="CLOCK_TYPE" value="DIGITAL"/>
+  <Metadata key="CLOCK_TYPE" value="${if (p.clockMode == ClockMode.ANALOG) "ANALOG" else "DIGITAL"}"/>
   <Metadata key="PREVIEW_TIME" value="10:10:00"/>
 
   <Scene backgroundColor="#ff000000">
@@ -419,35 +530,7 @@ object WffEmitter {
 
 $ring
 $dateLine
-    <DigitalClock x="0" y="${l.timeY - l.timeSize / 2}" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}">
-      <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
-                x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="255">
-        <Variant mode="AMBIENT" target="alpha" value="0"/>
-        <Font family="${XmlSafe.attr(l.fontFamily)}" size="$clockSize" weight="${XmlSafe.attr(l.fontWeight)}" color="$ink"/>
-      </TimeText>
-      <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
-                x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="0">
-        <Variant mode="AMBIENT" target="alpha" value="255"/>
-        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${l.timeSize}" weight="THIN" color="$inkDim"/>
-      </TimeText>${if (!p.showSeconds || SecondsBand.twoPositions(p)) "" else """
-      <!--
-        Seconds sit in the right gutter beside the time, on the SAME line: they
-        share the clock's element box, so both centre together. About a third of
-        its size, in the lightest weight available.
-
-        Not "hh:mm:ss" on the clock itself: that makes every digit the same size,
-        so the seconds shout as loudly as the hour and the whole line grows wide
-        enough to crowd the rim. The clock is centred, which leaves roughly a
-        seventy-nine points of empty dial on each side at the widest time, and
-        this uses the right one. The clock does not shrink to make room.
-
-        Awake only. The ambient TimeText above deliberately has no seconds:
-        ambient updates once a minute, so a second digit there would be wrong
-        for most of the minute it was shown.
-      -->
-      ${secondsText(p, SecondsBand.boxLeftFor(p))}"""}
-    </DigitalClock>
-${secondsCondition(p)}
+${clockBlock}
 $slots
 
   </Scene>

@@ -364,6 +364,18 @@ enum class RingSource(val label: String, val expression: String?) {
     val enabled: Boolean get() = expression != null
 }
 
+/**
+ * How a face tells the time.
+ *
+ * Deliberately not an [Engine] value. An engine is the dial PATTERN; the clock
+ * is what sits on top of it. Conflating them would mean every engine test also
+ * became a test about time, and "Knotwork" would stop meaning one thing.
+ */
+enum class ClockMode(val label: String) {
+    DIGITAL("Numbers"),
+    ANALOG("Hands")
+}
+
 enum class HourFormat(val label: String, val wff: String, val pattern: String) {
     // "Automatic", not "Match my watch". Three segments share one row and this
     // was the only label needing two lines, so its button grew taller than the
@@ -517,6 +529,36 @@ data class DialParams(
      * the XML it always did.
      */
     val showSeconds: Boolean = false,
+
+    /**
+     * Digital numerals or hands. Exclusive, and the reason is layout.
+     *
+     * Hands sweep the WHOLE dial, so the digital assumption -- reserve a centre
+     * band and stack complications clear of it -- stops meaning anything. The
+     * two modes want genuinely different layouts from [SlotGeometry], and a face
+     * that tried to be both would need a third.
+     *
+     * Defaults to DIGITAL, so every face saved before hands existed emits
+     * exactly the XML it always did.
+     */
+    val clockMode: ClockMode = ClockMode.DIGITAL,
+
+    /**
+     * Which hands, when [clockMode] is analog. Ignored otherwise.
+     *
+     * A style owns its hands AND its indices together -- see [HandStyle] -- so
+     * this one choice produces a coherent watch rather than a parts bin.
+     */
+    val handStyle: HandStyle = HandStyle.BATON,
+
+    /**
+     * The second hand's own colour, or null to use the ink like the others.
+     *
+     * The red seconds hand is the most recognisable analog convention there is,
+     * and nullable is what keeps it from being a decision anyone has to make:
+     * absent means "same as the rest", which is what every face gets by default.
+     */
+    val secondHandColor: String? = null,
 
     /**
      * Which slots draw the little icon above their value.
@@ -779,7 +821,7 @@ data class Layout(
  */
 val COMPONENT = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*/\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z0-9_$]+)*""")
 
-const val CURRENT_GENERATOR_VERSION = 11
+const val CURRENT_GENERATOR_VERSION = 12
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

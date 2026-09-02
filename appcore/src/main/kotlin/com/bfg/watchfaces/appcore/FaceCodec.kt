@@ -5,6 +5,8 @@ import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.HourFormat
 import com.bfg.watchfaces.generator.RingSource
 import com.bfg.watchfaces.generator.DateStyle
+import com.bfg.watchfaces.generator.ClockMode
+import com.bfg.watchfaces.generator.HandStyle
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.SlotPosition
 import com.bfg.watchfaces.generator.Engine
@@ -44,6 +46,16 @@ object FaceCodec {
             inkColor = q["inkColor"]?.normalizeHex() ?: d.inkColor,
             sheen = q.dbl("sheen", d.sheen),
             showSeconds = q["showSeconds"]?.let { it == "true" || it == "1" } ?: d.showSeconds,
+            // Unknown values fall back to the default rather than throwing: a
+            // face written by a NEWER build must still open here, degraded, in
+            // the same way an unknown submission state reads as pending.
+            clockMode = q["clockMode"]?.let { name ->
+                ClockMode.entries.firstOrNull { it.name == name }
+            } ?: d.clockMode,
+            handStyle = q["handStyle"]?.let { name ->
+                HandStyle.entries.firstOrNull { it.name == name }
+            } ?: d.handStyle,
+            secondHandColor = q["secondHandColor"]?.takeIf { it.isNotBlank() } ?: d.secondHandColor,
             // `iconSlots` is the current form. `showComplicationIcons` was the
             // single switch that preceded it and is still read, because faces
             // were saved with it: false meant no glyph anywhere, true meant all
@@ -166,6 +178,9 @@ object FaceCodec {
   "rotate": ${p.rotate}, "vignette": ${p.vignette}, "sheen": ${p.sheen},
   "dialColor": "${p.dialColor}", "inkColor": "${p.inkColor}",
   "showSeconds": ${p.showSeconds},
+  "clockMode": ${Json.quote(p.clockMode.name)},
+  "handStyle": ${Json.quote(p.handStyle.name)},
+  "secondHandColor": ${p.secondHandColor?.let { Json.quote(it) } ?: "null"},
   "providers": {${p.providers.entries.sortedBy { it.key.ordinal }
         .joinToString(", ") { "\"${it.key.name}\": \"${it.value}\"" }}},
   "iconSlots": [${p.iconSlots.sortedBy { it.ordinal }.joinToString(", ") { "\"${it.name}\"" }}],
@@ -199,6 +214,9 @@ object FaceCodec {
             "rotate" to p.rotate, "vignette" to p.vignette, "sheen" to p.sheen,
             "dialColor" to p.dialColor, "inkColor" to p.inkColor,
             "showSeconds" to p.showSeconds,
+            "clockMode" to p.clockMode.name,
+            "handStyle" to p.handStyle.name,
+            "secondHandColor" to (p.secondHandColor ?: ""),
             "iconSlots" to p.iconSlots.sortedBy { it.ordinal }.joinToString(",") { it.name },
             "providers" to p.providers.entries.sortedBy { it.key.ordinal }
                 .joinToString(",") { "${it.key.name}:${it.value}" },

@@ -103,6 +103,89 @@ class WffSchemaTest {
      * one cheap string check, because the failure is silent on a watch: the
      * face installs and never appears.
      */
+    /**
+     * ANALOG FACES VALIDATE. This is the only signal there is.
+     *
+     * A schema-invalid watch face compiles, links, signs and installs, and then
+     * silently never appears in the carousel — no runtime error, nothing in a
+     * log, nothing on the watch. Every other kind of mistake in this repo
+     * announces itself; this one does not.
+     *
+     * Every style, and with seconds both on and off, because the SecondHand
+     * element is emitted conditionally and an element the schema rejects only
+     * fails when it is actually present.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(HandStyle::class)
+    fun `hands emit schema-valid WFF`(style: HandStyle) {
+        for (seconds in listOf(false, true)) {
+            val p = DialParams(
+                clockMode = ClockMode.ANALOG,
+                handStyle = style,
+                showSeconds = seconds
+            )
+            val errors = validate(WffEmitter.emit(p))
+            assertTrue(errors.isEmpty()) { "$style seconds=$seconds: ${errors.joinToString("\n")}" }
+        }
+    }
+
+    /**
+     * The hands are actually THERE, and in the order the schema demands.
+     *
+     * Validation alone would pass an AnalogClock with no hands in it at all —
+     * every child is minOccurs="0" — which installs, renders a bare dial, and
+     * looks exactly like a face that failed to load.
+     */
+    @Test
+    fun `an analog face emits three hands, a hub, and no digital clock`() {
+        val xml = WffEmitter.emit(DialParams(clockMode = ClockMode.ANALOG, showSeconds = true))
+        assertTrue(xml.contains("<AnalogClock")) { "no AnalogClock element" }
+        assertTrue(!xml.contains("<DigitalClock")) { "an analog face still carries a DigitalClock" }
+        assertTrue(xml.contains("CLOCK_TYPE\" value=\"ANALOG")) { "CLOCK_TYPE still says DIGITAL" }
+        val hour = xml.indexOf("<HourHand")
+        val minute = xml.indexOf("<MinuteHand")
+        val second = xml.indexOf("<SecondHand")
+        assertTrue(hour in 1..minute) { "hour hand missing or after the minute hand" }
+        assertTrue(minute in 1..second) { "minute hand missing or after the second hand" }
+        assertTrue(xml.indexOf("hand_hub") > second) { "the hub must be drawn after the hands" }
+    }
+
+    /** Seconds off means no SecondHand at all, not a hidden one still ticking. */
+    @Test
+    fun `an analog face without seconds emits no second hand`() {
+        val xml = WffEmitter.emit(DialParams(clockMode = ClockMode.ANALOG, showSeconds = false))
+        assertTrue(!xml.contains("<SecondHand")) { "a second hand was emitted with seconds off" }
+    }
+
+    /**
+     * Every hand pivots on the CENTRE of its own image.
+     *
+     * The full-canvas decision is what makes that true, and it is what means no
+     * style carries pivot data that can be wrong. A hand pivoting anywhere else
+     * wobbles as it sweeps.
+     */
+    @Test
+    fun `every hand pivots on the centre of the image`() {
+        val xml = WffEmitter.emit(DialParams(clockMode = ClockMode.ANALOG, showSeconds = true))
+        // Counted rather than matched with a regex: the first version of this
+        // used a pattern whose own quoting was ambiguous inside a Kotlin raw
+        // string, and it failed against correct XML. Counting says the same
+        // thing and cannot be read two ways.
+        val hands = Regex("<(Hour|Minute|Second)Hand").findAll(xml).count()
+        assertEquals(3, hands) { "expected three hands, found $hands" }
+        assertEquals(3, xml.split("pivotX=\"0.5\"").size - 1) { "not every hand pivots on centre X" }
+        assertEquals(3, xml.split("pivotY=\"0.5\"").size - 1) { "not every hand pivots on centre Y" }
+    }
+
+    /** A digital face is untouched by any of this. */
+    @Test
+    fun `a digital face still emits a digital clock and no hands`() {
+        val xml = WffEmitter.emit(DialParams())
+        assertTrue(xml.contains("<DigitalClock")) { "the digital clock went missing" }
+        assertTrue(!xml.contains("<AnalogClock")) { "a digital face emitted hands" }
+        assertTrue(xml.contains("CLOCK_TYPE\" value=\"DIGITAL")) { "CLOCK_TYPE is wrong" }
+    }
+
     @Test
     fun `no emitted XML comment contains a double dash`() {
         for (style in DateStyle.entries) {

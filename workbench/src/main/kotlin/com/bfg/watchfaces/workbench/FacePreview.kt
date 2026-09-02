@@ -5,6 +5,8 @@ import com.bfg.watchfaces.generator.AmbientPalette
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.ClockText
 import com.bfg.watchfaces.generator.DateStyle
+import com.bfg.watchfaces.generator.ClockMode
+import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.SecondsBand
 import com.bfg.watchfaces.generator.SlotGeometry
@@ -140,7 +142,33 @@ object FacePreview {
         val hh = now.hour % 12
         // Awake only, matching the emitter and the Android preview.
         val timeText = ClockText.of(p, now.hour, now.minute)
-        if (ambient) {
+        // HANDS INSTEAD OF NUMERALS.
+        //
+        // A preview showing a digital clock for a face wearing hands would be a
+        // picture of a different watch — and this preview IS what the gallery,
+        // My faces and the watch's own carousel show. Drawn from the same
+        // `Hands` geometry the emitter names, rotated the way Watch Face Format
+        // rotates it.
+        val analog = p.clockMode == ClockMode.ANALOG
+        if (analog) {
+            DialRenderer.drawIndices(g, p, p.handStyle)
+            val hourDeg = (hh + now.minute / 60.0 + now.second / 3600.0) / 12.0 * 360.0
+            val minuteDeg = (now.minute + now.second / 60.0) / 60.0 * 360.0
+            drawRotated(g, DialRenderer.renderHand(p, p.handStyle, Hands.Hand.HOUR, DIAL_SIZE), hourDeg)
+            drawRotated(g, DialRenderer.renderHand(p, p.handStyle, Hands.Hand.MINUTE, DIAL_SIZE), minuteDeg)
+            // Seconds are awake-only, exactly as the emitter has them.
+            if (p.showSeconds && !ambient) {
+                drawRotated(
+                    g,
+                    DialRenderer.renderHand(
+                        p, p.handStyle, Hands.Hand.SECOND, DIAL_SIZE,
+                        p.secondHandColor ?: p.inkColor
+                    ),
+                    now.second / 60.0 * 360.0
+                )
+            }
+            drawRotated(g, DialRenderer.renderHub(p, p.handStyle, DIAL_SIZE), 0.0)
+        } else if (ambient) {
             // Mirror the emitter's version branch exactly. From v3 the ambient
             // ink clears a contrast floor against black; before that it is the
             // raw ink at alpha 160, dark or not.
@@ -160,7 +188,7 @@ object FacePreview {
         // Seconds in the right gutter, matching WffEmitter: just under half the
         // clock, lightest weight, awake only. The clock is centred, so this uses
         // the empty dial it leaves rather than widening the time itself.
-        if (p.showSeconds && !ambient) {
+        if (p.showSeconds && !ambient && !analog) {
             val secs = "%02d".format(now.second)
             g.font = Font(Font.SANS_SERIF, Font.PLAIN, SecondsBand.fontSizeFor(p))
             g.color = withAlpha(ink, SecondsBand.ALPHA)
@@ -183,6 +211,14 @@ object FacePreview {
 
         g.dispose()
         return img
+    }
+
+    /** Rotate a full-canvas hand about the dial centre, as WFF does with pivot 0.5. */
+    private fun drawRotated(g: java.awt.Graphics2D, img: java.awt.image.BufferedImage, degrees: Double) {
+        val at = java.awt.geom.AffineTransform.getRotateInstance(
+            Math.toRadians(degrees), DIAL_SIZE / 2.0, DIAL_SIZE / 2.0
+        )
+        g.drawImage(img, at, null)
     }
 
     private fun withAlpha(c: Color, a: Int) = Color(c.red, c.green, c.blue, a.coerceIn(0, 255))
