@@ -90,7 +90,7 @@ object WffEmitter {
         return """<TimeText format="ss" align="${SecondsBand.alignFor(p)}" alpha="255"
                 x="$left" y="${SecondsBand.offsetY(l)}" width="${SecondsBand.boxWidthFor(p)}" height="${SecondsBand.height(l)}">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
-        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${SecondsBand.fontSizeFor(p)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
+        <Font family="${FaceFont.of(l.fontFamily).wff}" size="${SecondsBand.fontSizeFor(p)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
       </TimeText>"""
     }
 
@@ -153,12 +153,12 @@ object WffEmitter {
       <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
                 x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="255">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
-        <Font family="${XmlSafe.attr(l.fontFamily)}" size="$clockSize" weight="${XmlSafe.attr(l.fontWeight)}" color="$ink"/>
+        <Font family="${FaceFont.of(l.fontFamily).wff}" size="$clockSize" weight="${XmlSafe.attr(l.fontWeight)}" color="$ink"/>
       </TimeText>
       <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
                 x="0" y="0" width="$DIAL_SIZE" height="${(l.timeSize * 1.4).toInt()}" alpha="0">
         <Variant mode="AMBIENT" target="alpha" value="255"/>
-        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${l.timeSize}" weight="THIN" color="$inkDim"/>
+        <Font family="${FaceFont.of(l.fontFamily).wff}" size="${l.timeSize}" weight="THIN" color="$inkDim"/>
       </TimeText>${if (!p.showSeconds || SecondsBand.twoPositions(p)) "" else """
       <!--
         Seconds sit in the right gutter beside the time, on the SAME line: they
@@ -275,7 +275,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
       <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
                 x="0" y="0" width="${box.w}" height="${box.h}" alpha="255">
         <Variant mode="AMBIENT" target="alpha" value="0"/>
-        <Font family="${XmlSafe.attr(p.layout.fontFamily)}" size="$size" weight="${XmlSafe.attr(p.layout.fontWeight)}" color="${argb(p.inkColor)}"/>
+        <Font family="${FaceFont.of(p.layout.fontFamily).wff}" size="$size" weight="${XmlSafe.attr(p.layout.fontWeight)}" color="${argb(p.inkColor)}"/>
       </TimeText>
     </DigitalClock>"""
     }
@@ -372,7 +372,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
       <DigitalClock x="0" y="0" width="$DIAL_SIZE" height="$h">
         <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
                   x="0" y="0" width="$DIAL_SIZE" height="$h" alpha="255">
-          <Font family="${XmlSafe.attr(l.fontFamily)}" size="${l.timeSize}" weight="${XmlSafe.attr(l.fontWeight)}" color="${argbOf(pass.argb)}"/>
+          <Font family="${FaceFont.of(l.fontFamily).wff}" size="${l.timeSize}" weight="${XmlSafe.attr(l.fontWeight)}" color="${argbOf(pass.argb)}"/>
         </TimeText>
       </DigitalClock>
     </Group>"""
@@ -441,7 +441,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
           <TimeText format="ss" align="START" alpha="255"
                     x="$left" y="${SecondsBand.offsetY(l)}" width="${DIAL_SIZE - left}" height="${SecondsBand.height(l)}">
             <Variant mode="AMBIENT" target="alpha" value="0"/>
-            <Font family="${XmlSafe.attr(l.fontFamily)}" size="${SecondsBand.fontSizeFor(p)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
+            <Font family="${FaceFont.of(l.fontFamily).wff}" size="${SecondsBand.fontSizeFor(p)}" weight="${SecondsBand.WEIGHT}" color="${argb(p.inkColor, SecondsBand.ALPHA)}"/>
           </TimeText>
         </DigitalClock>"""
     }
@@ -512,7 +512,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
     <PartText x="${band.x}" y="${band.y}" width="${band.w}" height="${band.h}" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="140"/>
       <Text align="CENTER">
-        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${SlotGeometry.fittedDateSize(p)}" weight="NORMAL" color="${argb(p.inkColor)}">
+        <Font family="${FaceFont.of(l.fontFamily).wff}" size="${SlotGeometry.fittedDateSize(p)}" weight="NORMAL" color="${argb(p.inkColor)}">
           <Template><![CDATA[$placeholders]]>$parameters</Template>
         </Font>
       </Text>
@@ -670,7 +670,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
     <PartText x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <Text align="CENTER">
-        <Font family="${XmlSafe.attr(l.fontFamily)}" size="${drawn.fontSize}" color="$ink">$ambientColorVariant
+        <Font family="${FaceFont.of(l.fontFamily).wff}" size="${drawn.fontSize}" color="$ink">$ambientColorVariant
           <Template><![CDATA[${drawn.format}]]>${drawn.expressions.joinToString("") { """<Parameter expression="$it"/>""" }}</Template>
         </Font>
       </Text>
@@ -689,7 +689,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
       <Complication type="SHORT_TEXT">${if (!p.hasIcon(pos)) "" else glyphElement(source, box, iconW, iconH, ink)}
         <PartText x="0" y="${SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)}" width="${box.w}" height="$textH">$ambientColorVariant
           <Text align="CENTER">
-            <Font family="${XmlSafe.attr(l.fontFamily)}" size="$fontSize" color="$ink">
+            <Font family="${FaceFont.of(l.fontFamily).wff}" size="$fontSize" color="$ink">
               <!--
                 TEXT only, and not TEXT + TITLE.
                 Tried on a watch: appending TITLE renders "Aug 30Sun",

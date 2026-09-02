@@ -1,5 +1,60 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — Fonts, and the attribute that had never done anything
+
+Second item off `launch-scope.md` §5. It began as "add a typeface picker" and the
+first thing it found was that the existing font attribute was inert.
+
+### Every face has been emitting a value that is not a typeface
+
+```xml
+<Font family="SYNC_TO_DEVICE" .../>
+```
+
+`SYNC_TO_DEVICE` is the value for **`hourFormat`**. It is not a font family, no
+watch has one by that name, and a family a device does not have does not fail —
+it falls back silently to the default sans. So the attribute has been decoration
+since the beginning, and nothing looked wrong because the fallback is the
+typeface every face was going to use anyway.
+
+Nothing renders differently now for a face that never chose one, which is why
+this needs no `generatorVersion` branch: it corrects a NAME, not a rendering.
+
+### The list was read off the watch, not invented
+
+`family` is a free string and the schema cannot say which families exist —
+that is a property of the device. So `/system/etc/fonts.xml` on the operator's
+Pixel Watch 5:
+
+```text
+sans-serif · sans-serif-condensed · sans-serif-light · sans-serif-medium
+sans-serif-black · sans-serif-thin · sans-serif-smallcaps
+serif · monospace · cursive · casual · roboto-flex
+```
+
+Six are offered. The `-light` and `-medium` variants are weights, and weight is
+already its own control — a picker that quietly fights another control is worse
+than no picker. A test asserts every offered family is in the list read off the
+watch, so an invented name cannot ship and fail silently.
+
+### The Android preview is now exact, and the workbench one is not
+
+Android resolves these names from the same `fonts.xml` the watch uses, so the
+phone preview shows the typeface that actually ships. A desktop JVM has none of
+them, so the workbench maps to the nearest logical AWT face and **says so** —
+it is a design tool, and pretending would be worse than approximating.
+
+### Injection got stronger as a side effect
+
+`XmlSafeTest` asserted that a malicious `fontFamily` was ESCAPED into the
+attribute. It is no longer escaped because it no longer arrives: `FaceFont.of`
+answers with one of six fixed names or the default, so nothing a caller supplies
+reaches the XML. An allowlist beats escaping, and this one came free.
+
+The golden test needed the same correction, and for a reason worth naming: it
+asserted the emitted family equalled the STORED value, which after this fix
+would have been asserting the bug.
+
 ## 2026-09-02 — Colourways: pairs somebody chose, with a floor that is checked
 
 First item off `launch-scope.md` §5, and the best ratio on that list: eight

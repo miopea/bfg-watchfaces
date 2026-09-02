@@ -9,6 +9,7 @@ import com.bfg.watchfaces.generator.ClockMode
 import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.EngravedStroke
+import com.bfg.watchfaces.generator.FaceFont
 import com.bfg.watchfaces.generator.Glare
 import kotlin.math.roundToInt
 import com.bfg.watchfaces.generator.SecondsBand
@@ -268,10 +269,23 @@ object FacePreview {
      */
     private fun awtStyle(weight: String): Int = if (weight.uppercase() == "BOLD") Font.BOLD else Font.PLAIN
 
-    private fun font(size: Double, style: Int, thin: Boolean, letterSpacing: Double): Font {
-        // DejaVu Sans is the closest widely-present stand-in for a Wear device
-        // font. SYNC_TO_DEVICE resolves on the watch, never here.
-        var f = Font("DejaVu Sans", if (thin) Font.PLAIN else style, size.toInt())
+    private fun font(
+        size: Double, style: Int, thin: Boolean, letterSpacing: Double,
+        face: FaceFont = FaceFont.DEFAULT
+    ): Font {
+        // APPROXIMATE, deliberately, and the Android preview is not.
+        //
+        // A desktop JVM has none of the watch's families, so this maps to the
+        // nearest logical face AWT has. The phone resolves the real name from
+        // the same fonts.xml the watch uses, which makes IT the accurate
+        // preview -- this one is a design tool and says so rather than
+        // pretending.
+        val family = when (face) {
+            FaceFont.SERIF -> Font.SERIF
+            FaceFont.MONO -> Font.MONOSPACED
+            else -> "DejaVu Sans"
+        }
+        var f = Font(family, if (thin) Font.PLAIN else style, size.toInt())
             .deriveFont(size.toFloat())
         if (letterSpacing != 0.0) {
             @Suppress("UNCHECKED_CAST")

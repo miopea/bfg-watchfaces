@@ -81,12 +81,28 @@ class XmlSafeTest {
     fun `a font family cannot add an attribute the emitter never wrote`() {
         val xml = WffEmitter.emit(DialParams(layout = Layout(fontFamily = """Roboto" weight="BOLD""")), "ok")
         assertTrue(parses(xml)) { why(xml) }
-        // The giveaway: well-formed XML carrying an attribute nobody emitted.
-        // Checking only that it parses would PASS on a successful injection.
         assertFalse(xml.contains("""family="Roboto" weight="BOLD"""")) {
             "the quote closed the attribute and injected another one"
         }
-        assertTrue(xml.contains("&quot;")) { "the quote was not escaped at all" }
+
+        // AN ALLOWLIST NOW, WHICH IS STRONGER THAN ESCAPING.
+        //
+        // This used to assert the string was escaped -- that it appeared in the
+        // XML with &quot; in it. It no longer appears AT ALL: the family is
+        // resolved through FaceFont, which answers with one of six fixed names
+        // or the default, so nothing a caller supplies can reach the attribute.
+        //
+        // That came from a different problem. Every face was emitting
+        // family="SYNC_TO_DEVICE", which is the value for hourFormat and is not
+        // a typeface, so the attribute had never done anything. Fixing it meant
+        // resolving through a list of families the watch actually has, and
+        // injection stopped being possible as a side effect.
+        assertFalse(xml.contains("Roboto")) {
+            "an arbitrary family reached the XML instead of being resolved away"
+        }
+        assertTrue(xml.contains("""family="${FaceFont.DEFAULT.wff}"""")) {
+            "an unknown family did not fall back to the default"
+        }
     }
 
     @Test
@@ -141,13 +157,20 @@ class XmlSafeTest {
 
     @Test
     fun `every engine still emits exactly what it emitted before`() {
-        // Belt and braces on the above: walk every engine and confirm the
-        // escaped attributes come out byte-identical to the raw values.
+        // Belt and braces: walk every engine and confirm the attributes come
+        // out clean.
+        //
+        // The family is checked against the RESOLVED name rather than the stored
+        // one, because the stored default is `SYNC_TO_DEVICE` -- the value for
+        // hourFormat, which was never a typeface, and which every face emitted
+        // until FaceFont existed. Asserting the raw value would now be
+        // asserting the bug.
         for (engine in Engine.entries) {
             val p = DialParams(engine = engine, texture = if (engine == Engine.TEXTURE) "x" else "")
             val xml = WffEmitter.emit(p, "Sample Face")
-            assertTrue(xml.contains("""family="${p.layout.fontFamily}"""")) {
-                "$engine: the font family was altered by escaping"
+            val resolved = FaceFont.of(p.layout.fontFamily).wff
+            assertTrue(xml.contains("""family="$resolved"""")) {
+                "$engine: the font family was altered on its way out"
             }
             assertFalse(xml.contains("&amp;amp;")) { "$engine: double-escaped" }
         }

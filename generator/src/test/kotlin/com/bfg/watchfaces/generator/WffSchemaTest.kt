@@ -301,6 +301,49 @@ class WffSchemaTest {
         assertTrue(!old.contains("<Gyro")) { "v12 grew a tilt effect" }
     }
 
+    /**
+     * EVERY font family we emit exists on the watch.
+     *
+     * `family` is a free string and a name the device does not have does not
+     * fail — it silently falls back to the default sans, which is a control
+     * that appears to work and does nothing.
+     *
+     * Every face used to emit `SYNC_TO_DEVICE`, which is the value for
+     * `hourFormat` and is not a typeface at all. This is the guard that stops
+     * that returning.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(FaceFont::class)
+    fun `every offered font is emitted as a real family`(font: FaceFont) {
+        val p = DialParams().let { it.copy(layout = it.layout.copy(fontFamily = font.wff)) }
+        val xml = WffEmitter.emit(p)
+        assertTrue(validate(xml).isEmpty()) { "$font produced invalid WFF" }
+        assertTrue(xml.contains("family=\"${font.wff}\"")) {
+            "$font did not reach the emitted font family"
+        }
+        // Read off a Pixel Watch 5's /system/etc/fonts.xml on 2026-09-02.
+        val onTheWatch = setOf(
+            "sans-serif", "sans-serif-condensed", "sans-serif-light",
+            "sans-serif-medium", "sans-serif-black", "sans-serif-thin",
+            "sans-serif-smallcaps", "serif", "monospace", "cursive",
+            "casual", "roboto-flex"
+        )
+        assertTrue(font.wff in onTheWatch) { "${font.wff} is not a family the watch has" }
+    }
+
+    /** The legacy value renders as what it always actually was. */
+    @Test
+    fun `an old face asking for SYNC_TO_DEVICE gets the default sans`() {
+        val old = DialParams().let { it.copy(layout = it.layout.copy(fontFamily = "SYNC_TO_DEVICE")) }
+        val xml = WffEmitter.emit(old)
+        assertTrue(!xml.contains("family=\"SYNC_TO_DEVICE\"")) {
+            "SYNC_TO_DEVICE is still being emitted as a typeface"
+        }
+        assertTrue(xml.contains("family=\"${FaceFont.SANS.wff}\"")) {
+            "the legacy value did not resolve to the font it has always rendered as"
+        }
+    }
+
     @Test
     fun `no emitted XML comment contains a double dash`() {
         for (style in DateStyle.entries) {

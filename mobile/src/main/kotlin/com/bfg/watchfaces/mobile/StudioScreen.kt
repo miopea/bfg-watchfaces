@@ -62,6 +62,7 @@ import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.appcore.Colourway
 import com.bfg.watchfaces.generator.ClockMode
+import com.bfg.watchfaces.generator.FaceFont
 import com.bfg.watchfaces.generator.HourFormat
 import com.bfg.watchfaces.generator.RingSource
 import com.bfg.watchfaces.generator.DialParams
@@ -269,6 +270,17 @@ fun StudioScreen(
             },
             onRemove = { onParams(params.copy(engine = Engine.KNOTWORK, texture = "")) }
         )
+
+        Spacer(Modifier.height(16.dp))
+        // Typeface is most of a face's character, and until now this control did
+        // not exist -- every face emitted family="SYNC_TO_DEVICE", which is the
+        // value for hourFormat and not a typeface at all, so every face fell
+        // back to the default sans. See FaceFont.
+        ChoiceRow(
+            label = "Typeface",
+            options = FaceFont.entries.map { it.label to it },
+            selected = FaceFont.of(params.layout.fontFamily)
+        ) { onParams(params.copy(layout = params.layout.copy(fontFamily = it.wff))) }
 
         Spacer(Modifier.height(20.dp))
         // COLOURWAYS FIRST, because a pair chosen together is the answer for

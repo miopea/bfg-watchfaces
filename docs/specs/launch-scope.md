@@ -161,8 +161,10 @@ flat-on-engraved inconsistency whether or not the tilt is ever noticed.
    independently of the pattern, each holding a measured 3:1 contrast floor. Not
    stored on a face — it sets `dialColor` and `inkColor`, so no version bump and
    nothing already saved changed.
-2. **Fonts.** `fontFamily` is `SYNC_TO_DEVICE` with no picker. Needs checking
-   against what typefaces a Wear OS watch actually ships before it is scoped.
+2. ~~**Fonts.**~~ **DONE 2026-09-02.** Six families in `FaceFont`, each read off
+   a Pixel Watch 5's own `fonts.xml`. Found that `SYNC_TO_DEVICE` was being
+   emitted as a typeface — it is the `hourFormat` value — so the attribute had
+   never done anything.
 3. **A complication data source of our own.** The Watch Face Push guidance's real
    trick: a face reads values the phone updates, so things can change *without* a
    rebuild and a push — routing around both the slot limit and the activation

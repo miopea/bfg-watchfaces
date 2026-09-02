@@ -11,6 +11,7 @@ import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.ClockText
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.ClockMode
+import com.bfg.watchfaces.generator.FaceFont
 import com.bfg.watchfaces.generator.Glare
 import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
@@ -86,6 +87,10 @@ object AndroidFacePreview {
         canvas.scale(s, s)
 
         val l = p.layout
+        // The SAME family the emitter writes, resolved through the same enum.
+        // Android reads these names from the identical fonts.xml the watch uses,
+        // so this preview shows the typeface that ships rather than a stand-in.
+        val faceFamily = FaceFont.of(l.fontFamily).wff
         val ink = EngravedStroke.withAlpha(EngravedStroke.rgb(p.inkColor), 255)
 
         // Sizes are PER SLOT and computed inside the loop below, matching the
@@ -129,7 +134,7 @@ object AndroidFacePreview {
                 box.x.toFloat(),
                 (box.y + SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)).toFloat(),
                 box.w.toFloat(), textH.toFloat(),
-                drawn.fontSize.toFloat(), c, bold = false
+                drawn.fontSize.toFloat(), c, bold = false, family = faceFamily
             )
         }
 
@@ -153,7 +158,7 @@ object AndroidFacePreview {
                 band.w.toFloat(), band.h.toFloat(),
                 SlotGeometry.fittedDateSize(p).toFloat(),
                 if (ambient) withAlpha(ambientSlotInk, 140) else ink,
-                bold = false
+                bold = false, family = faceFamily
             )
         }
 
@@ -209,7 +214,7 @@ object AndroidFacePreview {
                     band.w.toFloat(), band.h.toFloat(),
                     SlotGeometry.analogDigitalSize(p).toFloat(),
                     ink,
-                    bold = l.fontWeight.uppercase() == "BOLD"
+                    bold = l.fontWeight.uppercase() == "BOLD", family = faceFamily
                 )
             }
         }
@@ -235,7 +240,7 @@ object AndroidFacePreview {
                     DIAL_SIZE.toFloat(), (l.timeSize * 1.4).toFloat(),
                     l.timeSize.toFloat(),
                     pass.argb,
-                    bold = l.fontWeight.uppercase() == "BOLD"
+                    bold = l.fontWeight.uppercase() == "BOLD", family = faceFamily
                 )
             }
         }
@@ -268,7 +273,7 @@ object AndroidFacePreview {
                 SecondsBand.boxLeftFor(p, timeText.length).toFloat(), SecondsBand.topInDial(l).toFloat(),
                 SecondsBand.boxWidthFor(p, timeText.length).toFloat(), SecondsBand.height(l).toFloat(),
                 SecondsBand.fontSizeFor(p).toFloat(),
-                withAlpha(timeColor, SecondsBand.ALPHA), bold = false,
+                withAlpha(timeColor, SecondsBand.ALPHA), bold = false, family = faceFamily,
                 alignEnd = !startAligned,
                 alignStart = startAligned
             )
@@ -291,6 +296,13 @@ object AndroidFacePreview {
         canvas: Canvas, text: String,
         x: Float, y: Float, w: Float, h: Float,
         size: Float, color: Int, bold: Boolean,
+        /**
+         * The Watch Face Format family name, straight through.
+         *
+         * Android resolves these from the same `fonts.xml` the watch uses, so
+         * this preview shows the typeface that ships rather than a stand-in.
+         */
+        family: String = FaceFont.DEFAULT.wff,
         /** Right-align inside the box instead of centring. Used by the seconds. */
         alignEnd: Boolean = false,
         /** Left-align instead. The seconds use this when a ring crowds them. */
@@ -300,7 +312,11 @@ object AndroidFacePreview {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = color
             textSize = size
-            typeface = Typeface.create(Typeface.SANS_SERIF, if (bold) Typeface.BOLD else Typeface.NORMAL)
+            // The SAME family string the emitter writes. Android resolves these
+            // names from the identical fonts.xml the watch uses, so this preview
+            // is the typeface that ships rather than an approximation of it --
+            // the one place in this project where the phone can be exact.
+            typeface = Typeface.create(family, if (bold) Typeface.BOLD else Typeface.NORMAL)
         }
         val fm = paint.fontMetrics
         val tx = when {
