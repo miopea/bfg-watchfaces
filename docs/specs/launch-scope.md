@@ -157,9 +157,10 @@ flat-on-engraved inconsistency whether or not the tilt is ever noticed.
 
 ## 5. After launch, in order
 
-1. **Colourways.** Named dial/ink pairs — Taupe, Graphite, Steel, Noir — chosen
-   independently of the pattern. Eight engines × six colourways is forty-eight
-   looks from about twenty lines of `Presets` data. **The best ratio available.**
+1. ~~**Colourways.**~~ **DONE 2026-09-02.** Eight pairs in `Colourway`, chosen
+   independently of the pattern, each holding a measured 3:1 contrast floor. Not
+   stored on a face — it sets `dialColor` and `inkColor`, so no version bump and
+   nothing already saved changed.
 2. **Fonts.** `fontFamily` is `SYNC_TO_DEVICE` with no picker. Needs checking
    against what typefaces a Wear OS watch actually ships before it is scoped.
 3. **A complication data source of our own.** The Watch Face Push guidance's real

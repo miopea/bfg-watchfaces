@@ -1,5 +1,49 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — Colourways: pairs somebody chose, with a floor that is checked
+
+First item off `launch-scope.md` §5, and the best ratio on that list: eight
+engines against eight pairs is dozens of looks from one small file.
+
+### Why pairs rather than the two free swatches we had
+
+A dial swatch and an ink swatch chosen separately is maximum freedom and the
+easiest possible way to build a watch nobody can read. Most people do not pick
+two colours with enough contrast between them, and the failure does not look
+like a failure on a phone, indoors, held at reading distance.
+
+The swatch rows stay — they are the escape hatch. The colourways go above them,
+because a pair chosen together is the right answer for almost everybody.
+
+### The floor is asserted, not trusted
+
+Every pair clears **3:1**, checked in `ColourwayTest` with the same luminance
+maths `AmbientPalette` already uses. Curation that nobody verifies is just my
+eye on a monitor.
+
+3:1 rather than WCAG's 4.5:1 for body text: the numerals are enormous, and the
+stricter ratio would rule out every mid-tone ground and leave only black or
+white faces — which is a smaller choice, not a safer one.
+
+A further test asserts at least one PALE dial exists. A list where every entry
+is a variation of the same idea is not a choice, and that is the property most
+likely to erode as entries get added.
+
+### Not stored on a face
+
+A face keeps `dialColor` and `inkColor` exactly as before. A colourway is a way
+of SETTING those two, never a third thing to serialize — so no new field, **no
+`generatorVersion` bump**, and every face made before today is untouched.
+`matching()` recovers which one a face wears, and returns null for custom
+colours rather than showing the nearest, because the app should not claim a
+decision nobody made.
+
+### The chips show colour, not names
+
+"Oxblood" means nothing to somebody who has not seen it. Each chip is the dial
+colour with the ink colour inside it, so the pair — which is the whole point —
+is visible at a glance rather than described.
+
 ## 2026-09-02 — The glare, and what the two failures had in common
 
 Third implementation of one effect. The first two were not wrong about the

@@ -60,6 +60,7 @@ import com.bfg.watchfaces.generator.ControlInventory
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.DateStyle
+import com.bfg.watchfaces.appcore.Colourway
 import com.bfg.watchfaces.generator.ClockMode
 import com.bfg.watchfaces.generator.HourFormat
 import com.bfg.watchfaces.generator.RingSource
@@ -270,6 +271,18 @@ fun StudioScreen(
         )
 
         Spacer(Modifier.height(20.dp))
+        // COLOURWAYS FIRST, because a pair chosen together is the answer for
+        // almost everybody, and the two swatch rows below it are the escape
+        // hatch rather than the starting point.
+        //
+        // Free dial and ink swatches are maximum freedom and the easiest way to
+        // build a watch nobody can read: most people do not pick two colours
+        // with enough contrast, and it does not look wrong on a phone indoors.
+        // Every pair here clears a measured floor -- see Colourway.
+        SectionHeading("Colour")
+        ColourwayRow(Colourway.matching(params)) { onParams(it.applyTo(params)) }
+
+        Spacer(Modifier.height(16.dp))
         SectionHeading("Dial")
         Swatches(Presentation.DIALS, params.dialColor, onCustom = { onCustomColor(true) }) {
             onParams(params.copy(dialColor = it))
@@ -892,6 +905,65 @@ private fun PhotoRow(chosen: Boolean, onPick: () -> Unit, onRemove: () -> Unit) 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 6.dp)
         )
+    }
+}
+
+/**
+ * The curated pairs, as two-tone chips.
+ *
+ * Each chip shows the ACTUAL colours it applies — a name alone ("Oxblood")
+ * means nothing to somebody who has not seen it, and a swatch is the only
+ * honest label for a colour.
+ *
+ * [selected] is null when the face wears colours of its own, and then nothing
+ * is marked. Showing the nearest match would be the app claiming a decision
+ * nobody made.
+ */
+@Composable
+private fun ColourwayRow(selected: Colourway?, onPick: (Colourway) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        for (c in Colourway.entries) {
+            val on = c == selected
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable { onPick(c) }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(Color(EngravedStroke.withAlpha(EngravedStroke.rgb(c.dial), 255)))
+                        .border(
+                            width = if (on) 3.dp else 1.dp,
+                            color = if (on) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outlineVariant,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // The ink, shown ON the dial colour: the pair is the point,
+                    // and a chip showing only the dial says half of it.
+                    Box(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(Color(EngravedStroke.withAlpha(EngravedStroke.rgb(c.ink), 255)))
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    c.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (on) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
