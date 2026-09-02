@@ -106,9 +106,11 @@ private fun StyleGrid(onPick: (DialParams) -> Unit) {
 
 @Composable
 private fun PresetTile(name: String, params: DialParams, onClick: () -> Unit) {
+    val context = LocalContext.current
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = params) {
         value = withContext(Dispatchers.Default) {
-            runCatching { AndroidFacePreview.render(params, ambient = false, size = TILE_PX) }
+            val texture = Textures.forFace(context, params)
+            runCatching { AndroidFacePreview.render(params, ambient = false, size = TILE_PX, texture = texture) }
                 .onFailure { android.util.Log.e("BFG", "tile render failed for $name", it) }
                 .getOrNull()
         }

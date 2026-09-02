@@ -158,9 +158,13 @@ private fun FaceRow(
     // A face can name an app this watch does not have. It still renders, just
     // differently from its preview, and nothing else would say so.
     val missing = MissingApps.note(face.params, knownApps)
+    val previewContext = LocalContext.current
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = face.slug) {
         value = withContext(Dispatchers.Default) {
-            runCatching { AndroidFacePreview.render(face.params, ambient = false, size = ROW_PX) }.getOrNull()
+            val texture = Textures.forFace(previewContext, face.params)
+            runCatching {
+                AndroidFacePreview.render(face.params, ambient = false, size = ROW_PX, texture = texture)
+            }.getOrNull()
         }
     }
     Row(

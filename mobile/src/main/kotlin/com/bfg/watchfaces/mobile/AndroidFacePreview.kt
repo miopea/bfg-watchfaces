@@ -55,7 +55,19 @@ object AndroidFacePreview {
 
     /** Kept the same as WffEmitter's, so the preview and the face agree. */
 
-    fun render(p: DialParams, ambient: Boolean = false, size: Int = DIAL_SIZE): Bitmap {
+    fun render(
+        p: DialParams,
+        ambient: Boolean = false,
+        size: Int = DIAL_SIZE,
+        /**
+         * The imported image, when the face uses one.
+         *
+         * Passed in rather than resolved here, because this object has no
+         * Context and every caller already has one. `Textures.forFace` is the
+         * one place that decides.
+         */
+        texture: Bitmap? = null
+    ): Bitmap {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
@@ -64,7 +76,7 @@ object AndroidFacePreview {
 
         // Dial image: alpha 255 interactive, Variant AMBIENT alpha 0.
         if (!ambient) {
-            val dial = AndroidDialRenderer.render(p, size)
+            val dial = AndroidDialRenderer.render(p, size, texture)
             canvas.drawBitmap(dial, 0f, 0f, null)
             dial.recycle()
         }

@@ -10,6 +10,7 @@ import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.WffEmitter
 import com.bfg.watchfaces.mobile.AndroidDialRenderer
+import com.bfg.watchfaces.mobile.Textures
 import com.bfg.watchfaces.mobile.AndroidFacePreview
 import com.google.android.wearable.watchface.validator.client.DwfValidatorFactory
 import java.io.ByteArrayOutputStream
@@ -93,6 +94,11 @@ object FaceBuilder {
         val slug = FaceLibrary.slugify(name)
         val packageName = packageNameFor(context, slug)
 
+        // The photo, if this face uses one. Resolved once here and baked into
+        // dial_bg.png: nothing extra crosses to the watch, and a face with a
+        // photo costs what a face already cost.
+        val texture = Textures.forFace(context, params)
+
         val resources = buildList {
             add(PackBridge.Resource.of("raw", "watchface.xml", WffEmitter.emit(params, name)))
             add(PackBridge.Resource.of("values", "strings.xml", strings(name)))
@@ -100,8 +106,10 @@ object FaceBuilder {
             // drawable-nodpi, not drawable: these are authored at 456x456 dial
             // space and must not be density-scaled. The qualifier only survives
             // because of scripts/pack-qualifiers.patch -- see build-pack-android.sh.
-            add(PackBridge.Resource.of("drawable-nodpi", "dial_bg.png", dialPng(params)))
-            add(PackBridge.Resource.of("drawable-nodpi", "preview.png", previewPng(params)))
+            // Resolved ONCE and used for both, so the dial that ships and the
+            // preview beside it in the carousel are the same picture.
+            add(PackBridge.Resource.of("drawable-nodpi", "dial_bg.png", dialPng(params, texture)))
+            add(PackBridge.Resource.of("drawable-nodpi", "preview.png", previewPng(params, texture)))
             // Hands, only when the face wears them. A digital face must pack
             // exactly the bytes it always did -- four unused PNGs would cross
             // Bluetooth on every send for nothing.
@@ -142,8 +150,8 @@ object FaceBuilder {
      * the smooth guilloché gradients hard, and unlike a palette it cannot band
      * a dial that happens to use more than 64 distinct tones.
      */
-    private fun dialPng(params: DialParams): ByteArray {
-        val full = AndroidDialRenderer.render(params, DIAL_SIZE)
+    private fun dialPng(params: DialParams, texture: Bitmap?): ByteArray {
+        val full = AndroidDialRenderer.render(params, DIAL_SIZE, texture)
         val small = full.copy(Bitmap.Config.RGB_565, false) ?: full
         val bytes = ByteArrayOutputStream().use { out ->
             small.compress(Bitmap.CompressFormat.PNG, 100, out)
@@ -184,8 +192,8 @@ object FaceBuilder {
         }.also { bmp.recycle() }
     }
 
-    private fun previewPng(params: DialParams): ByteArray {
-        val preview = AndroidFacePreview.render(params, ambient = false, size = DIAL_SIZE)
+    private fun previewPng(params: DialParams, texture: Bitmap?): ByteArray {
+        val preview = AndroidFacePreview.render(params, ambient = false, size = DIAL_SIZE, texture = texture)
         return ByteArrayOutputStream().use { out ->
             preview.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()

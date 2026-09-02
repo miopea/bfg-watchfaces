@@ -71,7 +71,7 @@ object AndroidDialRenderer {
      * space and scaled here, so a larger render is the same image rather than a
      * different one — the same contract the workbench renderer keeps.
      */
-    fun render(p: DialParams, size: Int = DIAL_SIZE): Bitmap {
+    fun render(p: DialParams, size: Int = DIAL_SIZE, texture: Bitmap? = null): Bitmap {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val scale = size.toFloat() / DIAL_SIZE
@@ -94,8 +94,15 @@ object AndroidDialRenderer {
         // replaces the stroked pattern and draws its own sheen on top, and the
         // vignette goes over whichever happened.
         val procedural = TextureField.kindFor(p.engine)
-        if (procedural != null) drawProcedural(canvas, procedural, p, size) else drawSheen(canvas, p)
-        if (procedural == null) drawPattern(canvas, p)
+        // An imported image REPLACES the generated pattern entirely, and the
+        // sheen and vignette still go on top -- so a photo sits on the same dial
+        // as the engines rather than looking pasted onto one. Order mirrors the
+        // workbench renderer exactly; the two drawing one definition differently
+        // is the failure this project has paid for three times.
+        if (texture != null) drawTexture(canvas, texture, p)
+        else if (procedural != null) drawProcedural(canvas, procedural, p, size)
+        else drawSheen(canvas, p)
+        if (texture == null && procedural == null) drawPattern(canvas, p)
         // Indices belong to the DIAL: they do not rotate, so baking them here
         // costs nothing extra over Bluetooth, where a separate PartImage would
         // cost a second full-size PNG for something that never changes.
@@ -151,6 +158,44 @@ object AndroidDialRenderer {
             for (path in paths) canvas.drawPath(path, paint)
             canvas.restore()
         }
+    }
+
+    /**
+     * Cover-crop an imported image to fill the dial, then push it back.
+     *
+     * COVER, not contain: a dial with letterboxing on it is not a watch face.
+     *
+     * [DialParams.contrast] fades it toward the dial colour, which is what keeps
+     * the time readable over a photograph -- the thing most photo faces get
+     * wrong. It is a fade rather than a pad behind the numerals because a pad
+     * looks like a UI element stuck on someone's picture.
+     *
+     * The mirror of `DialRenderer.drawTexture`, down to the 235 and the halved
+     * sheen. If these two ever disagree the preview stops being a picture of the
+     * face that ships.
+     */
+    private fun drawTexture(canvas: Canvas, tex: Bitmap, p: DialParams) {
+        val scale = maxOf(
+            DIAL_SIZE.toFloat() / tex.width,
+            DIAL_SIZE.toFloat() / tex.height
+        )
+        val w = tex.width * scale
+        val h = tex.height * scale
+        val m = android.graphics.Matrix()
+        m.setScale(scale, scale)
+        m.postTranslate((DIAL_SIZE - w) / 2f, (DIAL_SIZE - h) / 2f)
+        canvas.drawBitmap(tex, m, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
+
+        val fade = (1.0 - (p.contrast / 100.0)).coerceIn(0.0, 1.0)
+        if (fade > 0.0) {
+            val paint = Paint().apply {
+                color = EngravedStroke.withAlpha(
+                    EngravedStroke.rgb(p.dialColor), (fade * 235).toInt()
+                )
+            }
+            canvas.drawRect(0f, 0f, DIAL_SIZE.toFloat(), DIAL_SIZE.toFloat(), paint)
+        }
+        drawSheen(canvas, p.copy(sheen = p.sheen * 0.5))
     }
 
     private fun drawSheen(canvas: Canvas, p: DialParams) {

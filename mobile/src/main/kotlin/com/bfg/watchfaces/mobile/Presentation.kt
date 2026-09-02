@@ -39,21 +39,21 @@ object Presentation {
     )
 
     /**
-     * `Engine.TEXTURE` is NOT offered, and that is the honest state of it.
+     * `Engine.TEXTURE` is not a CHIP, and that is still right.
      *
-     * It was in the list above, labelled "Your image", rendered as an ordinary
-     * selectable chip and indistinguishable from every engine that works.
-     * Choosing it draws a plain dial, because there is no image picker anywhere
-     * in this app and nothing on the device that can resolve an image id —
-     * `backlog.md` #9 records it as deliberately out of scope.
+     * It was once in the list above as "Your image", an ordinary selectable chip
+     * indistinguishable from every engine that works — and choosing it drew a
+     * plain dial, because nothing could resolve an image. A chip that promises a
+     * feature and fails silently is the shape this project keeps naming.
      *
-     * So the chip promised a feature that does not exist and then failed
-     * silently, which is the shape this project keeps calling out: a difference
-     * nobody can see. A chip that is absent asks no questions; a chip that does
-     * nothing makes somebody wonder whether their phone is broken.
+     * It now works, and it is still not a chip: choosing a photo means CHOOSING
+     * A PHOTO, so it belongs behind a button that opens the picker rather than
+     * beside Knotwork and Rosette. `PhotoRow` in the Studio owns it, and picking
+     * an image is what sets the engine.
      *
-     * It stays in [Engine] because the FILE FORMAT still has to read a stored
-     * face that names it. This list is the phone's offer, not the format.
+     * Empty rather than deleted, because the shape is what `OneVocabularyTest`
+     * reads to tell "decided against" from "forgot", and because the next engine
+     * that is not ready will want it.
      */
     val UNOFFERED: Set<Engine> = setOf(Engine.TEXTURE)
 

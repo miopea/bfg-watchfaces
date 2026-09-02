@@ -8,10 +8,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -219,6 +223,36 @@ fun StudioScreen(
         SectionHeading("Style")
         EngineChips(params.engine) { onParams(params.copy(engine = it)) }
 
+        // YOUR PHOTO, as one more style in the same list.
+        //
+        // A dial is a pattern, a generated surface, or a photo -- all three are
+        // Engine values, so a photo is not a mode or a different kind of face.
+        // Everything else works identically: hands, complications, colours.
+        //
+        // The Android photo picker, which needs NO permission: it returns the
+        // one image somebody chose and can see nothing else. That is why the
+        // Data Safety declaration can say photos are not collected and mean it.
+        val photoContext = LocalContext.current
+        val pickPhoto = rememberLauncherForActivityResult(
+            ActivityResultContracts.PickVisualMedia()
+        ) { uri ->
+            if (uri != null) {
+                val id = Textures.import(photoContext, uri)
+                if (id != null) {
+                    onParams(params.copy(engine = Engine.TEXTURE, texture = id))
+                }
+            }
+        }
+        PhotoRow(
+            chosen = params.engine == Engine.TEXTURE && params.texture.isNotBlank(),
+            onPick = {
+                pickPhoto.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
+            onRemove = { onParams(params.copy(engine = Engine.KNOTWORK, texture = "")) }
+        )
+
         Spacer(Modifier.height(20.dp))
         SectionHeading("Dial")
         Swatches(Presentation.DIALS, params.dialColor, onCustom = { onCustomColor(true) }) {
@@ -410,9 +444,14 @@ fun StudioScreen(
  */
 @Composable
 private fun DialPreview(params: DialParams, ambient: Boolean) {
+    val context = LocalContext.current
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = params, key2 = ambient) {
         value = withContext(Dispatchers.Default) {
-            runCatching { AndroidFacePreview.render(params, ambient, DIAL_SIZE) }.getOrNull()
+            // Resolved off the main thread with the render, not remembered
+            // separately: decoding a photo is the expensive half and it belongs
+            // on the same background hop the dial already takes.
+            val texture = Textures.forFace(context, params)
+            runCatching { AndroidFacePreview.render(params, ambient, DIAL_SIZE, texture) }.getOrNull()
         }
     }
     Box(
@@ -804,6 +843,39 @@ private fun <T> ChoiceRow(
                 ) { Text(text) }
             }
         }
+    }
+}
+
+/**
+ * Choose a photo for the dial, and say what that means.
+ *
+ * The one line about staying on the phone is not a disclaimer, it is the answer
+ * to the question somebody is about to ask: a face built from a photo is
+ * `isLocalOnly` and cannot be shared, because the catalog stores parameters and
+ * not bytes. Better said here, once, than discovered as a missing Share button.
+ */
+@Composable
+private fun PhotoRow(chosen: Boolean, onPick: () -> Unit, onRemove: () -> Unit) {
+    Column(Modifier.padding(top = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = onPick) {
+                Text(if (chosen) "Change photo" else "Use a photo")
+            }
+            if (chosen) {
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = onRemove) { Text("Remove") }
+            }
+        }
+        Text(
+            if (chosen) {
+                "Your photo stays on this phone. Faces made from a photo can't be shared."
+            } else {
+                "Use one of your own pictures as the dial."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
+        )
     }
 }
 

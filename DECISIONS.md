@@ -1,5 +1,58 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — Photo dials, and a guarantee rather than a hidden button
+
+`docs/specs/imported-images.md`, built. A launch gate from `launch-scope.md`
+§3.3, decided against my own recommendation to defer it — photo dials are table
+stakes and "90% of the goals" includes this one.
+
+### More than half of it already existed
+
+`TextureStore`, `drawTexture`, the contrast fade and `render(p, size, texture)`
+have been in `:workbench` since before the phone had a Studio screen. The gap was
+entirely on the phone: no picker, no storage, and an `AndroidDialRenderer` that
+took no image at all. Nothing about the LOOK needed designing.
+
+### No permission, at all
+
+`PickVisualMedia` returns the single image somebody chose and can see nothing
+else. `READ_MEDIA_IMAGES` was rejected: it asks for the whole library in order
+to use one picture, and it would put a prompt, a denial path, and a Data Safety
+answer where none are needed.
+
+### The guarantee is on the submit path
+
+`CatalogService.submit` now refuses an `isLocalOnly` face **before it touches the
+network**.
+
+Hiding the Share button is a courtesy and it stops working the moment a new
+screen forgets to hide one. The Data Safety declaration says photos are not
+collected; what makes that TRUE rather than a promise is a refusal in the one
+function that could publish. A test asserts the transport is never called.
+
+### Re-encoded on import, and that is not tidiness
+
+The chosen image is decoded, downscaled and re-encoded to PNG rather than stored
+as it arrived. It proves the bytes are really an image before they can reach a
+renderer, and **it strips EXIF — which on a photograph holds where it was
+taken.** There is no reason for that to survive into app storage, let alone into
+a dial.
+
+### Ids are checked by shape, not sanitised
+
+A texture id becomes a file PATH and arrives from a stored face, which on the
+catalog side is JSON somebody else wrote. `isId` requires forty lowercase hex
+characters, so `../../etc/passwd` is rejected for what it IS rather than by
+scrubbing it. There is no traversal that is also forty hex characters.
+
+### Still not a chip
+
+`Engine.TEXTURE` stays out of the engine picker, which is where it was correctly
+banished when it did nothing. Now it works and it is still not a chip: choosing a
+photo means choosing a photo, so it lives behind a button that opens the picker
+rather than beside Knotwork and Rosette. Picking the image is what sets the
+engine.
+
 ## 2026-09-02 — Controls for the face in front of you
 
 Two UI reports, and the same principle underneath both: **a control that cannot

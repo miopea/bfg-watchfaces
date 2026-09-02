@@ -59,6 +59,10 @@ class CatalogService(
          * Nothing a person could act on is lost: there is exactly one thing to
          * do about it, and this says it.
          */
+        /** Said to a person, not logged: they chose a photo and are being told why. */
+        const val LOCAL_ONLY =
+            "Faces made from your own photo stay on this phone and can't be shared."
+
         const val UNREACHABLE = "This phone could not reach the community catalog. " +
             "Check your connection and try again."
     }
@@ -206,6 +210,16 @@ class CatalogService(
         params: DialParams,
         idToken: String
     ): Result<Submission> {
+        // A PHOTO FACE CANNOT BE PUBLISHED, and this is where that is true.
+        //
+        // The catalog stores parameters, not bytes, so the image would not
+        // travel even if this were allowed -- but the reason to refuse HERE
+        // rather than by hiding a button is that the Data Safety declaration
+        // says photos are not collected. Hiding an affordance is a courtesy;
+        // refusing the submission is the guarantee, and it is the one that
+        // still holds if a future screen forgets to hide anything.
+        if (params.isLocalOnly) return Result.Failed(LOCAL_ONLY)
+
         val body = """{
   "name": ${Json.quote(name.trim())},
   "author": ${Json.quote(author.trim())},
