@@ -42,6 +42,20 @@ object Textures {
     private const val MAX_EDGE = DIAL_SIZE * 2
 
     /**
+     * What `contrast` becomes when a photo first arrives.
+     *
+     * `contrast` means "how much of the image survives": 100 is the photo
+     * untouched, lower fades it toward the dial colour. The default of 30 was
+     * chosen for a guilloche PATTERN, which is meant to be seen — a photo is
+     * meant to be underneath, and the two do not want the same number.
+     *
+     * Applied only on ARRIVAL. Swapping one photo for another keeps whatever
+     * was tuned for the last one, because at that point it is a value somebody
+     * chose and this has no business overwriting it.
+     */
+    const val ARRIVING_CONTRAST = 18.0
+
+    /**
      * Import the image at [uri] and return its id, or null if it cannot be read.
      *
      * Re-encoded to PNG rather than stored as it arrived. That proves the bytes

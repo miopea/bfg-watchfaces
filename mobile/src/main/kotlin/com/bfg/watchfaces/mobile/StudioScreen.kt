@@ -239,7 +239,23 @@ fun StudioScreen(
             if (uri != null) {
                 val id = Textures.import(photoContext, uri)
                 if (id != null) {
-                    onParams(params.copy(engine = Engine.TEXTURE, texture = id))
+                    // A photo arrives PUSHED BACK far enough to read the time
+                    // over, and only when arriving -- changing to a different
+                    // photo leaves whatever was tuned for the last one.
+                    //
+                    // Measured on a phone: a face's own contrast, chosen for a
+                    // guilloche pattern, leaves a text-heavy image competing
+                    // with the numerals. A pattern wants to be seen and a photo
+                    // wants to be underneath, so they do not want the same
+                    // value.
+                    val arriving = params.engine != Engine.TEXTURE
+                    onParams(
+                        params.copy(
+                            engine = Engine.TEXTURE,
+                            texture = id,
+                            contrast = if (arriving) Textures.ARRIVING_CONTRAST else params.contrast
+                        )
+                    )
                 }
             }
         }
