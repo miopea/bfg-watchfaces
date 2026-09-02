@@ -1,5 +1,66 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — v13: the time is engraved, and the light moves
+
+`launch-scope.md` §4. The dial was engraved and the TIME WAS NOT — flat ink on
+cut metal, which nobody noticed until a tilt effect was proposed on the premise
+that the clock already had relief layers to reuse. It had none.
+
+### The shape the schema forced
+
+`TimeText` accepts only `Variant`, `Font` and `BitmapFont` — **no `Gyro`** — so a
+clock cannot tilt by itself. `Group` accepts both a `DigitalClock` and a `Gyro`,
+so each relief copy is a group carrying the offset and the motion with a clock
+inside it that just draws.
+
+Two copies in the dial's own pass colours, offset up-left and down-right, with
+their gyros pulling OPPOSITE ways so tilting slides the highlight across the
+letterforms. **The ink copy on top has no gyro at all**: the time is the one
+thing that must always be readable, and a drifting clock reads as a bug.
+
+No `ACCELEROMETER_IS_SUPPORTED` branch — on a watch without one the expression
+rests at zero and the face renders as though the effect were off.
+
+### Reusing the dial's relief was a category error, and measuring caught it
+
+The first version offset the text by `EngravedStroke`'s own `dx`/`dy`. Measured:
+
+```text
+pass dx=-0.99 dy=-0.99 alpha=61
+pixels changed = 2,781 of 207,936   largest channel delta = 40
+```
+
+**A 0.99px offset behind a 104pt numeral is invisible.** `relief` is a distance
+for a one-pixel engine stroke; depth reads in proportion to what it is cutting.
+
+Scaling the offset to 3% of the type helped and was still not enough, because
+the second half of the problem is colour: the light pass is near-white at alpha
+61, and the numerals are near-white cream. **A light halo at alpha 61 is the
+colour of the text it sits behind.**
+
+`textPasses` keeps the colours and the diagonal exactly as `passes` defines them
+— one definition of what engraved looks like — and scales only the distance and
+the alpha:
+
+```text
+pass dx=-2.21 dy=-2.21 alpha=146
+pixels changed = 4,097   largest channel delta = 95
+```
+
+Now it reads.
+
+### The same mistake, third time
+
+Skeleton hands drawn with the dial's passes were too faint to read. The analog
+date sized against the clock's width was absurd at six o'clock. And a hairline's
+relief behind 104pt type is invisible.
+
+Every one is a treatment tuned at one scale applied at another, every one passed
+every test, and every one was caught by rendering it and looking. **That is now a
+pattern rather than three incidents**, and the lesson is narrow enough to state:
+when a value from one part of the system is reused in another, the SCALE has to
+be re-derived even when the intent transfers perfectly.
+
 ## 2026-09-02 — Store screenshots, and what one of them showed
 
 `./gradlew :workbench:storeshots` turns device captures into images the Play

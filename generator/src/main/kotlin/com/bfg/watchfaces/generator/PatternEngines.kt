@@ -52,6 +52,10 @@ object PatternEngines {
         // colour. All of it is the clock and the complication layout; the dial
         // pattern is untouched, so this delegates rather than copying an engine.
         12 -> v4(p)
+        // v13 gave the TIME the engraved relief the dial always had, and a gyro
+        // that slides the highlight across it. Two more elements above the dial;
+        // the dial pattern itself is untouched.
+        13 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

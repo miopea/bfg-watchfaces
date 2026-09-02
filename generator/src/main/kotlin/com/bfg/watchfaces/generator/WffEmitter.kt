@@ -1,5 +1,7 @@
 package com.bfg.watchfaces.generator
 
+import kotlin.math.roundToInt
+
 /**
  * Emits the WFF definition for a set of params.
  *
@@ -278,6 +280,89 @@ ${handPair("MinuteHand", "hand_minute")}$second
     </DigitalClock>"""
     }
 
+    /**
+     * How far the highlight travels at full tilt, in dial units.
+     *
+     * Small on purpose. This is meant to read as material rather than as an
+     * effect, and the tasteful range is narrow — a slider set to maximum is how
+     * this kind of thing looks cheap, which is the same reasoning that keeps
+     * hand proportions fixed. There is no control.
+     */
+    private const val TILT_TRAVEL = 2.5
+
+    /**
+     * The engraved relief under the time, and the light that moves across it.
+     *
+     * ## What was wrong before this
+     *
+     * The dial is engraved and the TIME WAS NOT. `EngravedStroke` cuts the
+     * pattern in three passes and the numerals were drawn as flat ink on top of
+     * it — an inconsistency nobody noticed until a tilt effect was proposed and
+     * the plan said "reuse the relief layers the clock already has". It had
+     * none. This adds them, and the tilt is what falls out.
+     *
+     * ## Why a Group
+     *
+     * `TimeText` accepts only `Variant`, `Font` and `BitmapFont` — no `Gyro`, so
+     * a clock cannot tilt by itself. `Group` accepts both a `DigitalClock` and a
+     * `Gyro`, so each relief copy is a group that carries the offset and the
+     * motion, and the clock inside it just draws.
+     *
+     * ## Opposite directions, and the text never moves
+     *
+     * The light copy sits up-left and the dark copy down-right, the offsets
+     * `EngravedStroke` already uses. Their gyros pull OPPOSITE ways, so tilting
+     * slides the highlight across the letterforms as though light were moving
+     * over cut metal. The ink copy on top has no gyro at all: the time is the
+     * one thing that must always be readable, and a drifting clock reads as a
+     * bug on a small screen.
+     *
+     * ## No IS_SUPPORTED branch
+     *
+     * On a watch with no accelerometer the expression rests at zero and the face
+     * renders exactly as if the effect were off. A `Condition` would add schema
+     * surface and a branch only ever exercisable on hardware nobody here has.
+     */
+    private fun reliefClock(p: DialParams): String {
+        if (p.generatorVersion < 13) return ""
+        // Sized for the TYPE, not for a hairline. See EngravedStroke.textPasses.
+        val passes = EngravedStroke.textPasses(p, p.layout.timeSize)
+        return reliefLayer(p, "clock_relief_light", passes[0], 1.0) +
+            reliefLayer(p, "clock_relief_dark", passes[1], -1.0)
+    }
+
+    /**
+     * One relief copy: offset, tinted, tilting, and gone in ambient.
+     *
+     * Ambient drops it entirely rather than dimming it. Ambient is a black
+     * low-power screen with its own THIN clock, and relief on a black ground is
+     * two extra elements lighting pixels to say nothing.
+     */
+    private fun reliefLayer(p: DialParams, name: String, pass: EngravedStroke.Pass, dir: Double): String {
+        val l = p.layout
+        val h = (l.timeSize * 1.4).toInt()
+        val y = l.timeY - l.timeSize / 2
+        // Rounded because Group geometry is integral; the sub-pixel part of the
+        // offset is smaller than the travel and would only add noise.
+        val ox = pass.dx.roundToInt()
+        val oy = pass.dy.roundToInt()
+        return """
+    <Group name="$name" x="$ox" y="${y + oy}" width="$DIAL_SIZE" height="$h" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="0"/>
+      <Gyro x="${gyro("ACCELEROMETER_ANGLE_X", dir)}" y="${gyro("ACCELEROMETER_ANGLE_Y", dir)}"/>
+      <DigitalClock x="0" y="0" width="$DIAL_SIZE" height="$h">
+        <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
+                  x="0" y="0" width="$DIAL_SIZE" height="$h" alpha="255">
+          <Font family="${XmlSafe.attr(l.fontFamily)}" size="${l.timeSize}" weight="${XmlSafe.attr(l.fontWeight)}" color="${argbOf(pass.argb)}"/>
+        </TimeText>
+      </DigitalClock>
+    </Group>"""
+    }
+
+    /** A linear map from a tilt angle to a small offset, clamped to the sensor's range. */
+    private fun gyro(source: String, dir: Double): String =
+        "(${dir * TILT_TRAVEL}/90) * clamp([$source], -90, 90)"
+
     private fun secondsClock(p: DialParams, left: Int): String {
         val l = p.layout
         return """
@@ -371,6 +456,15 @@ ${handPair("MinuteHand", "hand_minute")}$second
     private fun argb(rgb: String, alpha: Int = 255): String =
         "#%02x%s".format(alpha, rgb.removePrefix("#").lowercase())
 
+    /**
+     * An [EngravedStroke.Pass] colour as WFF's AARRGGBB.
+     *
+     * The passes carry ALPHA already — that is how the relief stays subtle —
+     * so this keeps it rather than forcing 255, which would turn a highlight
+     * into a second solid clock sitting behind the first.
+     */
+    private fun argbOf(packed: Int): String = "#%08x".format(packed)
+
     fun emit(p: DialParams, faceName: String = "Untitled"): String {
         // There is no default face. The name comes from whoever designs it and
         // becomes the carousel label; "Untitled" is a placeholder for callers
@@ -393,7 +487,9 @@ ${handPair("MinuteHand", "hand_minute")}$second
         // want genuinely different layouts and a face trying to be both would
         // need a third. See docs/specs/analog-hands.md.
         val clockBlock =
-            if (p.clockMode == ClockMode.ANALOG) analogClock(p) else digitalClock(p)
+            if (p.clockMode == ClockMode.ANALOG) analogClock(p)
+            // The relief goes BEFORE the clock so the ink reads on top of it.
+            else reliefClock(p) + digitalClock(p)
 
         // Ambient is a black screen. From v3 the ambient ink is lifted to clear
         // a contrast floor while keeping its hue, so a dark ink chosen for a

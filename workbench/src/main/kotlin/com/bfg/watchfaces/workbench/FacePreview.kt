@@ -8,6 +8,8 @@ import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.ClockMode
 import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
+import com.bfg.watchfaces.generator.EngravedStroke
+import kotlin.math.roundToInt
 import com.bfg.watchfaces.generator.SecondsBand
 import com.bfg.watchfaces.generator.SlotGeometry
 import com.bfg.watchfaces.generator.StepRing
@@ -190,6 +192,23 @@ object FacePreview {
             // Same size with or without seconds: turning them on must not
             // resize the face. See SecondsBand.
             val clockSize = l.timeSize.toDouble()
+            // ENGRAVED, from v13. The light and dark passes go down first,
+            // offset the way EngravedStroke offsets everything else, so the
+            // numerals are cut from the dial rather than printed on it. Static
+            // here: a preview cannot tilt, and the resting position is what the
+            // watch shows sitting on a table.
+            if (p.generatorVersion >= 13) {
+                for (pass in EngravedStroke.textPasses(p, l.timeSize).take(2)) {
+                    drawCentered(
+                        g, timeText,
+                        l.timeY - l.timeSize / 2 + pass.dy.roundToInt(),
+                        (l.timeSize * 1.4).toInt(),
+                        clockSize, awtStyle(l.fontWeight),
+                        Color(pass.argb, true),
+                        dx = pass.dx.roundToInt()
+                    )
+                }
+            }
             drawCentered(g, timeText, l.timeY - l.timeSize / 2, (l.timeSize * 1.4).toInt(),
                 clockSize, awtStyle(l.fontWeight), ink)
         }
@@ -256,8 +275,10 @@ object FacePreview {
 
     private fun drawCentered(
         g: java.awt.Graphics2D, text: String, y: Int, h: Int, size: Double,
-        style: Int, color: Color, thin: Boolean = false, letterSpacing: Double = 0.0
-    ) = drawCenteredIn(g, text, 0, y, DIAL_SIZE, h, size, style, color, thin, letterSpacing)
+        style: Int, color: Color, thin: Boolean = false, letterSpacing: Double = 0.0,
+        /** Horizontal offset, for the engraved relief passes. */
+        dx: Int = 0
+    ) = drawCenteredIn(g, text, dx, y, DIAL_SIZE, h, size, style, color, thin, letterSpacing)
 
     private fun drawCenteredIn(
         g: java.awt.Graphics2D, text: String, x: Int, y: Int, w: Int, h: Int, size: Double,

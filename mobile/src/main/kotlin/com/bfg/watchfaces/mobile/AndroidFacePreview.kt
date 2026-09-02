@@ -223,6 +223,21 @@ object AndroidFacePreview {
         } else {
             ink
         }
+        // ENGRAVED from v13, the mirror of the workbench preview. Static here:
+        // a preview cannot tilt, and the resting position is what the watch
+        // shows lying on a table.
+        if (!analog && p.generatorVersion >= 13 && !ambient) {
+            for (pass in EngravedStroke.textPasses(p, l.timeSize).take(2)) {
+                drawCenteredIn(
+                    canvas, timeText,
+                    pass.dx.toFloat(), (l.timeY - l.timeSize / 2 + pass.dy).toFloat(),
+                    DIAL_SIZE.toFloat(), (l.timeSize * 1.4).toFloat(),
+                    l.timeSize.toFloat(),
+                    pass.argb,
+                    bold = l.fontWeight.uppercase() == "BOLD"
+                )
+            }
+        }
         if (!analog) drawCenteredIn(
             canvas, timeText,
             0f, (l.timeY - l.timeSize / 2).toFloat(),

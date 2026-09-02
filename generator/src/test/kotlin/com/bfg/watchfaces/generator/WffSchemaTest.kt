@@ -147,9 +147,15 @@ class WffSchemaTest {
         assertTrue(with.contains("<DigitalClock")) { "the readout is missing" }
         assertTrue(with.contains("<AnalogClock")) { "the hands went away when the readout arrived" }
 
-        // Ignored on a digital face: it has a clock already.
-        val digital = WffEmitter.emit(DialParams(analogDigital = true))
-        assertEquals(1, digital.split("<DigitalClock").size - 1) { "a digital face grew a second clock" }
+        // Ignored on a digital face: it has a clock already. Asserted as
+        // "changes nothing" rather than by COUNTING clocks -- from v13 a digital
+        // face legitimately carries three, the ink one and its two relief
+        // copies, and a count would have to be revised every time the engraving
+        // changes while saying less than this does.
+        assertEquals(
+            WffEmitter.emit(DialParams()),
+            WffEmitter.emit(DialParams(analogDigital = true))
+        ) { "analogDigital changed a digital face, which has a clock already" }
     }
 
     /**
@@ -224,6 +230,55 @@ class WffSchemaTest {
         assertTrue(xml.contains("<DigitalClock")) { "the digital clock went missing" }
         assertTrue(!xml.contains("<AnalogClock")) { "a digital face emitted hands" }
         assertTrue(xml.contains("CLOCK_TYPE\" value=\"DIGITAL")) { "CLOCK_TYPE is wrong" }
+    }
+
+    /**
+     * The time is ENGRAVED, and the light moves without the text moving.
+     *
+     * Two relief copies in the dial's own pass colours, pulling opposite ways,
+     * with the ink copy on top carrying no gyro at all. If the ink copy ever
+     * gained one the clock would drift as the wrist turned, which on a small
+     * screen reads as a bug rather than as an effect.
+     */
+    @Test
+    fun `the time gets relief that tilts, and ink that does not`() {
+        val xml = WffEmitter.emit(DialParams())
+        assertTrue(xml.contains("clock_relief_light")) { "no highlight layer" }
+        assertTrue(xml.contains("clock_relief_dark")) { "no shadow layer" }
+
+        val gyros = Regex("<Gyro ").findAll(xml).count()
+        assertEquals(2, gyros) { "expected exactly two tilting layers, found $gyros" }
+
+        // Opposite directions, or the two would slide together and read as the
+        // whole clock wobbling rather than as light crossing it.
+        assertTrue(xml.contains("(2.5/90)")) { "the highlight does not travel" }
+        assertTrue(xml.contains("(-2.5/90)")) { "the shadow does not travel the other way" }
+
+        // The ink copy is last and untilted: the relief groups both close before
+        // the clock that carries the readable numerals opens.
+        val lastGroup = xml.lastIndexOf("</Group>")
+        val inkClock = xml.lastIndexOf("<DigitalClock")
+        assertTrue(lastGroup < inkClock) { "the ink clock is inside a tilting group" }
+    }
+
+    /** Ambient has its own thin clock; relief on a black ground lights pixels to say nothing. */
+    @Test
+    fun `the relief disappears in ambient`() {
+        val xml = WffEmitter.emit(DialParams())
+        val light = xml.indexOf("clock_relief_light")
+        val nextVariant = xml.indexOf("<Variant", light)
+        assertTrue(nextVariant > 0) { "the highlight layer has no ambient variant" }
+        assertTrue(
+            xml.substring(nextVariant, nextVariant + 80).contains("value=\"0\"")
+        ) { "the highlight survives into ambient" }
+    }
+
+    /** A v12 face renders exactly as it did; the relief is gated. */
+    @Test
+    fun `an older face gets no relief`() {
+        val old = WffEmitter.emit(DialParams(generatorVersion = 12))
+        assertTrue(!old.contains("clock_relief")) { "v12 grew relief it was not saved with" }
+        assertTrue(!old.contains("<Gyro")) { "v12 grew a tilt effect" }
     }
 
     @Test
