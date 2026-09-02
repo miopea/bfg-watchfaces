@@ -1,5 +1,67 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — The tilt moves the dial, because that is where the area is
+
+Two rounds of tuning the text relief ended in "I'm not sure I can tell if it is
+doing anything at all". The operator was right, and the answer was not a third
+number.
+
+### The effect was running the whole time
+
+The watch's own log, while rendering our face:
+
+```text
+usf_sensor_hal: accelerometer: Enter Activate. Enable = 1.
+MCU: Received start sampling request for Accelerometer (active:7)
+```
+
+**The watch powered up its accelerometer because our face asked it to.** The
+`Gyro` element parsed, evaluated and ran. Nothing was broken.
+
+### It could never have been visible
+
+The relief sits BEHIND the ink and is offset about two pixels, so all that shows
+is a hairline fringe around the numerals. Measured:
+
+```text
+relief visible on 4,097 px = 2.51% of the dial
+```
+
+An alpha swing of ±95 applied to 2.5% of a screen is imperceptible at arm's
+length. **There was no number that would have fixed it** — the ceiling is the
+area, and raising travel or alpha again would only have been a third guess.
+
+### The dial is the other 97%
+
+The gyro moved to the dial image, which parallaxes under a fixed clock. Measured
+the same way: **142,822 px, 87.5% of the dial** — thirty-five times the area the
+text version could reach.
+
+The dial fills the screen exactly, so it is now emitted OVERSIZED by 10px and
+positioned negatively, giving it margin to travel into. Without that, tilting
+exposes a black crescent on the side it came from. The PNG is unchanged and Watch
+Face Format does the scaling, so the bleed costs nothing on the wire.
+
+The relief stays as a STATIC treatment. It fixed a real inconsistency — flat
+numerals on an engraved dial — and reads fine standing still.
+
+### Changed in place, not versioned
+
+v13 is hours old, nothing is released, and the operator has said plainly that
+this is dev work. A v14 would have forced another save-and-resend cycle, and
+that cycle has already cost two rounds of confusion this evening. The version
+machinery stays for when faces are public.
+
+### What this cost, and the lesson
+
+Three implementations for one effect. The first two were not wrong about the
+mechanism — the mechanism worked on the first try — they were wrong about
+**where there was room for it to be seen**.
+
+Nothing measured the available AREA until after the second failure. The
+question "how much of the screen can this possibly affect" would have ruled out
+text relief before any of it was built, and it takes one probe to answer.
+
 ## 2026-09-02 — The tilt was the wrong model, not the wrong number
 
 Reported from a wrist, on a deliberately high-contrast dial: **"still way too

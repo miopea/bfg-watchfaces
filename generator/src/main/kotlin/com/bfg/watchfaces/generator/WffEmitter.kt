@@ -288,7 +288,19 @@ ${handPair("MinuteHand", "hand_minute")}$second
      * this kind of thing looks cheap, which is the same reasoning that keeps
      * hand proportions fixed. There is no control.
      */
-    private const val TILT_TRAVEL = 5.0
+    /**
+     * How far the DIAL slides at full tilt, and the bleed that makes it possible.
+     *
+     * The dial image fills the screen exactly, so moving it would expose the rim
+     * — a black crescent on the side it moved away from. Emitting it slightly
+     * OVERSIZED and positioned negatively gives it margin to travel into, at no
+     * cost in bytes: the PNG is unchanged and Watch Face Format scales it.
+     *
+     * Bleed comfortably exceeds travel so the edge can never appear, whatever
+     * the angle.
+     */
+    private const val DIAL_BLEED = 10
+    private const val TILT_TRAVEL = 6.0
 
     /**
      * How far the highlight BRIGHTENS and dims across the tilt range.
@@ -308,10 +320,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
      * rest they sit at [TILT_REST], which is what the dial looked like before
      * any of this.
      */
-    private const val TILT_ALPHA_SWING = 95.0
 
-    /** The alpha both relief layers sit at with the watch flat. */
-    private const val TILT_REST = 150.0
 
     /**
      * The engraved relief under the time, and the light that moves across it.
@@ -372,8 +381,6 @@ ${handPair("MinuteHand", "hand_minute")}$second
         return """
     <Group name="$name" x="$ox" y="${y + oy}" width="$DIAL_SIZE" height="$h" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="0"/>
-      <Gyro x="${gyro("ACCELEROMETER_ANGLE_X", dir)}" y="${gyro("ACCELEROMETER_ANGLE_Y", dir)}"
-            alpha="${gyroAlpha(dir)}"/>
       <DigitalClock x="0" y="0" width="$DIAL_SIZE" height="$h">
         <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
                   x="0" y="0" width="$DIAL_SIZE" height="$h" alpha="255">
@@ -383,9 +390,34 @@ ${handPair("MinuteHand", "hand_minute")}$second
     </Group>"""
     }
 
+    /**
+     * The dial slides under everything else as the wrist turns.
+     *
+     * ## Why this and not the text
+     *
+     * The first attempt tilted the TIME's engraved relief. It worked — the
+     * watch's own log shows it powering up the accelerometer for our face — and
+     * it was invisible, because the relief sits behind the ink and only a
+     * hairline fringe of it shows. **Measured: 4,097 pixels, 2.51% of the dial.**
+     * No swing applied to 2.5% of a screen is perceptible at arm's length, so
+     * there was nothing to tune.
+     *
+     * The dial is the other 97%. Moving it a few pixels under a fixed clock is
+     * what a domed crystal does over a printed face, and it is visible because
+     * there is something there to see.
+     *
+     * The relief stays as a STATIC treatment. It fixed a real inconsistency —
+     * flat numerals on an engraved dial — and it reads fine standing still.
+     */
+    private fun dialParallax(p: DialParams): String {
+        if (p.generatorVersion < 13) return ""
+        return """
+      <Gyro x="${gyro("ACCELEROMETER_ANGLE_X")}" y="${gyro("ACCELEROMETER_ANGLE_Y")}"/>"""
+    }
+
     /** A linear map from a tilt angle to a small offset, clamped to the sensor's range. */
-    private fun gyro(source: String, dir: Double): String =
-        "(${dir * TILT_TRAVEL}/90) * clamp([$source], -90, 90)"
+    private fun gyro(source: String): String =
+        "($TILT_TRAVEL/90) * clamp([$source], -90, 90)"
 
     /**
      * Alpha as a function of tilt, opposite for the two layers.
@@ -394,8 +426,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
      * 0-255 at any angle: at the extremes this runs from ${TILT_REST - TILT_ALPHA_SWING}
      * to ${TILT_REST + TILT_ALPHA_SWING}.
      */
-    private fun gyroAlpha(dir: Double): String =
-        "$TILT_REST + (${dir * TILT_ALPHA_SWING}/90) * clamp([ACCELEROMETER_ANGLE_X], -90, 90)"
+
 
     private fun secondsClock(p: DialParams, left: Int): String {
         val l = p.layout
@@ -698,8 +729,8 @@ ${handPair("MinuteHand", "hand_minute")}$second
 
   <Scene backgroundColor="#ff000000">
 
-    <PartImage x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="0"/>
+    <PartImage x="${-DIAL_BLEED}" y="${-DIAL_BLEED}" width="${DIAL_SIZE + DIAL_BLEED * 2}" height="${DIAL_SIZE + DIAL_BLEED * 2}" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="0"/>${dialParallax(p)}
       <Image resource="dial_bg"/>
     </PartImage>
 

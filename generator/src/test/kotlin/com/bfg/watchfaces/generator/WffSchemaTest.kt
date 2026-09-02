@@ -241,30 +241,48 @@ class WffSchemaTest {
      * screen reads as a bug rather than as an effect.
      */
     @Test
-    fun `the time gets relief that tilts, and ink that does not`() {
+    fun `the dial parallaxes and nothing else moves`() {
         val xml = WffEmitter.emit(DialParams())
-        assertTrue(xml.contains("clock_relief_light")) { "no highlight layer" }
-        assertTrue(xml.contains("clock_relief_dark")) { "no shadow layer" }
 
+        // ONE moving thing, and it is the dial.
+        //
+        // The first version tilted the TIME's relief. It ran -- the watch
+        // powered up its accelerometer for the face -- and could not be seen,
+        // because the relief sits behind the ink and only a hairline of it
+        // shows: measured at 4,097 pixels, 2.51% of the dial. The dial is the
+        // other 97%.
         val gyros = Regex("<Gyro ").findAll(xml).count()
-        assertEquals(2, gyros) { "expected exactly two tilting layers, found $gyros" }
+        assertEquals(1, gyros) { "expected exactly one tilting element, found $gyros" }
 
-        // Opposite directions, or the two would slide together and read as the
-        // whole clock wobbling rather than as light crossing it.
-        assertTrue(xml.contains("(5.0/90)")) { "the highlight does not travel" }
-        assertTrue(xml.contains("(-5.0/90)")) { "the shadow does not travel the other way" }
-        // And the part that makes it visible: the two BRIGHTEN and dim in
-        // opposite directions. Position alone was reported from a wrist as "way
-        // too subtle", which it was -- metal changes the intensity of a
-        // highlight, not just where it sits.
-        assertTrue(xml.contains("(95.0/90)")) { "the highlight does not brighten with tilt" }
-        assertTrue(xml.contains("(-95.0/90)")) { "the shadow does not dim the other way" }
+        // On the dial image, not on a clock.
+        val gyro = xml.indexOf("<Gyro")
+        val dialImage = xml.indexOf("dial_bg")
+        assertTrue(gyro < dialImage) { "the gyro is not on the dial image" }
 
-        // The ink copy is last and untilted: the relief groups both close before
-        // the clock that carries the readable numerals opens.
-        val lastGroup = xml.lastIndexOf("</Group>")
-        val inkClock = xml.lastIndexOf("<DigitalClock")
-        assertTrue(lastGroup < inkClock) { "the ink clock is inside a tilting group" }
+        // The relief survives as a STATIC treatment.
+        assertTrue(xml.contains("clock_relief_light")) { "the relief went away with the tilt" }
+        assertTrue(xml.contains("clock_relief_dark")) { "the relief went away with the tilt" }
+    }
+
+    /**
+     * The dial is emitted OVERSIZED, or tilting it would expose the rim.
+     *
+     * A dial that fills the screen exactly has nowhere to travel: moving it
+     * leaves a black crescent on the side it came from. The bleed has to exceed
+     * the travel at every angle.
+     */
+    @Test
+    fun `the dial has bleed to travel into`() {
+        val xml = WffEmitter.emit(DialParams())
+        val m = Regex("""<PartImage x="(-?\d+)" y="(-?\d+)" width="(\d+)" height="(\d+)"[^>]*>\s*<Variant[^>]*/>\s*<Gyro""")
+            .find(xml)
+        assertTrue(m != null) { "the dial image is not positioned for parallax" }
+        val x = m!!.groupValues[1].toInt()
+        val w = m.groupValues[3].toInt()
+        assertTrue(x < 0) { "the dial starts at $x, so it has no bleed on the left" }
+        assertTrue(w > DIAL_SIZE) { "the dial is $w wide, no larger than the screen" }
+        // Travel is 6; bleed must beat it with room to spare.
+        assertTrue(-x >= 8) { "only ${-x}px of bleed; the rim would show at full tilt" }
     }
 
     /** Ambient has its own thin clock; relief on a black ground lights pixels to say nothing. */
