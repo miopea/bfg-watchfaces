@@ -251,8 +251,14 @@ class WffSchemaTest {
 
         // Opposite directions, or the two would slide together and read as the
         // whole clock wobbling rather than as light crossing it.
-        assertTrue(xml.contains("(2.5/90)")) { "the highlight does not travel" }
-        assertTrue(xml.contains("(-2.5/90)")) { "the shadow does not travel the other way" }
+        assertTrue(xml.contains("(5.0/90)")) { "the highlight does not travel" }
+        assertTrue(xml.contains("(-5.0/90)")) { "the shadow does not travel the other way" }
+        // And the part that makes it visible: the two BRIGHTEN and dim in
+        // opposite directions. Position alone was reported from a wrist as "way
+        // too subtle", which it was -- metal changes the intensity of a
+        // highlight, not just where it sits.
+        assertTrue(xml.contains("(95.0/90)")) { "the highlight does not brighten with tilt" }
+        assertTrue(xml.contains("(-95.0/90)")) { "the shadow does not dim the other way" }
 
         // The ink copy is last and untilted: the relief groups both close before
         // the clock that carries the readable numerals opens.

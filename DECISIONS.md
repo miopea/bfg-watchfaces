@@ -1,5 +1,52 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — The tilt was the wrong model, not the wrong number
+
+Reported from a wrist, on a deliberately high-contrast dial: **"still way too
+subtle"**. Correct, and the first instinct — raise the travel — would have been
+treating a symptom.
+
+### What was wrong
+
+The effect moved a semi-transparent halo 2.5px behind 104pt numerals. At arm's
+length that is not something anyone notices, and no amount of it would have been:
+sliding a highlight sideways is not what metal does.
+
+**Metal changes the INTENSITY of a highlight.** The face turned toward the light
+gets brighter and the face turned away falls into shadow. Position is the detail
+on top of that, not the signal.
+
+`Gyro` drives `alpha` as well as `x` and `y`, which was in the schema the whole
+time and unused because the plan had been written around movement.
+
+### What it does now
+
+The two relief layers swing in OPPOSITE directions across the tilt range —
+highlight up while shadow drops, and the reverse coming back — around a resting
+alpha of 150, which is what the dial looked like before any of this. Travel
+doubled to 5px as the detail rather than the substance.
+
+### On the diagnosis
+
+A probe was written to measure how much the tilt changed, and it **shifted the
+entire face instead of the relief layer**, reporting that 130,000 pixels differed
+when the honest answer was a few thousand. It was deleted rather than reasoned
+from.
+
+That is the second broken measurement in this feature — a grep for `<Gyro[^/]*/>`
+also reported zero gyros on a face carrying two, because the pattern breaks on
+the `/` inside `2.5/90`. Both would have supported a wrong conclusion, and in
+both cases the tool was broken rather than the thing being measured.
+
+**A measurement is evidence only once it has itself been checked**, which is a
+narrower and more useful rule than "measure, do not guess".
+
+### What is still unverified
+
+Whether an alpha swing of ±95 reads on a wrist in daylight. It is roughly forty
+times the perceptual change of a 2.5px shift, but that is an argument and not an
+observation, and the last argument of that shape was wrong.
+
 ## 2026-09-02 — Save stamped the disk and not the screen
 
 Reported as "nothing is happening on my watch". Two reasons, and the tilt was

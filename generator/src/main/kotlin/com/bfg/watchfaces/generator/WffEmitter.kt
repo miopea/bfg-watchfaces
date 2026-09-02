@@ -288,7 +288,30 @@ ${handPair("MinuteHand", "hand_minute")}$second
      * this kind of thing looks cheap, which is the same reasoning that keeps
      * hand proportions fixed. There is no control.
      */
-    private const val TILT_TRAVEL = 2.5
+    private const val TILT_TRAVEL = 5.0
+
+    /**
+     * How far the highlight BRIGHTENS and dims across the tilt range.
+     *
+     * The first version moved the relief and nothing else, and it was reported
+     * from a wrist as "way too subtle" — correctly. A 2.5px translation of a
+     * semi-transparent halo behind large numerals, seen at arm's length, is not
+     * a thing anyone notices.
+     *
+     * It was also the wrong model. Metal catching light does not slide its
+     * highlight two pixels; the highlight gets BRIGHTER on the face turned
+     * toward the light and fades on the one turned away. Intensity is the
+     * signal, and position is the detail on top of it.
+     *
+     * So the two layers swing in opposite directions: tilt one way and the
+     * highlight comes up while the shadow drops, tilt back and they trade. At
+     * rest they sit at [TILT_REST], which is what the dial looked like before
+     * any of this.
+     */
+    private const val TILT_ALPHA_SWING = 95.0
+
+    /** The alpha both relief layers sit at with the watch flat. */
+    private const val TILT_REST = 150.0
 
     /**
      * The engraved relief under the time, and the light that moves across it.
@@ -349,7 +372,8 @@ ${handPair("MinuteHand", "hand_minute")}$second
         return """
     <Group name="$name" x="$ox" y="${y + oy}" width="$DIAL_SIZE" height="$h" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="0"/>
-      <Gyro x="${gyro("ACCELEROMETER_ANGLE_X", dir)}" y="${gyro("ACCELEROMETER_ANGLE_Y", dir)}"/>
+      <Gyro x="${gyro("ACCELEROMETER_ANGLE_X", dir)}" y="${gyro("ACCELEROMETER_ANGLE_Y", dir)}"
+            alpha="${gyroAlpha(dir)}"/>
       <DigitalClock x="0" y="0" width="$DIAL_SIZE" height="$h">
         <TimeText format="${p.hourFormat.pattern}" hourFormat="${p.hourFormat.wff}" align="CENTER"
                   x="0" y="0" width="$DIAL_SIZE" height="$h" alpha="255">
@@ -362,6 +386,16 @@ ${handPair("MinuteHand", "hand_minute")}$second
     /** A linear map from a tilt angle to a small offset, clamped to the sensor's range. */
     private fun gyro(source: String, dir: Double): String =
         "(${dir * TILT_TRAVEL}/90) * clamp([$source], -90, 90)"
+
+    /**
+     * Alpha as a function of tilt, opposite for the two layers.
+     *
+     * Clamped to the sensor range so the expression cannot drive alpha outside
+     * 0-255 at any angle: at the extremes this runs from ${TILT_REST - TILT_ALPHA_SWING}
+     * to ${TILT_REST + TILT_ALPHA_SWING}.
+     */
+    private fun gyroAlpha(dir: Double): String =
+        "$TILT_REST + (${dir * TILT_ALPHA_SWING}/90) * clamp([ACCELEROMETER_ANGLE_X], -90, 90)"
 
     private fun secondsClock(p: DialParams, left: Int): String {
         val l = p.layout
