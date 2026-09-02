@@ -139,6 +139,56 @@ class OneVocabularyTest {
      *
      * Scans source because `:appcore` cannot import `:mobile`.
      */
+    /**
+     * Every hand style is either offered or deliberately withheld.
+     *
+     * `Hands.shapes` THROWS for a style with no geometry — on purpose, so an
+     * undrawn style fails loudly rather than silently rendering as a baton. The
+     * consequence is that offering one in the picker puts a crash behind a
+     * button, and the picker is a hand-written list, so adding to the enum does
+     * not add to it.
+     *
+     * Same trap as `ENGINE_ORDER`, one layer down, and the same guard.
+     */
+    @Test
+    fun `every hand style is either offered or explicitly withheld`() {
+        val presentation = otherModuleSources().firstOrNull { it.name == "Presentation.kt" }
+        assertTrue(presentation != null) { "Presentation.kt was not found by the scan" }
+        val text = presentation!!.readText()
+        val named = Regex("""HandStyle\.(\w+)""").findAll(text).map { it.groupValues[1] }.toSet()
+        val missing = com.bfg.watchfaces.generator.HandStyle.entries
+            .map { it.name }
+            .filterNot { it in named }
+        assertEquals(emptyList<String>(), missing) {
+            "these hand styles appear in neither OFFERED_HANDS nor UNOFFERED_HANDS, so the " +
+                "phone silently never offers them: $missing"
+        }
+    }
+
+    /**
+     * And every OFFERED style can actually be drawn.
+     *
+     * The guard above only proves a style was thought about. This proves the
+     * ones on the picker do not throw when somebody taps them.
+     */
+    @Test
+    fun `every offered hand style has geometry`() {
+        val presentation = otherModuleSources().first { it.name == "Presentation.kt" }
+        val offered = Regex("""OFFERED_HANDS[^)]*?\)""", RegexOption.DOT_MATCHES_ALL)
+            .find(presentation.readText())?.value.orEmpty()
+        val styles = com.bfg.watchfaces.generator.HandStyle.entries
+            .filter { offered.contains("HandStyle.${it.name}") }
+        assertTrue(styles.isNotEmpty()) { "the scan found no offered hand styles" }
+        for (style in styles) {
+            for (hand in com.bfg.watchfaces.generator.Hands.Hand.entries) {
+                val result = runCatching { com.bfg.watchfaces.generator.Hands.shapes(style, hand) }
+                assertTrue(result.isSuccess) {
+                    "$style is on the picker but $hand throws: ${result.exceptionOrNull()?.message}"
+                }
+            }
+        }
+    }
+
     @Test
     fun `every engine is either offered or explicitly withheld`() {
         val presentation = otherModuleSources().firstOrNull { it.name == "Presentation.kt" }

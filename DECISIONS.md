@@ -1,5 +1,61 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — Hands: analog faces exist, and the layout does not know yet
+
+`ClockMode` (v12) makes a face analog, `WffEmitter` writes `AnalogClock`, both
+renderers cut the hands, and Studio can switch a face over. Steps 1 to 4 of
+`docs/specs/analog-hands.md`, plus the picker out of order so the feature is
+reachable rather than provable.
+
+### What the format decided
+
+`clock/hourHand.xsd` requires a `resource` attribute and permits no `PartDraw`
+child. A hand cannot be geometry in the definition — it is a PNG. So the shape
+lives in `Hands`, the renderers cut it, and the emitter only says where the
+pictures go.
+
+### The gate, and why it needs more than validation
+
+A schema-invalid face installs, signs and silently never appears. But validation
+alone is not enough here: **every child of `AnalogClock` is `minOccurs="0"`**, so
+an `AnalogClock` containing no hands at all is perfectly valid XML. It would
+install and render a bare dial — indistinguishable from a face that failed to
+load. So four tests assert the hands are actually present and in schema order,
+alongside the schema run over every style with seconds on and off.
+
+### Two mistakes worth keeping
+
+**RGB_565 would have shipped a black square.** `dial_bg.png` is squeezed to 565
+before packing, and applying that to a hand would have been the obvious
+consistency — but 565 has no alpha channel, and a hand canvas is almost entirely
+transparent. The result would be an opaque black square rotating over the face.
+Hands pack as ARGB_8888.
+
+**A test regex failed on correct XML.** Its own quoting was ambiguous inside a
+Kotlin raw string. It counts occurrences now. Second time this week a test has
+been wrong about correct output, and both times the tell was the same: the
+assertion was harder to read than the thing it was checking.
+
+### What is deliberately still wrong
+
+**Complications sit in the digital stack, under the sweeping hands.** The
+preview shows the minute hand crossing "8,412". `SlotGeometry` has no analog
+branch yet — that is step 5, and the interview named it as the real work of this
+feature, more than the hands themselves.
+
+Shipping it visibly wrong beats shipping it invisible: the last two hand
+releases changed nothing the operator could see, and the second one drew that
+complaint. A face that is obviously half-finished can be judged; one that looks
+identical cannot.
+
+### Two styles, not four
+
+`DAUPHINE` and `SYRINGE` throw rather than defaulting to a baton, and
+`Presentation.OFFERED_HANDS` lists only what is drawn. `OneVocabularyTest` now
+asserts every style is either offered or explicitly withheld, and that every
+offered one can actually be drawn — otherwise the picker puts a crash behind a
+button.
+
 ## 2026-09-02 — Two reports, and only one of them was a regression
 
 Both arrived together after re-saving a face at v11: **"the spacing option no

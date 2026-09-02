@@ -3,6 +3,7 @@ package com.bfg.watchfaces.mobile
 import com.bfg.watchfaces.generator.ComplicationSource
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
+import com.bfg.watchfaces.generator.HandStyle
 import com.bfg.watchfaces.generator.Layout
 import com.bfg.watchfaces.generator.SlotPosition
 
@@ -55,6 +56,27 @@ object Presentation {
      * face that names it. This list is the phone's offer, not the format.
      */
     val UNOFFERED: Set<Engine> = setOf(Engine.TEXTURE)
+
+    /**
+     * The hand styles the picker offers, in the order it offers them.
+     *
+     * Only styles with geometry. `Hands.shapes` THROWS for one that has none —
+     * deliberately, so an undrawn style fails loudly instead of silently
+     * rendering as a baton — which means offering it here would put a crash
+     * behind a button.
+     *
+     * A hand-written list for the same reason [ENGINE_ORDER] is one: adding a
+     * value to [HandStyle] must not silently change what people are shown.
+     * `HandsOfferedTest` asserts every entry here can actually be drawn, and
+     * that anything left out is left out on purpose.
+     */
+    val OFFERED_HANDS: List<HandStyle> = listOf(
+        HandStyle.BATON,
+        HandStyle.SKELETON
+    )
+
+    /** Named, not defaulted: these are drawn but not finished. See analog-hands.md step 8. */
+    val UNOFFERED_HANDS: Set<HandStyle> = setOf(HandStyle.DAUPHINE, HandStyle.SYRINGE)
 
     fun label(engine: Engine): String = when (engine) {
         Engine.KNOTWORK -> "Knotwork"

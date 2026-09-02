@@ -56,6 +56,7 @@ import com.bfg.watchfaces.generator.ControlInventory
 import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DateScale
 import com.bfg.watchfaces.generator.DateStyle
+import com.bfg.watchfaces.generator.ClockMode
 import com.bfg.watchfaces.generator.HourFormat
 import com.bfg.watchfaces.generator.RingSource
 import com.bfg.watchfaces.generator.DialParams
@@ -144,11 +145,33 @@ fun StudioScreen(
         }
         val controls: @Composable ColumnScope.() -> Unit = {
         AmbientToggle(ambient, onAmbient)
+        // Numbers or hands, first, because it changes what every control below
+        // it means. The 12/24-hour row is about NUMERALS and has nothing to say
+        // about a dial with hands on it, so it goes away rather than sitting
+        // there doing nothing -- a control that cannot affect the thing in
+        // front of you reads as broken, which is what the spacing row taught.
         ChoiceRow(
-            label = "Time",
-            options = HourFormat.entries.map { it.label to it },
-            selected = params.hourFormat
-        ) { onParams(params.copy(hourFormat = it)) }
+            label = "Clock",
+            options = ClockMode.entries.map { it.label to it },
+            selected = params.clockMode
+        ) { onParams(params.copy(clockMode = it)) }
+        if (params.clockMode == ClockMode.ANALOG) {
+            // ONLY the styles that have geometry. Hands.shapes throws for one
+            // that does not, by design, so offering it here would put a crash
+            // behind a button. Presentation.UNOFFERED exists for exactly this
+            // shape of mistake one layer up.
+            ChoiceRow(
+                label = "Hands",
+                options = Presentation.OFFERED_HANDS.map { it.label to it },
+                selected = params.handStyle
+            ) { onParams(params.copy(handStyle = it)) }
+        } else {
+            ChoiceRow(
+                label = "Time",
+                options = HourFormat.entries.map { it.label to it },
+                selected = params.hourFormat
+            ) { onParams(params.copy(hourFormat = it)) }
+        }
         SwitchRow(
             title = "Show seconds",
             detail = "Only while the watch is awake",
