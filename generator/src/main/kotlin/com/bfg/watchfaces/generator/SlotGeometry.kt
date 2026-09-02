@@ -485,12 +485,29 @@ object SlotGeometry {
      * the params regardless — switching a face to hands and back must not
      * destroy two of somebody's choices.
      */
+    /**
+     * The positions this face SUPPORTS, whether or not they are switched on.
+     *
+     * The picker builds from this, and so does [analogBoxes], so a control can
+     * never offer a slot the layout will not draw. Offering five when three are
+     * rendered is what the operator hit: "the complication list shows all five
+     * when they don't apply anymore".
+     *
+     * Not the same question as which slots are currently FILLED — a disabled
+     * slot still has to appear in the picker or it could never be switched back
+     * on. That is why this exists rather than reading `boxes().keys`.
+     */
+    fun supportedSlots(p: DialParams): List<SlotPosition> {
+        if (p.clockMode != ClockMode.ANALOG) return SlotPosition.entries
+        // Nine and three always; six unless the date has taken it.
+        val six = if (p.dateStyle == DateStyle.NONE) listOf(SlotPosition.BOTTOM) else emptyList()
+        return listOf(SlotPosition.LEFT, SlotPosition.RIGHT) + six
+    }
+
     fun analogBoxes(p: DialParams): LinkedHashMap<SlotPosition, Box> {
         val out = LinkedHashMap<SlotPosition, Box>()
         val size = analogSize(p)
         val w = boxWidth(size)
-        val dateOwnsSix = p.dateStyle != DateStyle.NONE
-
         // Far enough out to clear the hub, near enough in to stay inside the
         // chapter ring: the indices run from 0.88 of the radius inward, so
         // anything past about 0.80 would draw through them.
@@ -502,9 +519,15 @@ object SlotGeometry {
             out[pos] = Box((cx - w / 2.0).roundToInt(), (cy - h / 2.0).roundToInt(), w, h)
         }
 
-        place(SlotPosition.LEFT, DIAL_CENTER - reach, DIAL_CENTER)
-        place(SlotPosition.RIGHT, DIAL_CENTER + reach, DIAL_CENTER)
-        if (!dateOwnsSix) place(SlotPosition.BOTTOM, DIAL_CENTER, DIAL_CENTER + reach)
+        // Driven by supportedSlots so the picker and the layout cannot disagree.
+        for (pos in supportedSlots(p)) {
+            when (pos) {
+                SlotPosition.LEFT -> place(pos, DIAL_CENTER - reach, DIAL_CENTER)
+                SlotPosition.RIGHT -> place(pos, DIAL_CENTER + reach, DIAL_CENTER)
+                SlotPosition.BOTTOM -> place(pos, DIAL_CENTER, DIAL_CENTER + reach)
+                else -> Unit
+            }
+        }
         return out
     }
 

@@ -1,5 +1,45 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — Controls for the face in front of you
+
+Two UI reports, and the same principle underneath both: **a control that cannot
+affect what you are looking at reads as broken.** That is now three separate
+times this project has been told it, in three different places.
+
+### Spacing is gone on an analog face, not disabled
+
+Spacing is a ROW control. It spreads three complications across the middle of
+the dial. An analog face has no row — they sit at nine, three and six, at fixed
+points — so there is nothing for it to space.
+
+Not greyed out with an explanation, which is what the digital no-room case gets.
+There the control is real and temporarily has nothing to offer, so saying why is
+useful. Here it does not apply at all, and a disabled row with a paragraph
+attached is just clutter that has to be read before it can be dismissed.
+
+### The picker offers what the layout draws, from one list
+
+`SlotGeometry.supportedSlots` is now the single answer to "which positions does
+this face have", and both the Studio picker and `analogBoxes` build from it. An
+analog face offers Left, Right, and Bottom — or just Left and Right when the
+date has taken six.
+
+Deliberately NOT `boxes().keys`: a slot that is switched OFF has no box, and
+reading the boxes would remove it from the picker so it could never be switched
+back on. "Which slots exist" and "which slots are filled" are different
+questions and this is the first.
+
+TOP and MIDDLE stay in the params untouched. Switching back to numbers must find
+them where they were, which was settled during the interview and is why the
+picker filters rather than the data.
+
+### The note under the list says where they went
+
+A slot vanishing needs explaining only when something took its place, so the
+wording is conditional: the date one appears when the date owns six, and
+otherwise it just says hands sweep the middle. A control disappearing with no
+account of itself is the same failure as one that does nothing.
+
 ## 2026-09-02 — Four styles, ambient outlines, and the second element the schema was for
 
 Steps 6 to 9 of `docs/specs/analog-hands.md`. Dauphine and Syringe drawn,

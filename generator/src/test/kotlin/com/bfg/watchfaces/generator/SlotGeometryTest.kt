@@ -83,6 +83,37 @@ class SlotGeometryTest {
         DialParams(clockMode = ClockMode.ANALOG, dateStyle = date)
 
     /**
+     * The picker and the layout offer the same slots.
+     *
+     * They are built from one list on purpose. Offering five on a face that
+     * draws three is offering two that can never appear — reported from a phone
+     * as "the complication list shows all five when they don't apply anymore".
+     */
+    @Test
+    fun `an analog face supports exactly the slots it draws`() {
+        for (date in listOf(DateStyle.NONE, DateStyle.MONTH_DAY)) {
+            val p = analog(date)
+            val supported = SlotGeometry.supportedSlots(p)
+            assertEquals(SlotGeometry.boxes(p).keys.toList(), supported) {
+                "the picker offers $supported but the layout draws ${SlotGeometry.boxes(p).keys}"
+            }
+            assertTrue(SlotPosition.TOP !in supported && SlotPosition.MIDDLE !in supported) {
+                "an analog face offers a slot it cannot draw: $supported"
+            }
+        }
+        assertEquals(3, SlotGeometry.supportedSlots(analog()).size)
+        assertEquals(2, SlotGeometry.supportedSlots(analog(DateStyle.MONTH_DAY)).size) {
+            "the date took six but the picker still offers a slot there"
+        }
+    }
+
+    /** A digital face still offers all five, in order. */
+    @Test
+    fun `a digital face supports every slot`() {
+        assertEquals(SlotPosition.entries, SlotGeometry.supportedSlots(DialParams()))
+    }
+
+    /**
      * Nothing sits where the hands live.
      *
      * MIDDLE is under the hub and TOP fights both the twelve index and the hour

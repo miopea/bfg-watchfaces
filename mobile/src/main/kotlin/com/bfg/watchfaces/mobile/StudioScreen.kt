@@ -258,47 +258,67 @@ fun StudioScreen(
         // the boxes grew: at complication size 27, Tight 84, Normal 92 and Wide
         // 110 all came out as 115, because the layout's own minimum had passed
         // all three. Three controls, one result.
-        val spreads = SlotGeometry.spreadOptions(params)
-        if (spreads.size < 2) {
-            // ONE spacing means there is no choice, and a row of buttons that
-            // cannot change anything reads as a broken control -- which is how
-            // it was reported: "the spacing option no longer works and the UI
-            // has all three selected". Three buttons carrying the same number
-            // all matched the current value, so all three drew as selected.
-            //
-            // Say what is true instead. The geometry is right: at this size the
-            // complications fill the row and there is nowhere to spread them.
-            // Naming the cause makes it obvious what to change, and it is a
-            // control they already have, right above this one.
-            Text(
-                "Spacing",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Your complications are too big to space apart. Make them smaller " +
-                    "to get the spacing back.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(6.dp))
-        } else {
-            val spreadOptions = listOf("Tight", "Normal", "Wide").zip(spreads)
-            ChoiceRow(
-                label = "Spacing",
-                options = spreadOptions,
-                // The stored value is a REQUEST and rarely equals an option, so
-                // match the nearest -- otherwise nothing looks selected and the
-                // control reads as broken.
-                selected = spreadOptions.minByOrNull {
-                    kotlin.math.abs(it.second - params.layout.complicationSpread)
-                }?.second ?: params.layout.complicationSpread
-            ) { onParams(params.copy(layout = params.layout.copy(complicationSpread = it))) }
+        // SPACING IS A ROW CONTROL. An analog face has no row -- the
+        // complications sit at nine, three and six, at fixed points round the
+        // dial -- so there is nothing for it to space and it is not shown at
+        // all. Reported as "the wording for spacing doesn't make sense and you
+        // can just go away".
+        //
+        // Not disabled with an explanation, which is what the digital
+        // no-room case gets: there the control is real and temporarily has
+        // nothing to offer. Here it does not apply, and a greyed row would just
+        // be clutter with a paragraph attached.
+        if (params.clockMode != ClockMode.ANALOG) {
+            val spreads = SlotGeometry.spreadOptions(params)
+            if (spreads.size < 2) {
+                // ONE spacing means there is no choice, and a row of buttons
+                // that cannot change anything reads as a broken control --
+                // which is how it was reported: "the spacing option no longer
+                // works and the UI has all three selected". Three buttons
+                // carrying the same number all matched the current value, so
+                // all three drew as selected.
+                //
+                // Say what is true instead. The geometry is right: at this size
+                // the complications fill the row and there is nowhere to spread
+                // them. Naming the cause makes it obvious what to change, and
+                // it is a control they already have, right above this one.
+                Text(
+                    "Spacing",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Your complications are too big to space apart. Make them smaller " +
+                        "to get the spacing back.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+            } else {
+                val spreadOptions = listOf("Tight", "Normal", "Wide").zip(spreads)
+                ChoiceRow(
+                    label = "Spacing",
+                    options = spreadOptions,
+                    // The stored value is a REQUEST and rarely equals an option,
+                    // so match the nearest -- otherwise nothing looks selected
+                    // and the control reads as broken.
+                    selected = spreadOptions.minByOrNull {
+                        kotlin.math.abs(it.second - params.layout.complicationSpread)
+                    }?.second ?: params.layout.complicationSpread
+                ) { onParams(params.copy(layout = params.layout.copy(complicationSpread = it))) }
+            }
         }
 
         Spacer(Modifier.height(8.dp))
-        for (pos in SlotPosition.entries) {
+        // Only the positions this face HAS. An analog face draws three, so
+        // offering five was offering two that could never appear -- reported as
+        // "the complication list shows all five when they don't apply anymore".
+        //
+        // From SlotGeometry, which is also what places them, so the picker and
+        // the layout cannot drift apart. TOP and MIDDLE stay in the params
+        // untouched: switching back to numbers must find them where they were.
+        for (pos in SlotGeometry.supportedSlots(params)) {
             SlotPicker(
                 pos = pos,
                 selected = params.slot(pos),
@@ -331,7 +351,19 @@ fun StudioScreen(
             )
         }
         Text(
-            "Turn one off and the others move over to fill the space.",
+            if (params.clockMode == ClockMode.ANALOG) {
+                // Says where they went, so a slot vanishing from the list is
+                // explained rather than mysterious. Only when the date is what
+                // took the spot -- otherwise there is nothing to explain.
+                if (params.dateStyle != DateStyle.NONE) {
+                    "The date sits at the bottom, so there are two spots beside the hands. " +
+                        "Turn the date off to get a third."
+                } else {
+                    "Hands sweep the middle of the dial, so complications sit around it."
+                }
+            } else {
+                "Turn one off and the others move over to fill the space."
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 6.dp)
