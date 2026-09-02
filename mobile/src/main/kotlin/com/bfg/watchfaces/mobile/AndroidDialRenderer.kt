@@ -13,6 +13,7 @@ import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.DialShading
 import com.bfg.watchfaces.generator.ClockMode
+import com.bfg.watchfaces.generator.Glare
 import com.bfg.watchfaces.generator.HandStyle
 import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.EngravedStroke
@@ -249,6 +250,35 @@ object AndroidDialRenderer {
         if (ambient) Hands.ambientShapes(style, hand) else Hands.shapes(style, hand),
         size, color
     )
+
+    /**
+     * The glare band, the mirror of the workbench renderer.
+     *
+     * Per pixel because the falloff is a raised cosine, which no built-in
+     * gradient expresses, and a linear ramp leaves a crease where its slope
+     * changes — on a shape whose whole job is to have no visible edge.
+     */
+    fun renderGlare(p: DialParams, size: Int = DIAL_SIZE): Bitmap {
+        val margin = Glare.TRAVEL.toInt()
+        val w = size + margin * 2
+        val bmp = Bitmap.createBitmap(w, w, Bitmap.Config.ARGB_8888)
+        val a = Math.toRadians(Glare.ANGLE_DEGREES)
+        val nx = kotlin.math.cos(a)
+        val ny = kotlin.math.sin(a)
+        val c = w / 2.0
+        val scale = size.toDouble() / DIAL_SIZE
+        val row = IntArray(w)
+        for (y in 0 until w) {
+            for (x in 0 until w) {
+                val d = ((x - c) * nx + (y - c) * ny) / scale
+                val i = Glare.intensityAt(d)
+                row[x] = if (i <= 0.0) 0
+                else ((i * Glare.PEAK_ALPHA).toInt().coerceIn(0, 255) shl 24) or 0xFFFFFF
+            }
+            bmp.setPixels(row, 0, w, 0, y, w, 1)
+        }
+        return bmp
+    }
 
     /** The hub the hands turn on. Static; it does not rotate with anything. */
     fun renderHub(p: DialParams, style: HandStyle, size: Int = DIAL_SIZE, ambient: Boolean = false): Bitmap =

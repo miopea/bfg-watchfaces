@@ -241,48 +241,44 @@ class WffSchemaTest {
      * screen reads as a bug rather than as an effect.
      */
     @Test
-    fun `the dial parallaxes and nothing else moves`() {
+    fun `exactly one thing moves, and it is the glare`() {
         val xml = WffEmitter.emit(DialParams())
 
-        // ONE moving thing, and it is the dial.
-        //
-        // The first version tilted the TIME's relief. It ran -- the watch
-        // powered up its accelerometer for the face -- and could not be seen,
-        // because the relief sits behind the ink and only a hairline of it
-        // shows: measured at 4,097 pixels, 2.51% of the dial. The dial is the
-        // other 97%.
+        // ONE gyro. Two earlier attempts are gone rather than kept as
+        // decoration: tilting the text relief reached 2.51% of the dial, and
+        // tilting the dial itself was invisible because a guilloche is periodic
+        // -- 6px gave a mean delta of 9/255 and 20px gave 10.3. Shipping an
+        // effect measured to be invisible is clutter that costs battery.
         val gyros = Regex("<Gyro ").findAll(xml).count()
-        assertEquals(1, gyros) { "expected exactly one tilting element, found $gyros" }
+        assertEquals(1, gyros) { "expected exactly one moving element, found $gyros" }
 
-        // On the dial image, not on a clock.
-        val gyro = xml.indexOf("<Gyro")
-        val dialImage = xml.indexOf("dial_bg")
-        assertTrue(gyro < dialImage) { "the gyro is not on the dial image" }
-
+        assertTrue(xml.contains("\"glare\"")) { "the glare band is not referenced" }
+        // Over everything: light on glass falls on the numerals too.
+        assertTrue(xml.lastIndexOf("glare") > xml.lastIndexOf("<DigitalClock")) {
+            "the glare is drawn under the clock rather than over it"
+        }
         // The relief survives as a STATIC treatment.
         assertTrue(xml.contains("clock_relief_light")) { "the relief went away with the tilt" }
-        assertTrue(xml.contains("clock_relief_dark")) { "the relief went away with the tilt" }
     }
 
     /**
-     * The dial is emitted OVERSIZED, or tilting it would expose the rim.
+     * The band is emitted OVERSIZED, or its own edge becomes the effect.
      *
-     * A dial that fills the screen exactly has nowhere to travel: moving it
-     * leaves a black crescent on the side it came from. The bleed has to exceed
-     * the travel at every angle.
+     * A soft band whose edge crosses the dial reads as a stripe laid on top
+     * rather than as light. The margin has to exceed the travel at every angle.
      */
     @Test
-    fun `the dial has bleed to travel into`() {
+    fun `the glare has room to sweep without showing an edge`() {
         val xml = WffEmitter.emit(DialParams())
-        val m = Regex("""<PartImage x="(-?\d+)" y="(-?\d+)" width="(\d+)" height="(\d+)"[^>]*>\s*<Variant[^>]*/>\s*<Gyro""")
+        val m = Regex("""<PartImage x="(-\d+)" y="-\d+" width="(\d+)"[^>]*>\s*<Variant[^>]*/>\s*<Gyro""")
             .find(xml)
-        assertTrue(m != null) { "the dial image is not positioned for parallax" }
-        val x = m!!.groupValues[1].toInt()
-        val w = m.groupValues[3].toInt()
-        assertTrue(x < 0) { "the dial starts at $x, so it has no bleed on the left" }
-        assertTrue(w > DIAL_SIZE) { "the dial is $w wide, no larger than the screen" }
-        // Travel is 6; bleed must beat it with room to spare.
-        assertTrue(-x >= 8) { "only ${-x}px of bleed; the rim would show at full tilt" }
+        assertTrue(m != null) { "the glare is not positioned for a sweep" }
+        val inset = -m!!.groupValues[1].toInt()
+        val span = m.groupValues[2].toInt()
+        assertTrue(inset >= Glare.TRAVEL.toInt()) {
+            "only ${inset}px of margin against ${Glare.TRAVEL.toInt()}px of travel"
+        }
+        assertEquals(DIAL_SIZE + inset * 2, span) { "the band is not centred on the dial" }
     }
 
     /** Ambient has its own thin clock; relief on a black ground lights pixels to say nothing. */

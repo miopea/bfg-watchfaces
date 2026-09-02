@@ -9,6 +9,7 @@ import com.bfg.watchfaces.generator.ClockMode
 import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.EngravedStroke
+import com.bfg.watchfaces.generator.Glare
 import kotlin.math.roundToInt
 import com.bfg.watchfaces.generator.SecondsBand
 import com.bfg.watchfaces.generator.SlotGeometry
@@ -235,6 +236,14 @@ object FacePreview {
                 else SecondsBand.rightEdgeFor(p) - fm.stringWidth(secs),
                 baseline
             )
+        }
+
+        // The glare, last, over everything -- light on glass falls on the
+        // numerals too. Static here: a preview cannot tilt, and the resting
+        // position is what the watch shows lying flat.
+        if (Glare.enabledFor(p) && !ambient) {
+            val m = Glare.TRAVEL.toInt()
+            g.drawImage(DialRenderer.renderGlare(p, DIAL_SIZE), -m, -m, null)
         }
 
         g.dispose()

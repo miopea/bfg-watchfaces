@@ -3,6 +3,7 @@ package com.bfg.watchfaces.workbench
 import com.bfg.watchfaces.generator.DIAL_CENTER
 import com.bfg.watchfaces.generator.DIAL_RADIUS
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.Glare
 import com.bfg.watchfaces.generator.HandStyle
 import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
@@ -161,6 +162,42 @@ object DialRenderer {
     private const val OUTLINE_WIDTH = 3.0f
 
     /** The hub the hands turn on. Static: it does not rotate with anything. */
+    /**
+     * The glare band, alone on a transparent canvas larger than the dial.
+     *
+     * Oversized by the travel in each direction so the band can sweep without
+     * its own edges ever entering the dial — for a shape whose whole job is to
+     * have no visible edge, that matters more than it does for the dial itself.
+     *
+     * Drawn per pixel rather than with a Java gradient because the falloff is a
+     * raised cosine, which GradientPaint cannot express, and a linear ramp
+     * leaves a crease where its slope changes.
+     */
+    fun renderGlare(p: DialParams, size: Int = DIAL_SIZE): BufferedImage {
+        val margin = Glare.TRAVEL.toInt()
+        val w = size + margin * 2
+        val img = BufferedImage(w, w, BufferedImage.TYPE_INT_ARGB)
+
+        val a = Math.toRadians(Glare.ANGLE_DEGREES)
+        val nx = kotlin.math.cos(a)
+        val ny = kotlin.math.sin(a)
+        val c = w / 2.0
+        val scale = size.toDouble() / DIAL_SIZE
+
+        for (y in 0 until w) {
+            for (x in 0 until w) {
+                val d = ((x - c) * nx + (y - c) * ny) / scale
+                val i = Glare.intensityAt(d)
+                if (i <= 0.0) continue
+                val alpha = (i * Glare.PEAK_ALPHA).toInt()
+                if (alpha <= 0) continue
+                img.setRGB(x, y, (alpha.coerceAtMost(255) shl 24) or 0xFFFFFF)
+            }
+        }
+        return img
+    }
+
+
     fun renderHub(p: DialParams, style: HandStyle, size: Int = DIAL_SIZE, ambient: Boolean = false): BufferedImage =
         renderShapes(
             p,

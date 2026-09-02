@@ -7,6 +7,7 @@ import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.appcore.Complications
 import com.bfg.watchfaces.generator.ClockMode
 import com.bfg.watchfaces.generator.Hands
+import com.bfg.watchfaces.generator.Glare
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.WffEmitter
 import com.bfg.watchfaces.mobile.AndroidDialRenderer
@@ -110,6 +111,11 @@ object FaceBuilder {
             // preview beside it in the carousel are the same picture.
             add(PackBridge.Resource.of("drawable-nodpi", "dial_bg.png", dialPng(params, texture)))
             add(PackBridge.Resource.of("drawable-nodpi", "preview.png", previewPng(params, texture)))
+            // The glare band. Big canvas, almost all of it a smooth gradient or
+            // empty, so it compresses to very little despite the dimensions.
+            if (Glare.enabledFor(params)) {
+                add(PackBridge.Resource.of("drawable-nodpi", "glare.png", glarePng(params)))
+            }
             // Hands, only when the face wears them. A digital face must pack
             // exactly the bytes it always did -- four unused PNGs would cross
             // Bluetooth on every send for nothing.
@@ -178,6 +184,14 @@ object FaceBuilder {
             params.inkColor
         }
         val bmp = AndroidDialRenderer.renderHand(params, params.handStyle, hand, DIAL_SIZE, color, ambient)
+        return ByteArrayOutputStream().use { out ->
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }.also { bmp.recycle() }
+    }
+
+    private fun glarePng(params: DialParams): ByteArray {
+        val bmp = AndroidDialRenderer.renderGlare(params, DIAL_SIZE)
         return ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()

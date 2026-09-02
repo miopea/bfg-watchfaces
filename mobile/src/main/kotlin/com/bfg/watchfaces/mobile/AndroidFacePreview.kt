@@ -11,6 +11,7 @@ import com.bfg.watchfaces.generator.DIAL_SIZE
 import com.bfg.watchfaces.generator.ClockText
 import com.bfg.watchfaces.generator.DateStyle
 import com.bfg.watchfaces.generator.ClockMode
+import com.bfg.watchfaces.generator.Glare
 import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.EngravedStroke
@@ -271,6 +272,14 @@ object AndroidFacePreview {
                 alignEnd = !startAligned,
                 alignStart = startAligned
             )
+        }
+        // The glare, last and over everything -- the mirror of the workbench
+        // preview. Static: a preview cannot tilt.
+        if (Glare.enabledFor(p) && !ambient) {
+            val m = Glare.TRAVEL.toInt()
+            val glare = AndroidDialRenderer.renderGlare(p, DIAL_SIZE)
+            canvas.drawBitmap(glare, -m.toFloat(), -m.toFloat(), null)
+            glare.recycle()
         }
         return bitmap
     }

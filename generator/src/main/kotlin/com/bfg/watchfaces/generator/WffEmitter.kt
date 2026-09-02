@@ -288,19 +288,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
      * this kind of thing looks cheap, which is the same reasoning that keeps
      * hand proportions fixed. There is no control.
      */
-    /**
-     * How far the DIAL slides at full tilt, and the bleed that makes it possible.
-     *
-     * The dial image fills the screen exactly, so moving it would expose the rim
-     * — a black crescent on the side it moved away from. Emitting it slightly
-     * OVERSIZED and positioned negatively gives it margin to travel into, at no
-     * cost in bytes: the PNG is unchanged and Watch Face Format scales it.
-     *
-     * Bleed comfortably exceeds travel so the edge can never appear, whatever
-     * the angle.
-     */
-    private const val DIAL_BLEED = 10
-    private const val TILT_TRAVEL = 6.0
+
 
     /**
      * How far the highlight BRIGHTENS and dims across the tilt range.
@@ -390,34 +378,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
     </Group>"""
     }
 
-    /**
-     * The dial slides under everything else as the wrist turns.
-     *
-     * ## Why this and not the text
-     *
-     * The first attempt tilted the TIME's engraved relief. It worked — the
-     * watch's own log shows it powering up the accelerometer for our face — and
-     * it was invisible, because the relief sits behind the ink and only a
-     * hairline fringe of it shows. **Measured: 4,097 pixels, 2.51% of the dial.**
-     * No swing applied to 2.5% of a screen is perceptible at arm's length, so
-     * there was nothing to tune.
-     *
-     * The dial is the other 97%. Moving it a few pixels under a fixed clock is
-     * what a domed crystal does over a printed face, and it is visible because
-     * there is something there to see.
-     *
-     * The relief stays as a STATIC treatment. It fixed a real inconsistency —
-     * flat numerals on an engraved dial — and it reads fine standing still.
-     */
-    private fun dialParallax(p: DialParams): String {
-        if (p.generatorVersion < 13) return ""
-        return """
-      <Gyro x="${gyro("ACCELEROMETER_ANGLE_X")}" y="${gyro("ACCELEROMETER_ANGLE_Y")}"/>"""
-    }
 
-    /** A linear map from a tilt angle to a small offset, clamped to the sensor's range. */
-    private fun gyro(source: String): String =
-        "($TILT_TRAVEL/90) * clamp([$source], -90, 90)"
 
     /**
      * Alpha as a function of tilt, opposite for the two layers.
@@ -427,6 +388,51 @@ ${handPair("MinuteHand", "hand_minute")}$second
      * to ${TILT_REST + TILT_ALPHA_SWING}.
      */
 
+
+    /**
+     * Light across the crystal, and the only thing on the face that moves.
+     *
+     * ## Why this, after two that did not work
+     *
+     * Tilting the TIME's relief ran correctly and was invisible: the relief sits
+     * behind the ink, so only a hairline shows — 4,097 px, 2.51% of the dial.
+     * Tilting the DIAL covered 97% and was also invisible, because a guilloche
+     * is periodic; shifting it 6px gave a mean channel delta of 9/255 and
+     * tripling the distance gave 10.3. There is no landmark in a repeating
+     * texture to see movement against.
+     *
+     * A single soft band has what neither had: area, NO periodicity to hide in,
+     * and travel measured in [Glare.TRAVEL] rather than single pixels.
+     *
+     * ## Placement
+     *
+     * LAST in the scene, so it falls over the numerals the way light on glass
+     * does. At [Glare.PEAK_ALPHA] the cream text stays fully legible underneath,
+     * checked in a render — "still readable" is a judgement about a picture, not
+     * a property a test can hold.
+     *
+     * Oversized by the travel in each direction so the band's own edges never
+     * enter the dial. A band with a visible edge reads as a stripe laid on top
+     * rather than as light.
+     *
+     * Hidden in ambient, where the dial image is dropped too: nothing for light
+     * to fall on.
+     */
+    private fun glareLayer(p: DialParams): String {
+        if (!Glare.enabledFor(p)) return ""
+        val m = Glare.TRAVEL.toInt()
+        val span = DIAL_SIZE + m * 2
+        return """
+    <PartImage x="${-m}" y="${-m}" width="$span" height="$span" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="0"/>
+      <Gyro x="${glareGyro("ACCELEROMETER_ANGLE_X")}" y="${glareGyro("ACCELEROMETER_ANGLE_Y")}"/>
+      <Image resource="glare"/>
+    </PartImage>"""
+    }
+
+    /** The band sweeps across most of the dial, not the few pixels that failed twice. */
+    private fun glareGyro(source: String): String =
+        "(${Glare.TRAVEL}/90) * clamp([$source], -90, 90)"
 
     private fun secondsClock(p: DialParams, left: Int): String {
         val l = p.layout
@@ -729,8 +735,8 @@ ${handPair("MinuteHand", "hand_minute")}$second
 
   <Scene backgroundColor="#ff000000">
 
-    <PartImage x="${-DIAL_BLEED}" y="${-DIAL_BLEED}" width="${DIAL_SIZE + DIAL_BLEED * 2}" height="${DIAL_SIZE + DIAL_BLEED * 2}" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="0"/>${dialParallax(p)}
+    <PartImage x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE" alpha="255">
+      <Variant mode="AMBIENT" target="alpha" value="0"/>
       <Image resource="dial_bg"/>
     </PartImage>
 
@@ -738,7 +744,7 @@ $ring
 $dateLine
 ${clockBlock}
 $slots
-
+${glareLayer(p)}
   </Scene>
 </WatchFace>
 """

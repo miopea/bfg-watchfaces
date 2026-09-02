@@ -1,5 +1,63 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — The glare, and what the two failures had in common
+
+Third implementation of one effect. The first two were not wrong about the
+mechanism — it worked on the first try — they were wrong about whether the thing
+they moved could carry a visible signal.
+
+| attempt | area | why it failed |
+| --- | --- | --- |
+| Text relief | **2.51%** of the dial | the relief hides behind the ink |
+| Dial parallax | 97% of the dial | a guilloche is **periodic** |
+| Glare band | 97%, non-repeating | — |
+
+### The measurement that mattered, and the one that misled
+
+Parallax was shipped on "87.5% of pixels changed". That number counted every
+pixel differing by any amount, **including one part in 255**, and said nothing
+about whether a person could see it. Measured properly:
+
+```text
+travel  6px -> mean channel delta 9.0
+travel 20px -> 10.3      <- three times the distance, no real change
+travel 60px -> 22.8
+```
+
+Tripling the travel barely moves the number. That is the signature of a
+repeating texture: there is no landmark to see movement against, so shifting it
+within its own period looks the same.
+
+**Pixel count is not perceptibility.** That is the third broken measurement in
+this feature, and the only one that was acted on.
+
+### Choosing the strength by measuring, not by eye
+
+```text
+peak  46 -> mean delta 4.7    (fainter than the parallax that failed)
+peak  90 -> 9.3
+peak 140 -> 14.5              <- shipped
+peak 190 -> 19.7              (starts to flatten the numerals)
+```
+
+140 is where the band is unmistakable in a render and the cream numerals are
+still fully legible under it. Both extremes of tilt were rendered and LOOKED AT
+before shipping, which is the promise made after the second failure.
+
+### The invisible parallax was removed, not kept
+
+It cost a gyro and a bleed for an effect measured to be imperceptible. Shipping
+something proven invisible is clutter that still costs battery. The engraved
+relief stays, because it is a real static improvement — it fixed flat numerals on
+an engraved dial — and only its tilt is gone.
+
+### The lesson, which is not "measure"
+
+I measured three times. What was missing every time was a question asked BEFORE
+building: **can the thing I am about to move carry a visible signal at all?**
+Area, periodicity, and travel are all answerable in one probe, in minutes, and
+either failure would have been predicted by it.
+
 ## 2026-09-02 — The tilt moves the dial, because that is where the area is
 
 Two rounds of tuning the text relief ended in "I'm not sure I can tell if it is
