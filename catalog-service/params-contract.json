@@ -45,6 +45,7 @@
   },
   "unpublishableEngines": ["TEXTURE"],
   "fields": [
+    "analogDigital",
     "batteryY",
     "clockMode",
     "complicationSize",
