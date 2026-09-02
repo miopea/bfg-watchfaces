@@ -3,6 +3,8 @@ package com.bfg.watchfaces.workbench
 import com.bfg.watchfaces.generator.DIAL_CENTER
 import com.bfg.watchfaces.generator.DIAL_RADIUS
 import com.bfg.watchfaces.generator.DIAL_SIZE
+import com.bfg.watchfaces.generator.HandStyle
+import com.bfg.watchfaces.generator.Hands
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.DialShading
 import com.bfg.watchfaces.generator.EngravedStroke
@@ -107,6 +109,142 @@ object DialRenderer {
         g.dispose()
         return img
     }
+
+    /**
+     * One hand, alone on a transparent 456x456 canvas, pointing at twelve.
+     *
+     * ## Why the whole canvas for one hand
+     *
+     * Watch Face Format rotates a hand image about a pivot given as a fraction
+     * of that image. Drawing every hand on the full dial canvas makes the pivot
+     * 0.5/0.5 for all of them, always, with no per-style data to get wrong.
+     * A wrong pivot is a hand that WOBBLES as it sweeps -- subtle enough to
+     * ship, and miserable to diagnose from a photograph of a wrist. The empty
+     * space costs almost nothing once quantized.
+     *
+     * ## Filled, then stroked
+     *
+     * [drawPattern] only strokes, because a guilloche pattern is lines. A hand
+     * is a solid object with an engraved edge, so this fills the outline first
+     * and then runs the SAME [EngravedStroke] passes over it. That is what makes
+     * a hand look like it was cut from the same metal as the dial rather than
+     * printed on top of it.
+     *
+     * [Hands.HandShape.filled] decides, not this method -- the style owns that,
+     * so the Android renderer cannot disagree. SKELETON is the identical outline
+     * with the fill skipped, which is how the dial pattern shows through.
+     *
+     * No dial background and no clip circle: this is a transparent overlay that
+     * WFF composites over the dial.
+     */
+    fun renderHand(
+        p: DialParams,
+        style: HandStyle,
+        hand: Hands.Hand,
+        size: Int = DIAL_SIZE,
+        /** The hand's own colour, for a second hand that differs from the ink. */
+        color: String = p.inkColor
+    ): BufferedImage = renderShapes(p, Hands.shapes(style, hand), size, color)
+
+    /**
+     * How heavy an unfilled hand's edge is drawn, in dial units.
+     *
+     * Wide enough to read at a glance on a 456px dial and no wider: the whole
+     * point of an outline hand is that the pattern shows through it.
+     */
+    private const val OUTLINE_WIDTH = 3.0f
+
+    /** The hub the hands turn on. Static: it does not rotate with anything. */
+    fun renderHub(p: DialParams, style: HandStyle, size: Int = DIAL_SIZE): BufferedImage =
+        renderShapes(p, listOf(Hands.hub(style)), size, p.inkColor)
+
+    /**
+     * Shared by every hand, the hub and the indices, so all four are cut the
+     * same way. A second copy of this loop is exactly how two renderers end up
+     * drawing one definition differently.
+     */
+    private fun renderShapes(
+        p: DialParams,
+        shapes: List<Hands.HandShape>,
+        size: Int,
+        color: String
+    ): BufferedImage {
+        val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+        val g = img.createGraphics()
+        hints(g)
+        val s = size.toDouble() / DIAL_SIZE
+        g.scale(s, s)
+        drawShapes(g, p, shapes, color)
+        g.dispose()
+        return img
+    }
+
+    /**
+     * ONE way to cut a hand, an index or a hub.
+     *
+     * There were briefly two copies of this — one for the rotating hands and
+     * one for the indices — and within minutes they had diverged: unfilled
+     * hands gained a readable edge and unfilled INDICES did not, so a skeleton
+     * face rendered with hands you could read and a chapter ring you could not.
+     * Caught by looking at the sheet, by nothing else.
+     *
+     * That is the [SlotGeometry] lesson in miniature and it took under an hour
+     * to repeat, in a file whose own comment warned about it.
+     */
+    private fun drawShapes(
+        g: java.awt.Graphics2D,
+        p: DialParams,
+        shapes: List<Hands.HandShape>,
+        color: String
+    ) {
+        val paths = shapes.map { it to path(it.outline) }
+
+        for ((shape, pa) in paths) {
+            if (shape.filled) {
+                g.color = hex(color)
+                g.fill(pa)
+            } else {
+                // AN UNFILLED SHAPE STILL NEEDS A READABLE EDGE.
+                //
+                // The engraved passes alone are not enough. They are tuned for a
+                // guilloche pattern, where subtlety is the point — on a bare
+                // outline they produced a skeleton hand too faint to read the
+                // time from. Every geometry test passed; the sheet showed it at
+                // a glance.
+                //
+                // A real skeleton hand is solid metal with the middle cut away,
+                // so it has a genuine edge. This draws that edge in the ink and
+                // the passes below give it the same relief as a filled style.
+                g.color = hex(color)
+                g.stroke = BasicStroke(OUTLINE_WIDTH, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                g.draw(pa)
+            }
+        }
+
+        // The dial's own passes, so the edge relief matches the pattern exactly.
+        for (pass in EngravedStroke.passes(p)) {
+            val old = g.transform
+            g.translate(pass.dx, pass.dy)
+            g.color = Color(pass.argb, true)
+            g.stroke = BasicStroke(pass.width.toFloat(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+            for ((_, pa) in paths) g.draw(pa)
+            g.transform = old
+        }
+    }
+
+    /**
+     * The chapter ring, drawn INTO the dial rather than as a rotating overlay.
+     *
+     * Indices do not move, so they belong in `dial_bg.png` with the pattern.
+     * Emitting them as a separate image would cost a `PartImage` and a second
+     * full-size PNG over Bluetooth for something that never changes.
+     *
+     * Inboard of the rim on purpose: `RingSource` keeps the outer track, so an
+     * analog face still shows steps, battery or rain. See
+     * `docs/specs/analog-hands.md` section 4.
+     */
+    fun drawIndices(g: java.awt.Graphics2D, p: DialParams, style: HandStyle) =
+        drawShapes(g, p, Hands.indices(style), p.inkColor)
 
     /**
      * Centre-crop an imported image to fill the dial, preserving aspect ratio.

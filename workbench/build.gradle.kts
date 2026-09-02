@@ -56,6 +56,20 @@ tasks.register<JavaExec>("bake") {
     workingDir = rootProject.projectDir
 }
 
+/**
+ * Draw the hands, so geometry is judged on screen rather than on a wrist.
+ *
+ * Writes each hand, the hub, and a composite at 10:10:30 -- the time that makes
+ * an hour hand wrongly the same length as the minute hand obvious at a glance.
+ */
+tasks.register<JavaExec>("hands") {
+    group = "bfg"
+    description = "Render the hand styles to build/hands for review"
+    mainClass.set("com.bfg.watchfaces.workbench.HandsSheet")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
 /** Regenerate the app icon from BrandMark. Writes checked-in files. */
 tasks.register<JavaExec>("brand") {
     group = "bfg"
