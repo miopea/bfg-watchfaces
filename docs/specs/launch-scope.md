@@ -1,167 +1,200 @@
 # Launch scope
 
-Written 2026-09-02, from research into what the popular Wear OS watch face apps
-actually ship, measured against what this repo has.
+Written 2026-09-02 from research into what the popular Wear OS watch face apps
+ship, then interviewed to decisions. `watch-app.md` §1 holds the Play Store
+gates; `backlog.md` is everything not built. This file answers one question:
+**what has to be true before `com.bfg.watchfaces` leaves internal testing.**
 
-`watch-app.md` §1 holds the Play Store gates. `backlog.md` is everything not
-built. This file is the answer to one question: **what has to be true before
-`com.bfg.watchfaces` leaves internal testing**, and what is deliberately not on
-that list.
+## 0. The position, in the operator's words
 
-## 0. A correction, before the recommendations
+> We don't win on faces, we win on free features and hitting 90% of the goals.
 
-On 2026-09-02, asked what was missing, the answer given was **"on-watch
-customization, it's the biggest gap"** — reasoning from the fact that
-`UserConfiguration`, `ListConfiguration` and `ColorConfiguration` appear in the
-XSD and are emitted in zero files.
+That sentence decides most of what follows, and it is a better strategy than the
+one this document started with. It rules out the race that cannot be won and
+names the one that can.
 
-That reasoning was backwards. Google's own guidance for Watch Face **Push** apps
-says the opposite:
+**Everything is free. No advertising. Nothing is sold.** This is a free thing
+BFG Solutions is handing out. Every item in §3 is free at launch, permanently,
+and that is the product rather than a promotion.
 
-> The examples favor companion phone apps using `WearableListenerService` and the
-> Data Layer to send information to watches… This suggests designing for
-> phone-initiated changes rather than watch-side editing.
-> — [Further explorations with Watch Face Push](https://android-developers.googleblog.com/2025/08/further-explorations-with-watch-face-push.html)
+## 1. Two corrections, recorded because both felt like evidence
 
-A pushed face gets **one slot** on Wear OS 6 and the app lives on the phone.
-Configuration belonging on the phone is the intended architecture, not a gap in
-this one. The schema elements are unused because they are for a different
-distribution model.
+**"On-watch customization is the biggest gap."** Reasoned from
+`UserConfiguration` and `ColorConfiguration` being in the XSD and emitted
+nowhere. Google's guidance for Watch Face **Push** apps says the opposite —
+configuration belongs in the companion phone app, and a pushed face gets one
+slot. Those elements are unused because they serve a different distribution
+model. *The schema describes what the format can do; it says nothing about what
+our delivery route should.*
 
-Recorded because "it is in the schema and we do not emit it" felt like evidence
-and was not. The schema describes what the FORMAT can do; it says nothing about
-what our delivery route should.
+**"The time already ships as a light and dark relief pair, so tilt can reuse
+it."** It does not. The two `TimeText` elements at `WffEmitter.kt:151` are
+**interactive versus ambient**, not light versus dark. The engraved relief exists
+only in the baked dial PNG. The time is flat ink on an engraved dial, which is
+its own inconsistency and had gone unnoticed until a feature was proposed on top
+of it.
 
-## 1. What the competition actually is
+Both were stated confidently and both were wrong in the same way: a plausible
+reading of something real, never checked against the thing itself.
+
+## 2. What the competition is, and where it is weak
 
 | App | Scale | Model |
 | --- | --- | --- |
-| Facer | 500,000+ faces, brand tie-ins (SpongeBob, Star Trek, Barbie) | Free tier + subscription |
-| WatchMaker | 130,000+ faces converted to WFF | Free + paid |
-| Pujie | Building-block designer, real-time simulator | Paid |
+| Facer | 500,000+ faces, brand tie-ins | Free tier + subscription |
+| WatchMaker | 130,000+ converted to WFF | Free + paid |
+| Pujie | Building-block designer, live simulator | Paid |
 
-**We cannot compete on library size and should not try.** Three orders of
-magnitude separate 500,000 faces from a preset list. Anything shaped like
-"more faces" is a losing race.
+**Library size is not a contest.** Three orders of magnitude. Anything shaped
+like "more faces" is out of scope by strategy, not by capacity.
 
-### What they are all struggling with, and we are not
-
-WFF removed the effects the old format had:
+### The thing they all lost
 
 > WFF "limits visual effects such as depth or shadow, rendering very
 > artificial-looking visuals" — particularly affecting analog designs.
 > — [Android Authority](https://www.androidauthority.com/pujie-watchmaker-watch-face-wear-os-6-support-3581417/)
 
-**This repo's entire premise is the answer to that complaint.** `EngravedStroke`
-fakes depth in three passes at BAKE time and ships a PNG, so the dial has relief
-that WFF's own drawing primitives cannot express. The competition lost depth in
-the migration; a generator that rasterizes never had to.
-
-That is the differentiator, and nothing on the launch list should come at its
-expense.
+`EngravedStroke` fakes depth in three passes at BAKE time and ships a PNG, so
+this app never depended on the primitives WFF removed. **The competition lost
+depth in the migration; a generator that rasterizes never had to.** That is the
+differentiator and nothing here may come at its expense.
 
 ### What their users complain about
 
-Battery drain, surprise subscriptions (£29.99 charged after a £6.99 face,
-refunds refused), and faces that will not sync.
-[Trustpilot](https://fr.trustpilot.com/review/facer.io),
+Battery drain, surprise subscriptions (£29.99 after a £6.99 face, refunds
+refused), faces that will not sync.
+[Trustpilot](https://fr.trustpilot.com/review/facer.io) ·
 [Samsung community](https://r2.community.samsung.com/t5/Tips/Wearable-app/m-p/12380183/highlight/true)
 
-Free, open source, no account required to browse, install or report — the
-positioning is already right. It only has to be **said** on the store listing,
-which today says nothing about it.
+Free, no account to browse or install, no ads. Already true, and currently said
+nowhere.
 
-## 2. Must-have before launch
+## 3. Launch gates
 
-Ordered. Every item is a gate, not an improvement.
+Ordered. Each is a gate, not an improvement.
 
-### 2.1 The Play Store gates — `watch-app.md` §1
+### 3.1 A clean install performed by a human
 
-Unchanged and still the top of the list. The **Data Safety declaration is wrong**
-and understates what the app does, which is the single item most likely to fail
-review.
+**Uninstall both apps, reinstall from the Play listing, and go start to finish
+with no adb and no coaching**: open, make a face, send it, grant the prompt, see
+it on the wrist.
 
-### 2.2 The first-run path has to work for somebody who is not the operator
+This has never been done. Every install so far was driven over adb, which is
+exactly how a fresh install that *could not ask for the activation permission at
+all* survived into a release — the ask is a notification and a fresh install
+holds no notification permission. **If any step needs explaining, that is the
+bug.**
 
-Measured on 2026-09-02, a fresh watch install could not ask for the activation
-permission AT ALL — the ask is a notification and a fresh install holds no
-notification permission, so the first face installed and nothing appeared on
-either device. Fixed by having the phone open the watch app
-(`WatchSetup`), but **that fix has never been exercised by anyone but adb**.
+### 3.2 Play Store gates — `watch-app.md` §1
 
-**Gate: a genuinely clean install on hardware, driven by hand, start to finish.**
-Nothing else on this list matters if the first face never switches on.
+The **Data Safety declaration is wrong** and understates what the app does. It
+should say exactly what is observed and nothing more:
 
-### 2.3 Say what the app is on the store listing
+- **Collected**: a Google account at sign-in, stored as an anonymous hash, only
+  to allow withdrawing a published face.
+- **Transmitted**: face parameters, only when somebody publishes.
+- **Not collected**: photos, location, contacts.
 
-Free, open source, no account to browse or install, no subscription. Given what
-the category's reviews look like, this is a feature, and it is currently unsaid.
+Photos are not collected and must not be declared as though they were.
+Over-declaring is still a mismatch, and here the code enforces it: a photo is
+baked into a local face and `isLocalOnly` stops that face reaching the catalog.
 
-### 2.4 Imported images — `backlog.md` #9
+### 3.3 Imported images, finished
 
-`Engine.TEXTURE` exists, has a control, and has nowhere on the device to resolve
-an image from. A control that cannot work is the failure this project has been
-told about three times. **Either finish it or hide it before launch** — I would
-hide it, because photo dials are a whole feature and the launch does not need
-one.
+Decided against the earlier recommendation to hide it: photo dials are table
+stakes in this category, and "90% of the goals" includes this one.
 
-### 2.5 Recovering a full slot — `backlog.md` #5
+- **The Android photo picker, with no permission at all.** `PickVisualMedia`
+  returns the single chosen image and can see nothing else, so there is no
+  prompt, no denial path, and nothing to declare.
+- **Baked into `dial_bg.png`**, the path that already exists —
+  `DialRenderer.drawTexture` crops, fades and quantizes it like any other dial.
+  Nothing new crosses to the watch and a face costs what it already cost.
+- **Copied into app storage keyed by the texture id.** The face JSON stores an
+  id, not content, and copying means the face survives the original being
+  deleted from the gallery — which is what happens to photos.
+- **`contrast` protects the time**, already built and documented, defaulted low
+  enough that a photo arrives pushed back far enough to read over.
+- **Local only, said once and plainly.** Share is hidden on such a face with a
+  line explaining the photo stays on the phone.
 
-The slot limit is 1. Every path that leaves a face stranded needs to end
-somewhere a person can act on. Partly measured already: uninstalling the app
-DOES remove its pushed face, so faces do not orphan the way that entry feared.
-Worth re-reading against what is now known.
+Uploading photos to the catalog is explicitly **not** in scope: it is image
+hosting, storage cost, and moderating arbitrary user photographs with a queue of
+one person.
 
-## 3. Worth building, in this order, after launch
+### 3.4 Say what the app is
 
-**Colourways.** Free values for `dialColor`/`inkColor` and no curated pairs. The
-competition ships dozens per design; we ship one per preset. Pure `Presets` data,
-an afternoon, multiplies what exists by ten. **The highest ratio on this list.**
+Free, open source, no account to browse or install, no subscription, no ads.
+Given the category's reviews this is a feature, and the listing has never been
+written.
 
-**Fonts.** `fontFamily` is `SYNC_TO_DEVICE` with no picker. Typeface is most of a
-watch face's character and we offer none of it.
+## 4. Tilt, and the relief the text never had
 
-**Gyro / tilt.** In the schema, unused, and the one WFF effect that still reads as
-expensive. An engraved dial catching light as the wrist turns is exactly what
-this app's material is for. Already noted in `backlog.md` #4.
+The one WFF effect that still reads as expensive, and the right one for this
+app's material. `Gyro` attaches to any part or group and drives `x`, `y`,
+`scaleX`, `scaleY`, `angle` or `alpha` from `[ACCELEROMETER_ANGLE_*]`.
 
-**A complication data source of our own.** The Watch Face Push guidance's actual
-trick: a face reads values from a data source the phone updates, so things can
-change **without a rebuild and a push**. That routes around the slot limit and
-the activation one-shot for anything that is a value rather than a shape.
+**The text gets real engraved relief, and the tilt moves the light.** A light
+copy and a dark copy offset by ±`relief`, exactly as `EngravedStroke` already
+does for the dial, given opposite `Gyro` offsets so the highlight slides as the
+wrist turns. The text itself never moves.
 
-**Weather beyond now.** Forecast strip, sunrise/sunset as a drawn arc.
+- **The text never moves.** The time is the one thing that must always be
+  readable, and a drifting clock reads as a bug on a small screen.
+- **Subtle and fixed: about ±2.5px at full tilt.** No control. The tasteful range
+  is narrow and a slider set to maximum is how this looks cheap — the same
+  reasoning that fixed the hand proportions.
+- **Off in ambient, always.** Continuous sensor reads and redraws are the most
+  expensive thing a face can do, battery is the top complaint in the category,
+  and ambient drops the dial image anyway so there is nothing to catch light.
+- **No `ACCELEROMETER_IS_SUPPORTED` branch.** On a watch without one the
+  expression rests and the face renders as though the effect were off. A
+  `Condition` would add schema surface and a branch only exercisable on hardware
+  nobody here owns.
 
-## 4. Deliberately not doing
+This changes every face, so it is a `generatorVersion` branch, and it fixes the
+flat-on-engraved inconsistency whether or not the tilt is ever noticed.
 
-**Face marketplace at scale.** 500,000 faces is not a target, it is a different
-company.
+## 5. After launch, in order
 
-**Subscriptions.** The category's worst reviews are about billing. Free is the
-position.
+1. **Colourways.** Named dial/ink pairs — Taupe, Graphite, Steel, Noir — chosen
+   independently of the pattern. Eight engines × six colourways is forty-eight
+   looks from about twenty lines of `Presets` data. **The best ratio available.**
+2. **Fonts.** `fontFamily` is `SYNC_TO_DEVICE` with no picker. Needs checking
+   against what typefaces a Wear OS watch actually ships before it is scoped.
+3. **A complication data source of our own.** The Watch Face Push guidance's real
+   trick: a face reads values the phone updates, so things can change *without* a
+   rebuild and a push — routing around both the slot limit and the activation
+   one-shot for anything that is a value rather than a shape.
+4. **Weather beyond now.** Forecast strip, sunrise/sunset as a drawn arc.
 
-**On-watch editing.** §0. Wrong architecture for a Push app.
+## 6. Deliberately not doing
 
-**Animation.** `PartAnimatedImage` is unused and should stay that way for now.
-Battery is the first thing reviewers complain about, and the smooth-seconds
-question was already deferred pending measurement rather than opinion.
+- **A face marketplace at scale.** 500,000 faces is a different company.
+- **Subscriptions, paid tiers, ads.** Everything is free. The category's worst
+  reviews are about billing.
+- **On-watch editing.** §1. Wrong architecture for a Push app.
+- **Animation.** `PartAnimatedImage` stays unused. Battery is the first thing
+  reviewers complain about, and smooth seconds was already deferred pending
+  measurement rather than opinion.
+- **Hosting user photos.** §3.3.
 
-## 5. The honest summary
+## 7. The honest summary
 
-**The app is closer to launch than the feature list suggests, and further than
-the code suggests.**
+**Closer to launch than the feature list suggests, and further than the code
+suggests.**
 
-Closer, because the differentiator is already built and the competition cannot
-easily copy it. Further, because the gates are unglamorous — a Data Safety form,
-a store listing, and one clean install performed by a human rather than adb.
+Closer, because the differentiator is built and hard to copy. Further, because
+the gates are unglamorous — a Data Safety form, a store listing, a photo picker,
+and one clean install performed by a person rather than by adb.
 
-Nothing in section 3 should delay section 2.
+Nothing in §5 delays §3.
 
 Sources:
-[Android Authority — Pujie and WatchMaker on Wear OS 6](https://www.androidauthority.com/pujie-watchmaker-watch-face-wear-os-6-support-3581417/) ·
-[Android Developers — Further explorations with Watch Face Push](https://android-developers.googleblog.com/2025/08/further-explorations-with-watch-face-push.html) ·
-[Android Developers — Watch Face Push](https://developer.android.com/training/wearables/watch-face-push) ·
-[Android Developers — Watch Face Format](https://developer.android.com/training/wearables/wff) ·
-[Facer — customizable complications](https://www.facer.io/collection/customizable-widgets) ·
-[Geekflare — best Wear OS watch face apps](https://geekflare.com/consumer-tech/best-wear-os-watchfaces-apps/) ·
-[Trustpilot — Facer reviews](https://fr.trustpilot.com/review/facer.io)
+[Android Authority](https://www.androidauthority.com/pujie-watchmaker-watch-face-wear-os-6-support-3581417/) ·
+[Further explorations with Watch Face Push](https://android-developers.googleblog.com/2025/08/further-explorations-with-watch-face-push.html) ·
+[Watch Face Push](https://developer.android.com/training/wearables/watch-face-push) ·
+[Watch Face Format](https://developer.android.com/training/wearables/wff) ·
+[Facer](https://www.facer.io/collection/customizable-widgets) ·
+[Geekflare](https://geekflare.com/consumer-tech/best-wear-os-watchfaces-apps/) ·
+[Trustpilot](https://fr.trustpilot.com/review/facer.io)
