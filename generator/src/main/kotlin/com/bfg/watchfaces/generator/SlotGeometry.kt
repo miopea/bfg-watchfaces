@@ -163,6 +163,18 @@ object SlotGeometry {
      */
     fun fittedDateSize(p: DialParams): Int {
         if (p.dateStyle == DateStyle.NONE) return 0
+        // A DATE WINDOW, not a date band.
+        //
+        // The digital rule sizes the date to match the CLOCK's width, because
+        // there it sits alone above a big number and the two should agree. At
+        // six on an analog face it is one of three small things arranged round
+        // a dial, and that rule rendered "Mar 10" nearly as wide as the watch —
+        // seen immediately in the preview, and by nothing else, since the
+        // arithmetic was doing exactly what it was written to do.
+        //
+        // It reads as a sub-dial instead: the same size as the complications it
+        // shares the ring with.
+        if (p.clockMode == ClockMode.ANALOG) return fontSize(analogSize(p))
         val l = p.layout
         val clockWidth = l.timeSize * DIGIT_ADVANCE * "HH:MM".length
         val chars = p.dateStyle.widestSample().length.coerceAtLeast(1)
@@ -305,6 +317,14 @@ object SlotGeometry {
 
     fun dateBand(p: DialParams): Box? {
         if (p.dateStyle == DateStyle.NONE) return null
+        // At six on an analog face, which is where a watch puts a date window
+        // and why [analogBoxes] gives up its third sub-dial for it. Above the
+        // clock is meaningless when the clock is the whole dial.
+        if (p.clockMode == ClockMode.ANALOG) {
+            val h = (fittedDateSize(p) * 1.6).roundToInt()
+            val cy = DIAL_CENTER + DIAL_RADIUS * 0.50
+            return Box(0, (cy - h / 2.0).roundToInt(), DIAL_SIZE, h)
+        }
         val l = p.layout
         val (timeTop, _) = timeBand(l)
         val h = (fittedDateSize(p) * 1.6).roundToInt()
@@ -411,9 +431,75 @@ object SlotGeometry {
      * is reported by [fittedSize] so the UI can say what it actually used.
      */
     fun boxes(p: DialParams): LinkedHashMap<SlotPosition, Box> {
+        if (p.clockMode == ClockMode.ANALOG) return analogBoxes(p)
         val row = fittedSize(p)
         return layoutAt(p, row, topSize = fittedTopSize(p, row))
     }
+
+    /**
+     * Sub-dials, because hands sweep the whole face.
+     *
+     * ## Why the digital layout cannot be reused
+     *
+     * It reserves a band across the middle for the clock and stacks
+     * complications clear of it. That works because a digital clock occupies a
+     * fixed rectangle. Hands occupy EVERYTHING — a complication at centre-left
+     * is under the minute hand twice an hour — so "clear of the clock" stops
+     * meaning anything and the stack has to go.
+     *
+     * Shipped once without this, deliberately and visibly: the minute hand swept
+     * through "8,412". That was better than shipping it invisible, but it was
+     * never the layout.
+     *
+     * ## Where they go, and why only three
+     *
+     * Nine and three, the classic sub-dial positions: hands cross them briefly
+     * and at predictable angles, unlike the centre. Six takes a third UNLESS the
+     * date is on, in which case the date owns it — a date window at six is where
+     * a watch puts one, and two things cannot have the same spot. The layout
+     * adapts to what is switched on, which is what the digital row already does,
+     * so there is no new control and the collision cannot occur.
+     *
+     * TOP and MIDDLE are not rendered. MIDDLE sits under the hub, and TOP fights
+     * both the twelve index and the hour hand's most-used arc. They are KEPT in
+     * the params regardless — switching a face to hands and back must not
+     * destroy two of somebody's choices.
+     */
+    fun analogBoxes(p: DialParams): LinkedHashMap<SlotPosition, Box> {
+        val out = LinkedHashMap<SlotPosition, Box>()
+        val size = analogSize(p)
+        val w = boxWidth(size)
+        val dateOwnsSix = p.dateStyle != DateStyle.NONE
+
+        // Far enough out to clear the hub, near enough in to stay inside the
+        // chapter ring: the indices run from 0.88 of the radius inward, so
+        // anything past about 0.80 would draw through them.
+        val reach = DIAL_RADIUS * 0.50
+
+        fun place(pos: SlotPosition, cx: Double, cy: Double) {
+            if (!p.slot(pos).enabled) return
+            val h = boxHeight(size, pos in p.iconSlots, p.generatorVersion)
+            out[pos] = Box((cx - w / 2.0).roundToInt(), (cy - h / 2.0).roundToInt(), w, h)
+        }
+
+        place(SlotPosition.LEFT, DIAL_CENTER - reach, DIAL_CENTER)
+        place(SlotPosition.RIGHT, DIAL_CENTER + reach, DIAL_CENTER)
+        if (!dateOwnsSix) place(SlotPosition.BOTTOM, DIAL_CENTER, DIAL_CENTER + reach)
+        return out
+    }
+
+    /**
+     * How big a sub-dial may be.
+     *
+     * Narrower than the digital row: three slots share a row across the middle
+     * of a circle, but a sub-dial sits between the hub and the chapter ring with
+     * a hand passing over it, so a box that reads well in a row is too heavy
+     * here. Clamped to the same bounds so the size control still means
+     * something.
+     */
+    fun analogSize(p: DialParams): Int =
+        (p.layout.complicationSize.coerceIn(MIN_SIZE, MAX_SIZE) * 0.85)
+            .roundToInt().coerceIn(MIN_SIZE, MAX_SIZE)
 
     /**
      * What the layout actually used, versus what was asked for.
@@ -524,6 +610,7 @@ object SlotGeometry {
      * one's text too large for the box it was given.
      */
     fun sizeAt(p: DialParams, pos: SlotPosition): Int {
+        if (p.clockMode == ClockMode.ANALOG) return analogSize(p)
         val row = fittedSize(p)
         return if (pos == SlotPosition.TOP) fittedTopSize(p, row) else row
     }

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import kotlin.math.hypot
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.math.sqrt
@@ -78,6 +79,119 @@ class SlotGeometryTest {
      *
      * The geometry was right; the offer was the lie.
      */
+    private fun analog(date: DateStyle = DateStyle.NONE) =
+        DialParams(clockMode = ClockMode.ANALOG, dateStyle = date)
+
+    /**
+     * Nothing sits where the hands live.
+     *
+     * MIDDLE is under the hub and TOP fights both the twelve index and the hour
+     * hand's most-used arc, so an analog face renders neither — while KEEPING
+     * both in the params, because switching a face to hands and back must not
+     * destroy two of somebody's choices.
+     */
+    @Test
+    fun `an analog face renders no centre or top complication`() {
+        val boxes = SlotGeometry.boxes(analog())
+        assertTrue(SlotPosition.MIDDLE !in boxes) { "a complication sits under the hub" }
+        assertTrue(SlotPosition.TOP !in boxes) { "a complication sits under the twelve" }
+        assertTrue(SlotPosition.LEFT in boxes && SlotPosition.RIGHT in boxes) {
+            "the nine and three sub-dials are missing: ${boxes.keys}"
+        }
+    }
+
+    /** Six is a sub-dial, or the date, and never both. */
+    @Test
+    fun `the date and the six o'clock sub-dial never share the spot`() {
+        val bare = SlotGeometry.boxes(analog())
+        assertTrue(SlotPosition.BOTTOM in bare) { "six should hold a sub-dial when there is no date" }
+
+        val dated = analog(DateStyle.MONTH_DAY)
+        assertTrue(SlotPosition.BOTTOM !in SlotGeometry.boxes(dated)) {
+            "the date and a sub-dial both claimed six"
+        }
+        val band = SlotGeometry.dateBand(dated)
+        assertTrue(band != null) { "the date vanished instead of taking six" }
+        assertTrue(band!!.y > DIAL_CENTER) { "the analog date is not at the bottom of the dial" }
+    }
+
+    /**
+     * Sub-dials clear the hub and stop short of the chapter ring.
+     *
+     * Too far in and a hand's pivot covers the value; too far out and it draws
+     * through the indices. Both look like a rendering fault rather than a
+     * layout choice.
+     */
+    @Test
+    fun `sub-dials sit between the hub and the chapter ring`() {
+        for (date in listOf(DateStyle.NONE, DateStyle.MONTH_DAY)) {
+            for ((pos, box) in SlotGeometry.boxes(analog(date))) {
+                val corners = listOf(
+                    box.x to box.y,
+                    box.x + box.w to box.y,
+                    box.x to box.y + box.h,
+                    box.x + box.w to box.y + box.h
+                )
+                for ((x, y) in corners) {
+                    val r = hypot(x - DIAL_CENTER, y - DIAL_CENTER)
+                    assertTrue(r < DIAL_RADIUS * 0.88) {
+                        "$pos reaches radius $r, into the chapter ring at ${DIAL_RADIUS * 0.88}"
+                    }
+                }
+                val centre = hypot(
+                    box.x + box.w / 2.0 - DIAL_CENTER,
+                    box.y + box.h / 2.0 - DIAL_CENTER
+                )
+                assertTrue(centre > DIAL_RADIUS * 0.20) { "$pos is close enough to sit under the hub" }
+            }
+        }
+    }
+
+    /** Two sub-dials must never overlap; a value drawn over another is unreadable. */
+    @Test
+    fun `analog sub-dials do not overlap each other`() {
+        val boxes = SlotGeometry.boxes(analog()).toList()
+        for (i in boxes.indices) for (j in i + 1 until boxes.size) {
+            val (posA, a) = boxes[i]
+            val (posB, b) = boxes[j]
+            val apart = a.x + a.w <= b.x || b.x + b.w <= a.x ||
+                a.y + a.h <= b.y || b.y + b.h <= a.y
+            assertTrue(apart) { "$posA and $posB overlap: $a and $b" }
+        }
+    }
+
+    /**
+     * The DATE is a window, not a band.
+     *
+     * The digital rule sizes it against the clock's width, which at six on an
+     * analog dial rendered "Mar 10" nearly as wide as the watch.
+     */
+    @Test
+    fun `the analog date reads as a sub-dial, not a headline`() {
+        val dated = analog(DateStyle.MONTH_DAY)
+        val analogSize = SlotGeometry.fittedDateSize(dated)
+        val digitalSize = SlotGeometry.fittedDateSize(
+            dated.copy(clockMode = ClockMode.DIGITAL)
+        )
+        assertTrue(analogSize < digitalSize) {
+            "the analog date ($analogSize) is not smaller than the digital one ($digitalSize)"
+        }
+        assertTrue(analogSize <= SlotGeometry.fontSize(SlotGeometry.analogSize(dated))) {
+            "the date out-shouts the complications it shares the dial with"
+        }
+    }
+
+    /** A digital face is untouched by any of the analog branching. */
+    @Test
+    fun `the digital layout is unchanged by the analog branch`() {
+        val p = DialParams()
+        val boxes = SlotGeometry.boxes(p)
+        assertEquals(
+            listOf(SlotPosition.TOP, SlotPosition.LEFT, SlotPosition.MIDDLE, SlotPosition.RIGHT, SlotPosition.BOTTOM),
+            boxes.keys.toList()
+        ) { "the digital layout lost or reordered a slot" }
+    }
+
     @Test
     fun `spacing never offers the same value more than once`() {
         for (size in 14..40) {

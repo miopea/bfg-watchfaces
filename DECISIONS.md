@@ -1,5 +1,46 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-02 — Sub-dials, and a date window that was shouting
+
+`SlotGeometry` has an analog branch. Complications sit at nine and three, with
+six taking a third unless the date is on, in which case the date owns it.
+
+### Why the digital layout could not be reused
+
+It reserves a band across the middle for the clock and stacks complications
+clear of it. That works because a digital clock occupies a fixed rectangle.
+Hands occupy **everything** — a complication at centre-left is under the minute
+hand twice an hour — so "clear of the clock" stops meaning anything.
+
+MIDDLE and TOP are not rendered at all: MIDDLE sits under the hub, and TOP fights
+both the twelve index and the hour hand's most-used arc. Both are KEPT in the
+params, because switching a face to hands and back must not destroy two of
+somebody's choices.
+
+### The date, which looked absurd the moment it was drawn
+
+`fittedDateSize` sizes the date against the CLOCK's width — right for a digital
+face, where the date sits alone above a big number and the two should agree. At
+six on an analog dial it rendered **"Mar 10" nearly as wide as the watch**.
+
+Nothing was broken. The arithmetic did exactly what it was written to do, in a
+situation nobody had written it for. On an analog face the date is one of three
+small things arranged round a ring, so it now takes the same size as the
+complications it shares that ring with.
+
+Found by looking at the render, in the second after it existed. There is no test
+that would have caught it, because "too big" is not a property — it is a
+comparison against everything else on the dial, which is exactly what an eye
+does and an assertion does not. What the tests hold now is the RELATIONSHIP:
+smaller than the digital date, no larger than its neighbours.
+
+### The collision that cannot happen
+
+Six is a sub-dial or the date, never both, decided by whether the date is on
+rather than by a control. The layout adapts to what is switched on, which is
+what the digital row already does, so there was nothing new to explain and no
+way to arrange it wrongly.
+
 ## 2026-09-02 — Hands: analog faces exist, and the layout does not know yet
 
 `ClockMode` (v12) makes a face analog, `WffEmitter` writes `AnalogClock`, both
