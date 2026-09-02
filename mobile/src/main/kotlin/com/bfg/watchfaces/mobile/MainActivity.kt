@@ -375,7 +375,24 @@ class MainActivity : ComponentActivity() {
                                 Button(
                                     onClick = {
                                         if (open != null) {
-                                            FaceStorage.save(context, open.name, params)
+                                            // TAKE BACK what was written.
+                                            //
+                                            // Saving stamps the current
+                                            // generatorVersion, and that stamp
+                                            // landed on disk while this screen
+                                            // kept the old params -- so Save
+                                            // then Send built the face at the
+                                            // version it had BEFORE saving.
+                                            // Measured: a face re-saved for
+                                            // v13 arrived on the watch still
+                                            // reading "generator, v12".
+                                            //
+                                            // The store is the authority on
+                                            // what a saved face is, so the
+                                            // screen takes its answer rather
+                                            // than assuming it wrote what it
+                                            // sent.
+                                            params = FaceStorage.save(context, open.name, params).params
                                             faces = FaceStorage.list(context)
                                             scope.launch {
                                                 snackbar.showSnackbar("Saved “${open.name}”.")
@@ -514,7 +531,9 @@ class MainActivity : ComponentActivity() {
                         sheetState = nameState,
                         onDismiss = { naming = false; nameThenSend = false },
                         onSave = { name ->
-                            FaceStorage.save(context, name, params)
+                            // Same reason as the in-place save above: the stamp
+                            // is applied by the store, so read it back.
+                            params = FaceStorage.save(context, name, params).params
                             faces = FaceStorage.list(context)
                             naming = false
                             // Naming was the price of sending, so sending is

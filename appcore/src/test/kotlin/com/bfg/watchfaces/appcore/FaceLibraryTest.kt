@@ -50,6 +50,30 @@ class FaceLibraryTest {
         ) { "the stamp did not survive the round trip to disk" }
     }
 
+    /**
+     * The RETURNED face carries the stamp, not just the file.
+     *
+     * The phone kept its own copy of the params and saved from it, so the stamp
+     * landed on disk while the screen went on holding the old version — and a
+     * face re-saved for v13 was then SENT at v12. Measured by pulling the APK
+     * off the watch, which still read "generator, v12".
+     *
+     * Returning the stamped face is what lets a caller take back what was
+     * actually written instead of assuming it wrote what it sent.
+     */
+    @Test
+    fun `save returns the face it actually stored`(@TempDir tmp: File) {
+        val old = DialParams(generatorVersion = 10)
+        val returned = FaceLibrary.save(tmp, "Old Face", old)
+        assertEquals(CURRENT_GENERATOR_VERSION, returned.params.generatorVersion) {
+            "the returned face still carries the version the caller passed in"
+        }
+        assertEquals(
+            FaceLibrary.load(tmp, "old_face")!!.params.generatorVersion,
+            returned.params.generatorVersion
+        ) { "what was returned differs from what was written" }
+    }
+
     /** Everything else leaves a stored version alone. */
     @Test
     fun `reading a face does not move its version`() {
