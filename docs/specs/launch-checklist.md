@@ -81,32 +81,41 @@ as `logo_<name>.png` and set `logo =` on the product to swap a tile for a mark.
 
 ## After submit
 
-### A face package is named after the face, everywhere
+### ~~A face package is named after the face, everywhere~~ — NOT A BUG, 2026-09-03
 
-In the phone's Wear OS companion app, "On your watch", a pushed face appears
-under its own name rather than under "BFG Watch Faces". Reported 2026-09-03 with
-a screenshot.
+Reported with a screenshot of the Wear OS companion app's "On your watch". The
+face there read "Default" rather than "BFG Watch Faces".
 
-**The face in that screenshot is named "Default", which is what made it look
-like a bug in naming rather than a question about labels.** Verified by pulling
-the APK off the watch: package `com.bfg.watchfaces.watchfacepush.default`,
-`application-label:'Default'`, and the WFF header reads "Default - Watch Face
-Format definition ... v13". Nothing in this codebase produces that name, and
-`git log -S` finds no build that ever did, so it was typed. The companion app is
-showing the face name correctly.
+**Working as intended, and the label must not change.** Four pieces of evidence,
+gathered from the device rather than reasoned about:
 
-**Investigate before promising a fix, because the obvious fix is wrong.** Watch
-Face Push installs one PACKAGE PER FACE, and that package has exactly one
-`android:label`, currently `@string/watch_face_name`. That label is what the
-watch face CAROUSEL shows — and a face carrying its own name there is a founding
-decision of this project, not an accident. Relabelling every package "BFG Watch
-Faces" would make the carousel useless to fix an app list.
+1. **The face is genuinely named "Default".** Pulled the APK off the watch:
+   package `com.bfg.watchfaces.watchfacepush.default`,
+   `application-label:'Default'`, WFF header "Default - Watch Face Format
+   definition ... v13". Nothing in this codebase produces that name and
+   `git log --all -S` finds no build that ever did, so it was typed when naming
+   a face.
 
-So the question to answer first is what surface the operator actually saw, and
-whether it reads a different field. If there is no second field, this is
-inherent to Watch Face Push and the honest outcome is to record that.
+2. **That screen lists FACES, not apps.** Google ships its own faces from a
+   single package, `com.google.android.wearable.watchface.rwf`, which declares
+   84 watch-face components — and they appear individually in the same list.
+   A per-app list could not do that. So every face there is shown under its own
+   name, ours included.
 
-The wear app's own label is already correct.
+3. **Watch Face Push has no attribution field.** `WatchFaceDetails` carries
+   `slotId`, `packageName`, `versionCode` and a `getMetaData(String)` accessor,
+   and nothing else. Nothing in `watchfacepush-1.0.0.aar` names a publisher,
+   provider or developer. `meta-data` IS a permitted manifest tag and IS
+   readable back through `getMetaData` — but that is the pushing app reading its
+   own faces, not something system UI displays.
+
+4. **The wear app's own label is already "BFG Watch Faces"** and appears
+   correctly wherever apps are listed.
+
+Relabelling the face packages would put "BFG Watch Faces" on every entry of the
+watch face carousel, destroying the thing this project is built around — a face
+carries the name its designer typed — in order to change a screen that is
+behaving the same way it does for Google's own faces.
 
 ### `WEATHER.IS_AVAILABLE` fallback for drawn weather
 

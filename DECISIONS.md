@@ -1,5 +1,61 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — A face is labelled with its own name, and that is correct
+
+Reported from the Wear OS companion app's "On your watch": a pushed face showed
+as "Default" rather than "BFG Watch Faces". Investigated as a naming bug, and it
+is not one. Recorded here because the obvious fix would have been destructive
+and somebody will propose it again.
+
+### The face really is called "Default"
+
+Pulled off the watch rather than reasoned about:
+
+```text
+package:           com.bfg.watchfaces.watchfacepush.default
+application-label: 'Default'
+WFF header:        Default - Watch Face Format definition ... v13
+```
+
+Nothing in this codebase produces that name — `grep` across `:mobile`,
+`:appcore` and `:generator` finds nothing, and `git log --all -S '"Default"'`
+finds no build that ever did. It was typed when naming a face.
+
+### That screen lists faces, not apps
+
+The decisive evidence. Google ships its own faces from ONE package,
+`com.google.android.wearable.watchface.rwf`, which declares 84 watch-face
+components — and each appears individually in the same list. A list of apps
+could not do that. Every face there is shown under its own name, and ours is
+being treated exactly like Google's.
+
+### There is no attribution field to set instead
+
+`WatchFaceDetails` in `watchfacepush-1.0.0.aar` carries `slotId`,
+`packageName`, `versionCode` and a `getMetaData(String)` accessor. Nothing in
+the library names a publisher, provider or developer.
+
+`meta-data` IS on Watch Face Push's permitted manifest tag list, and
+`getMetaData` reads it back — worth knowing, and worth NOT confusing with
+attribution: that is the pushing app reading its own faces, not a field any
+system UI displays.
+
+### Why the tempting fix is the wrong one
+
+Watch Face Push installs one package per face, and a package has exactly one
+`android:label`. Setting it to "BFG Watch Faces" would put that string on every
+entry of the watch face carousel — destroying the thing this project is built
+around, that a face carries the name its designer typed, in order to change a
+screen behaving the same way it does for Google.
+
+The wear app's own label is already "BFG Watch Faces" and is correct wherever
+apps are listed.
+
+### What was actually confusing
+
+A face named "Default" is indistinguishable from a system default at a glance.
+That is a naming coincidence, not a defect, and no code change follows from it.
+
 ## 2026-09-03 — The watch app answers questions instead of announcing itself
 
 Photographed on a wrist and reported: the watch screen showed the app name, one
