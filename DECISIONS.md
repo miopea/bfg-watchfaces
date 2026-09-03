@@ -1,5 +1,75 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — The preview tells the time, and two controls say what they do
+
+Three things reported from the app, all of them the same fault in different
+places: a control that was working while looking like it was not.
+
+### The preview was fixed at 10:10, which is where this control is invisible
+
+The phone's preview drew a fixed showroom time. 10:10 is the watch-advertising
+convention -- the hands frame the dial and hide nothing -- and it is also one of
+the few times of day where 12- and 24-hour form produce the SAME STRING. So
+switching the hour format redrew the preview to look exactly the same, and the
+control appeared dead.
+
+Measured, rather than guessed, and the first guess was wrong. The assumption was
+that every morning hour reads alike; it does not, because the 12-hour form drops
+the leading zero, so 9 gives "9:30" against "09:30". The real answer:
+
+```text
+ambiguous hours: [10, 11, 12]
+h=9   12h='9:30'    24h='09:30'   differ
+h=10  12h='10:30'   24h='10:30'   same
+h=13  12h='1:30'    24h='13:30'   differ
+```
+
+Exactly three hours out of twenty-four. The fixed preview sat in a window
+covering an eighth of the day where the control cannot show itself.
+
+So the Studio preview now draws the REAL time, re-read on the minute. The date
+moves with it: today's date beside a showroom clock would be as wrong as March's
+date beside the real time -- they have to tell one story. `HourFormat.DEVICE`
+now reads the phone's actual setting too, instead of always previewing as
+12-hour.
+
+**The baked `preview.png` keeps the showroom time.** It is an artefact looked at
+long after it was made, and a picture stamped with the minute it was built is
+stale immediately. Screens show the real time; artefacts show 10:10. The gallery
+and My faces thumbnails stay on the showroom time for the same reason, and
+because a ticking clock across a scrolling grid buys nothing.
+
+The ticker sleeps to the top of the next minute rather than a flat 60 seconds,
+or the preview drifts and updates at an arbitrary point in each minute. Not per
+second: the dial render is the expensive thing on that screen and the preview
+draws no seconds unless the face asks for them.
+
+### Six typefaces do not fit side by side
+
+"Modern" and "Condensed" both wrapped mid-word in a segmented row.
+`OptionRow`'s own doc comment already predicted this -- side-by-side options
+"work for three short words and fall apart at five long ones" -- so the fix was
+to use the component that already existed for it rather than to invent one.
+
+Each name is now drawn IN its own typeface. "Serif" set in Roboto tells you
+nothing, and a font picker that lists its fonts in one font is asking somebody
+to choose by name alone.
+
+### "Colour", "Dial" and "Ink" were three headings for the same word
+
+Nothing said what the first one did differently from the two under it. The
+intent was in the source -- a comment explaining that colourways come first
+because a matched pair is the answer for almost everybody -- and nowhere on
+screen.
+
+Now: **Colour pairs**, "Sets the dial and the ink together. Every pair stays
+easy to read." Then **Dial**, "The background on its own", and **Ink**, "The
+time and text on their own."
+
+The readability line is doing real work: those pairs each clear a measured 3:1
+contrast floor, and free dial and ink swatches are the easiest way to build a
+watch nobody can read. That is worth one clause in plain words, and no more.
+
 ## 2026-09-03 — The tilt glow has a control, and off means off
 
 `glare`, 0-100, on the pattern sliders as "Tilt glow". Asked for directly: the

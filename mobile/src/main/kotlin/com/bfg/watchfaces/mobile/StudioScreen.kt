@@ -39,6 +39,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -281,10 +282,23 @@ fun StudioScreen(
         // not exist -- every face emitted family="SYNC_TO_DEVICE", which is the
         // value for hourFormat and not a typeface at all, so every face fell
         // back to the default sans. See FaceFont.
-        ChoiceRow(
+        //
+        // A LIST rather than a segmented row. Six names do not fit side by side
+        // on a phone: "Modern" broke as "Mode/rn" and "Condensed" as
+        // "Cond/ensed", which OptionRow's own note predicted -- side-by-side
+        // options work for three short words and fall apart at five long ones.
+        //
+        // Each name is drawn IN its own typeface, because that is the actual
+        // content of this choice. "Serif" set in Roboto tells you nothing.
+        OptionRow(
             label = "Typeface",
-            options = FaceFont.entries.map { it.label to it },
-            selected = FaceFont.of(params.layout.fontFamily)
+            value = FaceFont.of(params.layout.fontFamily).label,
+            title = "Typeface",
+            options = FaceFont.entries.map { it to it.label },
+            selected = FaceFont.of(params.layout.fontFamily),
+            fontFor = { androidx.compose.ui.text.font.FontFamily(
+                android.graphics.Typeface.create(it.wff, android.graphics.Typeface.NORMAL)
+            ) }
         ) { onParams(params.copy(layout = params.layout.copy(fontFamily = it.wff))) }
 
         Spacer(Modifier.height(20.dp))
@@ -296,17 +310,23 @@ fun StudioScreen(
         // build a watch nobody can read: most people do not pick two colours
         // with enough contrast, and it does not look wrong on a phone indoors.
         // Every pair here clears a measured floor -- see Colourway.
-        SectionHeading("Colour")
+        // Three headings that were all just colours: "Colour", "Dial", "Ink"
+        // gave no way to tell what the first one did differently from the two
+        // under it. Reported as exactly that. Each now says what it changes.
+        SectionHeading(
+            "Colour pairs",
+            "Sets the dial and the ink together. Every pair stays easy to read."
+        )
         ColourwayRow(Colourway.matching(params)) { onParams(it.applyTo(params)) }
 
         Spacer(Modifier.height(16.dp))
-        SectionHeading("Dial")
+        SectionHeading("Dial", "The background on its own.")
         Swatches(Presentation.DIALS, params.dialColor, onCustom = { onCustomColor(true) }) {
             onParams(params.copy(dialColor = it))
         }
 
         Spacer(Modifier.height(16.dp))
-        SectionHeading("Ink")
+        SectionHeading("Ink", "The time and text on their own.")
         Swatches(Presentation.INKS, params.inkColor, onCustom = { onCustomColor(false) }) {
             onParams(params.copy(inkColor = it))
         }
@@ -502,16 +522,52 @@ fun StudioScreen(
  * Round, because the watch is: clipping here is not decoration, it is the
  * difference between judging a design and judging a square crop of one.
  */
+/**
+ * The current time, recomposing when the MINUTE changes and not before.
+ *
+ * A per-second tick would re-render the whole dial sixty times a minute to
+ * change nothing visible: the preview draws no seconds unless the face asks
+ * for them, and a dial render is the expensive thing on this screen. Sleeping
+ * to the top of the next minute costs one recomposition an hour more than
+ * nothing at all.
+ */
+@Composable
+private fun currentMinute(): java.time.LocalDateTime {
+    var value by remember { mutableStateOf(java.time.LocalDateTime.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val now = java.time.LocalDateTime.now()
+            value = now
+            // To the top of the next minute, not a flat 60s, or the preview
+            // drifts and updates at an arbitrary point in each minute.
+            kotlinx.coroutines.delay(60_000L - (now.second * 1000L + now.nano / 1_000_000L))
+        }
+    }
+    return value
+}
+
 @Composable
 private fun DialPreview(params: DialParams, ambient: Boolean) {
     val context = LocalContext.current
-    val bitmap by produceState<Bitmap?>(initialValue = null, key1 = params, key2 = ambient) {
+    // The real time, re-read every minute.
+    //
+    // A fixed 10:10 reads identically in 12- and 24-hour form, so the hour
+    // format control appeared to do nothing in the only place anyone judges
+    // it. Keyed into produceState so the dial redraws on the minute as well
+    // as on every edit.
+    val now = currentMinute()
+    val is24 = android.text.format.DateFormat.is24HourFormat(context)
+    val bitmap by produceState<Bitmap?>(
+        initialValue = null, key1 = params, key2 = ambient, key3 = now
+    ) {
         value = withContext(Dispatchers.Default) {
             // Resolved off the main thread with the render, not remembered
             // separately: decoding a photo is the expensive half and it belongs
             // on the same background hop the dial already takes.
             val texture = Textures.forFace(context, params)
-            runCatching { AndroidFacePreview.render(params, ambient, DIAL_SIZE, texture) }.getOrNull()
+            runCatching {
+                AndroidFacePreview.render(params, ambient, DIAL_SIZE, texture, now, is24)
+            }.getOrNull()
         }
     }
     Box(
@@ -827,6 +883,14 @@ private fun <T> OptionRow(
     selected: T,
     /** Shown above the list, for a choice that belongs WITH this one. */
     header: @Composable () -> Unit = {},
+    /**
+     * The typeface to draw an option's own name in, when that IS the choice.
+     *
+     * A font picker that lists its fonts in one font is asking somebody to
+     * choose by name alone. Null everywhere else, where the words are the
+     * whole content.
+     */
+    fontFor: ((T) -> androidx.compose.ui.text.font.FontFamily?)? = null,
     onSelect: (T) -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
@@ -844,7 +908,11 @@ private fun <T> OptionRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(value, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = fontFor?.invoke(selected)
+            )
         }
         Text("\u203A", style = MaterialTheme.typography.titleMedium,
              color = MaterialTheme.colorScheme.outline)
@@ -870,7 +938,11 @@ private fun <T> OptionRow(
                                 onClick = { onSelect(option); open = false }
                             )
                             Spacer(Modifier.size(4.dp))
-                            Text(text, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontFamily = fontFor?.invoke(option)
+                            )
                         }
                     }
                 }
@@ -1162,11 +1234,19 @@ private fun Swatches(
 }
 
 @Composable
-internal fun SectionHeading(text: String) {
+internal fun SectionHeading(text: String, note: String? = null) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(bottom = 6.dp)
+        modifier = Modifier.padding(bottom = if (note == null) 6.dp else 2.dp)
     )
+    if (note != null) {
+        Text(
+            text = note,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+    }
 }

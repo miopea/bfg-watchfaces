@@ -51,9 +51,20 @@ object AndroidFacePreview {
         bmp.recycle()
     }
 
-    private const val SAMPLE_HOUR = 10
-    private const val SAMPLE_MINUTE = 10
-    private const val SAMPLE_SECOND = 30
+    /**
+     * The showroom time, for previews that are ARTEFACTS rather than screens.
+     *
+     * 10:10:30 is the watch-advertising convention: the hands frame the dial
+     * and hide nothing. It is the right thing to bake into the `preview.png`
+     * that ships inside a face, which is looked at long after it was made.
+     *
+     * It is the WRONG thing for a preview somebody is editing, because 10:10
+     * reads identically in 12- and 24-hour form — so the hour format control
+     * appeared to do nothing at all. Screens pass the real time instead; see
+     * [render]'s `now`.
+     */
+    private val SHOWROOM: java.time.LocalDateTime =
+        java.time.LocalDateTime.of(DateStyle.SAMPLE_DATE, java.time.LocalTime.of(10, 10, 30))
 
     /** Kept the same as WffEmitter's, so the preview and the face agree. */
 
@@ -68,8 +79,21 @@ object AndroidFacePreview {
          * Context and every caller already has one. `Textures.forFace` is the
          * one place that decides.
          */
-        texture: Bitmap? = null
+        texture: Bitmap? = null,
+        /**
+         * The moment to draw, or null for the [SHOWROOM] time.
+         *
+         * A SCREEN passes the real time: 10:10 is the same string in 12- and
+         * 24-hour form, so a fixed preview made the hour format control look
+         * broken. An ARTEFACT — the `preview.png` baked into a face — passes
+         * null, because a picture stamped with the minute it was built would
+         * be stale by the time anybody saw it.
+         */
+        now: java.time.LocalDateTime? = null,
+        /** The phone's own setting, for [HourFormat.DEVICE]. */
+        deviceIs24Hour: Boolean = false
     ): Bitmap {
+        val shown = now ?: SHOWROOM
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
@@ -141,8 +165,8 @@ object AndroidFacePreview {
         // Time: the emitter ships TWO TimeText elements, one interactive
         // (alpha 255 -> ambient 0) and one ambient-only (alpha 0 -> ambient 255,
         // THIN weight, dimmed ink). Reproduce that split rather than dimming one.
-        val timeText = ClockText.of(p, SAMPLE_HOUR, SAMPLE_MINUTE)
-        val hh = SAMPLE_HOUR % 12
+        val timeText = ClockText.of(p, shown.hour, shown.minute, deviceIs24Hour)
+        val hh = shown.hour % 12
         // Seconds are an AWAKE-only affordance, so the ambient preview must not
         // show them -- otherwise the toggle appears to do nothing in the one
         // view where it is deliberately absent.
@@ -153,7 +177,10 @@ object AndroidFacePreview {
             drawCenteredIn(
                 // The same fixed day the workbench preview uses, so the two
                 // agree and neither draws today's date beside a 10:10 clock.
-                canvas, p.dateStyle.sample(DateStyle.SAMPLE_DATE),
+                // The date moves WITH the clock. Today's date beside a
+                // showroom time would be as wrong as March's date beside the
+                // real time -- they have to tell one story.
+                canvas, p.dateStyle.sample(shown.toLocalDate()),
                 band.x.toFloat(), band.y.toFloat(),
                 band.w.toFloat(), band.h.toFloat(),
                 SlotGeometry.fittedDateSize(p).toFloat(),
@@ -191,8 +218,8 @@ object AndroidFacePreview {
         val analog = p.clockMode == ClockMode.ANALOG
         if (analog) {
             AndroidDialRenderer.drawIndices(canvas, p, p.handStyle)
-            val hourDeg = (hh + SAMPLE_MINUTE / 60.0 + SAMPLE_SECOND / 3600.0) / 12.0 * 360.0
-            val minuteDeg = (SAMPLE_MINUTE + SAMPLE_SECOND / 60.0) / 60.0 * 360.0
+            val hourDeg = (hh + shown.minute / 60.0 + shown.second / 3600.0) / 12.0 * 360.0
+            val minuteDeg = (shown.minute + shown.second / 60.0) / 60.0 * 360.0
             drawRotated(canvas, AndroidDialRenderer.renderHand(p, p.handStyle, Hands.Hand.HOUR, DIAL_SIZE, p.inkColor, ambient), hourDeg)
             drawRotated(canvas, AndroidDialRenderer.renderHand(p, p.handStyle, Hands.Hand.MINUTE, DIAL_SIZE, p.inkColor, ambient), minuteDeg)
             if (p.showSeconds && !ambient && !analog) {
@@ -202,7 +229,7 @@ object AndroidFacePreview {
                         p, p.handStyle, Hands.Hand.SECOND, DIAL_SIZE,
                         p.secondHandColor ?: p.inkColor
                     ),
-                    SAMPLE_SECOND / 60.0 * 360.0
+                    shown.second / 60.0 * 360.0
                 )
             }
             drawRotated(canvas, AndroidDialRenderer.renderHub(p, p.handStyle, DIAL_SIZE, ambient), 0.0)
@@ -269,7 +296,7 @@ object AndroidFacePreview {
         if (p.showSeconds && !ambient && !analog) {
             val startAligned = SecondsBand.alignFor(p) == "START"
             drawCenteredIn(
-                canvas, "%02d".format(SAMPLE_SECOND),
+                canvas, "%02d".format(shown.second),
                 SecondsBand.boxLeftFor(p, timeText.length).toFloat(), SecondsBand.topInDial(l).toFloat(),
                 SecondsBand.boxWidthFor(p, timeText.length).toFloat(), SecondsBand.height(l).toFloat(),
                 SecondsBand.fontSizeFor(p).toFloat(),
