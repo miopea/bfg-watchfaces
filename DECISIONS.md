@@ -1,5 +1,56 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — Three styles nobody could find, and the policy that did not cover the app
+
+Closing out the publish checklist. Two of the three things found were gaps
+between what the app SAYS it offers and what somebody can actually reach.
+
+### The privacy policy covered every product except this one
+
+Play needs a policy URL before an app can be submitted. `bfgsolutions.net` has
+had a `/privacy` page all along, so the box looked fillable — but it covers
+BudgetBug, Sculpt Studio and VoiceBridge and never mentions Watch Faces. Pasting
+it would have pointed a reviewer at a policy that does not describe the app.
+
+The other products each host their own at their own domain. This app has no
+domain, so it now lives at `bfgsolutions.net/products/watchfaces/privacy`,
+linked from the per-product list. Live and verified HTTP 200.
+
+Written from behaviour rather than from a template: photos never leave the phone
+and a face made from one cannot be published; a published design stores its
+parameters plus a one-way hash of the Google account id and never the address or
+name; rate limiting stores a salted hash inside an expiring window and never the
+address; reports need no account; step count and heart rate are drawn by the
+WATCH and never reach the app.
+
+### Three advertised styles had no way in
+
+The store listing names seven patterns including **lattice**, and four surfaces,
+"Grain, brushed, carbon and **linen**". Lattice, grain and linen had no preset.
+Somebody could read the listing, open the gallery, and find no example of three
+styles they had just been sold — the only way to see one was to guess at the
+engine picker.
+
+Added *Lattice Slate*, *Grain Walnut* and *Linen Bone*. `PresetCoverageTest`
+now fails when an engine can be chosen but the gallery shows no example, with
+`TEXTURE` the one declared exception: it renders an imported photograph, so a
+preset for it would have nothing to draw, and its way in is the photo picker.
+
+*Linen Bone* is worth noting on its own: it is the gallery's first LIGHT dial
+with dark ink. Twelve presets that were all dark is a narrower shop window than
+twelve presets sounds, and this widens it more than a fourth dark one would.
+
+### The store listing was already finished
+
+Checked against the Play API rather than assumed, because the checklist implied
+work that did not exist: title, short description, full description, five phone
+screenshots, two Wear screenshots, icon and feature graphic are all live.
+Nothing to do.
+
+`contactWebsite` points at the GitHub repo rather than a product page. Defensible
+for an open-source app, and flagged rather than changed — there is no
+`bfgsolutions.net/products/watchfaces` page for it to point at instead.
+
 ## 2026-09-03 — A false privacy claim, and the logos that were there all along
 
 Two things reported from the About screen. The second one matters far more than

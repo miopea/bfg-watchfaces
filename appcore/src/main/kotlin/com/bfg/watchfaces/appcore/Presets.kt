@@ -88,6 +88,29 @@ object Presets {
             engine = Engine.SUNBURST, scale = 9.0, depth = 6.0, freq = 3, contrast = 22.0,
             dialColor = "#5A6B77", inkColor = "#FFFFFF", sheen = 44.0, vignette = 26.0
         ),
+        // THE THREE STYLES THAT HAD NO WAY IN.
+        //
+        // Lattice, grain and linen are all offered by the engine list and all
+        // three are named in the Play listing -- "lattice" among the seven
+        // patterns, "Grain, brushed, carbon and linen" among the surfaces --
+        // and none of them had a preset. Somebody reading the listing and
+        // opening the gallery found no example of three advertised styles, and
+        // the only way to see one was to guess at the engine picker.
+        //
+        // A preset is how this app introduces a look. A style with none is a
+        // style most people never meet.
+        "Lattice Slate" to DialParams(
+            engine = Engine.LATTICE, scale = 22.0, depth = 4.5, freq = 8, contrast = 28.0,
+            dialColor = "#3A4048", inkColor = "#EDEFF2", sheen = 20.0, vignette = 26.0
+        ),
+        "Grain Walnut" to DialParams(
+            engine = Engine.GRAIN, scale = 20.0, contrast = 30.0, relief = 1.5,
+            dialColor = "#5C4433", inkColor = "#F6EEE4", sheen = 16.0, vignette = 28.0
+        ),
+        "Linen Bone" to DialParams(
+            engine = Engine.LINEN, scale = 18.0, contrast = 26.0, relief = 1.2,
+            dialColor = "#D9D2C5", inkColor = "#2E2A24", sheen = 10.0, vignette = 18.0
+        ),
         "Flat" to DialParams(engine = Engine.NONE, sheen = 22.0, vignette = 20.0)
     )
 

@@ -28,14 +28,37 @@ Google ID-token judgement call flagged there.
 
 Not something this repo can submit. It is a console form and a legal statement.
 
-### 3. Privacy policy URL — OPERATOR
+### 3. ~~Privacy policy URL~~ — DONE 2026-09-03
 
-Must resolve on `bfgsolutions.net` before review. Play checks it.
+**`https://bfgsolutions.net/products/watchfaces/privacy`** — live, HTTP 200.
+
+Written rather than found: the site's existing `/privacy` covers BudgetBug,
+Sculpt Studio and VoiceBridge and never mentioned Watch Faces, so the obvious
+URL would have pointed at a policy that did not cover the app. The other
+products each host their own at their own domain; this app has no domain, so it
+lives on the company site and is linked from the per-product list.
+
+Every claim in it is drawn from actual behaviour, not written generically —
+photos, the Google-id hash, the salted rate-limit hash, anonymous reports, and
+the fact that step count and heart rate are drawn by the WATCH and never reach
+the app. **Paste this URL into the console; it still wants a human to read it
+once, because it is a legal document.**
 
 ### 4. Content rating questionnaire — OPERATOR
 
 Console form. The app has user-generated content (the community catalog), which
 changes the answers.
+
+### 4a. ~~Store listing itself~~ — ALREADY COMPLETE, verified 2026-09-03
+
+Checked against the Play API rather than assumed. Title, short description (78
+of 80 chars), full description (1,530 chars), 5 phone screenshots, 2 Wear
+screenshots, icon and feature graphic are all uploaded and live. Nothing to do.
+
+One thing to look at: `contactWebsite` is `github.com/miopea/bfg-watchfaces`,
+which is the source repo rather than a product page. Correct if deliberate —
+the app is open source and that is where it lives — but worth a glance, since
+there is no `bfgsolutions.net/products/watchfaces` page for it to point at.
 
 ### 5. Store listing screenshots — OPERATOR TO REVIEW
 
