@@ -1,5 +1,49 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — A way back from a refused permission, and an offer instead of an instruction
+
+Two gaps the operator found by asking the right question: what happens to
+somebody who taps the wrong button once?
+
+### There was no way back
+
+The watch app told a wearer who had refused activation that it "cannot be asked
+again" — true, `ActivationConsent` is one-shot — and then offered nothing. That
+is the end of the road for anybody who misclicks on the first face they ever
+send.
+
+It is not actually the end of the road. `dumpsys` reports
+`com.google.wear.permission.SET_PUSHED_WATCH_FACE_AS_ACTIVE` as a real runtime
+permission, flagged `USER_SET`, which means the wearer can turn it back on in
+system settings. The app just never mentioned the door, let alone opened it.
+
+Both refused permissions now offer **Open settings**. The notification one needs
+it for the same reason: Android stops showing that dialog after two refusals,
+after which the "Allow notifications" button silently does nothing, which reads
+as a broken app rather than a spent permission.
+
+### "Install it and try again" is a sentence, not a fix
+
+`FaceSender` already detected a watch without the app, and its own doc comment
+quoted Google's guidance — the phone "should detect the absence of the watch app
+through `CapabilityClient` and offer to install it". It detected, and then said
+"Install BFG Watch Faces on the watch and try again", leaving somebody to work
+out how, on a device with no keyboard, having already made a face.
+
+The snackbar now carries an **Install on watch** action that opens this app's
+Play listing on the watch through `RemoteActivityHelper`. The wearer still taps
+Install, which is right — it is their watch.
+
+Both apps share one package and one listing, so a phone install normally brings
+the watch app down by itself. Normally is not always: it needs the watch paired
+and reachable at the time, and somebody who pairs a watch AFTER installing the
+phone app gets nothing. That is the case this covers, and it is the case a
+first-run person is most likely to be in.
+
+`SendReport` carries a flag for it rather than the UI matching on the sentence.
+This file already learned that lesson once, when "landed" was derived from
+wording and two different outcomes shared a shape.
+
 ## 2026-09-03 — The house mascots, and the first shareable picture dial
 
 Swarm task 01a06710. Bugsy and the Swarm bee are now dials.

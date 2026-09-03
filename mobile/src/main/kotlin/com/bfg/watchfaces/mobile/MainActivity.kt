@@ -58,6 +58,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 
 /** Logcat tag for the Studio’s send path. `adb logcat -s BfgStudio`. */
 private const val TAG = "BfgStudio"
@@ -305,7 +306,26 @@ class MainActivity : ComponentActivity() {
                         // answer rather than a prefix match on the sentence
                         // shown to the user. See WatchLink.Report.landed.
                         if (report.landed) CurrentFace.record(context, name, face)
-                        snackbar.showSnackbar(report.message, duration = SnackbarDuration.Long)
+                        // A missing watch app is the one failure with a
+                        // one-tap fix, so it gets an action rather than an
+                        // instruction. Google's guidance is to OFFER the
+                        // install; this app used to say "install it and try
+                        // again", which is a sentence, not a fix.
+                        val result = snackbar.showSnackbar(
+                            report.message,
+                            actionLabel = if (report.offerWatchInstall) "Install on watch" else null,
+                            duration = SnackbarDuration.Long
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            WatchAppInstall.openListingOnWatch(context) { ok ->
+                                scope.launch {
+                                    snackbar.showSnackbar(
+                                        if (ok) "Opened the Play Store on your watch. Install it there, then send again."
+                                        else "Could not open the Play Store on your watch."
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -675,7 +695,18 @@ class MainActivity : ComponentActivity() {
      * for "it is there but not showing" and "it never confirmed", and those are
      * opposite answers to "should this become the current face".
      */
-    private data class SendReport(val message: String, val landed: Boolean)
+    private data class SendReport(
+        val message: String,
+        val landed: Boolean,
+        /**
+         * Whether to offer installing the watch app.
+         *
+         * A flag rather than a prefix match on [message]: this file already
+         * learned that lesson once, when "landed" was derived from the wording
+         * and two different outcomes shared a sentence shape.
+         */
+        val offerWatchInstall: Boolean = false
+    )
 
     private fun buildThenSend(
         context: android.content.Context,
@@ -710,7 +741,12 @@ class MainActivity : ComponentActivity() {
                     landed = false
                 )
             }
-        if (target !is FaceSender.Target.Ready) return SendReport(describe(target), landed = false)
+        if (target !is FaceSender.Target.Ready) {
+            return SendReport(
+                describe(target), landed = false,
+                offerWatchInstall = target is FaceSender.Target.AppMissing
+            )
+        }
         // The watch's name is only known now, which is why this is the second
         // beat and not part of the first.
         onStage("Sending to ${target.name}…")
@@ -810,8 +846,7 @@ class MainActivity : ComponentActivity() {
         is FaceSender.Target.Ready ->
             "Found ${target.name}, with the app installed. The transfer is the last piece."
         is FaceSender.Target.AppMissing ->
-            "${target.name} is connected, but it does not have the app yet. " +
-                "Install BFG Watch Faces on the watch and try again."
+            "${target.name} is connected, but does not have the app yet."
         FaceSender.Target.NoWatch ->
             "No watch connected. Pair one, then try again."
     }

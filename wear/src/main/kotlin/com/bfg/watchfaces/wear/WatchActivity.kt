@@ -169,16 +169,29 @@ class WatchActivity : ComponentActivity() {
                                 }
                             }
                             if (consent == ActivationConsent.State.DENIED) {
-                                // There is no second ask -- ActivationConsent is
-                                // one-shot and the system will not show the
-                                // dialog again. Saying so is the only honest
-                                // thing; offering a button that cannot work is
-                                // worse than offering none.
+                                // There is no second ASK -- ActivationConsent is
+                                // one-shot and the system will not show that
+                                // dialog again. But there IS a way back, and
+                                // until 2026-09-03 this screen did not offer it.
+                                //
+                                // The underlying permission is a real Android
+                                // runtime permission and dumpsys reports it
+                                // USER_SET, which means the wearer can turn it
+                                // on in system settings. Somebody who tapped the
+                                // wrong button on the first face they ever sent
+                                // was otherwise stuck for good, with the app
+                                // telling them so and offering nothing.
                                 item {
                                     Hint(
-                                        "This cannot be asked again. Faces still arrive — " +
-                                            "pick them from the watch face list."
+                                        "The app cannot ask again, but you can turn it " +
+                                            "on yourself in Settings."
                                     )
+                                }
+                                item {
+                                    Button(
+                                        onClick = { openAppSettings() },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("Open settings") }
                                 }
                             }
 
@@ -200,6 +213,17 @@ class WatchActivity : ComponentActivity() {
                                         },
                                         modifier = Modifier.fillMaxWidth()
                                     ) { Text("Allow notifications") }
+                                }
+                                // The system stops showing the runtime dialog
+                                // after two refusals and then the button above
+                                // silently does nothing -- which looks like a
+                                // broken app rather than a spent permission.
+                                // Settings always works.
+                                item {
+                                    Button(
+                                        onClick = { openAppSettings() },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("Open settings") }
                                 }
                             }
 
@@ -277,6 +301,29 @@ class WatchActivity : ComponentActivity() {
             active = worn?.packageName?.substringAfterLast('.')?.replace('_', ' ')
         )
     }.getOrNull()
+
+    /**
+     * This app's own page in the watch's Settings.
+     *
+     * The only route back from a refused permission. Both permissions here can
+     * be turned on there — the activation one is a real runtime permission,
+     * reported USER_SET by dumpsys — and neither can be asked for again from
+     * inside the app once it has been refused.
+     *
+     * Wrapped, because a watch without a settings activity for this would
+     * otherwise crash on a button press. There is nothing useful to fall back
+     * to, so it fails quietly and the screen keeps working.
+     */
+    private fun openAppSettings() {
+        runCatching {
+            startActivity(
+                Intent(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.fromParts("package", packageName, null)
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }.onFailure { android.util.Log.w("BfgWatchActivity", "no settings screen to open", it) }
+    }
 
     /**
      * Open the phone app from the watch.
