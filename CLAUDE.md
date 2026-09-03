@@ -224,13 +224,18 @@ On Google Play (2026-08-29):
   account from 1Password, uploads and commits in one command. **A Wear bundle
   cannot go on the phone track** — Play rejects the commit — so phone and watch
   are two releases.
-- **The service account can release, and cannot touch the store listing.**
-  Measured 2026-09-03: uploading screenshots into an edit succeeds, and the
+- **The service account cannot edit this app's listing while it is a DRAFT.**
+  Measured 2026-09-03: uploading screenshots into an edit succeeds and the
   COMMIT is refused with a bare `403 PERMISSION_DENIED`. An empty edit commits
-  fine from the same key, which is what isolates it — the refusal is about the
-  listing change, not about committing. It holds "Release apps to testing
-  tracks" and nothing more. Adding "Store presence" to it would let
-  screenshots, descriptions and graphics be scripted too.
+  fine from the same key, so the refusal is about the listing change and not
+  about committing.
+  **It is NOT a store-listing permission.** "Manage store presence" is already
+  granted — checked in the console, 2026-09-03. What is missing is **"Edit and
+  delete draft apps"**, and `com.bfg.watchfaces` is still a Draft app. The
+  "Release apps to testing tracks" permission covers UPLOADING a draft app,
+  which is why `play-release.py` works, but not editing its listing.
+  The same account has 13 permissions on BudgetBug and Sculpt Studio and 9
+  here, which is the fastest way to spot it.
 - Release signing: upload keystore in `~/.keystores` (outside the repo),
   password in 1Password, read from the environment at build time. A release
   build fails loudly rather than emitting an unsigned bundle.
