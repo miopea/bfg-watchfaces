@@ -57,7 +57,7 @@ that have it.
 
 Its first version walked the filesystem with a directory blocklist and failed on
 200-odd Rust `.rlib` and `.rmeta` files under `scripts/pack-java/target/` —
-gitignored build output, legitimately binary. Blocklisting `target` would have
+gitignored build output, legitimately binary. Excluding `target` by name would have
 held until the next tool invented a build directory. `git ls-files` is the
 boundary the test actually means.
 
