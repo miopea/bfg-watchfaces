@@ -216,6 +216,21 @@ Watch Face Push installs a face (2026-08-29):
 
 On Google Play (2026-08-29):
 
+- **Submitted for production review on 2026-09-03**, submission 1, status
+  `In review`. Twelve changes went together: the `1.75 — first public release`
+  production release (bundle 76, phone form factors only), all 176 countries
+  plus rest of world, the default store listing, content rating, target
+  audience, privacy policy, ads, data safety, health apps, the Wear OS form
+  factor opt-in and the app category. **The Wear bundle is NOT in it** — this
+  track is scoped to Phones/Tablets/Chrome OS/XR and Play rejects a Wear bundle
+  there, so `wear:production` is a second release after this one lands.
+  Two advisory warnings were accepted: no R8 mapping file and no native debug
+  symbols. Both only affect how readable a crash report is.
+- **Target age is declared 18 and over**, and the "restrict users Google
+  determines to be minors" box is deliberately LEFT OFF — that box would block
+  installs, the age declaration alone does not. 18+ keeps the app out of the
+  Families programme, which is the right side of the line while the community
+  catalog accepts user-submitted faces.
 - `com.bfg.watchfaces` is live on **internal testing** in the BFG Solutions org
   account — phone `versionCode 1` on `internal`, watch `versionCode 1001` on
   `wear:internal`. Opt-in:
