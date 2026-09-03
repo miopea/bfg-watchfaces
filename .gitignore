@@ -61,3 +61,10 @@ __pycache__/
 # carries the workerd binary for whichever platform ran npm install.
 catalog-service/node_modules/
 catalog-service/.wrangler/
+
+# Shotcraft screenshot tooling. The CONFIG is checked in -- it is the recipe --
+# but neither the device captures nor the rendered composites are: they are
+# build output, they are large, and they go stale the moment the app changes.
+# Regenerate with tools/screenshots/README.md.
+tools/screenshots/node_modules/
+tools/screenshots/screenshots/

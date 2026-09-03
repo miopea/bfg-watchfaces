@@ -1,0 +1,13 @@
+{
+  "name": "bfg-watchfaces-screenshots",
+  "private": true,
+  "type": "module",
+  "description": "Play Store composites, rendered by Shotcraft from device captures.",
+  "scripts": {
+    "render": "shotcraft render play-store-phone"
+  },
+  "devDependencies": {
+    "shotcraft": "link:../../../shotcraft/packages/core",
+    "@shotcraft/template-play-store-phone": "link:../../../shotcraft/packages/template-play-store-phone"
+  }
+}
