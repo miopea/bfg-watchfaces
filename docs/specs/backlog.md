@@ -127,16 +127,25 @@ rights-holders that is not the app, and a working in-app complaint path (Play
 requires one for user content). The GitHub route covers the second today and
 must not be retired before the replacement is live.
 
-## 9. Imported images
+## ~~9. Imported images~~ — DONE 2026-09-02
 
-**Considered and left here on 2026-08-31.** Scoped out deliberately: it creates
-an un-shareable second class of face and an IP surface the parametric catalog
-exists to avoid. If it is ever built, `docs/specs/watch-app.md` §2 is the gate
-it has to pass first.
+Scoped out on 2026-08-31 and **that decision was reversed** the next day: photo
+dials are table stakes in this category, and "90% of the goals" includes this
+one. See `launch-scope.md` §3.3.
 
-`Engine.TEXTURE` needs a bitmap the face only references by id, and there is
-nowhere on the device to resolve that id from yet. Both previews fall back to a
-plain dial.
+Built and seen on a wrist. `PickVisualMedia` (no permission at all),
+`TextureStore` content-addressing the bytes by SHA-1, and the image baked into
+`dial_bg.png` through the path that already existed — so nothing new crosses to
+the watch and a face costs what it already cost. The face JSON stores an id,
+never content.
+
+The concerns that argued against it were kept rather than dismissed: such a
+face is local only, Share is hidden on it with a line saying why, and no photo
+ever reaches the catalog.
+
+**This entry said "there is nowhere on the device to resolve that id from" for
+a day after it was built.** So did `CLAUDE.md`. Corrected 2026-09-03 while
+answering "what is left" — a stale doc reads exactly like a true one.
 
 ## 10. Testing the transport without real hardware
 

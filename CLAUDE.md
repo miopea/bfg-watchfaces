@@ -264,6 +264,13 @@ The community catalog is live (2026-08-30):
 
 Still never tested:
 
-- **Imported images.** `Engine.TEXTURE` still has nowhere on the device to
-  resolve an image id from.
 - **`reskin.sh`** — written and read, not exercised since the workbench landed.
+- **A clean install by a human with no adb.** The one launch gate nothing here
+  can close. See `launch-scope.md` §3.1.
+
+Photo dials (2026-09-02):
+
+- **Imported images work and have been seen on a wrist.** `PickVisualMedia`,
+  `TextureStore` (SHA-1 content addressing), baked into `dial_bg.png` through
+  the existing path. Local only: Share is hidden on such a face and no photo
+  reaches the catalog.
