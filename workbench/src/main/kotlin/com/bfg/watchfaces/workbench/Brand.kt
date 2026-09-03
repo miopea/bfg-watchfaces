@@ -124,6 +124,15 @@ object Brand {
         write(File(brand, "icon-light.svg"), tileSvg(BrandMark.Palette.LIGHT))
         write(File(brand, "icon-dark.svg"), tileSvg(BrandMark.Palette.DARK))
         writePng(File(brand, "play-icon-512.png"), storeIcon())
+        // NOT WHAT IS ON THE STORE, since 2026-09-03. The shipped feature
+        // graphic is composed rather than generated — brand ground, the mark
+        // and name locked up, a headline, and dials rendered by FacePreview —
+        // and lives at docs/brand/store/play-feature-1024x500.png, built by
+        // tools/screenshots/feature-graphic.mjs.
+        //
+        // This one stays because it is the honest fallback and three tests pin
+        // it, but do NOT upload it: running `brand` rewrites the file below and
+        // it is one directory away from the real one on purpose.
         writePng(File(brand, "play-feature-1024x500.png"), featureGraphic())
 
         // --sheet=<path> renders the icon as the launcher will actually mask it,

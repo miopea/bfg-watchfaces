@@ -74,3 +74,38 @@ cd ~/projects/personal/shotcraft
 node node_modules/.pnpm/playwright@X.Y.Z/node_modules/playwright/cli.js \
   install chromium-headless-shell
 ```
+
+## The feature graphic
+
+`docs/brand/store/play-feature-1024x500.png` is what is on the store. It is
+COMPOSED, not generated, and it is deliberately not the file `./gradlew
+:workbench:brand` writes — that one stays as a fallback and is one directory up.
+
+Two steps, because the dials have to come from the real renderer rather than be
+drawn again:
+
+```bash
+# 1. Render the dials FacePreview actually produces, at 900px.
+#    A throwaway JVM main or test that calls
+#    FacePreview.render(Presets.byName("Brushed Steel")!!, false, 900)
+#    for Brushed Steel, Knotwork Taupe and Carbon Black, into a scratch dir as
+#    dial-brushed-steel.png, dial-knotwork-taupe.png, dial-carbon-black.png.
+
+# 2. Composite: ground, the mark and name lockup, the headline, the dials.
+node tools/screenshots/feature-graphic.mjs <that scratch dir>
+```
+
+Three things that were learned the hard way:
+
+**Clip every dial to a circle.** `DialRenderer` emits a SQUARE bitmap whose
+corners carry the dial's own background. Drawn straight it puts a pale box
+behind each face, which only becomes obvious once a shadow sits under it. The
+shadow has to be cast by a filled disc first — a clip suppresses the shadow
+outside it.
+
+**Keep the headline clear of the artwork.** At 54px "Design your own" reached
+into the first dial. 47px clears it. Check, do not assume: the collision is
+invisible in a thumbnail and obvious at full size.
+
+**Say "watch face" once.** With the name locked up above it, a headline of
+"Design your own watch face" repeats the app's own name back at itself.
