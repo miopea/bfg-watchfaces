@@ -243,6 +243,16 @@ On Google Play (2026-08-29):
   put in front of testers mid-review; only production, the store listing and
   the App content declarations restart the queue. Check submission activity
   either side anyway — it costs one page load and the failure is expensive.
+- **`play-listing.py` COMMITS, and with managed publishing off a commit
+  SUBMITS.** Measured 2026-09-03: uploading screenshots through it did not
+  stage a pending change for someone to review — it created submission 3 and
+  put everything in the publishing overview straight into review, including a
+  production release that had only been SAVED in the console minutes earlier.
+  There is no confirmation step and the script cannot know one was wanted.
+  So on this app the last action before an intended pause must be a console
+  save, never an API commit; and if a human is meant to press the button, do
+  the listing FIRST and the release last. Use `--dry-run` to prove Play accepts
+  the assets — it stages and then deletes the edit, changing nothing.
 - **Target age is declared 18 and over**, and the "restrict users Google
   determines to be minors" box is deliberately LEFT OFF — that box would block
   installs, the age declaration alone does not. 18+ keeps the app out of the
