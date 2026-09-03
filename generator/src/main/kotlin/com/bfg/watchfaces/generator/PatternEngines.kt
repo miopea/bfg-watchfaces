@@ -56,6 +56,11 @@ object PatternEngines {
         // that slides the highlight across it. Two more elements above the dial;
         // the dial pattern itself is untouched.
         13 -> v4(p)
+        // v14 gives a drawn WEATHER slot something to show when the watch has
+        // no weather. It is a Condition around a PartText and nothing else;
+        // the dial pattern is untouched, so this delegates like the eight
+        // versions above it. See WeatherFallback.
+        14 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

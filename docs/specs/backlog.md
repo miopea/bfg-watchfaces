@@ -52,6 +52,13 @@ number means something. High, low and UV are DAY-INDEXED
 (`WEATHER.DAYS.0....`); the bare spellings are in Google's enum, validate
 against Google's XSD, and render a black face.
 
+~~`IS_AVAILABLE` / `IS_ERROR` are also unused~~ — DONE 2026-09-03 as v14, but
+NOT as recorded below: "fall back to the slot's system provider" is not
+expressible, because `ComplicationSlot` is a child of `Scene` and nothing else.
+A drawn slot now shows an em dash when `[WEATHER.IS_AVAILABLE]` is false. See
+`DECISIONS.md` 2026-09-03.
+
+The original wording, kept because the reasoning is still worth reading:
 `IS_AVAILABLE` / `IS_ERROR` are also unused — the decided behaviour when weather
 is unavailable is to fall back to the slot's system provider, and that is not
 built either. **Still open after the forecast work of 2026-09-03**, but the
@@ -157,7 +164,6 @@ face that is already there. `FaceInstaller` calls it rather than repeating it.
 
 The transport itself is unchanged and still needs hardware. See `DECISIONS.md`
 2026-09-03.
-
 
 Every expensive bug this week lived between "the bytes left the phone" and "the
 face is on the watch", and none of it can be exercised here: the emulators

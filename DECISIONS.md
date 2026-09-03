@@ -1,5 +1,87 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — v14: a drawn weather slot says something when there is no weather
+
+Swarm task 01a064e7. `WEATHER.IS_AVAILABLE` and `WEATHER.IS_ERROR` have been in
+the schema since the beginning and nothing here read either, so a drawn weather
+slot asked for `[WEATHER.TEMPERATURE]` unconditionally and a watch with no
+location got whatever the runtime does with an absent value — undocumented, and
+never once observed by this project.
+
+### The recorded decision was not implementable, and that is the finding
+
+`backlog.md` #3 said the fallback should be "the slot's system provider". It
+cannot be. `ComplicationSlot` appears in exactly ONE place in Google's whole
+schema — `sceneElement.xsd`, a direct child of `Scene`, `maxOccurs="8"`. Not
+inside a `Group`, not inside a `Condition`. Established with
+`grep -rn 'ref="ComplicationSlot"'` over the schema tree, which returns that one
+line.
+
+A drawn slot emits no `ComplicationSlot` at all — that is what "drawn" means —
+and the format offers no way to conditionally introduce one. So there was never
+a provider to fall back to. The decision had been recorded without checking the
+format permitted it, and it sat in the backlog for days looking actionable.
+
+What is expressible: a `Condition` on `[WEATHER.IS_AVAILABLE]`, with the
+existing `PartText` in `Compare` and a placeholder in `Default`.
+
+### The `Group` wrapper this was filed as needing does not exist either
+
+The task said `Condition` rejects `PartText` and each branch would need a
+`Group` around its text. Wrong, and I wrote it from memory. `_CompareChild` in
+`conditionElement.xsd` includes `<xs:group ref="PartElementGroup"/>`, and that
+group is exactly `{PartText, PartImage, PartAnimatedImage, PartDraw}`. A
+`PartText` is a legal child of `Compare` directly. The change is simpler than
+its own ticket claimed.
+
+### A Template needs a Parameter, which a fixed string has none of
+
+The first version put the placeholder in a `<Template>`, because every other
+string this emitter writes is one. Xerces refused the whole face:
+
+```text
+cvc-complex-type.2.4.b: The content of element 'Template' is not complete.
+One of '{Parameter}' is expected.
+```
+
+`<Font>` is `mixed="true"` (`group/part/text/fontElement.xsd:22`), so the text
+sits in it directly — and INLINE, with no surrounding newlines, because mixed
+content keeps whitespace and a placeholder on its own indented line is the
+string `"\n            —\n            "`.
+
+This is the failure mode `WffSchemaTest` exists for. It was caught in seconds
+instead of installing silently and never appearing.
+
+### Gated at v14, and the cost is accepted
+
+It changes the XML every drawn weather slot emits, so it takes a
+`generatorVersion` branch and v13 output is byte-identical to what it was.
+`WeatherFallbackTest` asserts that for every source. The cost is real: faces
+saved before today never get the fallback. That is the same trade every version
+gate in this project makes, and it is the one that keeps a stored face rendering
+the way its author saw it.
+
+`PatternEngines.paths()` gains `14 -> v4(p)` like the eight versions before it —
+the dial pattern is untouched.
+
+### `IS_ERROR` gets no branch of its own
+
+An error and an absence are the same thing to somebody looking at their wrist:
+there is no reading. A second branch would be a distinction this project has
+never observed on a device and could not test.
+
+### The placeholder
+
+An em dash, the same glyph `PhoneNote` uses for an empty note and for the same
+reason: a slot rendering nothing looks like a broken face, and somebody who put
+weather there needs to see the slot is theirs and simply has no reading yet.
+Not "N/A" and not "no data" — those are a system talking about itself.
+
+### Verified by mutation
+
+Removing the version check from `appliesTo` failed
+`v13 output is untouched(WEATHER_TEMPERATURE)`. Restoring it passed.
+
 ## 2026-09-03 — The install decisions are testable; the transport still is not
 
 Swarm task 01a064e8. `backlog.md` #10 calls the transport the single biggest gap

@@ -225,6 +225,17 @@ enum class ComplicationSource(
     val isDrawn: Boolean get() = drawn.isNotEmpty()
 
     /**
+     * Whether this source reads the weather service.
+     *
+     * Decided by what it actually ASKS FOR rather than by its name, so a source
+     * added later cannot be forgotten here: `WEATHER_LATER` reads
+     * `[WEATHER.HOURS.3.TEMPERATURE]` and would be missed by a name check that
+     * looked for a prefix and found one anyway, but a renamed source would not.
+     * See [WeatherFallback].
+     */
+    val readsWeather: Boolean get() = drawn.any { it.startsWith("[WEATHER.") }
+
+    /**
      * Roughly how many characters this source's value runs to.
      *
      * Only drawn sources need it, and only so the text can be shrunk to fit its
@@ -910,7 +921,7 @@ data class Layout(
  */
 val COMPONENT = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*/\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z0-9_$]+)*""")
 
-const val CURRENT_GENERATOR_VERSION = 13
+const val CURRENT_GENERATOR_VERSION = 14
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

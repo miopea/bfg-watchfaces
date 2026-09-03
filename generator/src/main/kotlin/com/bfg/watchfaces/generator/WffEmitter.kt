@@ -666,15 +666,23 @@ ${handPair("MinuteHand", "hand_minute")}$second
                 // SlotGeometry so the previews give the same answer. It
                 // shortens before it shrinks; see SlotGeometry.drawnText.
                 val drawn = SlotGeometry.drawnText(source, box, fontSize, p.generatorVersion, pos)
-                return@map """
+                val face = FaceFont.of(l.fontFamily).wff
+                val text = """
     <PartText x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <Text align="CENTER">
-        <Font family="${FaceFont.of(l.fontFamily).wff}" size="${drawn.fontSize}" color="$ink">$ambientColorVariant
+        <Font family="$face" size="${drawn.fontSize}" color="$ink">$ambientColorVariant
           <Template><![CDATA[${drawn.format}]]>${drawn.expressions.joinToString("") { """<Parameter expression="$it"/>""" }}</Template>
         </Font>
       </Text>
     </PartText>"""
+                if (!WeatherFallback.appliesTo(p, source)) return@map text
+                return@map WeatherFallback.wrap(
+                    available = text,
+                    box = box, fontSize = drawn.fontSize, family = face,
+                    ink = ink, ambientAlpha = ambientAlpha,
+                    ambientColorVariant = ambientColorVariant
+                )
             }
 
             """

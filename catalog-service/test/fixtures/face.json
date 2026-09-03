@@ -4,7 +4,7 @@
   "author": "The Test Suite",
   "created": "2026-08-30T00:00:00Z",
   "params": {
-    "generatorVersion": 13,
+    "generatorVersion": 14,
     "engine": "KNOTWORK",
     "scale": 26.0, "depth": 5.0, "freq": 9,
     "stroke": 1.2, "relief": 1.4, "contrast": 30.0,
