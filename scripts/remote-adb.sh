@@ -138,12 +138,24 @@ if [ "$COUNT" -eq 0 ]; then
   exit 2
 fi
 
-echo "$COUNT device(s) reachable. To put a face on one:"
+echo "$COUNT device(s) reachable."
 echo
-echo "    cd watchface-template && ./build.sh"
-echo "    ADB_SERVER_SOCKET=$SOCKET \\"
-echo "      \$ANDROID_HOME/platform-tools/adb install -r build/watchface.apk"
+echo "SIDELOADING A FACE DOES NOT WORK ON A REAL WATCH. This printed an"
+echo "adb install recipe until 2026-09-03 and the recipe was wrong: it"
+echo "succeeds, the package lists, and the face never appears in the"
+echo "carousel. A watchfacepush.* package is only a FACE once the DWF"
+echo "receiver has installed it into a slot through addWatchFace() --"
+echo "compare installerPackageName on a working face"
+echo "(com.google.android.wearable.dwf.receiver) with a sideloaded one"
+echo "(null). adb install writes the APK to disk and registers nothing."
 echo
-echo "Then open the watch face picker and look for it by name. That single"
-echo "observation is what docs/SPEC.md calls step one, and nothing in this repo"
-echo "has ever been able to make it."
+echo "It did work on the emulator, which does not enforce this, and that"
+echo "is what the carousel line in CLAUDE.md was measured on."
+echo
+echo "So a face reaches a real watch ONLY through the phone app:"
+echo "  1. get the app onto the phone (Play internal -- a local build"
+echo "     cannot update a Play install, the signatures differ)"
+echo "  2. build the face in the app and send it"
+echo
+echo "adb is still how you READ the watch: pm list packages, dumpsys"
+echo "wallpaper, exec-out screencap, logcat."

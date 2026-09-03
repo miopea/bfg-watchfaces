@@ -188,6 +188,9 @@ Confirmed on a Wear OS 6 emulator (2026-08-29):
 
 - **A face from this repo appears in the watch face carousel, can be selected,
   and renders with live complications.** `sdk_gwear_x86_64`, release 16, SDK 36.
+  **Emulator only, and it does not generalise** — see 2026-09-03. A real Pixel
+  Watch 5 never shows a sideloaded `watchfacepush.*` package, because a face is
+  only a face once the DWF receiver installs it into a slot.
   `dumpsys wallpaper` shows `DeclarativeWatchFaceRuntime0` rendering it. This was
   step one in `docs/SPEC.md` and it gated everything else.
 - The emulator runs on the operator's Windows laptop and is driven from here over

@@ -1,5 +1,59 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — A sideloaded face is not a face on a real watch
+
+`adb install` of a built `watchfacepush.*` APK reports Success, the package
+lists under `pm list packages`, and the face NEVER appears in the carousel.
+There is no error anywhere.
+
+The evidence is one field. On a face that works, installed by the phone:
+
+```text
+installerPackageName=com.google.android.wearable.dwf.receiver
+versionCode=1788392840
+```
+
+On the sideloaded one:
+
+```text
+installerPackageName=<adb>
+versionCode=1
+```
+
+A `watchfacepush.*` package is inert until the **DWF receiver** installs it into
+a slot through `addWatchFace()`. `adb install` writes the APK to disk and
+registers nothing — no slot, so the carousel has nothing to show. This is the
+architecture working as designed, not a bug to route around.
+
+### Why this was believed to work
+
+`scripts/remote-adb.sh` printed an `adb install` recipe ending "then open the
+watch face picker and look for it by name", and CLAUDE.md records a face
+appearing in the carousel. Both are true **on the emulator**, which does not
+enforce the slot requirement. The carousel line was always labelled as an
+emulator result; the script's recipe was not labelled at all, and it is what
+got followed.
+
+Corrected both: the script now says sideloading does not work on a real watch
+and names the field to compare, and the CLAUDE.md line now says the result does
+not generalise.
+
+This is the `verify-on-the-real-device` lesson again, in the shape that is
+hardest to catch: not a step that failed, but a step that SUCCEEDED — install,
+package list and all — while accomplishing nothing.
+
+### What this means for getting a face onto a real watch
+
+Only through the phone app. And a local build cannot update the phone: it is
+installed by `com.android.vending` and carries Play's app-signing key, so
+`adb install -r` of a locally-signed APK fails
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE` (measured, not assumed). Replacing it would
+need an uninstall, which wipes saved faces.
+
+So a new generator feature reaches a wrist only after a Play internal release.
+That is a real constraint on the test loop and worth knowing before promising a
+watch test.
+
 ## 2026-09-03 — The weather a face shows is no longer only right now
 
 Three drawn sources: `WEATHER_LATER` (`[WEATHER.HOURS.3.TEMPERATURE]`),
