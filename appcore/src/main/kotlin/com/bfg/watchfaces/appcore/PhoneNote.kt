@@ -51,9 +51,33 @@ object PhoneNote {
      * Newlines and runs of whitespace collapse to single spaces rather than
      * being rejected: somebody pasting two lines meant the words, not the break,
      * and a complication has nowhere to put a break.
+     *
+     * Control characters are REMOVED. Until 2026-09-03 they were not, and a
+     * file holding NUL bytes -- a truncated write, or a file somebody poked at
+     * -- survived every step of the journey and reached the watch, where a
+     * SHORT_TEXT complication rendered it as nothing or as tofu. The doc on
+     * [load]'s test always said a corrupt file should read as no note; this is
+     * what makes that true.
      */
     fun clean(raw: String): String =
-        raw.replace(Regex("\\s+"), " ").trim().take(MAX_LENGTH)
+        raw.replace(Regex("\\s+"), " ")
+            // Control characters go, AFTER the whitespace collapse above.
+            //
+            // Order is the whole trick. Tab, newline and carriage return are
+            // control characters too, so filtering first would delete them and
+            // run the words together -- "one\ttwo" would become "onetwo". The
+            // collapse turns them into spaces before anything is removed, and
+            // what is left to remove is the genuinely unprintable: NUL from a
+            // truncated write, and its neighbours.
+            //
+            // isISOControl covers U+0000-U+001F and U+007F-U+009F, which is
+            // exactly the Cc category. Deliberately NOT the wider "format"
+            // category: U+200D ZERO WIDTH JOINER lives there and is what holds
+            // a family emoji together, so stripping it would quietly break
+            // somebody's note into separate people.
+            .filter { !it.isISOControl() }
+            .trim()
+            .take(MAX_LENGTH)
 
     /**
      * Store a note. An empty one REMOVES it rather than storing emptiness.

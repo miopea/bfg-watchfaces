@@ -92,12 +92,57 @@ class PhoneNoteTest {
         assertTrue(PhoneNote.EMPTY_PLACEHOLDER.length <= 3) { "the placeholder is a value, not a sentence" }
     }
 
-    /** A corrupt or unreadable file reads as no note, never as a crash on the wrist. */
+    /**
+     * A corrupt file reads as NO NOTE, never as a crash and never as garbage.
+     *
+     * ## What this used to assert, which was nothing
+     *
+     * It wrote two NUL bytes and then checked `clean(note) == note`. Since
+     * [PhoneNote.load] already applies `clean` and `clean` is idempotent, that
+     * compared `clean(clean(x))` with `clean(x)` and held for EVERY possible
+     * input. It was an assertion about `clean` being idempotent, not about a
+     * corrupt file, and it passed while the behaviour it named did not happen:
+     * `load` returned the two NUL characters and `has` reported true.
+     *
+     * Those bytes reached further than a test. Nothing between here and the
+     * watch removed them, so a truncated write would have arrived at a
+     * SHORT_TEXT complication and rendered as tofu on somebody's dial.
+     *
+     * Fixed on both sides on 2026-09-03: `clean` now strips control characters,
+     * and this asserts the outcome the name always claimed.
+     */
     @Test
     fun `an unreadable note reads as absent`(@TempDir dir: File) {
         File(dir, "phone-note.txt").writeText("\u0000\u0000")
-        // Whatever comes back, it must not throw and must be clean.
-        val note = PhoneNote.load(dir)
-        assertEquals(PhoneNote.clean(note), note)
+
+        assertEquals("", PhoneNote.load(dir)) { "control bytes survived load()" }
+        assertFalse(PhoneNote.has(dir)) { "a file of control bytes counts as a note" }
+    }
+
+    /**
+     * Control bytes are removed, and the words either side of them are not.
+     *
+     * The order inside `clean` is load-bearing: whitespace collapses to spaces
+     * FIRST, then controls are removed. Filtering first would delete the tab in
+     * "one\ttwo" and leave "onetwo".
+     */
+    @Test
+    fun `a control byte in the middle of a note does not eat the words`() {
+        assertEquals("one two", PhoneNote.clean("one" + "\u0000" + " two"))
+        assertEquals("one two", PhoneNote.clean("one\ttwo"))
+        assertEquals("ab", PhoneNote.clean("a\u0000b"))
+    }
+
+    /**
+     * A zero-width joiner is NOT a control character and must survive.
+     *
+     * It is what holds a family emoji together. Stripping the wider "format"
+     * category along with the control one would quietly break somebody's note
+     * into separate people.
+     */
+    @Test
+    fun `a joined emoji is not taken apart`() {
+        val family = "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67"
+        assertEquals(family, PhoneNote.clean(family)) { "the joiner was stripped" }
     }
 }

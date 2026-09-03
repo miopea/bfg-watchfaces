@@ -1,5 +1,75 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — A test that could not fail, and the bug hiding behind it
+
+Swarm task 01a0651a, filed by me while fixing the NUL bytes in the same file and
+deliberately left for its own decision.
+
+### The test asserted nothing
+
+`an unreadable note reads as absent` wrote two NUL bytes and then checked
+`clean(note) == note`. `PhoneNote.load` already applies `clean`, and `clean` is
+idempotent, so that compared `clean(clean(x))` with `clean(x)` — true for EVERY
+possible input. It was an assertion about `clean` being idempotent wearing the
+name of an assertion about corrupt files.
+
+### Behind it was a real defect, not just a naming problem
+
+The name was the correct intent and the code did not do it. Measured:
+
+```text
+writeText(two NULs)   -> load() = 2 chars, has() = TRUE    not absent
+writeText(two spaces) -> load() = "",      has() = FALSE   absent
+```
+
+`clean` collapsed `\s`, and NUL is not `\s`. So control bytes survived `load`,
+and nothing between there and the wrist removed them: `NoteSender` sends what
+`save` returns, `FaceReceiverService` stores it, `PhoneNoteService` hands it to a
+SHORT_TEXT complication. A truncated write would have rendered as tofu on
+somebody's dial.
+
+Four callers checked; none wanted control characters preserved.
+
+### The fix, and why the ORDER in it is the whole trick
+
+```kotlin
+raw.replace(Regex("\\s+"), " ")     // tab, newline, CR become spaces
+   .filter { !it.isISOControl() }   // then the genuinely unprintable goes
+   .trim()
+   .take(MAX_LENGTH)
+```
+
+Filtering first would have deleted the tab in `"one\ttwo"` and produced
+`"onetwo"`. Collapsing first turns it into a space, and what remains to remove is
+only what should never have been there. There is now a test for each half, and
+swapping the order fails two of them.
+
+`isISOControl` is exactly the Cc category. Deliberately NOT the wider "format"
+category: U+200D ZERO WIDTH JOINER lives there and is what holds a family emoji
+together, so stripping it would quietly break somebody's note into separate
+people. There is a test for that too.
+
+### The history question I had left open
+
+When filing this I wrote "plausible is not evidence; git history would settle it
+and I did not look." Looked now. `git show e145c9e` — the commit that introduced
+the line — has the NUL bytes already. They were never spaces. The test has been
+weak since the moment it was written, and the file has been binary to grep for
+just as long.
+
+### Verified by mutation
+
+- Removing the filter fails `an unreadable note reads as absent`.
+- Filtering before the collapse fails `a control byte ... does not eat the words`
+  AND `newlines and runs of whitespace collapse`.
+
+### Not shipped yet, on purpose
+
+`clean` is in `:appcore` and both apps embed it, so this needs a release of each
+to reach a device. The trigger is a corrupt note file, which nobody has, and the
+operator has already taken six app updates today. It rides with the next release
+of either app rather than earning two of its own.
+
 ## 2026-09-03 — A source file that reads as binary, and the guard for it
 
 Swarm task 01a06506, found by Queen while checking a test count I had reported.
