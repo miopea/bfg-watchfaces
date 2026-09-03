@@ -107,3 +107,52 @@
 -dontwarn javax.lang.model.type.TypeVisitor
 -dontwarn javax.lang.model.util.SimpleTypeVisitor8
 -dontwarn org.eclipse.wst.xml.xpath2.processor.PsychoPathXPathTypeHelper
+
+# --- Xerces, reached through JAXP service discovery ---------------------------
+#
+# THIS ONE FAILED IN THE FIELD, on the first R8 build, and it is the reason the
+# rules above are written the way they are.
+#
+# Google's Watch Face Push validator calls DocumentBuilderFactory.newInstance()
+# to parse the face XML. JAXP resolves the implementation BY CLASS NAME through
+# META-INF/services, so nothing in the app refers to Xerces statically and R8
+# removed it. The face then failed to validate with:
+#
+#     Provider org.apache.xerces.jaxp.DocumentBuilderFactoryImpl not found
+#
+# which the app reported as "couldn't be sent — something went wrong on our
+# end". No crash, no stack trace to the user, and every face refused.
+#
+# R8 SAID SO AT BUILD TIME and it is easy to miss:
+#
+#     R8: Unexpected reference to missing service class:
+#         META-INF/services/org.xml.sax.driver
+#
+# Treat any "missing service class" warning as a keep rule waiting to be
+# written, not as noise. Service-loader lookups are invisible to R8 by
+# construction — that is the whole point of them.
+-keep class org.apache.xerces.** { *; }
+-dontwarn org.apache.xerces.**
+
+# --- XML interfaces that MUST keep the platform's names -----------------------
+#
+# The second failure on the same feature, and a different mechanism from the one
+# above. Xerces bundles its own copies of the org.w3c.dom / org.xml.sax
+# interfaces. R8 renamed those copies — reasonably, nothing else referred to
+# them — and then at runtime Android resolved `Document` from the PLATFORM
+# (core-libart.jar), whose createAttributeNS returns the real org.w3c.dom.Attr.
+# The renamed type and the platform type are not the same type:
+#
+#     java.lang.NoSuchMethodError: No interface method
+#     createAttributeNS(String,String)Lt9/a; in class Lorg/w3c/dom/Document;
+#
+# `Lt9/a;` is what org.w3c.dom.Attr had been renamed to. Any type that crosses
+# the boundary between bundled code and the platform has to keep the name the
+# platform knows it by, so these three families are kept whole rather than
+# trusted to R8's view of who references them.
+-keep class org.w3c.dom.** { *; }
+-keep class org.xml.sax.** { *; }
+-keep class javax.xml.** { *; }
+-dontwarn org.w3c.dom.**
+-dontwarn org.xml.sax.**
+-dontwarn javax.xml.**
