@@ -259,6 +259,8 @@ object AndroidDialRenderer {
      * changes — on a shape whose whole job is to have no visible edge.
      */
     fun renderGlare(p: DialParams, size: Int = DIAL_SIZE): Bitmap {
+        // Scaled by the face's own glare control, once, here. See Glare.
+        val peak = Glare.peakAlphaFor(p)
         val margin = Glare.TRAVEL.toInt()
         val w = size + margin * 2
         val bmp = Bitmap.createBitmap(w, w, Bitmap.Config.ARGB_8888)
@@ -273,7 +275,7 @@ object AndroidDialRenderer {
                 val d = ((x - c) * nx + (y - c) * ny) / scale
                 val i = Glare.intensityAt(d)
                 row[x] = if (i <= 0.0) 0
-                else ((i * Glare.PEAK_ALPHA).toInt().coerceIn(0, 255) shl 24) or 0xFFFFFF
+                else ((i * peak).toInt().coerceIn(0, 255) shl 24) or 0xFFFFFF
             }
             bmp.setPixels(row, 0, w, 0, y, w, 1)
         }

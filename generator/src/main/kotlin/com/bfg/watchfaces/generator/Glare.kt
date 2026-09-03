@@ -86,6 +86,42 @@ object Glare {
         return 0.5 * (1.0 + kotlin.math.cos(Math.PI * t))
     }
 
-    /** True when a face should carry one. Gated with the rest of the tilt work. */
-    fun enabledFor(p: DialParams): Boolean = p.generatorVersion >= 13
+    /**
+     * True when a face should carry one.
+     *
+     * Gated with the rest of the tilt work, AND on the control being above
+     * zero. A face turned down to nothing emits no layer at all rather than a
+     * transparent one, so it carries no `<Gyro>` and never turns the
+     * accelerometer on. See [DialParams.glare].
+     */
+    fun enabledFor(p: DialParams): Boolean = supportedBy(p) && p.glare > 0.0
+
+    /**
+     * Whether this face's geometry has a glow at all, regardless of the setting.
+     *
+     * Separate from [enabledFor] because a UI needs to know whether to OFFER the
+     * control, and "turned down to zero" must keep offering it -- otherwise the
+     * slider vanishes at the moment somebody drags it to nothing, and there is
+     * no way to bring it back.
+     */
+    fun supportedBy(p: DialParams): Boolean = p.generatorVersion >= 13
+
+    /**
+     * [PEAK_ALPHA] scaled by the face's own setting. What renderers must use.
+     *
+     * ## Why the scale is here and not on the emitted `alpha`
+     *
+     * The `<PartImage>` could have carried it instead, and that was the first
+     * shape. But the two PREVIEWS do not go through the emitter -- they call
+     * `renderGlare` directly -- so an emitter-side scale would need scaling
+     * again in the workbench preview and again in the phone's, and a control
+     * implemented three times is three chances to disagree. That is the exact
+     * shape `SlotGeometry` and `ControlInventory` exist to stop.
+     *
+     * Putting it in the PNG means the previews and the shipped face read the
+     * same number by construction, and the emitter keeps the literal 255 it
+     * always had.
+     */
+    fun peakAlphaFor(p: DialParams): Int =
+        (PEAK_ALPHA * (p.glare.coerceIn(0.0, 100.0) / 100.0)).toInt()
 }

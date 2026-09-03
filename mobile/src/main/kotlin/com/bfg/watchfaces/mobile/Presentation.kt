@@ -115,6 +115,9 @@ object Presentation {
         "contrast" -> "Contrast"
         "sheen" -> "Sheen"
         "vignette" -> "Edge shading"
+        // "Tilt glow" rather than "glare": glare is what you call light you did
+        // not want. This is the effect, named for what makes it happen.
+        "glare" -> "Tilt glow"
         "timeSize" -> "Clock size"
         "timeY" -> "Clock position"
         "complicationSpread" -> "Spacing"

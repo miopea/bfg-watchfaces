@@ -174,6 +174,8 @@ object DialRenderer {
      * leaves a crease where its slope changes.
      */
     fun renderGlare(p: DialParams, size: Int = DIAL_SIZE): BufferedImage {
+        // Scaled by the face's own glare control, once, here. See Glare.
+        val peak = Glare.peakAlphaFor(p)
         val margin = Glare.TRAVEL.toInt()
         val w = size + margin * 2
         val img = BufferedImage(w, w, BufferedImage.TYPE_INT_ARGB)
@@ -189,7 +191,7 @@ object DialRenderer {
                 val d = ((x - c) * nx + (y - c) * ny) / scale
                 val i = Glare.intensityAt(d)
                 if (i <= 0.0) continue
-                val alpha = (i * Glare.PEAK_ALPHA).toInt()
+                val alpha = (i * peak).toInt()
                 if (alpha <= 0) continue
                 img.setRGB(x, y, (alpha.coerceAtMost(255) shl 24) or 0xFFFFFF)
             }

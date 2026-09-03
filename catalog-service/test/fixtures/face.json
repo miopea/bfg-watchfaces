@@ -9,6 +9,7 @@
     "scale": 26.0, "depth": 5.0, "freq": 9,
     "stroke": 1.2, "relief": 1.4, "contrast": 30.0,
     "rotate": 45.0, "vignette": 18.0, "sheen": 30.0,
+    "glare": 100.0,
     "dialColor": "#7D7369", "inkColor": "#FCF9F1",
     "showSeconds": true,
     "clockMode": "DIGITAL",

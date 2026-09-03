@@ -62,7 +62,7 @@ fun TuneSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             for (target in ControlInventory.Target.entries) {
-                val controls = ControlInventory.CONTROLS.filter { it.target == target }
+                val controls = ControlInventory.forFace(params).filter { it.target == target }
                 if (controls.isEmpty()) continue
                 Spacer(Modifier.height(18.dp))
                 SectionHeading(

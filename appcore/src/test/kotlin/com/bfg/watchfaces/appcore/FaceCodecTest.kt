@@ -197,4 +197,31 @@ class FaceCodecTest {
             val v = java.net.URLDecoder.decode(it.substringAfter("=", ""), "UTF-8")
             k to v
         }
+
+    /**
+     * A face saved before the tilt glow had a control reads back at full glow.
+     *
+     * This is what lets the control ship with no `generatorVersion` branch.
+     * Every stored face in the catalog and in anybody's library predates the
+     * `glare` key; if the missing key read as anything but 100, adding a slider
+     * would have silently dimmed every face already saved.
+     */
+    @Test
+    fun `a face saved before the glare control reads back at full glow`() {
+        val stored = parse(FaceCodec.toQuery(DialParams())).toMutableMap()
+        stored.remove("glare")
+        assertTrue(!stored.containsKey("glare")) { "the key was not actually removed" }
+        assertEquals(100.0, FaceCodec.fromQuery(stored).glare, 1e-9) {
+            "an older face dimmed itself just by being loaded"
+        }
+    }
+
+    /** And a face that DID choose a value keeps it. */
+    @Test
+    fun `a chosen glare survives the round trip`() {
+        for (v in listOf(0.0, 40.0, 100.0)) {
+            val q = parse(FaceCodec.toQuery(DialParams(glare = v)))
+            assertEquals(v, FaceCodec.fromQuery(q).glare, 1e-9) { "glare=$v did not survive" }
+        }
+    }
 }

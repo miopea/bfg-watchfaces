@@ -1,5 +1,79 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — The tilt glow has a control, and off means off
+
+`glare`, 0-100, on the pattern sliders as "Tilt glow". Asked for directly: the
+light was fixed at [Glare.PEAK_ALPHA] with no way to soften it on a face where
+it fought the pattern.
+
+### The default is the top of the range, on purpose
+
+100 reproduces the light exactly as it shipped. Every face saved before this
+existed carries no `glare` key, reads the default, and emits the same bytes it
+always did — so this needs no `generatorVersion` branch, and
+`GeneratorVersionTest` did not have to move. Defaulting to a tasteful middle
+value would have silently restyled every face already saved, which is the one
+thing that file exists to prevent. Pinned by a test that strips the key from a
+stored face and asserts it loads at 100.
+
+### Zero removes the layer, rather than drawing it transparent
+
+At 0 no `<PartImage>` is emitted, which drops its `<Gyro>` with it. That matters
+more than the pixels: the Gyro is what turns the ACCELEROMETER on, and a
+continuous sensor read is the most expensive thing on the dial. An "off" that
+still read the sensor and multiplied by zero would cost the battery and show
+nothing — the worst of both. Measured, emitting across the range:
+
+```text
+glare    0 -> peak   0, gyros 0, no band
+glare   25 -> peak  35, gyros 1
+glare   50 -> peak  70, gyros 1
+glare   75 -> peak 105, gyros 1
+glare  100 -> peak 140, gyros 1   <- identical to before the control
+```
+
+### The scale lives in the PNG, not on the emitted alpha
+
+The first shape put it on the `<PartImage alpha=...>`, which reads naturally and
+is wrong: the two PREVIEWS do not go through the emitter, they call
+`renderGlare` directly. An emitter-side scale would need scaling again in the
+workbench preview and again in the phone's — a control implemented three times,
+which is three chances to disagree. `Glare.peakAlphaFor` is read by both
+renderers instead, so the previews and the shipped face cannot drift, and the
+emitter keeps the literal `alpha="255"` it always had.
+
+Verified by render as well as by number, because a mean delta has lied here
+before. glare 0 vs 50 vs 100 gave mean channel deltas of 11.78, 23.27 and 34.84
+— monotonic, and additive to within 0.2 — and looking at the images confirms it:
+at 100 a band of light crosses the dial, at 0 the dial is flat and the pattern
+reads evenly.
+
+### A control that does nothing is not offered
+
+`Control.sinceVersion` is new, and `glare` is 13. A saved face KEEPS the version
+it was made with, so a pre-v13 face opened for editing genuinely has no glow;
+showing the slider would be a control that ignores the person using it — the
+same fault as `family="SYNC_TO_DEVICE"`, where every face named a typeface the
+watch did not have and nothing appeared to be wrong. `ControlInventory.forFace`
+is the filter and the phone's tune sheet builds from it.
+
+`supportedBy` is deliberately separate from `enabledFor`: turning the glow down
+to zero must NOT hide its own slider, or the control vanishes at the moment
+somebody drags it to nothing and there is no way to bring it back.
+
+The workbench does not filter, because its state carries no `generatorVersion` —
+it always designs at the current one. The field is served on `/api/controls`
+anyway so the inventory stays self-describing.
+
+### Caught by a test that was right
+
+`ControlInventoryTest` asserts every control changes something when moved to its
+maximum. `glare` is the first control whose DEFAULT is its maximum, so that read
+as a dead mapping. The test's intent is to guard the `with` mapping, not to
+assume where defaults sit, so it now moves to whichever end the default is not
+already on. Separately it caught a real omission: `with` had a `glare` branch and
+`valueOf` did not, which would have made the slider jump under the finger.
+
 ## 2026-09-03 — A sideloaded face is not a face on a real watch
 
 `adb install` of a built `watchfacepush.*` APK reports Success, the package

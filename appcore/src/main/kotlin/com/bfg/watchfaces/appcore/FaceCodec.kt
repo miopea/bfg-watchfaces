@@ -45,6 +45,7 @@ object FaceCodec {
             dialColor = q["dialColor"]?.normalizeHex() ?: d.dialColor,
             inkColor = q["inkColor"]?.normalizeHex() ?: d.inkColor,
             sheen = q.dbl("sheen", d.sheen),
+            glare = q.dbl("glare", d.glare),
             showSeconds = q["showSeconds"]?.let { it == "true" || it == "1" } ?: d.showSeconds,
             // Unknown values fall back to the default rather than throwing: a
             // face written by a NEWER build must still open here, degraded, in
@@ -177,6 +178,7 @@ object FaceCodec {
   "scale": ${p.scale}, "depth": ${p.depth}, "freq": ${p.freq},
   "stroke": ${p.stroke}, "relief": ${p.relief}, "contrast": ${p.contrast},
   "rotate": ${p.rotate}, "vignette": ${p.vignette}, "sheen": ${p.sheen},
+  "glare": ${p.glare},
   "dialColor": "${p.dialColor}", "inkColor": "${p.inkColor}",
   "showSeconds": ${p.showSeconds},
   "clockMode": ${Json.quote(p.clockMode.name)},
@@ -214,6 +216,7 @@ object FaceCodec {
             "engine" to p.engine.name, "scale" to p.scale, "depth" to p.depth, "freq" to p.freq,
             "stroke" to p.stroke, "relief" to p.relief, "contrast" to p.contrast,
             "rotate" to p.rotate, "vignette" to p.vignette, "sheen" to p.sheen,
+            "glare" to p.glare,
             "dialColor" to p.dialColor, "inkColor" to p.inkColor,
             "showSeconds" to p.showSeconds,
             "clockMode" to p.clockMode.name,

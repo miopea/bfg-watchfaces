@@ -395,7 +395,8 @@ object Workbench {
     private fun serveControls(ex: HttpExchange) {
         val controls = com.bfg.watchfaces.generator.ControlInventory.CONTROLS.joinToString(",") { c ->
             """{"id":${jsonStr(c.id)},"min":${c.min},"max":${c.max},"step":${c.step},""" +
-            """"target":${jsonStr(c.target.name)},"integral":${c.integral}}"""
+            """"target":${jsonStr(c.target.name)},"integral":${c.integral},""" +
+            """"sinceVersion":${c.sinceVersion}}"""
         }
         val engines = com.bfg.watchfaces.generator.Engine.entries.joinToString(",") { jsonStr(it.name) }
         val sources = com.bfg.watchfaces.generator.ComplicationSource.entries.joinToString(",") { jsonStr(it.name) }

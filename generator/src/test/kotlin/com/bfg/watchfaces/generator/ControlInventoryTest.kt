@@ -71,8 +71,14 @@ class ControlInventoryTest {
         // Guards the with() mapping: a copy/paste that set the wrong field would
         // leave one control silently doing nothing, or two doing the same thing.
         val base = DialParams()
-        val moved = ControlInventory.with(base, c.id, c.max)
-        assertFalse(base == moved) { "moving ${c.id} to its maximum changed nothing" }
+        // Move to whichever END the default is not already sitting on. `glare`
+        // defaults to its MAXIMUM on purpose -- 100 is the light as it shipped,
+        // so that every face saved before the control existed reproduces
+        // exactly -- and "move to max" would have looked like a dead mapping.
+        val here = ControlInventory.valueOf(base, c.id)
+        val target = if (here == c.max) c.min else c.max
+        val moved = ControlInventory.with(base, c.id, target)
+        assertFalse(base == moved) { "moving ${c.id} to $target changed nothing" }
     }
 
     @Test

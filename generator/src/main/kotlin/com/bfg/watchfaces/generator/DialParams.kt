@@ -557,6 +557,28 @@ data class DialParams(
     val sheen: Double = 30.0,
 
     /**
+     * How strong the tilt glow is, 0-100. 100 is the light as it shipped.
+     *
+     * ## Why the default is the top of the range
+     *
+     * Every face saved before this existed was drawn at full strength, and the
+     * emitter showed the band at `alpha="255"`. Defaulting to 100 makes the
+     * stored value reproduce that byte for byte, so no face already saved
+     * changes and this needs no `generatorVersion` branch. Defaulting to a
+     * "nicer" middle value would have restyled every existing face silently,
+     * which is the thing `GeneratorVersionTest` exists to prevent.
+     *
+     * ## Zero removes the layer rather than hiding it
+     *
+     * At 0 the `<PartImage>` is not emitted at all, which also drops its
+     * `<Gyro>`. That matters more than the pixels: the Gyro is what puts the
+     * ACCELEROMETER on, and a continuous sensor read is the most expensive
+     * thing on the dial. "Off" that still read the sensor and multiplied by
+     * zero would cost the battery and show nothing -- the worst of both.
+     */
+    val glare: Double = 100.0,
+
+    /**
      * Id of an imported image, used only by [Engine.TEXTURE]. Empty means none,
      * and TEXTURE with no image falls back to a plain dial rather than failing.
      *

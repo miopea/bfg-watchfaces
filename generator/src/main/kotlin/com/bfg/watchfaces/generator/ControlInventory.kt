@@ -62,7 +62,19 @@ object ControlInventory {
         val max: Double,
         val step: Double,
         val target: Target,
-        val integral: Boolean = false
+        val integral: Boolean = false,
+        /**
+         * The first `generatorVersion` this control does anything on.
+         *
+         * A saved face KEEPS the version it was made with, so an older face
+         * opened for editing genuinely has no such setting. Showing the slider
+         * anyway would be a control that silently ignores the person using it
+         * -- the exact fault [FaceFont] documents, where every face emitted a
+         * font name the watch did not have and nothing appeared to be wrong.
+         *
+         * 1 means "always", which is every control that predates this field.
+         */
+        val sinceVersion: Int = 1
     ) {
         /** Every value this control can actually take, in order. */
         fun values(): List<Double> {
@@ -75,6 +87,16 @@ object ControlInventory {
             return out.distinct()
         }
     }
+
+    /**
+     * The controls that do something on THIS face, in inventory order.
+     *
+     * Both front ends filter through this rather than deciding for themselves,
+     * for the reason the whole object exists: two lists that must agree
+     * eventually do not.
+     */
+    fun forFace(p: DialParams): List<Control> =
+        CONTROLS.filter { p.generatorVersion >= it.sinceVersion }
 
     /**
      * In the order a UI should show them: the pattern first, then the layout.
@@ -93,6 +115,7 @@ object ControlInventory {
         Control("contrast", 0.0, 100.0, 1.0, Target.PATTERN),
         Control("sheen", 0.0, 100.0, 1.0, Target.PATTERN),
         Control("vignette", 0.0, 100.0, 1.0, Target.PATTERN),
+        Control("glare", 0.0, 100.0, 1.0, Target.PATTERN, sinceVersion = 13),
 
         Control("timeSize", 40.0, 170.0, 1.0, Target.LAYOUT, integral = true),
         // 300, not 380. Measured: with all five complication slots on, every
@@ -146,6 +169,7 @@ object ControlInventory {
         "rotate" -> p.copy(rotate = value)
         "contrast" -> p.copy(contrast = value)
         "sheen" -> p.copy(sheen = value)
+        "glare" -> p.copy(glare = value)
         "vignette" -> p.copy(vignette = value)
 
         "timeSize" -> p.copy(layout = p.layout.copy(timeSize = value.toInt()))
@@ -176,6 +200,7 @@ object ControlInventory {
         "rotate" -> p.rotate
         "contrast" -> p.contrast
         "sheen" -> p.sheen
+        "glare" -> p.glare
         "vignette" -> p.vignette
 
         "timeSize" -> p.layout.timeSize.toDouble()
