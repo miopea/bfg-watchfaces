@@ -235,6 +235,14 @@ On Google Play (2026-08-29):
   review.** Play warns and asks; the earlier submission then reads `Canceled`
   in Submission activity. So stage every form factor BEFORE submitting —
   submission 1 was thrown away eighteen minutes in for exactly this reason.
+- **That applies to REVIEWED SURFACES only. A testing track is exempt.**
+  Measured 2026-09-03: phone 1.76 (77) went to `internal` through
+  `play-release.py` while submission 2 was in review, and submission activity
+  was byte-identical before and after — no third row, nothing cancelled, and
+  the publishing overview grew no "not yet submitted" section. So a fix can be
+  put in front of testers mid-review; only production, the store listing and
+  the App content declarations restart the queue. Check submission activity
+  either side anyway — it costs one page load and the failure is expensive.
 - **Target age is declared 18 and over**, and the "restrict users Google
   determines to be minors" box is deliberately LEFT OFF — that box would block
   installs, the age declaration alone does not. 18+ keeps the app out of the
