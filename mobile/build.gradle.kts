@@ -24,8 +24,8 @@ android {
         // so anything lower fails the manifest merge. Android 9 and up.
         minSdk = 28
         targetSdk = 36
-        versionCode = 77
-        versionName = "1.76"
+        versionCode = 78
+        versionName = "1.77"
         // pack ships as native libs; limit ABIs to what you actually ship
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
@@ -80,7 +80,20 @@ android {
             // Fail loudly rather than emit an unsigned bundle that Play rejects
             // with a message about the upload key rather than about this.
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
+            // R8 ON, with rules in proguard-rules.pro that name every thing
+            // reached by name at runtime — the JNI bridge into pack and the
+            // JCA provider lookups the on-device signer makes. Play reported
+            // obfuscation at 1% with this off.
+            //
+            // NOT `isShrinkResources`. That is a different risk: resource
+            // shrinking removes anything it cannot see referenced, and this app
+            // resolves drawables for the built-in dials and the complication
+            // icons through generated code. Size is not what Play flagged.
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 

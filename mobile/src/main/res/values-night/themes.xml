@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The same bare shell as values/themes.xml, on the DARK platform parent.
+
+  Why this file exists: the light theme was declared unconditionally, so the
+  window background before Compose draws was white whatever the phone's theme —
+  a white flash on every cold launch in dark mode, and a light-bar hint to the
+  system on an app that is usually dark. Compose already follows the system
+  palette; this is only about the frame it paints into before Compose runs.
+-->
+<resources>
+  <style name="Theme.BfgWatchFaces" parent="android:Theme.Material.NoActionBar" />
+</resources>
