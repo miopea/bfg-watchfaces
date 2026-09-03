@@ -52,7 +52,7 @@ actually installed.
 This is on the BEFORE list because it is a shipped surface that looks unfinished,
 and a reviewer opens it.
 
-### 7. The About page has no logos, and links avoid the Play Store — BUILD
+### 7. ~~The About page has no logos, and links avoid the Play Store~~ — DONE 2026-09-03
 
 Sibling products are listed as text with links to `bfgsolutions.net`. Two of them
 are on Play and should link there, because that is where an Android reader can
@@ -66,12 +66,34 @@ act:
 Confirmed against the live developer listing 2026-09-03. VoiceBridge, Swarm and
 Shotcraft are not on Play and keep their web links.
 
+Shipped: both Android apps carry their own launcher icon, taken from their own
+repositories, and their rows open `market://details?id=...`. The three web and
+CLI products get a lettered tile in their own brand colour — they have no
+launcher icon anywhere, and inventing one or stretching a marketing image would
+be worse than a deliberate tile. "On Google Play" appears only on the two rows
+where it is true.
+
+Not done: the real marks for VoiceBridge, Swarm and Shotcraft. They exist only
+as SVG on bfgsolutions.net, and nothing in this environment can rasterise SVG —
+no rsvg, no Inkscape, no ImageMagick, no cairosvg, and the browser route returns
+base64 that the tool blocks. Drop PNGs into `mobile/src/main/res/drawable-nodpi/`
+as `logo_<name>.png` and set `logo =` on the product to swap a tile for a mark.
+
 ## After submit
 
 ### A face package is named after the face, everywhere
 
-In the phone's Wear OS companion app a pushed face appears under its own name
-("Glow 100") rather than under "BFG Watch Faces". Reported 2026-09-03.
+In the phone's Wear OS companion app, "On your watch", a pushed face appears
+under its own name rather than under "BFG Watch Faces". Reported 2026-09-03 with
+a screenshot.
+
+**The face in that screenshot is named "Default", which is what made it look
+like a bug in naming rather than a question about labels.** Verified by pulling
+the APK off the watch: package `com.bfg.watchfaces.watchfacepush.default`,
+`application-label:'Default'`, and the WFF header reads "Default - Watch Face
+Format definition ... v13". Nothing in this codebase produces that name, and
+`git log -S` finds no build that ever did, so it was typed. The companion app is
+showing the face name correctly.
 
 **Investigate before promising a fix, because the obvious fix is wrong.** Watch
 Face Push installs one PACKAGE PER FACE, and that package has exactly one

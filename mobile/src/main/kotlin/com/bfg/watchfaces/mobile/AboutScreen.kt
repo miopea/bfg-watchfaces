@@ -1,5 +1,8 @@
 package com.bfg.watchfaces.mobile
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.res.painterResource
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -58,37 +61,63 @@ private data class Product(
     val availability: String,
     val href: String,
     val badge: String?,
-    val tagline: String
+    val tagline: String,
+    /**
+     * The product's own launcher icon, when it HAS one.
+     *
+     * Only the two Android apps do, and that is not a gap to paper over: the
+     * other three are web and CLI products with no launcher icon anywhere.
+     * They get a lettered tile in their own brand colour rather than a
+     * borrowed or invented mark.
+     */
+    val logo: Int? = null,
+    /** Brand colour for the lettered tile, when there is no [logo]. */
+    val tint: Long = 0xFF4A4A4A,
+    /**
+     * Play package, for the products that are actually on Play.
+     *
+     * Where one exists it wins over [href]: an Android reader can install from
+     * Play and cannot install from a marketing page. Confirmed against the live
+     * developer listing 2026-09-03 rather than guessed.
+     */
+    val playId: String? = null
 )
 
 private val PRODUCTS = listOf(
     Product(
         "BudgetBug", "Web · iOS · Android", "https://budgetbug.live", null,
         "A personal budget tracker that syncs with your bank, tracks recurring bills, " +
-            "and shows you exactly where your money is going."
+            "and shows you exactly where your money is going.",
+        logo = R.drawable.logo_budgetbug,
+        playId = "live.budgetbug.app"
     ),
     Product(
         "Sculpt Studio", "Web · iOS · Android",
         "https://bfgsolutions.net/products/sculptstudio", null,
         "Goal-driven strength training — a guided session runner, honest progression, " +
-            "and an AI coach that can read your data and program your week."
+            "and an AI coach that can read your data and program your week.",
+        logo = R.drawable.logo_sculptstudio,
+        playId = "com.bfg.sculptstudio"
     ),
     Product(
         "VoiceBridge", "Web", "https://bfgsolutions.net/products/voicebridge", null,
         "Real-time speech translation. Speak once, reach everyone in the room — " +
-            "in their own language."
+            "in their own language.",
+        tint = 0xFF2563EB
     ),
     Product(
         "Swarm", "Linux · macOS · WSL", "https://bfgsolutions.net/products/swarm",
         "Free & open source",
         "A web-based control center for AI coding agents. Manage one agent or ten " +
-            "from a single browser tab."
+            "from a single browser tab.",
+        tint = 0xFFD69C28
     ),
     Product(
         "Shotcraft", "CLI · GitHub", "https://bfgsolutions.net/products/shotcraft",
         "Free & open source",
         "Capture your live app and ship App Store-ready screenshots, README hero " +
-            "images, and social cards in one command."
+            "images, and social cards in one command.",
+        tint = 0xFF10B981
     )
 )
 
@@ -111,7 +140,7 @@ fun AboutScreen(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(28.dp))
         SectionHeading("Also from BFG Solutions")
         for (product in PRODUCTS) {
-            ProductRow(product) { open(product.href) }
+            ProductRow(product) { open(destinationFor(product)) }
             HorizontalDivider()
         }
 
@@ -208,8 +237,10 @@ private fun ProductRow(product: Product, onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(vertical = 15.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        ProductLogo(product)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -244,11 +275,68 @@ private fun ProductRow(product: Product, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // Said only where it is TRUE. Three of these are web and CLI
+            // products, and a Play line under them would be a promise the
+            // tap cannot keep.
+            if (product.playId != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "On Google Play ›",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
         Text(
             "›",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.outline
         )
+    }
+
+}
+
+/**
+ * A product's mark: its real launcher icon, or a lettered tile in its colour.
+ *
+ * The two Android apps ship a launcher icon and it is used as-is. The other
+ * three have none — they are web and CLI products — so rather than inventing a
+ * logo or stretching a marketing image, they get their initial on their own
+ * brand colour, taken from the icon each one uses on bfgsolutions.net.
+ */
+/**
+ * Where a product row goes.
+ *
+ * Play wins wherever there IS a Play listing, because the reader is holding an
+ * Android phone: they can install from Play and cannot install from a marketing
+ * page. `market://` opens the Play app directly; it is the documented scheme and
+ * `open` already falls back safely if nothing handles it.
+ */
+private fun destinationFor(product: Product): String =
+    if (product.playId != null) "market://details?id=${product.playId}" else product.href
+
+@Composable
+private fun ProductLogo(product: Product) {
+    val shape = RoundedCornerShape(12.dp)
+    if (product.logo != null) {
+        Image(
+            painter = painterResource(product.logo),
+            // Decorative: the product name is right beside it, and a screen
+            // reader announcing the logo would read the name twice.
+            contentDescription = null,
+            modifier = Modifier.size(48.dp).clip(shape)
+        )
+    } else {
+        Box(
+            modifier = Modifier.size(48.dp).clip(shape).background(Color(product.tint)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                product.name.first().toString(),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            )
+        }
     }
 }
