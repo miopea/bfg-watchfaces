@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.wear.watchfacepush.WatchFacePushManagerFactory
 import com.bfg.watchfaces.appcore.ActivationConsent
+import com.bfg.watchfaces.appcore.InstallPlan
 import java.io.File
 
 /**
@@ -132,7 +133,19 @@ object FaceInstaller {
                 // the watch is reset by the next send, and this spends an
                 // addWatchFace call every time.
                 val ours = existing.installedWatchFaceDetails.firstOrNull()
-                if (ours != null && !resetComplications) {
+                // The DECISION comes from :appcore, not from conditions written
+                // here. These branches were only ever reachable on a wrist, and
+                // two of them cost real damage before anything could test them.
+                // InstallPlanTest exercises every one in milliseconds.
+                //
+                // The `ours != null` guards below are for the COMPILER, so the
+                // details smart-cast; the choice is InstallPlan's alone.
+                val route = InstallPlan.route(
+                    oursSlotId = ours?.slotId,
+                    resetComplications = resetComplications,
+                    freeSlots = existing.remainingSlotCount
+                )
+                if (ours != null && route is InstallPlan.Route.UpdateInPlace) {
                     // ASK BEFORE, because afterwards the answer is wrong.
                     //
                     // `isWatchFaceActive` returns FALSE in the moments after
@@ -201,7 +214,7 @@ object FaceInstaller {
                         // and leave it alone.
                         val wearingOurs = runCatching { manager.isWatchFaceActive(ours.packageName) }
                             .getOrElse { false }
-                        if (wearingOurs) {
+                        if (!InstallPlan.mayRemoveAfterFailedUpdate(wearingOurs)) {
                             Log.e(TAG, "updateWatchFace failed and ours is the active face; " +
                                 "refusing to remove it", cause)
                             throw cause
@@ -222,7 +235,7 @@ object FaceInstaller {
                     // before, EVERY install tried, and a face sent to a watch
                     // wearing something else silently stopped switching.
                     // Already worn means already done: no call, nothing spent.
-                    val asked = if (wasWorn) {
+                    val asked = if (!InstallPlan.spendActivation(route, wasWorn)) {
                         Log.i(TAG, "ours was already on the wrist; the update keeps it there")
                         true
                     } else {
@@ -255,7 +268,7 @@ object FaceInstaller {
                         note = listOf(fallback, activationNote, slotPicture)
                             .filter { it.isNotEmpty() }.joinToString(" | ")
                     )
-                } else if (ours != null) {
+                } else if (ours != null && route is InstallPlan.Route.ReplaceOurs) {
                     // Whether OUR face is the one on the wrist decides if the
                     // new one has to be activated. Ask BEFORE removing it,
                     // because afterwards there is nothing left to ask about.
@@ -281,14 +294,16 @@ object FaceInstaller {
                     // setWatchFaceAsActive has an undocumented attempt limit
                     // this project has already hit, so it is not spent on a
                     // face that was sitting in the picker anyway.
-                    val asked = if (wasActive) onFaceInstalled(context, details.slotId, details.packageName) else false
+                    val asked = if (InstallPlan.spendActivation(route, wasActive)) {
+                        onFaceInstalled(context, details.slotId, details.packageName)
+                    } else false
                     // Same as the update branch: the activation call is not the
                     // authority on whether the face is on the wrist.
                     val active = asked || runCatching {
                         manager.isWatchFaceActive(details.packageName)
                     }.getOrElse { false }
                     Result.Installed(details.slotId, replaced = true, active = active)
-                } else if (existing.remainingSlotCount > 0) {
+                } else if (route is InstallPlan.Route.AddFresh) {
                     val details = manager.addWatchFace(fd, token)
                     val asked = onFaceInstalled(context, details.slotId, details.packageName)
                     val active = asked || runCatching {
@@ -317,13 +332,7 @@ object FaceInstaller {
                     // wearer cannot be left to work this out -- one did, by
                     // uninstalling the watch app on a hunch, after an evening
                     // of sends that all reported success.
-                    Result.Failed(
-                        IllegalStateException(
-                            "the watch's face slot is full and holds nothing this app " +
-                                "can replace. Reinstall BFG Watch Faces on the watch, " +
-                                "then send again."
-                        )
-                    )
+                    Result.Failed(IllegalStateException(InstallPlan.NO_SLOT_MESSAGE))
                 }
             }
         }.getOrElse { Result.Failed(it, slotPicture) }

@@ -141,10 +141,13 @@ Verified — built and run, not assumed:
 - `:generator` — 455 tests green, including validation against Google's official
   XSD, a v1↔v2 guard proving the version bump changed no existing geometry, and
   every complication source checked against the schema's own provider list.
-- `:appcore` — 102 tests green. Rules and words the shipped apps share, pure
+- `:appcore` — 183 tests green. Rules and words the shipped apps share, pure
   JVM. Not `:generator` (that is the file format) and not `:workbench` (never
   shipped). Holds `ActivationConsent`, whose one-shot rule guards the only
-  unrecoverable action in the system.
+  unrecoverable action in the system, and `InstallPlan`, which holds the install
+  DECISIONS — which route, whether a failed update may remove the worn face,
+  whether to spend an activation — so the branches that used to be reachable
+  only on a wrist run here in milliseconds. See `DECISIONS.md` 2026-09-03.
 - `:workbench` — 135 tests green. Serves the app at localhost:7777; bakes
   `dial_bg.png`, `preview.png`, `watchface.xml`, `strings.xml` and the manifest
   package from parameters. Quantization measured at 64 colours, mean error

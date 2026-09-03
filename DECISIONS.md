@@ -1,5 +1,80 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — The install decisions are testable; the transport still is not
+
+Swarm task 01a064e8. `backlog.md` #10 calls the transport the single biggest gap
+in this project's ability to test itself, and it still is. This narrows it
+without pretending to close it.
+
+### What was untestable, and what actually hurt
+
+Every expensive bug in this project has lived between "the bytes left the phone"
+and "the face is on the watch", and none of that runs here — the emulators
+cannot pair, and this machine cannot run one at all (`/dev/kvm`). But the two
+that cost the most were never transport. They were DECISIONS:
+
+- a fallback removed the face the operator was WEARING, and `setWatchFaceAsActive`
+  is spendable once per install, so nothing could put it back;
+- activation was spent on every send, exhausting that same budget, after which
+  the app told somebody to long-press and pick a face already on their wrist.
+
+Neither needed a watch to catch. They were unreachable only because they sat
+inside a `runCatching` around a system service and a `ParcelFileDescriptor`.
+
+### `InstallPlan`, in `:appcore`
+
+Three pure functions and a sealed route: which way an install goes, whether a
+failed update may fall back to remove-and-add, and whether to spend an
+activation. `InstallPlanTest` covers them in milliseconds with no Android.
+
+`:appcore` for the same reason `ActivationConsent` is there — a rule both sides
+depend on, guarding the very budget that file guards.
+
+### The asymmetry worth having a test for
+
+`UpdateInPlace` spends activation when the face was NOT worn.
+`ReplaceOurs` spends it when the face WAS worn.
+
+Both are right, and they look like a bug next to each other: an update INHERITS
+active status, so a worn face is already where it should be; a replace destroys
+the slot and deactivates whatever was in it. A test asserts the two disagree for
+every input, so flattening them fails loudly.
+
+### It is wired, not parallel
+
+`FaceInstaller` calls `InstallPlan` — it does not re-implement it. Checked by
+grep afterwards: no `remainingSlotCount > 0`, no `if (wearingOurs)`, no
+`if (wasWorn)`, no second copy of the dead-end message. That matters more than
+usual here: `SlotGeometry` exists because the same arithmetic was written twice
+with a test asserting the copies agreed, and they agreed while both were wrong.
+
+Behaviour is provably unchanged, which is why this ships with the next release
+rather than one of its own. `spendActivation(UpdateInPlace, worn)` is `!worn`,
+and the old code read `if (wasWorn) true else ask` — the same function.
+`mayRemoveAfterFailedUpdate(w)` is `!w`, and the old guard was `if (w) throw`.
+
+### Verified by mutation, not by passing
+
+A green test nobody has watched fail is not evidence. Both invariants were
+broken on purpose and the right tests caught them:
+
+```text
+mayRemoveAfterFailedUpdate -> true   =>  "a failed update never falls back to
+                                          removing the worn face" FAILED
+UpdateInPlace -> faceWasOnWrist      =>  "update and replace want activation in
+                                          opposite circumstances" FAILED
+```
+
+### What this does NOT do
+
+The transport is still first run on a wrist. `ChannelClient`, `receiveFile`,
+the Data Layer and the DWF receiver are all untouched by this and all still
+need hardware. The task stays open on that; only its second avenue is done.
+
+Its first avenue — pairing a Wear emulator to a phone emulator here — is
+environmental and was not attempted: CLAUDE.md says to name environmental
+problems and stop, and this box cannot run an emulator at all.
+
 ## 2026-09-03 — A face is labelled with its own name, and that is correct
 
 Reported from the Wear OS companion app's "On your watch": a pushed face showed

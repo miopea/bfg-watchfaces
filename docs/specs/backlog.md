@@ -149,6 +149,16 @@ answering "what is left" — a stale doc reads exactly like a true one.
 
 ## 10. Testing the transport without real hardware
 
+**Partly addressed 2026-09-03.** The DECISIONS an install makes now live in
+`InstallPlan` (`:appcore`) and are covered by `InstallPlanTest` in milliseconds
+with no Android — including the two that reached a wrist: never removing the
+face somebody is wearing, and not spending the one-per-install activation on a
+face that is already there. `FaceInstaller` calls it rather than repeating it.
+
+The transport itself is unchanged and still needs hardware. See `DECISIONS.md`
+2026-09-03.
+
+
 Every expensive bug this week lived between "the bytes left the phone" and "the
 face is on the watch", and none of it can be exercised here: the emulators
 cannot pair, so the Data Layer path — including the new install report — is
