@@ -216,16 +216,25 @@ Watch Face Push installs a face (2026-08-29):
 
 On Google Play (2026-08-29):
 
-- **Submitted for production review on 2026-09-03**, submission 1, status
-  `In review`. Twelve changes went together: the `1.75 — first public release`
-  production release (bundle 76, phone form factors only), all 176 countries
-  plus rest of world, the default store listing, content rating, target
-  audience, privacy policy, ads, data safety, health apps, the Wear OS form
-  factor opt-in and the app category. **The Wear bundle is NOT in it** — this
-  track is scoped to Phones/Tablets/Chrome OS/XR and Play rejects a Wear bundle
-  there, so `wear:production` is a second release after this one lands.
-  Two advisory warnings were accepted: no R8 mapping file and no native debug
-  symbols. Both only affect how readable a crash report is.
+- **Submitted for production review on 2026-09-03**, submission 2, status
+  `In review` — phone AND watch together: the `1.75 — first public release`
+  production release (bundle 76) and the `1.35 — watch companion` Wear OS
+  production release (bundle 1028), plus 177 countries, the default store
+  listing, content rating, target audience, privacy policy, ads, data safety,
+  health apps, the Wear OS form factor opt-in and the app category.
+  Two advisory warnings were accepted on both bundles: no R8 mapping file and
+  no native debug symbols. Both only affect how readable a crash report is.
+- **"A Wear bundle cannot go on the phone track" is about TRACKS, not about
+  submissions.** There are two production tracks behind one listing, reached
+  through the form-factor switcher at the top right of Test and release:
+  `tracks/4698091721647438032` (Phones, Tablets, Chrome OS, Android XR) and
+  `tracks/4698552052103227019` (Wear OS). Each takes its own release; the Wear
+  track inherits the phone track's countries rather than needing its own.
+  Both go to Google in ONE review.
+- **Adding a change while a review is running CANCELS and RESTARTS that
+  review.** Play warns and asks; the earlier submission then reads `Canceled`
+  in Submission activity. So stage every form factor BEFORE submitting —
+  submission 1 was thrown away eighteen minutes in for exactly this reason.
 - **Target age is declared 18 and over**, and the "restrict users Google
   determines to be minors" box is deliberately LEFT OFF — that box would block
   installs, the age declaration alone does not. 18+ keeps the app out of the
