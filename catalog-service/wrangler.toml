@@ -52,4 +52,8 @@ GOOGLE_CLIENT_ID = "819189022552-gll7rn5ic7f6ruo6oj5ii684945ke35g.apps.googleuse
 #   IP_SALT            salts the hashed IP used for rate limiting AND the hashed
 #                      Google subject id stored as author_key, so neither a raw
 #                      address nor a raw subject id is ever written down
-BUILD_SHA = "5bbed9c"
+# Stamped BY HAND, and it drifted: it read 5bbed9c through several deploys
+# after that commit, which makes `curl /config` agree with itself while
+# naming the wrong build. Update it in the same commit as any deploy --
+# a version marker nobody moves is worse than none, because it is believed.
+BUILD_SHA = "3246134"
