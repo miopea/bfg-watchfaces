@@ -1,5 +1,79 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — Two gaps closed by not building one of them
+
+Swarm task 01a064e8. Two unrelated items; both ended somewhere other than where
+the ticket pointed.
+
+### `HEART_RATE_Z` is not a heart rate zone
+
+`backlog.md` #4 listed it as a schema source nothing here offers, alongside the
+step and accelerometer sources that became the rim ring and the tilt glow. The
+obvious reading of the name is ZONE, and a zone would have been worth having —
+a labelled "Zone 3" is something an athlete uses.
+
+It is not a zone. **The `_Z` suffix means ZERO-PADDED**, and it means that
+consistently across all nine sources carrying it: `SECOND_Z`, `MINUTE_Z`,
+`HOUR_0_11_Z`, `HOUR_1_12_Z`, `HOUR_0_23_Z`, `HOUR_1_24_Z`, `DAY_Z`, `MONTH_Z`,
+`HEART_RATE_Z`. Google's own source-type reference:
+
+> padded with zeros on the left as needed to make the value at least 2
+> characters long
+
+So it is the same reading `HEART_RATE` gives — which this app has offered as a
+provider-backed complication all along — differing only in padding.
+
+**Declined, and that is the work.** Adding it would put a second "Heart rate" in
+the picker that a person cannot distinguish from the first, and its failure mode
+is worse than the one already there: with no reading it renders `00`, which
+reads as a heart rate of zero rather than as no reading. The provider-backed one
+shows the provider's own empty state.
+
+Checking the name cost one documentation lookup. Building it on the assumption
+would have shipped a control labelled "Zone" showing `65`.
+
+### `reskin.sh` worked, and that is why it is gone
+
+Never run since it was written. Run now, once, for the first time: it validated
+the incoming `watchface.xml` against the schema, swapped the dial and the face
+definition, re-signed, and passed both its signature check and the Push
+allowlist check. The mechanism is sound — `resources.arsc` stores resource
+PATHS, not bytes, so the entries can be swapped in a built APK.
+
+Then the artefact was inspected rather than the exit code trusted, and that is
+where it ended:
+
+```text
+new dial PNG   sha1 420356ed... == the file passed in     ✓
+watchface.xml  "Reskin Probe - Watch Face Format ..."     ✓
+package        com.bfg.watchfaces.watchfacepush.forecast_test   ✗
+label          'Forecast Test'                            ✗
+```
+
+The reskinned face carries the TEMPLATE's identity. Its own header warned this
+would happen — "google/pack ... can also vary the package name, unlike this
+script" — but the consequence is sharper than that sentence suggests now that
+Watch Face Push is understood: a face's name IS its package suffix AND its
+carousel label. A reskinned face would appear on the wrist under the wrong name,
+and installing it would REPLACE whatever face shares that package rather than
+arriving as a new one.
+
+So it works, and what it produces is unusable here. Its real job — proving the
+on-device reskin pipeline before `google/pack` existed — is done and shipped;
+`google/pack` runs the same idea on the phone, measured at 2.7s for a 520KB APK,
+and gets the package name right.
+
+Deleted rather than kept. A script listed among the repo's commands reads as a
+supported path, and this one silently mislabels faces. What it proved is
+recorded here and in the two `DECISIONS.md` entries that already cite it; git
+keeps the source.
+
+### Also corrected
+
+`CLAUDE.md` still listed "a clean install by a human with no adb" as never
+tested. The operator reported doing it many times, earlier the same day. The
+"still never tested" list is now empty.
+
 ## 2026-09-03 — v14: a drawn weather slot says something when there is no weather
 
 Swarm task 01a064e7. `WEATHER.IS_AVAILABLE` and `WEATHER.IS_ERROR` have been in

@@ -96,7 +96,16 @@ its neighbours.
 
 - ~~`STEP_GOAL`, `STEP_PERCENT` — a goal ring~~ DONE 2026-08-30: a rim ring,
   bound to `[STEP_PERCENT]` with `<Transform>`, costing no slot
-- `HEART_RATE_Z`
+- ~~`HEART_RATE_Z`~~ — CONSIDERED AND DECLINED 2026-09-03. It is not a heart
+  rate ZONE. The `_Z` suffix means ZERO-PADDED, consistently across all nine
+  sources that carry it (`SECOND_Z`, `MINUTE_Z`, `HOUR_*_Z`, `DAY_Z`,
+  `MONTH_Z`, `HEART_RATE_Z`) — Google's source-type reference: "padded with
+  zeros on the left as needed to make the value at least 2 characters long".
+  So it is the same reading `HEART_RATE` gives, which this app already offers
+  provider-backed, differing only in padding. Declined because it would put a
+  near-duplicate "Heart rate" in the picker whose failure mode is worse: an
+  absent reading renders `00`, which reads as a heart rate of zero rather than
+  as no reading. See `DECISIONS.md` 2026-09-03.
 - `ACCELEROMETER_ANGLE_X/Y/Z/XY` with `ACCELEROMETER_IS_SUPPORTED` — what
   tilt-reactive faces are built from
 

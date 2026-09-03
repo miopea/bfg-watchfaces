@@ -115,7 +115,6 @@ make docs-check                         # markdownlint + cspell over the docs
 ./gradlew :mobile:assembleDebug
 
 cd watchface-template && ./build.sh    # validates + builds build/$FACE_SLUG.apk
-cd watchface-template && ./reskin.sh <template.apk> <bg.png> <wff.xml> <out.apk>
 
 scripts/setup-emulators.sh             # create + pair phone and Wear AVDs
 scripts/remote-adb.sh                  # check the bridge to a watch on ANOTHER machine
@@ -156,8 +155,11 @@ Verified — built and run, not assumed:
   Watch Face Push permits, named and packaged after the design being built.
   Verified by `unzip -l`, `apksigner verify` and `aapt2 dump badging` on
   2026-08-27.
-- `reskin.sh` — swaps resources into a built APK without recompiling.
-  (Written and read, but not exercised since the workbench landed.)
+- `reskin.sh` — **deleted 2026-09-03.** It was run once, for the first time,
+  and it worked: new dial and new `watchface.xml` in, signature and Push
+  allowlist verified. It also produced a face carrying the TEMPLATE's package
+  and label, which is fatal here — a face's name IS its package and its
+  carousel entry. See `DECISIONS.md` 2026-09-03.
 
 Installed and driven on emulators (2026-08-29):
 
@@ -265,11 +267,9 @@ The community catalog is live (2026-08-30):
   still said 9, which would have refused every submission the day sharing
   opened. Deployed 2026-08-31; `curl .../config` is how you check.
 
-Still never tested:
-
-- **`reskin.sh`** — written and read, not exercised since the workbench landed.
-- **A clean install by a human with no adb.** The one launch gate nothing here
-  can close. See `launch-scope.md` §3.1.
+Still never tested: nothing on this list. The clean install by a human with no
+adb — the one gate nothing here could close — has been done by the operator
+many times, reported 2026-09-03. See `docs/specs/launch-checklist.md`.
 
 Photo dials (2026-09-02):
 

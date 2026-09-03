@@ -139,9 +139,19 @@ needs something from the platform.
 
 A schema source nothing here offers. `backlog.md` #4.
 
-### `reskin.sh` has never been exercised
+### ~~`reskin.sh` has never been exercised~~ — RUN, THEN DELETED 2026-09-03
 
-Written and read, not run since the workbench landed.
+Run once for the first time and it worked — schema-validated, resources swapped,
+signature and Push allowlist both verified. Inspecting the artefact rather than
+the exit code showed why it cannot be used: the output carries the TEMPLATE's
+package and label, so a reskinned face appears on the wrist under the wrong name
+and replaces whatever shares that package. Deleted; `DECISIONS.md` 2026-09-03.
+
+### ~~`HEART_RATE_Z`~~ — CONSIDERED AND DECLINED 2026-09-03
+
+The `_Z` suffix means zero-padded, not zone. It is the same reading
+`HEART_RATE` gives, which is already offered provider-backed, and its empty
+state renders `00`.
 
 ### The transport cannot be tested without hardware
 
