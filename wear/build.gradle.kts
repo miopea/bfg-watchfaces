@@ -19,8 +19,8 @@ android {
         // the phone and watch apps ship as two artefacts under one listing. The
         // scheme is "wear = phone + 1000", so the two never collide and it stays
         // obvious which is which in the console.
-        versionCode = 1025
-        versionName = "1.32"
+        versionCode = 1026
+        versionName = "1.33"
     }
     /**
      * Release signing. Identical to `:mobile`'s and deliberately so: both
@@ -53,7 +53,10 @@ android {
     // Java and Kotlin must agree, or the build fails with "Inconsistent
     // JVM-target compatibility" -- the scaffolds set Kotlin to 17 and left Java
     // at the 1.8 default, which only shows up once there is Kotlin to compile.
-    buildFeatures { compose = true }
+    // buildConfig for VERSION_NAME/VERSION_CODE: the watch screen shows them,
+    // because the version is the first thing anyone is asked for when a send
+    // goes wrong and the watch is the far end of that.
+    buildFeatures { compose = true; buildConfig = true }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -88,5 +91,9 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.androidx.activity.compose)
     implementation(libs.wear.compose.material3)
+    // "Open on phone". RemoteActivityHelper is the only supported way for a
+    // watch to start something on the paired phone -- an app cannot reach
+    // across the Data Layer and start an activity itself.
+    implementation(libs.wear.remote.interactions)
     implementation(libs.wear.compose.foundation)
 }

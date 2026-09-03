@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     android:versionCode="1"
     android:versionName="1.0"
-    package="com.bfg.watchfaces.watchfacepush.brushed_steel">
+    package="com.bfg.watchfaces.watchfacepush.glow_100">
 
   <!--
     Declared HERE rather than only as aapt2 link flags, so the manifest fully

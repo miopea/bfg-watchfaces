@@ -30,6 +30,22 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
+      <!--
+        So the WATCH can open this app. RemoteActivityHelper hands the phone an
+        ACTION_VIEW intent, and without something to view it can only open the
+        Play listing, which for an app already installed is a page with an
+        "Open" button on it, one tap short of useful.
+
+        A private scheme rather than an https App Link: an App Link needs
+        assetlinks.json served from a verified domain, and the only caller is a
+        watch we also wrote. There is nothing here worth a domain round trip.
+      -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="bfgwatchfaces" android:host="open" />
+      </intent-filter>
     </activity>
   </application>
 </manifest>

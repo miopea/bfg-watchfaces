@@ -1,5 +1,62 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — The watch app answers questions instead of announcing itself
+
+Photographed on a wrist and reported: the watch screen showed the app name, one
+status sentence and a hint. Nothing about permissions once they were granted, no
+way to reach the phone, no sign of what was actually installed.
+
+### What it shows now, in this order
+
+**What is on the watch, first.** The screen used to open on a sentence about a
+permission, which is the app talking about itself. The thing somebody opens it
+to find out is whether their faces arrived. So: how many faces this app has
+installed, which one is being worn, and how many slots are free.
+
+Free slots matter more than they look. The limit is 1 on some watches, and
+somebody whose next send will silently replace a face should be able to see that
+coming rather than discover it.
+
+**Both permissions, always, whatever their state.** Each line used to appear
+only when something was WRONG, so a working app showed nothing at all — and
+there was nowhere to look when it stopped working. A permission screen that
+hides granted permissions cannot answer "is it still on?", which is the only
+question anybody brings to it.
+
+`DENIED` now says plainly that it cannot be asked again, because
+`ActivationConsent` is one-shot and the system will not show that dialog twice.
+Offering a button that cannot work would be worse than offering none.
+
+**Open on phone.** `RemoteActivityHelper` is the only supported route: an app
+cannot reach across the Data Layer and start an activity itself.
+
+**Version, last and quiet.** Nobody opens the app for it and everybody is asked
+for it the moment a send goes wrong.
+
+### A private scheme rather than an App Link
+
+The phone had only MAIN/LAUNCHER, so `RemoteActivityHelper` had nothing to open
+and could only have reached the Play listing — which for an installed app is a
+page with an "Open" button on it. The phone now declares
+`bfgwatchfaces://open`.
+
+Not an https App Link: that needs `assetlinks.json` from a verified domain, and
+the only caller is a watch we also wrote.
+
+### Null is not zero
+
+`readInstalledFaces` returns null when the service cannot be read, and the
+screen says "Checking..." rather than "No faces yet". Those are different facts
+and showing the second for the first would be the screen making a claim it
+cannot support.
+
+### `--` inside an XML comment, for the THIRD time this session
+
+`ManifestMerger2$MergeFailureException`, no line number, no mention of comments.
+Written up twice already and hit again the same day, which says the note is not
+where it gets read. The rule: **never type a double hyphen inside an XML
+comment** — an em dash in prose becomes ", which" or a full stop in a manifest.
+
 ## 2026-09-03 — The preview tells the time, and two controls say what they do
 
 Three things reported from the app, all of them the same fault in different
