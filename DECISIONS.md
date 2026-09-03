@@ -1,5 +1,62 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — A false privacy claim, and the logos that were there all along
+
+Two things reported from the About screen. The second one matters far more than
+it looks.
+
+### The app claimed something untrue about privacy
+
+The hero card read:
+
+> Nothing leaves this phone except a face you send to your own watch. No
+> analytics, no advertising, no personal data collected.
+
+That was true when it was written and became FALSE when Share shipped. Sharing a
+face uploads its parameters to the community gallery, publicly, and signing in
+to share sends a Google ID token whose subject is stored as a salted hash. Both
+were verified in the code rather than assumed — `MainActivity:597` reaches the
+share sheet, `CatalogService.submit` posts with a bearer token.
+
+An overstated privacy claim is worse than no claim. It is also the exact text a
+Data Safety declaration gets checked against, and Play refuses declarations that
+do not match observed behaviour — which is already the highest-risk item on the
+launch checklist.
+
+Now:
+
+> Nothing leaves this phone unless you choose it. A face you send goes straight
+> to your watch. A face you share publishes its settings to the community
+> gallery — never your photos, which stay on this phone. Signing in to share
+> stores your account as an anonymous code, and nothing else. No ads, no
+> analytics, no tracking.
+
+Still a strong story, and every clause is checkable.
+
+**`play-listing.md` was already right.** Its Data Safety draft declares User IDs
+and published designs, and scopes "what never leaves the phone" specifically to
+photos. Only the app had drifted, so the fix was to bring the app to the
+document rather than the other way round. They agree now.
+
+### The three logos that could have been there
+
+VoiceBridge, Swarm and Shotcraft were given lettered tiles on the grounds that
+"nothing in this environment can rasterise SVG — no rsvg, no Inkscape, no
+ImageMagick, no cairosvg, and the browser route returns base64 the tool blocks."
+
+Every word of that was true and the conclusion was wrong: **Google Chrome is
+installed on this machine**, and `--headless --screenshot` writes a PNG to local
+disk. The blocked route was Chrome-in-the-extension, whose downloads land on the
+operator's machine; the local binary was never checked.
+
+All five products now carry their own mark, so `Product.logo` stopped being
+nullable and the tile fallback is deleted.
+
+Two things caught by looking at the output rather than the exit code: injecting
+`width="192"` into an SVG that already had one produced duplicate attributes and
+Chrome rendered its XML parse error page — which screenshots perfectly happily
+as a pink error box. The fix strips existing width/height before setting one.
+
 ## 2026-09-03 — A test that could not fail, and the bug hiding behind it
 
 Swarm task 01a0651a, filed by me while fixing the NUL bytes in the same file and

@@ -63,16 +63,14 @@ private data class Product(
     val badge: String?,
     val tagline: String,
     /**
-     * The product's own launcher icon, when it HAS one.
+     * The product's own mark.
      *
-     * Only the two Android apps do, and that is not a gap to paper over: the
-     * other three are web and CLI products with no launcher icon anywhere.
-     * They get a lettered tile in their own brand colour rather than a
-     * borrowed or invented mark.
+     * All five have one. The two Android apps ship a launcher icon; the three
+     * web and CLI products publish an SVG on bfgsolutions.net, rasterised at
+     * 192px. Not optional: a product without its own mark would be the only
+     * row that looked unfinished.
      */
-    val logo: Int? = null,
-    /** Brand colour for the lettered tile, when there is no [logo]. */
-    val tint: Long = 0xFF4A4A4A,
+    val logo: Int,
     /**
      * Play package, for the products that are actually on Play.
      *
@@ -103,21 +101,21 @@ private val PRODUCTS = listOf(
         "VoiceBridge", "Web", "https://bfgsolutions.net/products/voicebridge", null,
         "Real-time speech translation. Speak once, reach everyone in the room — " +
             "in their own language.",
-        tint = 0xFF2563EB
+        logo = R.drawable.logo_voicebridge
     ),
     Product(
         "Swarm", "Linux · macOS · WSL", "https://bfgsolutions.net/products/swarm",
         "Free & open source",
         "A web-based control center for AI coding agents. Manage one agent or ten " +
             "from a single browser tab.",
-        tint = 0xFFD69C28
+        logo = R.drawable.logo_swarm
     ),
     Product(
         "Shotcraft", "CLI · GitHub", "https://bfgsolutions.net/products/shotcraft",
         "Free & open source",
         "Capture your live app and ship App Store-ready screenshots, README hero " +
             "images, and social cards in one command.",
-        tint = 0xFF10B981
+        logo = R.drawable.logo_shotcraft
     )
 )
 
@@ -220,9 +218,22 @@ private fun FreeHero() {
                 Text(".", style = MaterialTheme.typography.bodyMedium)
             }
             Spacer(Modifier.height(14.dp))
+            // ACCURATE, not flattering. This said "nothing leaves this phone
+            // except a face you send to your own watch. No personal data
+            // collected", and that was FALSE once Share shipped: a shared face
+            // publishes its settings to the community gallery, and signing in
+            // to share sends a Google ID token whose subject is stored hashed.
+            //
+            // A privacy claim that overstates is worse than no claim. It is
+            // also the exact thing a Data Safety declaration is checked
+            // against, and Play refuses declarations that do not match
+            // observed behaviour. Reported 2026-09-03.
             Text(
-                "Nothing leaves this phone except a face you send to your own watch. " +
-                    "No analytics, no advertising, no personal data collected.",
+                "Nothing leaves this phone unless you choose it. A face you send goes " +
+                    "straight to your watch. A face you share publishes its settings to " +
+                    "the community gallery — never your photos, which stay on this phone. " +
+                    "Signing in to share stores your account as an anonymous code, and " +
+                    "nothing else. No ads, no analytics, no tracking.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -317,26 +328,11 @@ private fun destinationFor(product: Product): String =
 
 @Composable
 private fun ProductLogo(product: Product) {
-    val shape = RoundedCornerShape(12.dp)
-    if (product.logo != null) {
-        Image(
-            painter = painterResource(product.logo),
-            // Decorative: the product name is right beside it, and a screen
-            // reader announcing the logo would read the name twice.
-            contentDescription = null,
-            modifier = Modifier.size(48.dp).clip(shape)
-        )
-    } else {
-        Box(
-            modifier = Modifier.size(48.dp).clip(shape).background(Color(product.tint)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                product.name.first().toString(),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
-            )
-        }
-    }
+    Image(
+        painter = painterResource(product.logo),
+        // Decorative: the product name is right beside it, and a screen reader
+        // announcing the logo would read the name twice.
+        contentDescription = null,
+        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+    )
 }
