@@ -169,7 +169,13 @@ flat-on-engraved inconsistency whether or not the tilt is ever noticed.
    `PhoneNoteService` on the watch answers a `SHORT_TEXT` complication from a
    note the phone sends by message. It appeared in the existing slot picker with
    no picker change, because `ProviderCatalog` already found providers by intent.
-4. **Weather beyond now.** Forecast strip, sunrise/sunset as a drawn arc.
+4. ~~**Weather beyond now.**~~ DONE 2026-09-03 — three forecast sources: a
+   temperature three hours out, tomorrow's high and low, and tomorrow's sky.
+   Sunrise/sunset as a drawn ARC is not built. `SUNRISE_SUNSET` has been offered
+   as a slot source with its own glyph all along, but it is a default provider
+   POLICY name, not a data-source expression — it hands a slot some text. There
+   is no `[SUNRISE]` to bind an arc's angle to, so the arc would need sun times
+   the face cannot compute, and the text form already answers the question.
 
 ## 6. Deliberately not doing
 

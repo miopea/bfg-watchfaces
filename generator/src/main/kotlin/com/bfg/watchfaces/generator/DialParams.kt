@@ -149,6 +149,39 @@ enum class ComplicationSource(
     /** "30%" — how likely rain is. */
     WEATHER_RAIN(null, "%s%%", "[WEATHER.CHANCE_OF_PRECIPITATION]"),
 
+    // ---- Weather beyond now -------------------------------------------------
+    //
+    // Everything above answers "what is it doing", which a window also answers.
+    // These answer "what will it do", which is the question somebody actually
+    // looks at a watch for -- whether to take a coat.
+    //
+    // `WEATHER.HOURS.n` and `WEATHER.DAYS.n` have been in the schema all along
+    // and nothing here read past day zero.
+
+    /**
+     * The temperature a few hours out.
+     *
+     * Three hours rather than one: an hour ahead is the weather you are already
+     * in, and a full day ahead is [WEATHER_TOMORROW]. Three is far enough to
+     * change a decision and near enough to be about today.
+     */
+    WEATHER_LATER(null, "%s°", "[WEATHER.HOURS.3.TEMPERATURE]"),
+
+    /** Tomorrow's high and low, the shape [WEATHER_HIGH_LOW] uses for today. */
+    WEATHER_TOMORROW(
+        null, "%s° / %s°",
+        "[WEATHER.DAYS.1.TEMPERATURE_HIGH]", "[WEATHER.DAYS.1.TEMPERATURE_LOW]"
+    ),
+
+    /**
+     * What tomorrow looks like, in a word.
+     *
+     * `CONDITION_DAY_NAME` rather than `CONDITION_NIGHT_NAME`: somebody glancing
+     * at tomorrow means the daytime, and a face that answered "clear" because
+     * tomorrow NIGHT is clear would be technically right and useless.
+     */
+    WEATHER_TOMORROW_SKY(null, "%s", "[WEATHER.DAYS.1.CONDITION_DAY_NAME]"),
+
     /**
      * "UV 6", for today.
      *
@@ -203,6 +236,12 @@ enum class ComplicationSource(
         get() = when (this) {
             WEATHER_TEMP_CONDITION -> 10
             WEATHER_HIGH_LOW -> 9
+            WEATHER_TOMORROW -> 9
+            WEATHER_LATER -> 4
+            // "Partly cloudy" is thirteen, the same as CONDITION_NAME. Measured
+            // once already: under-measuring clips a word and nobody can tell a
+            // clipped word from a short one.
+            WEATHER_TOMORROW_SKY -> 13
             WEATHER_UV -> 5
             WEATHER_RAIN -> 4
             WEATHER_CONDITION -> 7
@@ -262,6 +301,15 @@ enum class ComplicationSource(
                 "%s/%s",
                 listOf("[WEATHER.DAYS.0.TEMPERATURE_HIGH]", "[WEATHER.DAYS.0.TEMPERATURE_LOW]"),
                 7, "78/61"
+            )
+            // Tomorrow shortens the same way today does. Without this the two
+            // sources behave differently in the same box -- today shortens and
+            // stays legible, tomorrow shrinks a third smaller than its
+            // neighbours, which is the bug the compact forms exist to stop.
+            WEATHER_TOMORROW -> CompactForm(
+                "%s/%s",
+                listOf("[WEATHER.DAYS.1.TEMPERATURE_HIGH]", "[WEATHER.DAYS.1.TEMPERATURE_LOW]"),
+                7, "81/64"
             )
             else -> null
         }

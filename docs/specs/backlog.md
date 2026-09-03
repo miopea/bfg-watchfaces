@@ -54,7 +54,36 @@ against Google's XSD, and render a black face.
 
 `IS_AVAILABLE` / `IS_ERROR` are also unused — the decided behaviour when weather
 is unavailable is to fall back to the slot's system provider, and that is not
-built either.
+built either. **Still open after the forecast work of 2026-09-03**, but the
+shape is now known rather than guessed:
+
+- A drawn slot emits as a bare `<PartText>` with a `<Template>`.
+- `<Condition>`'s `Compare`/`Default` accept `Group`, `Condition`, `AnalogClock`
+  and `DigitalClock` — **not `PartText`**. So the fallback cannot wrap the
+  existing element directly; each branch needs a `<Group>` around its text.
+- That makes it a change to how EVERY drawn weather slot is emitted, so it
+  wants a `generatorVersion` branch rather than an edit in place.
+
+Deliberately not bundled with the forecast sources: forecast data is no more
+fragile than current weather — both are unavailable in the same circumstance
+(no location, weather not set up), so the new sources inherit today's behaviour
+rather than introducing a worse one.
+
+## ~~Weather beyond now~~ — DONE 2026-09-03
+
+Three forecast sources, all drawn, all reading indices nothing here had touched:
+`WEATHER_LATER` (`HOURS.3.TEMPERATURE`), `WEATHER_TOMORROW`
+(`DAYS.1.TEMPERATURE_HIGH`/`LOW`) and `WEATHER_TOMORROW_SKY`
+(`DAYS.1.CONDITION_DAY_NAME`).
+
+Three hours rather than one for "later": an hour ahead is the weather you are
+already standing in. `CONDITION_DAY_NAME` rather than `CONDITION_NIGHT_NAME`:
+somebody glancing at tomorrow means the daytime.
+
+`WEATHER_TOMORROW` carries the same compact form as `WEATHER_HIGH_LOW`
+("81/64"), because without it the two would behave differently in the same box
+— today shortening and staying legible, tomorrow shrinking a third smaller than
+its neighbours.
 
 ## 4. Sources in the schema that nothing here offers
 

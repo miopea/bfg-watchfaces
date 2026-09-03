@@ -99,7 +99,12 @@ object ComplicationGlyphs {
         ComplicationSource.WEATHER_TEMP_CONDITION,
         ComplicationSource.WEATHER_HIGH_LOW,
         ComplicationSource.WEATHER_RAIN,
-        ComplicationSource.WEATHER_UV -> emptyList()
+        ComplicationSource.WEATHER_UV,
+        // The forecast sources are drawn too, for the same reason: no provider,
+        // so no MONOCHROMATIC_IMAGE to draw above the value.
+        ComplicationSource.WEATHER_LATER,
+        ComplicationSource.WEATHER_TOMORROW,
+        ComplicationSource.WEATHER_TOMORROW_SKY -> emptyList()
         ComplicationSource.STEP_COUNT -> steps()
         ComplicationSource.HEART_RATE -> heart()
         ComplicationSource.WATCH_BATTERY -> battery()

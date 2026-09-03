@@ -707,6 +707,57 @@ class WffSchemaTest {
         }
     }
 
+    /**
+     * Every expression a face reads is a source the SCHEMA declares.
+     *
+     * ## Why this is derived rather than listed
+     *
+     * `sourceType.xsd` carries one `<xs:pattern>` per data source the format
+     * has. Nothing else checks a drawn expression against it: the expression
+     * sits inside a `<Template>`, which the XSD types as a plain string, so
+     * `[WEATHER.DAYS.1.TEMPERATURE_HI]` validates, installs, and renders an
+     * empty slot. There is no runtime error and nothing to read in a log.
+     *
+     * The list above this one names two spellings measured to be dead. This
+     * catches the ones nobody has met yet, and it cannot go stale, because the
+     * grammar it reads is Google's file rather than a copy of it here.
+     *
+     * It is deliberately NOT a replacement for that list: `WEATHER.TEMPERATURE_HIGH`
+     * matches a pattern in this file and still renders a black face, so being
+     * in the grammar is necessary and not sufficient.
+     */
+    @Test
+    fun `every drawn expression names a source the schema declares`() {
+        val grammar = File(
+            WffSchemaTest::class.java.classLoader
+                .getResource("wff-schema/common/attributes/sourceType.xsd")!!.toURI()
+        ).readText()
+        // The grammar is in two halves and reading either alone passes half the
+        // expressions wrongly: <xs:enumeration> for the fixed names, and
+        // <xs:pattern> for the indexed ones (WEATHER.DAYS.n....). Measured
+        // 2026-09-03: 95 enumerations, 16 patterns.
+        val fixed = Regex("""<xs:enumeration value="([^"]+)"\s*/>""")
+            .findAll(grammar).map { Regex.escape(it.groupValues[1]) }.toList()
+        val indexed = Regex("""<xs:pattern value="([^"]+)"\s*/>""")
+            .findAll(grammar).map { it.groupValues[1] }.toList()
+        assertTrue(fixed.size > 50 && indexed.size > 10) {
+            "read ${fixed.size} names and ${indexed.size} patterns out of sourceType.xsd; " +
+                "the file is not the shape this reads, so a pass here would mean nothing"
+        }
+        val allowed = (fixed + indexed).map { Regex("^$it$") }
+
+        for (source in ComplicationSource.entries) {
+            for (expression in source.drawn) {
+                // The expressions are stored bracketed; the grammar is not.
+                val name = expression.removePrefix("[").removeSuffix("]")
+                assertTrue(allowed.any { it.matches(name) }) {
+                    "$source reads [$name], which no pattern in sourceType.xsd allows. " +
+                        "It would validate, install, and draw nothing."
+                }
+            }
+        }
+    }
+
     @Test
     fun `colors are emitted as 8 digit AARRGGBB`() {
         val xml = WffEmitter.emit(DialParams(inkColor = "#FCF9F1"))

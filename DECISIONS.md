@@ -1,5 +1,81 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — The weather a face shows is no longer only right now
+
+Three drawn sources: `WEATHER_LATER` (`[WEATHER.HOURS.3.TEMPERATURE]`),
+`WEATHER_TOMORROW` (`[WEATHER.DAYS.1.TEMPERATURE_HIGH]`/`LOW`) and
+`WEATHER_TOMORROW_SKY` (`[WEATHER.DAYS.1.CONDITION_DAY_NAME]`).
+
+Everything the app offered before answers "what is it doing", which a window
+also answers. These answer "what will it do", which is the question somebody
+looks at a watch for — whether to take a coat. `WEATHER.HOURS.n` and
+`WEATHER.DAYS.n` have been in the schema the whole time and nothing here had
+ever read past day zero.
+
+**Three hours out rather than one.** An hour ahead is the weather you are
+already standing in, and a full day ahead is `WEATHER_TOMORROW`. Three is far
+enough to change a decision and near enough to still be about today.
+
+**`CONDITION_DAY_NAME`, not `CONDITION_NIGHT_NAME`.** Somebody glancing at
+tomorrow means the daytime. A face answering "clear" because tomorrow NIGHT is
+clear would be technically right and useless.
+
+**Tomorrow gets the same compact form as today** ("81/64"). Without it the two
+sources behave differently in the same box: today shortens and stays legible,
+tomorrow shrinks by a third and turns into the "almost impossible to read" bug
+the compact forms were built to stop.
+
+### No version bump, and why that is safe
+
+New enum values change no existing geometry — no face already saved can name
+one. `GeneratorVersionTest` would have failed if the version moved, and it did
+not need to.
+
+The catalog Worker is a different matter: it validates `complicationSource`
+against the bundled `params-contract.json`, so until it is redeployed it
+REJECTS any shared face using these. Same shape as the v10-against-9 incident.
+Regenerated with `:workbench:contract` and redeployed the same day.
+
+### Rejected: bundling the `IS_AVAILABLE` fallback
+
+`backlog.md` #3 stays open. Forecast data is no more fragile than current
+weather — both go missing in the same circumstance — so the new sources inherit
+today's behaviour rather than introducing a worse one, and the fallback is a
+change to how every drawn weather slot is emitted. It wants its own version
+branch, not a ride on this.
+
+The shape is now known rather than guessed: a drawn slot is a bare `<PartText>`,
+and `<Condition>` accepts `Group`, `Condition`, `AnalogClock` and `DigitalClock`
+but **not `PartText`** — so each branch needs a `<Group>` around its text.
+
+### A test that reads Google's grammar instead of a list I maintain
+
+`WffSchemaTest` gained "every drawn expression names a source the schema
+declares". A drawn expression sits inside a `<Template>`, which the XSD types as
+a plain string, so `[WEATHER.DAYS.1.TEMPERATURE_HI]` validates, installs, and
+renders an empty slot with no runtime error and nothing in a log. The new test
+reads every `<xs:enumeration>` and `<xs:pattern>` out of `sourceType.xsd` and
+requires each expression to match one.
+
+Two things worth recording about building it. First, the extraction was WRONG on
+the first try: it read only `<xs:pattern>` and found 16, missing the 95
+`<xs:enumeration>` entries that carry the fixed names — the test passed while
+checking half of what it claimed. The count guard is what caught it, which is
+why the guard asserts both halves rather than a total. Second, it was then
+verified by MUTATION: `TEMPERATURE_HIGH` to `TEMPERATURE_HI` made it fail, and
+restoring it made it pass. A green test nobody has watched fail is not evidence.
+
+It does not replace the dead-spelling list above it. `WEATHER.TEMPERATURE_HIGH`
+matches a pattern in that file and still renders a black face, so being in the
+grammar is necessary and not sufficient.
+
+### Corrected while writing this up
+
+The scope doc was about to claim the schema has no sunrise source. It has
+`SUNRISE_SUNSET`, this app has offered it as a slot source with its own glyph
+all along, and what is actually absent is the drawn ARC — because it is a
+default provider policy name, not an expression an arc's angle can bind to.
+
 ## 2026-09-02 — A complication of our own: the first value that needs no rebuild
 
 Third off `launch-scope.md` §5, and the one with something to say about the
