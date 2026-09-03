@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -227,10 +228,23 @@ private fun FaceRow(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-                // Said in the SAME words the share sheet uses, from one function,
-                // so the row and the sheet cannot describe one state two ways.
+                // A STATE HAS TO LOOK LIKE A STATE.
+                //
+                // This was the sentence on its own, in the same bodySmall and
+                // onSurfaceVariant as the install name directly above it. Three
+                // grey lines stacked up and the one that mattered read as more
+                // metadata — a face waiting on moderation looked exactly like a
+                // face nobody had shared, the only other signal being a button
+                // reading "Shared" rather than "Share". Reported by the operator
+                // in those words.
+                //
+                // The chip carries the state; the sentence still explains it.
+                // Both come from SubmissionLog, one function each, so they
+                // cannot drift into describing one state two ways.
                 shared?.let {
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(6.dp))
+                    SharedChip(it.state)
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         SubmissionLog.describe(it.state),
                         style = MaterialTheme.typography.bodySmall,
@@ -270,5 +284,55 @@ private fun FaceRow(
             }
             TextButton(onClick = onDelete) { Text("Delete") }
         }
+    }
+}
+
+/**
+ * The share state of a face, as a chip rather than another line of grey text.
+ *
+ * ## Colour carries the same distinction the words do
+ *
+ * Three groups, and they are about what the person can expect rather than about
+ * good and bad news:
+ *
+ *  - PENDING is WAITING. Neutral, because nothing has gone wrong and nothing has
+ *    happened yet, and colouring a queue as a warning invites somebody to go
+ *    looking for a problem that does not exist.
+ *  - PUBLISHED is DONE, and the only state where the face is actually out there.
+ *    It gets the primary colour — the one thing on this row worth being drawn to.
+ *  - REJECTED / REMOVED / WITHDRAWN are all ENDED. The error colour would be
+ *    wrong for WITHDRAWN, which is something the person chose to do, so all
+ *    three share a quiet surface and let the sentence underneath say which.
+ *
+ * Not an AssistChip: those are interactive affordances and this is not tappable.
+ * Making a status look like a button is the same failure as making a state look
+ * like metadata, pointing the other way.
+ */
+@Composable
+private fun SharedChip(state: SubmissionLog.State) {
+    val published = state == SubmissionLog.State.PUBLISHED
+    val waiting = state == SubmissionLog.State.PENDING
+    val background = when {
+        published -> MaterialTheme.colorScheme.primaryContainer
+        waiting -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val ink = when {
+        published -> MaterialTheme.colorScheme.onPrimaryContainer
+        waiting -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(background)
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        Text(
+            SubmissionLog.label(state),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = ink
+        )
     }
 }

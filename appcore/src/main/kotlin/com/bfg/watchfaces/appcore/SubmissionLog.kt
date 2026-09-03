@@ -99,6 +99,35 @@ object SubmissionLog {
         State.WITHDRAWN -> "You took this one back."
     }
 
+    /**
+     * The same fact as [describe], short enough to sit in a chip.
+     *
+     * ## Why both exist
+     *
+     * [describe] is a sentence, and a sentence rendered in the same small grey
+     * as everything else around it reads as more metadata rather than as a
+     * STATE. On the face row the shared line sat directly under the install
+     * name in identical type, so a face waiting on moderation looked exactly
+     * like a face that was not shared at all — the only other signal being a
+     * button that says "Shared" rather than "Share", which you have to already
+     * know to look for. The operator reported precisely that.
+     *
+     * So this is not a second vocabulary. It is the same five states said in
+     * two lengths, in ONE function each, so the chip and the sentence cannot
+     * disagree about what is happening. Whoever changes one is looking at the
+     * other.
+     *
+     * Kept short deliberately: a chip that wraps is a worse chip than no chip.
+     * Three words is the ceiling.
+     */
+    fun label(state: State): String = when (state) {
+        State.PENDING -> "In review"
+        State.PUBLISHED -> "In the gallery"
+        State.REJECTED -> "Not added"
+        State.REMOVED -> "Taken down"
+        State.WITHDRAWN -> "You took it back"
+    }
+
     private fun file(root: File): File = File(root, "submissions.json")
 
     /**
