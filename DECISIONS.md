@@ -1,5 +1,67 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — A default on a font family is a bug generator; both previews lost one
+
+Two defects reported in one email, and they turned out to be the same mistake
+made twice, in the two renderers CLAUDE.md says must agree.
+
+### The shape
+
+Both previews had a helper that took the typeface as a parameter WITH A DEFAULT:
+
+- `AndroidFacePreview.drawCenteredIn(..., family: String = FaceFont.DEFAULT.wff)`
+- `FacePreview.font(..., face: FaceFont = FaceFont.DEFAULT)`
+
+A default makes forgetting the argument legal. Both call sites forgot, and
+because a font family is not the kind of thing that throws, neither failed —
+they drew the wrong glyphs and carried on.
+
+### The two symptoms were very different, and that is the point
+
+**The phone GHOSTED, and was reported in a day.** From v13 the clock is drawn
+three times: two engraved relief passes, then the glyphs on top. Five of six
+call sites passed the family; the sixth — the main time, the largest text on
+the face — did not. So the relief was set in the chosen family and the glyphs
+in the default one. Two families disagree about every advance width, so the
+relief slid further out from under the text with each character: in the report's
+screenshot the "1" of 1:20 is clean and the "0" is doubled. It was invisible
+until somebody changed the font, because until then the two families matched.
+
+**The workbench hid completely, and had since the control shipped.** `font()`
+was called from exactly one place, which never passed `face`. So the whole
+`FaceFont` -> AWT mapping was written, correct and unreachable, and choosing
+Serif or Mono changed the emitted XML and changed nothing you could see. Nobody
+reported it, because a control that does nothing is indistinguishable from a
+control you have not noticed working.
+
+The louder bug was the safer one. That is the lesson worth keeping.
+
+### What was done
+
+The defaults are gone on both. That is the actual fix; passing the argument is
+just the consequence. On the workbench side removing it turned the bug into six
+compiler errors naming every call site, which is the failure mode we want.
+
+Rejected: keeping the default and adding a test that all call sites pass it.
+That guards a copy rather than removing the hazard, and `PreviewDateTest`
+already records this bug family twice producing "a guard that compared two calls
+down one path and could not fail".
+
+No `generatorVersion` branch, and this is not an exception to the never-change-
+geometry rule. The emitted `watchface.xml` always carried the right family and
+the WATCH always rendered it correctly. Only the previews were wrong, and a
+preview is not the stored file format.
+
+### What is still approximate, deliberately
+
+AWT has only the logical faces a desktop JVM ships, so on the workbench SERIF
+and MONO map to real ones and the other four families all resolve to the same
+local sans. The typeface control is therefore PARTLY visible in the workbench
+and fully visible on the phone, which resolves the real family from the same
+`fonts.xml` the watch uses. `PreviewTypefaceTest` asserts only SERIF and MONO
+for that reason — asserting the rest would pin the suite to a machine's
+installed fonts.
+
 ## 2026-09-03 — A way back from a refused permission, and an offer instead of an instruction
 
 Two gaps the operator found by asking the right question: what happens to

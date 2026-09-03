@@ -36,9 +36,16 @@ import com.bfg.watchfaces.appcore.Complications
  *  - The DIAL is exact. It is [DialRenderer] output, the same bytes that get
  *    baked into dial_bg.png and shipped.
  *  - The TEXT is an approximation. On the watch it is drawn by the WFF runtime
- *    using the device font (`SYNC_TO_DEVICE`). Here it is drawn by AWT with a
- *    local sans. Positions and sizes mirror WffEmitter's arithmetic exactly, so
- *    layout is trustworthy; glyph shapes and metrics are not pixel-identical.
+ *    using the family the face names. Here it is drawn by AWT, which has only
+ *    the logical faces a desktop JVM ships: SERIF and MONO map to real ones,
+ *    and the other four families all resolve to the same local sans. Positions
+ *    and sizes mirror WffEmitter's arithmetic exactly, so layout is
+ *    trustworthy; glyph shapes and metrics are not pixel-identical.
+ *
+ *    So the typeface control is PARTLY visible here and fully visible on the
+ *    phone, which resolves the real family from the same fonts.xml the watch
+ *    uses. Judge a typeface choice there. Until 2026-09-03 it was not visible
+ *    here AT ALL — see [font].
  *
  * Use it to judge composition, contrast, legibility and ambient behaviour. Do
  * not use it to sign off on kerning.
@@ -65,6 +72,11 @@ object FacePreview {
 
         val s = size.toDouble() / DIAL_SIZE
         val l = p.layout
+        // Resolved ONCE and passed to every text draw, the mirror of what
+        // AndroidFacePreview does with `faceFamily`. It used to be resolved
+        // inside `font()` from a parameter nobody passed, so the whole mapping
+        // sat behind a default and no face ever reached it.
+        val face = FaceFont.of(l.fontFamily)
         val ink = DialRenderer.hex(p.inkColor)
 
         // Dial image: alpha 255 interactive, Variant AMBIENT alpha 0.
@@ -108,7 +120,7 @@ object FacePreview {
             val drawn = SlotGeometry.drawnText(source, box, fontSize.toInt(), p.generatorVersion, pos)
             drawCenteredIn(g, drawn.sample ?: Complications.sample(source),
                 box.x, box.y + textY, box.w, textH,
-                drawn.fontSize.toDouble(), Font.PLAIN, c)
+                drawn.fontSize.toDouble(), Font.PLAIN, c, face)
         }
 
         // The date the FACE draws, matching WffEmitter's PartText: centred at
@@ -120,7 +132,7 @@ object FacePreview {
             // beside it. Defaulting to today made this preview non-deterministic
             // and put the build date into every baked preview.png.
             drawCentered(g, p.dateStyle.sample(now.toLocalDate()), band.y, band.h,
-                SlotGeometry.fittedDateSize(p).toDouble(), Font.PLAIN, dateInk)
+                SlotGeometry.fittedDateSize(p).toDouble(), Font.PLAIN, dateInk, face)
         }
 
         // The step ring, matching WffEmitter: a faint full circle with a
@@ -178,7 +190,7 @@ object FacePreview {
                 drawCentered(
                     g, timeText, band.y, band.h,
                     SlotGeometry.analogDigitalSize(p).toDouble(),
-                    awtStyle(l.fontWeight), ink
+                    awtStyle(l.fontWeight), ink, face
                 )
             }
         } else if (ambient) {
@@ -189,7 +201,7 @@ object FacePreview {
                 if (p.generatorVersion >= 3) DialRenderer.hex(AmbientPalette.forAmbient(p.inkColor))
                 else withAlpha(ink, 160)
             drawCentered(g, timeText, l.timeY - l.timeSize / 2, (l.timeSize * 1.4).toInt(),
-                l.timeSize.toDouble(), Font.PLAIN, ambientInk, thin = true)
+                l.timeSize.toDouble(), Font.PLAIN, ambientInk, face, thin = true)
         } else {
             // Same size with or without seconds: turning them on must not
             // resize the face. See SecondsBand.
@@ -206,13 +218,13 @@ object FacePreview {
                         l.timeY - l.timeSize / 2 + pass.dy.roundToInt(),
                         (l.timeSize * 1.4).toInt(),
                         clockSize, awtStyle(l.fontWeight),
-                        Color(pass.argb, true),
+                        Color(pass.argb, true), face,
                         dx = pass.dx.roundToInt()
                     )
                 }
             }
             drawCentered(g, timeText, l.timeY - l.timeSize / 2, (l.timeSize * 1.4).toInt(),
-                clockSize, awtStyle(l.fontWeight), ink)
+                clockSize, awtStyle(l.fontWeight), ink, face)
         }
 
         // Seconds in the right gutter, matching WffEmitter: just under half the
@@ -271,7 +283,16 @@ object FacePreview {
 
     private fun font(
         size: Double, style: Int, thin: Boolean, letterSpacing: Double,
-        face: FaceFont = FaceFont.DEFAULT
+        /**
+         * NO DEFAULT, deliberately.
+         *
+         * This read `= FaceFont.DEFAULT` and the one caller never passed it, so
+         * the mapping below was correct and unreachable and the typeface control
+         * did nothing here for its whole life. The phone preview had the same
+         * shape and lost one call site out of six, which ghosted. A default on a
+         * font family is how both happened; make the compiler ask instead.
+         */
+        face: FaceFont
     ): Font {
         // APPROXIMATE, deliberately, and the Android preview is not.
         //
@@ -298,16 +319,18 @@ object FacePreview {
 
     private fun drawCentered(
         g: java.awt.Graphics2D, text: String, y: Int, h: Int, size: Double,
-        style: Int, color: Color, thin: Boolean = false, letterSpacing: Double = 0.0,
+        style: Int, color: Color, face: FaceFont,
+        thin: Boolean = false, letterSpacing: Double = 0.0,
         /** Horizontal offset, for the engraved relief passes. */
         dx: Int = 0
-    ) = drawCenteredIn(g, text, dx, y, DIAL_SIZE, h, size, style, color, thin, letterSpacing)
+    ) = drawCenteredIn(g, text, dx, y, DIAL_SIZE, h, size, style, color, face, thin, letterSpacing)
 
     private fun drawCenteredIn(
         g: java.awt.Graphics2D, text: String, x: Int, y: Int, w: Int, h: Int, size: Double,
-        style: Int, color: Color, thin: Boolean = false, letterSpacing: Double = 0.0
+        style: Int, color: Color, face: FaceFont,
+        thin: Boolean = false, letterSpacing: Double = 0.0
     ) {
-        g.font = font(size, style, thin, letterSpacing)
+        g.font = font(size, style, thin, letterSpacing, face)
         g.color = color
         val fm = g.fontMetrics
         val tx = x + (w - fm.stringWidth(text)) / 2.0
