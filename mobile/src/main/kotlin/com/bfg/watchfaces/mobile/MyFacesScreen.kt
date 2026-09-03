@@ -167,84 +167,108 @@ private fun FaceRow(
             }.getOrNull()
         }
     }
-    Row(
+    // TEXT FIRST, ACTIONS UNDER IT — not side by side.
+    //
+    // These used to share one row: the text column held `weight(1f)` and three
+    // TextButtons sat beside it. The buttons take a fixed width whatever is
+    // left, so the column got roughly a third of the screen and everything in
+    // it wrapped — a two-word name broke across two lines, and "Waiting for
+    // someone to check it. That can take a while." ran to FIVE, next to a wide
+    // band of empty space where the buttons were.
+    //
+    // A row that reads and a row that acts. The text gets the full width, so
+    // wrapping is now about the length of the words rather than about how many
+    // buttons happen to be showing.
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onOpen)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(Color(EngravedStroke.withAlpha(EngravedStroke.rgb(face.params.dialColor), 255))),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            // TOP, not centre: with three lines of status beside a 56dp circle,
+            // centring floats the thumbnail against the middle of the sentence.
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            bitmap?.let {
-                Image(
-                    painter = BitmapPainter(it.asImageBitmap()),
-                    contentDescription = null,
-                    modifier = Modifier.size(56.dp),
-                    contentScale = ContentScale.FillWidth
-                )
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color(EngravedStroke.withAlpha(EngravedStroke.rgb(face.params.dialColor), 255))),
+                contentAlignment = Alignment.Center
+            ) {
+                bitmap?.let {
+                    Image(
+                        painter = BitmapPainter(it.asImageBitmap()),
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp),
+                        contentScale = ContentScale.FillWidth
+                    )
+                }
             }
-        }
-        Column(Modifier.weight(1f)) {
-            Text(face.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(
-                // The slug is what the watch will call this face's package, so
-                // it is worth showing: two names can collide into one.
-                face.slug,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            // Quiet, not a warning: the face works, it just will not look the
-            // way its preview does.
-            missing?.let {
-                Spacer(Modifier.height(2.dp))
+            Column(Modifier.weight(1f)) {
+                Text(face.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                 Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-            // Said in the SAME words the share sheet uses, from one function,
-            // so the row and the sheet cannot describe one state two ways.
-            shared?.let {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    SubmissionLog.describe(it.state),
+                    // The slug is what the watch will call this face's package, so
+                    // it is worth showing: two names can collide into one.
+                    face.slug,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // Quiet, not a warning: the face works, it just will not look the
+                // way its preview does.
+                missing?.let {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                // Said in the SAME words the share sheet uses, from one function,
+                // so the row and the sheet cannot describe one state two ways.
+                shared?.let {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        SubmissionLog.describe(it.state),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
-        // Send is the point of having saved it. Putting it behind "open in the
-        // studio, then send" made the list a staging area rather than a library.
-        TextButton(onClick = onSend) { Text("Send") }
-        // "Shared" rather than "Share" once it is: the button still opens the
-        // same sheet, but it is now the way back to taking it down, and
-        // labelling that "Share" would invite somebody to send it twice.
-        // NO SHARE ON A PHOTO FACE.
-        //
-        // `CatalogService.submit` already refuses one, so the guarantee holds
-        // either way — but leaving the button here would walk somebody through a
-        // Google sign-in and THEN tell them no, which is the app wasting their
-        // time to enforce a rule it knew before they tapped.
-        //
-        // The row says why instead of just going quiet. A missing control with
-        // no account of itself is the same failure as one that does nothing.
-        if (face.params.isLocalOnly) {
-            Text(
-                "On this phone",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else if (canShare) {
-            TextButton(onClick = onShare) { Text(if (shared == null) "Share" else "Shared") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Send is the point of having saved it. Putting it behind "open in the
+            // studio, then send" made the list a staging area rather than a library.
+            TextButton(onClick = onSend) { Text("Send") }
+            // "Shared" rather than "Share" once it is: the button still opens the
+            // same sheet, but it is now the way back to taking it down, and
+            // labelling that "Share" would invite somebody to send it twice.
+            // NO SHARE ON A PHOTO FACE.
+            //
+            // `CatalogService.submit` already refuses one, so the guarantee holds
+            // either way — but leaving the button here would walk somebody through a
+            // Google sign-in and THEN tell them no, which is the app wasting their
+            // time to enforce a rule it knew before they tapped.
+            //
+            // The row says why instead of just going quiet. A missing control with
+            // no account of itself is the same failure as one that does nothing.
+            if (face.params.isLocalOnly) {
+                Text(
+                    "On this phone",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else if (canShare) {
+                TextButton(onClick = onShare) { Text(if (shared == null) "Share" else "Shared") }
+            }
+            TextButton(onClick = onDelete) { Text("Delete") }
         }
-        TextButton(onClick = onDelete) { Text("Delete") }
     }
 }

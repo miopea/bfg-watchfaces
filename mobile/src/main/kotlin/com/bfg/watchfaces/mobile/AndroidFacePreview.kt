@@ -282,7 +282,8 @@ object AndroidFacePreview {
             // PLAIN rather than overstate the weight. Match that here, so the
             // two previews agree about the one thing that matters most --
             // legibility of the time.
-            bold = !ambient && l.fontWeight.uppercase() == "BOLD"
+            bold = !ambient && l.fontWeight.uppercase() == "BOLD",
+            family = faceFamily
         )
 
         // Seconds in the right gutter, matching WffEmitter: just under half the
@@ -328,8 +329,20 @@ object AndroidFacePreview {
          *
          * Android resolves these from the same `fonts.xml` the watch uses, so
          * this preview shows the typeface that ships rather than a stand-in.
+         *
+         * NO DEFAULT, deliberately. It used to be `= FaceFont.DEFAULT.wff`, and
+         * exactly one of the six call sites — the main time, the largest text on
+         * the face — forgot to pass it. The engraved relief passes drew in the
+         * CHOSEN family and the glyphs on top drew in the default one, so the
+         * two disagreed about every advance width and the relief slid further
+         * out from under the text with each character: the "1" of 1:20 looked
+         * clean and the "0" was doubled. It only appeared once somebody changed
+         * the typeface, because until then the two families were the same.
+         *
+         * A default here silently produces a face drawn in two fonts. Make the
+         * compiler ask instead.
          */
-        family: String = FaceFont.DEFAULT.wff,
+        family: String,
         /** Right-align inside the box instead of centring. Used by the seconds. */
         alignEnd: Boolean = false,
         /** Left-align instead. The seconds use this when a ring crowds them. */
