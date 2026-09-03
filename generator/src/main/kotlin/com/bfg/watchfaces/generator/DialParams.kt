@@ -787,8 +787,17 @@ data class DialParams(
         require(HEX.matches(inkColor)) { "inkColor must be #RRGGBB, got $inkColor" }
     }
 
-    /** True when this face depends on a local image and cannot enter the catalog. */
-    val isLocalOnly: Boolean get() = engine == Engine.TEXTURE && texture.isNotBlank()
+    /**
+     * True when this face depends on a LOCAL image and cannot enter the catalog.
+     *
+     * A [BuiltInDial] is explicitly not local: its bytes ship inside the app, so
+     * whoever installs the face already has the picture and there is nothing of
+     * anybody's to upload. Those are the only shareable `TEXTURE` faces.
+     */
+    val isLocalOnly: Boolean
+        get() = engine == Engine.TEXTURE &&
+            texture.isNotBlank() &&
+            BuiltInDial.byId(texture) == null
 
     /** The source at [pos], or NONE when the stored list is short/absent. */
     /**

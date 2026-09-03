@@ -90,6 +90,15 @@ object Textures {
      */
     fun forFace(context: Context, p: DialParams): Bitmap? {
         if (p.engine != Engine.TEXTURE || p.texture.isBlank()) return null
+        // A BUILT-IN comes from the app itself, not from this phone's storage.
+        // That is the whole difference: whoever installs a face using one
+        // already has the picture, so the face can be shared. Checked first,
+        // and it can never collide with an import -- TextureStore ids are 40
+        // hex characters and these are not.
+        com.bfg.watchfaces.generator.BuiltInDial.byId(p.texture)?.let { built ->
+            val b = built.bytes() ?: return null
+            return runCatching { BitmapFactory.decodeByteArray(b, 0, b.size) }.getOrNull()
+        }
         val bytes = TextureStore.load(context.filesDir, p.texture) ?: return null
         return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
             .getOrElse {

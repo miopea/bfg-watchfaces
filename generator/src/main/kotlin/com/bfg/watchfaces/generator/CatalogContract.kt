@@ -230,6 +230,13 @@ object CatalogContract {
         sb.append("""  "slugPattern": ${q(SLUG_PATTERN)},${'\n'}""")
         sb.append("""  "maxSlugChars": $MAX_SLUG_CHARS,${'\n'}""")
         sb.append("""  "publishedIdChars": $PUBLISHED_ID_CHARS,${'\n'}""")
+        // The dial images that ship INSIDE the app. The Worker refuses every
+        // other texture, because any other value names a picture only the
+        // sender has. These it must accept, or the first shareable TEXTURE
+        // face would be rejected on submission. See BuiltInDial.
+        sb.append(
+            """  "builtInDials": [${BuiltInDial.IDS.joinToString(", ") { q(it) }}],${'\n'}"""
+        )
 
         sb.append("""  "controls": [${'\n'}""")
         sb.append(ControlInventory.CONTROLS.joinToString(",\n") { c ->

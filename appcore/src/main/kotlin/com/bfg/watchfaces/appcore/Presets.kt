@@ -2,6 +2,7 @@ package com.bfg.watchfaces.appcore
 
 import com.bfg.watchfaces.generator.ClockMode
 import com.bfg.watchfaces.generator.HandStyle
+import com.bfg.watchfaces.generator.BuiltInDial
 import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.Engine
 
@@ -110,6 +111,24 @@ object Presets {
         "Linen Bone" to DialParams(
             engine = Engine.LINEN, scale = 18.0, contrast = 26.0, relief = 1.2,
             dialColor = "#D9D2C5", inkColor = "#2E2A24", sheen = 10.0, vignette = 18.0
+        ),
+        // THE HOUSE MASCOTS, and the only TEXTURE presets there can be.
+        //
+        // Every other TEXTURE face draws a picture from the wearer's own phone,
+        // so it cannot have a preset -- there would be nothing to draw. These
+        // ship inside the app, which is also what lets a face using one be
+        // shared. See BuiltInDial.
+        //
+        // contrast 35 on purpose. At full strength the mark sits under the time
+        // and fights it; here it reads as a watermark and the numerals stay
+        // completely legible. Anybody who wants it bold has the slider.
+        "Bugsy" to DialParams(
+            engine = Engine.TEXTURE, texture = BuiltInDial.BUGSY.id, contrast = 35.0,
+            dialColor = "#1E2A24", inkColor = "#FFFFFF", sheen = 14.0, vignette = 26.0
+        ),
+        "Queen Bee" to DialParams(
+            engine = Engine.TEXTURE, texture = BuiltInDial.SWARM_BEE.id, contrast = 35.0,
+            dialColor = "#2B2F36", inkColor = "#F5F3EE", sheen = 14.0, vignette = 26.0
         ),
         "Flat" to DialParams(engine = Engine.NONE, sheen = 22.0, vignette = 20.0)
     )

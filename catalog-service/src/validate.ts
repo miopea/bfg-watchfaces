@@ -245,7 +245,26 @@ export function validateFace(submission: unknown): Problem[] {
 
   const engine = params["engine"];
   checkEnum("engine", engine, "engine", problems);
-  if (typeof engine === "string" && CONTRACT.unpublishableEngines.includes(engine)) {
+  const texture = params["texture"];
+
+  // A TEXTURE face is publishable in EXACTLY ONE case: its picture ships inside
+  // the app, so whoever installs the face already has it. Anything else names a
+  // file only the sender holds.
+  //
+  // The two checks below used to be independent and both absolute — TEXTURE was
+  // always refused, and any non-empty texture was always refused. They are one
+  // rule now, and splitting them again would let a face through that names a
+  // built-in with some other engine, where the picture is silently ignored.
+  const namesBuiltIn =
+    engine === "TEXTURE" &&
+    typeof texture === "string" &&
+    CONTRACT.builtInDials.includes(texture);
+
+  if (
+    typeof engine === "string" &&
+    CONTRACT.unpublishableEngines.includes(engine) &&
+    !namesBuiltIn
+  ) {
     // The IP shield and the size guarantee, not a style preference: a face
     // built on an imported image cannot be re-derived from parameters and
     // cannot be licensed by us.
@@ -257,11 +276,15 @@ export function validateFace(submission: unknown): Problem[] {
     });
   }
 
-  const texture = params["texture"];
   if (typeof texture !== "string") {
     problems.push({ field: "texture", message: "must be a string" });
-  } else if (texture.length > 0) {
-    problems.push({ field: "texture", message: "references an imported image, which cannot be published" });
+  } else if (texture.length > 0 && !namesBuiltIn) {
+    problems.push({
+      field: "texture",
+      message:
+        "references an imported image, which cannot be published. Only a dial " +
+        "that ships with the app may be named here.",
+    });
   }
 
   for (const [id, control] of CONTROLS) {

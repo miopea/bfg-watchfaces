@@ -119,10 +119,9 @@ object Workbench {
      */
     private fun catalogRoot(): File? = CatalogStore.resolveRoot(root)
 
-    /** The imported image a TEXTURE face refers to, or null for every other engine. */
+    /** The image a TEXTURE face refers to. See [resolveTexture]. */
     private fun textureFor(p: DialParams): java.awt.image.BufferedImage? =
-        if (p.engine == com.bfg.watchfaces.generator.Engine.TEXTURE && p.texture.isNotBlank())
-            TextureStore.load(root, p.texture) else null
+        resolveTexture(root, p)
 
     private fun send(ex: HttpExchange, code: Int, type: String, body: ByteArray) {
         ex.responseHeaders.add("Content-Type", type)
@@ -487,14 +486,39 @@ object Workbench {
      * Watch Face Push package suffix, and the APK filename. Nothing here is
      * hardcoded to a particular face any more.
      */
+    /**
+     * The image a TEXTURE face refers to, or null for every other engine.
+     *
+     * ## One resolver, and it used to be three
+     *
+     * The live preview, `exportTo`, and the phone each looked a texture up
+     * their own way. They agreed while the only source was the imported store,
+     * and stopped agreeing the moment built-in dials arrived: `bake` rendered a
+     * mascot face as a bare gradient with no image and no error, because its
+     * copy only knew how to read from disk. That is the shape `SlotGeometry`
+     * exists to prevent, arriving somewhere new.
+     *
+     * A BUILT-IN is tried first and comes from the jar, not from disk. Those
+     * ship with the app, which is exactly what makes a face using one
+     * shareable. The imported store is the fallback and holds only this
+     * machine's own files.
+     */
+    fun resolveTexture(root: File, p: DialParams): java.awt.image.BufferedImage? {
+        if (p.engine != com.bfg.watchfaces.generator.Engine.TEXTURE || p.texture.isBlank()) return null
+        com.bfg.watchfaces.generator.BuiltInDial.byId(p.texture)?.let { built ->
+            val bytes = built.bytes() ?: return null
+            return runCatching { javax.imageio.ImageIO.read(bytes.inputStream()) }.getOrNull()
+        }
+        return TextureStore.load(root, p.texture)
+    }
+
     fun exportTo(root: File, p: DialParams, colors: Int = 64, faceName: String = "Untitled"): List<String> {
         val tpl = File(root, "watchface-template")
         val drawable = File(tpl, "res/drawable-nodpi").apply { mkdirs() }
         val slug = FaceLibrary.slugify(faceName)
 
         // Dial: quantized, because it crosses to the watch over Bluetooth.
-        val tex = if (p.engine == com.bfg.watchfaces.generator.Engine.TEXTURE && p.texture.isNotBlank())
-            TextureStore.load(root, p.texture) else null
+        val tex = resolveTexture(root, p)
         val dial = Quantizer.quantize(DialRenderer.render(p, DIAL_SIZE, tex), colors)
         val dialFile = File(drawable, "dial_bg.png")
         ImageIO.write(dial.image, "png", dialFile)

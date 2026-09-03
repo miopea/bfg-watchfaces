@@ -1,5 +1,61 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — The house mascots, and the first shareable picture dial
+
+Swarm task 01a06710. Bugsy and the Swarm bee are now dials.
+
+### The interesting part is not the pictures
+
+`Engine.TEXTURE` has always drawn an image as the dial, and the only source was
+the photo picker. A photo is somebody's own file, so a face using one is
+`isLocalOnly` and the catalog refuses it — the Worker rejected `TEXTURE`
+outright AND rejected any non-empty `texture`, two independent absolutes.
+
+A built-in is different in the one way that matters: **the bytes ship inside the
+app**, so whoever installs the face already has the picture. Nothing is
+uploaded, nothing of anybody's leaks, and there is no reason to refuse the
+share. These are the first `TEXTURE` faces that can enter the catalog.
+
+That meant the two absolutes became one rule: a `TEXTURE` face is publishable
+exactly when its texture names a built-in. Splitting them again would let
+through a face naming a mascot with some other engine, where the picture is
+silently ignored — there is a test for that.
+
+### The ids are not hashes, deliberately
+
+`TextureStore` ids are exactly 40 lowercase hex characters, a SHA-1 of imported
+bytes. `bfg-bugsy` and `bfg-bee` contain a hyphen and letters outside `a-f`, so
+the two spaces cannot overlap BY SHAPE and neither check has to know about the
+other. A test asserts no built-in id could pass for a hash — otherwise a crafted
+face could name a photo and be published.
+
+### One resolver, after finding a third copy
+
+The first bake of a mascot dial produced a bare gradient with no image and no
+error. The live preview, `Workbench.exportTo` and the phone each looked a
+texture up their own way. All three agreed while the only source was the
+imported store, and stopped agreeing the moment a second source existed —
+`exportTo` only knew how to read from disk.
+
+That is the shape `SlotGeometry` exists to prevent, arriving somewhere new.
+There is now one `resolveTexture`, and the preview and the bake both call it.
+
+### contrast 35, not full strength
+
+At full strength the mark sits under the time and fights it. At 35 it reads as a
+watermark and the numerals stay completely legible, which is what both presets
+ship at. Anybody who wants it bold has the slider.
+
+Both marks have a transparent ground and `drawTexture` composites rather than
+replaces, so the wearer's dial colour and sheen show through the mark. A
+photograph ignores those controls; these do not.
+
+### Also
+
+Contract regenerated and the Worker redeployed — it accepts a texture only if
+the contract lists it, so without that every mascot face would be refused on
+submission.
+
 ## 2026-09-03 — Three styles nobody could find, and the policy that did not cover the app
 
 Closing out the publish checklist. Two of the three things found were gaps

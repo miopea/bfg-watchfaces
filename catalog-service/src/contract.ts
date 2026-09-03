@@ -44,6 +44,13 @@ export interface Contract {
   readonly bounds: Readonly<Record<string, Bound>>;
   readonly enums: Readonly<Record<string, readonly string[]>>;
   readonly unpublishableEngines: readonly string[];
+  /**
+   * Dial images that ship inside the app.
+   *
+   * The only textures a face may name. Every other value points at a picture
+   * only the sender has, which is why `texture` is otherwise refused outright.
+   */
+  readonly builtInDials: readonly string[];
   readonly fields: readonly string[];
 }
 

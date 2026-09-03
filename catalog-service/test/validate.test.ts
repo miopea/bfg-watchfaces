@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CONTRACT } from "../src/contract";
 import { flatten, validateFace } from "../src/validate";
 import { FIXTURE, submission } from "./helpers";
 
@@ -39,6 +40,39 @@ describe("validateFace", () => {
     const bad = submission();
     (bad["params"] as Record<string, unknown>)["texture"] = "local-image-42";
     expect(validateFace(bad).some((p) => p.field === "texture")).toBe(true);
+  });
+
+  // A SHA-1 of imported bytes is what TextureStore ids look like. It must not
+  // slip through the built-in allowance just by being well-formed.
+  it("refuses an imported image even when its id looks like a real hash", () => {
+    const bad = submission();
+    const params = bad["params"] as Record<string, unknown>;
+    params["engine"] = "TEXTURE";
+    params["texture"] = "a".repeat(40);
+    expect(validateFace(bad).some((p) => p.field === "texture")).toBe(true);
+  });
+
+  it("accepts a TEXTURE face whose picture ships inside the app", () => {
+    const ok = submission();
+    const params = ok["params"] as Record<string, unknown>;
+    params["engine"] = "TEXTURE";
+    params["texture"] = CONTRACT.builtInDials[0];
+    const problems = validateFace(ok);
+    expect(problems.filter((p) => p.field === "engine" || p.field === "texture")).toEqual([]);
+  });
+
+  // The picture is only drawn by the TEXTURE engine, so naming one anywhere
+  // else is a face whose image would be silently ignored.
+  it("refuses a built-in dial named by an engine that would not draw it", () => {
+    const bad = submission();
+    const params = bad["params"] as Record<string, unknown>;
+    params["engine"] = "ROSETTE";
+    params["texture"] = CONTRACT.builtInDials[0];
+    expect(validateFace(bad).some((p) => p.field === "texture")).toBe(true);
+  });
+
+  it("publishes at least one built-in dial, or the feature is unreachable", () => {
+    expect(CONTRACT.builtInDials.length).toBeGreaterThan(0);
   });
 
   it("refuses a generatorVersion this build cannot render", () => {
