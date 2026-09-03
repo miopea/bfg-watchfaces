@@ -17,10 +17,18 @@
  * rejected outright — which is exactly the 1080x1920 the play-store-phone
  * template expects, so the raws drop straight in.
  *
- * ## Dark only
+ * ## Both themes, and the dark/light choice is still open
  *
- * The template offers dark and light. This app has one look, so asking for
- * both would produce five composites nobody can take a screenshot of.
+ * This said "dark only ... this app has one look", which was wrong: the app
+ * follows the phone's theme, and light captures exist. Both are rendered so the
+ * two sets can be compared side by side before one is chosen for the listing.
+ *
+ * PICK ONE. A listing that mixes them reads as five screenshots of two apps.
+ *
+ * The light raws currently come from the bfg-solutions site captures, which are
+ * 760x1593 and padded up to 1080x1920 — there is no light capture of My faces,
+ * so `04-myfaces` renders dark only. A missing raw renders nothing and says
+ * nothing, which is why that is written down here rather than discovered.
  */
 import { defineConfig } from "shotcraft";
 
@@ -30,7 +38,7 @@ export default defineConfig({
   // honest about where a web capture WOULD come from.
   target: "http://localhost:7777",
 
-  templates: [{ pkg: "@shotcraft/template-play-store-phone", themes: ["dark"] }],
+  templates: [{ pkg: "@shotcraft/template-play-store-phone", themes: ["dark", "light"] }],
 
   /**
    * Five screens, in the order somebody meets the app.
