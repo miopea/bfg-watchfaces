@@ -1,5 +1,89 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-03 — A source file that reads as binary, and the guard for it
+
+Swarm task 01a06506, found by Queen while checking a test count I had reported.
+
+`PhoneNoteTest.kt` carried two literal NUL bytes inside a string literal — a
+deliberately corrupt file for `writeText`, spelled with the raw bytes instead of
+escapes. The file was valid UTF-8 and matched HEAD. Nothing was corrupted. But
+`file(1)` called it `data`, and every text tool then skipped it WITHOUT SAYING
+SO.
+
+### What each tool actually did
+
+Measured here, and it is worse than the ticket described:
+
+```text
+ugrep -c "@Test"      ->  no output, exit 1     reads as A CLEAN ABSENCE
+GNU grep -o "@Test"   ->  "binary file matches", no matches listed
+bytes, counted        ->  8
+```
+
+`grep` on this machine is ugrep 7.8.4, which returns nothing and a non-zero
+exit — indistinguishable from the pattern genuinely not being there. GNU grep at
+least warns. The ticket said `-c` counted correctly; that is true of GNU grep
+and false of the one actually in the shell.
+
+Concretely it produced a wrong number: counting tests across `:appcore` by grep
+gave 175 against an actual 183, and the missing 8 were this one file. The 183 I
+reported was read from the JUnit XML, which is why it was right.
+
+### It happened twice more while being fixed
+
+Not a rare accident. The ticket describing the bug acquired the same two NUL
+bytes on its way through a shell, and so did the first probe written to verify
+the fix. Raw NULs travel through shells, editors and tickets invisibly and raise
+no error anywhere. Earlier the same day the file had been read in full and line
+98 rendered as `writeText("  ")` — what looks like two spaces.
+
+### The fix, and the proof it is equivalent
+
+`"\u0000\u0000"`. Measured rather than assumed, by writing both forms and
+comparing bytes:
+
+```text
+escape form : 2 bytes  0x00 0x00
+Char(0) form: 2 bytes  0x00 0x00
+identical   : true
+```
+
+### The standing guard
+
+`SourceIsTextTest` in `:workbench` opens every git-tracked file and counts NUL
+and stray C0 bytes. It reads BYTES, deliberately not grep — grep is exactly the
+tool that cannot see this, so a search for the offending files skips the files
+that have it.
+
+Its first version walked the filesystem with a directory blocklist and failed on
+200-odd Rust `.rlib` and `.rmeta` files under `scripts/pack-java/target/` —
+gitignored build output, legitimately binary. Blocklisting `target` would have
+held until the next tool invented a build directory. `git ls-files` is the
+boundary the test actually means.
+
+Verified by mutation: reinstating the two NUL bytes fails it, removing them
+passes. Swept at the same time — 258 tracked non-binary files, and this was the
+only one.
+
+### A separate finding, deliberately not acted on here
+
+The test is named `an unreadable note reads as absent`. With the NUL bytes it
+does not assert that. Measured:
+
+```text
+writeText(two NULs)   -> load() = 2 chars, has() = TRUE   (not absent)
+writeText(two spaces) -> load() = "",      has() = FALSE  (absent)
+```
+
+`PhoneNote.clean` treats `\s` as whitespace and NUL is not in that class, so the
+bytes survive `load()`, and the assertion `clean(note) == note` is then trivially
+true for any input. With two spaces it would have been a real assertion about
+absence.
+
+Left alone on purpose: the ticket said keep the behaviour, and changing what a
+test asserts is a different decision from changing how its bytes are spelled.
+Filed separately.
+
 ## 2026-09-03 — Two gaps closed by not building one of them
 
 Swarm task 01a064e8. Two unrelated items; both ended somewhere other than where
