@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import schema from "../schema.sql?raw";
 import fixture from "./fixtures/face.json";
 import { makeToken } from "./tokens";
@@ -31,6 +31,7 @@ export async function migrate(): Promise<void> {
  * service returning the wrong thing.
  */
 export async function reset(): Promise<void> {
+  await env.DB.prepare("DELETE FROM face_reviews").run();
   await env.DB.prepare("DELETE FROM faces").run();
   await env.DB.prepare("DELETE FROM reports").run();
   await env.DB.prepare("DELETE FROM rate").run();
@@ -81,3 +82,26 @@ export function get(path: string, headers: Record<string, string> = {}): Request
 }
 
 export const MODERATOR = { authorization: "Bearer test-moderator-token" };
+
+/** Give a submitted face the trusted technical-review prerequisite. */
+export async function passReview(id: string): Promise<Response> {
+  const face = await env.DB.prepare(
+    "SELECT params_hash, generator_version FROM faces WHERE id = ?",
+  )
+    .bind(id)
+    .first<{ params_hash: string; generator_version: number }>();
+  if (!face) throw new Error(`missing test face ${id}`);
+  return SELF.fetch(
+    post(
+      `/admin/faces/${id}/review`,
+      {
+        paramsHash: face.params_hash,
+        generatorVersion: Number(face.generator_version),
+        verdict: "passed",
+        problems: [],
+        previewBase64: "iVBORw0KGgo=",
+      },
+      MODERATOR,
+    ),
+  );
+}

@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { publishReviewed } from "./review";
 
 /**
  * The BFG ops contract, so this catalog appears in the ops console as a
@@ -241,13 +242,12 @@ async function incidents(env: Env): Promise<unknown> {
 }
 
 /**
- * The pending queue as a generic table.
+ * The pending queue as a generic review surface.
  *
- * WHAT THIS DOES NOT DO, said here because it is the important part: it does
- * NOT show the face. A face is parameters, and rasterising them needs the JVM
- * DialRenderer — the console's column types are text-only and there is
- * deliberately one rasterizer in this project. So this is a TRIAGE surface:
- * who submitted, how their previous submissions went, how long it has waited.
+ * The preview is produced by the repository's JVM moderation pass from the
+ * exact stored parameters. The Worker never redraws it and a submitter never
+ * supplies it. A matching params hash and generator version keep a stale
+ * preview from authorising publication.
  *
  * The per-author counts carry most of the signal an account buys a moderator —
  * a first submission and an eleventh from someone with nine rejections are
@@ -258,17 +258,33 @@ async function queueView(env: Env): Promise<unknown> {
   const { results } = await env.DB.prepare(
     `SELECT f.id, f.slug, f.name, f.author, f.state, f.created,
             (SELECT COUNT(*) FROM faces p WHERE p.author_key = f.author_key AND p.state = 'published') AS author_published,
-            (SELECT COUNT(*) FROM faces r WHERE r.author_key = f.author_key AND r.state IN ('rejected','removed')) AS author_rejected
-       FROM faces f WHERE f.state = 'pending'
+            (SELECT COUNT(*) FROM faces x WHERE x.author_key = f.author_key AND x.state IN ('rejected','removed')) AS author_rejected,
+            CASE
+              WHEN r.params_hash = f.params_hash AND r.generator_version = f.generator_version THEN r.verdict
+              ELSE 'pending'
+            END AS validation,
+            CASE
+              WHEN r.params_hash = f.params_hash AND r.generator_version = f.generator_version AND r.verdict = 'passed'
+                THEN r.preview_base64
+              ELSE NULL
+            END AS preview_base64
+       FROM faces f LEFT JOIN face_reviews r ON r.face_id = f.id
+      WHERE f.state = 'pending'
       ORDER BY f.created ASC LIMIT 100`,
   ).all();
-  const rows = (results ?? []) as Record<string, unknown>[];
+  const rows = ((results ?? []) as Record<string, unknown>[]).map((row) => {
+    const preview = typeof row["preview_base64"] === "string" ? row["preview_base64"] : null;
+    const rest = { ...row };
+    delete rest["preview_base64"];
+    return { ...rest, preview: preview ? `data:image/png;base64,${preview}` : null };
+  });
   return {
     capability: CAPABILITY,
     collectedAt: Date.now(),
     columns: [
-      { key: "id", label: "ID", type: "id" },
+      { key: "preview", label: "Preview", type: "image" },
       { key: "name", label: "Name", type: "string" },
+      { key: "validation", label: "Technical review", type: "status" },
       { key: "slug", label: "Slug", type: "string" },
       { key: "author", label: "Author", type: "string" },
       { key: "created", label: "Submitted", type: "timestamp" },
@@ -285,12 +301,12 @@ async function queueView(env: Env): Promise<unknown> {
         unit: "count",
       },
       { key: "state", label: "State", type: "status" },
+      { key: "id", label: "ID", type: "id" },
     ],
     rows,
     note:
-      "Parameters only — the face itself is not shown. Rendering needs the " +
-      "JVM DialRenderer, so review the design in the workbench before " +
-      "publishing.",
+      "Previews come from the JVM renderer and exact stored parameters. " +
+      "Publish stays disabled until technical validation and preview generation pass.",
   };
 }
 
@@ -328,6 +344,11 @@ function actionCatalog(): unknown {
         label: "Publish",
         description: "Make this face visible in the catalog.",
         destructive: false,
+        availableWhen: {
+          column: "validation",
+          equals: "passed",
+          reason: "A matching passed JVM review and trusted preview are required.",
+        },
         params: [face],
       },
       {
@@ -381,10 +402,14 @@ async function execute(
   if (state !== "published" && !reason) {
     return json({ error: "a reason is required", action }, 422);
   }
+  if (state === "published") {
+    const published = await publishReviewed(env, id);
+    return json(published.body, published.status);
+  }
   const result = await env.DB.prepare(
     `UPDATE faces SET state = ?, reason = ? WHERE id = ?`,
   )
-    .bind(state, state === "published" ? null : reason, id)
+    .bind(state, reason, id)
     .run();
   if (!result.meta.changes) {
     return json({ error: "no such face", id }, 404);

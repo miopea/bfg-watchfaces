@@ -79,6 +79,20 @@ CREATE INDEX IF NOT EXISTS reports_by_face  ON reports(face_slug);
 -- moderator has never had.
 CREATE INDEX IF NOT EXISTS faces_by_author ON faces(author_key);
 
+-- The trusted moderation artifact. It is produced by the repository's JVM
+-- renderer from the exact stored params, never accepted from a submitter.
+-- Keeping the params hash and generator version beside it makes a stale image
+-- unusable even if the face record is ever repaired or migrated in place.
+CREATE TABLE IF NOT EXISTS face_reviews (
+  face_id           TEXT PRIMARY KEY REFERENCES faces(id) ON DELETE CASCADE,
+  params_hash       TEXT NOT NULL,
+  generator_version INTEGER NOT NULL,
+  verdict           TEXT NOT NULL CHECK (verdict IN ('passed','failed')),
+  problems          TEXT NOT NULL DEFAULT '[]',
+  preview_base64    TEXT,
+  created           TEXT NOT NULL
+);
+
 -- Blocked authors. This is the capability the anonymous design could not have:
 -- with nobody to block, pre-moderation was the only control there was.
 --

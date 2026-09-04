@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { get, migrate, MODERATOR, post, reset, signedIn, submission } from "./helpers";
+import { get, migrate, MODERATOR, passReview, post, reset, signedIn, submission } from "./helpers";
 
 beforeAll(migrate);
 beforeEach(reset);
@@ -18,6 +18,7 @@ async function submit(overrides: Record<string, unknown> = {}, sub = "test-autho
 }
 
 async function publish(id: string): Promise<Response> {
+  await passReview(id);
   return SELF.fetch(post(`/admin/faces/${id}/publish`, {}, MODERATOR));
 }
 
@@ -105,6 +106,55 @@ describe("submitting", () => {
 });
 
 describe("publishing", () => {
+  it("refuses to publish until the current parameters have a passed JVM review and preview", async () => {
+    const { id } = await submit();
+    const early = await SELF.fetch(post(`/admin/faces/${id}/publish`, {}, MODERATOR));
+    expect(early.status).toBe(409);
+
+    expect((await passReview(id)).status).toBe(200);
+    expect((await SELF.fetch(post(`/admin/faces/${id}/publish`, {}, MODERATOR))).status).toBe(200);
+  });
+
+  it("rejects a stale review hash", async () => {
+    const { id } = await submit();
+    const response = await SELF.fetch(
+      post(
+        `/admin/faces/${id}/review`,
+        {
+          paramsHash: "0".repeat(64),
+          generatorVersion: 14,
+          verdict: "passed",
+          problems: [],
+          previewBase64: "iVBORw0KGgo=",
+        },
+        MODERATOR,
+      ),
+    );
+    expect(response.status).toBe(409);
+  });
+
+  it("serves the trusted preview and a row-local publish gate through Ops", async () => {
+    const { id } = await submit();
+    await passReview(id);
+
+    const view = (await (await SELF.fetch(get("/api/ops/inbox", MODERATOR))).json()) as {
+      columns: { key: string; type: string }[];
+      rows: { id: string; validation: string; preview: string }[];
+    };
+    expect(view.columns).toContainEqual({ key: "preview", label: "Preview", type: "image" });
+    expect(view.rows[0]).toMatchObject({ id, validation: "passed" });
+    expect(view.rows[0]?.preview).toBe("data:image/png;base64,iVBORw0KGgo=");
+
+    const actions = (await (
+      await SELF.fetch(get("/api/ops/inbox/actions", MODERATOR))
+    ).json()) as { actions: { id: string; availableWhen?: unknown }[] };
+    expect(actions.actions.find((a) => a.id === "publish")?.availableWhen).toEqual({
+      column: "validation",
+      equals: "passed",
+      reason: "A matching passed JVM review and trusted preview are required.",
+    });
+  });
+
   it("makes a face visible, with its parameters byte-for-byte as submitted", async () => {
     const { id, slug } = await submit();
     expect((await publish(id)).status).toBe(200);

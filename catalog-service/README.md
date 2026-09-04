@@ -128,7 +128,7 @@ The queue is worked from the repo, not from a dashboard:
 export BFG_CATALOG_URL=https://bfg-catalog.<subdomain>.workers.dev
 eval "$(op-login)" && export BFG_MODERATOR_TOKEN="$(op read op://…/moderator-token)"
 
-./gradlew :workbench:moderate                        # review, decide nothing
+./gradlew :workbench:moderate                        # validate, render and sync previews; decide nothing
 ./gradlew :workbench:moderate --args="--auto-reject" # reject what provably fails
 ./gradlew :workbench:moderate --args="--publish=<id>"
 ./gradlew :workbench:moderate --args="--reject=<id> --reason=..."
@@ -143,6 +143,13 @@ means looking at it.
 `--reject` and `--remove` both require a reason. `MODERATION.md` promises
 appeals are answered, and an appeal against a decision with no recorded reason
 cannot be.
+
+The default pass also uploads each technical verdict and 320px PNG to the
+private moderation record. The service binds that artifact to the stored
+parameter hash and generator version. Publish is refused until a matching
+passed review exists, so the Ops Console can show the face without learning how
+to render one and cannot approve an unseen or stale image. GitHub Actions runs
+this pass every ten minutes using the repository's `BFG_MODERATOR_TOKEN` secret.
 
 ## Deploying
 

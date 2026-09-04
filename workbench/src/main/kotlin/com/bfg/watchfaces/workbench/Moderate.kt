@@ -3,12 +3,14 @@ package com.bfg.watchfaces.workbench
 import com.bfg.watchfaces.appcore.FaceCodec
 import com.bfg.watchfaces.appcore.Json
 import java.io.File
+import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 import javax.imageio.ImageIO
+import java.util.Base64
 
 /**
  * Work the moderation queue.
@@ -117,6 +119,7 @@ object Moderate {
             review.problems.forEach { println("        - ${it.message}") }
 
             if (review.verdict == Moderation.Verdict.REFUSE) {
+                recordReview(base, token, row, review, previewBase64 = null)
                 refused++
                 if (autoReject) {
                     decide(base, token, review.id, "reject", review.reason())
@@ -126,7 +129,17 @@ object Moderate {
                 continue
             }
 
-            writePreview(previews, row, review)?.let { println("        preview: $it") }
+            val preview = writePreview(previews, row, review)
+            if (preview == null) {
+                recordReview(
+                    base, token, row, review,
+                    previewBase64 = null,
+                    overrideProblems = listOf("preview generation failed")
+                )
+            } else {
+                println("        preview: ${preview.path}")
+                recordReview(base, token, row, review, preview.base64)
+            }
         }
 
         println()
@@ -147,17 +160,64 @@ object Moderate {
      * cannot be drawn is a nuisance, and stopping would leave the rest of the
      * queue unworked, which is the outcome the response promises are about.
      */
-    private fun writePreview(dir: File, row: Map<String, Any?>, review: Moderation.Review): String? =
+    private data class GeneratedPreview(val path: String, val base64: String)
+
+    private fun writePreview(
+        dir: File,
+        row: Map<String, Any?>,
+        review: Moderation.Review
+    ): GeneratedPreview? =
         runCatching {
             val params = FaceCodec.fromJson(Json.obj(Json.parse(Json.str(row, "params", "{}"))))
-            val image = FacePreview.render(params)
+            val image = FacePreview.render(params, size = 320)
             val file = File(dir, "${review.slug}.png")
             ImageIO.write(image, "png", file)
-            file.path
+            val bytes = ByteArrayOutputStream().use { out ->
+                check(ImageIO.write(image, "png", out)) { "no PNG writer installed" }
+                out.toByteArray()
+            }
+            GeneratedPreview(file.path, Base64.getEncoder().encodeToString(bytes))
         }.getOrElse {
             println("        (preview failed: ${it.message})")
             null
         }
+
+    /**
+     * Put the machine verdict beside the exact params it reviewed.
+     *
+     * The service checks both the hash and generator version again. Echoing
+     * those values from the queue makes an old render fail closed if the stored
+     * face changed between GET and POST.
+     */
+    private fun recordReview(
+        base: String,
+        token: String,
+        row: Map<String, Any?>,
+        review: Moderation.Review,
+        previewBase64: String?,
+        overrideProblems: List<String>? = null
+    ) {
+        val problems = overrideProblems ?: review.problems.map { it.message }
+        val passed = review.verdict == Moderation.Verdict.LOOKS_FINE && previewBase64 != null
+        val payload = buildString {
+            append("{\"paramsHash\":")
+            append(Json.quote(Json.str(row, "params_hash", "")))
+            append(",\"generatorVersion\":")
+            append((row["generator_version"] as? Number)?.toInt() ?: -1)
+            append(",\"verdict\":")
+            append(Json.quote(if (passed) "passed" else "failed"))
+            append(",\"problems\":[")
+            append(problems.take(20).joinToString(",") { Json.quote(it) })
+            append("]")
+            if (previewBase64 != null) {
+                append(",\"previewBase64\":")
+                append(Json.quote(previewBase64))
+            }
+            append("}")
+        }
+        post(base, token, "/admin/faces/${review.id}/review", payload)
+        println("        technical review: ${if (passed) "passed" else "failed"} (synced)")
+    }
 
     private fun reports(base: String, token: String) {
         val body = get(base, token, "/admin/reports")

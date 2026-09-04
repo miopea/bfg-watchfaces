@@ -7171,3 +7171,31 @@ replaced them set the shape of everything else.
 - **Nothing has been tested on hardware.** Every claim above is verified against
   schemas, dumps, and unit tests. No face from this repo has been confirmed to
   appear on a real watch. That is step one and it gates everything else.
+## 2026-09-04 — A preview is a moderation prerequisite, not decoration
+
+The Ops Console could publish a pending face while showing only its parameter
+metadata. That did not satisfy pre-moderation: the operator could not judge
+spam, harassment, impersonation, or library saturation without seeing the
+design, and the Worker cannot run the Kotlin renderer or Google's WFF schema.
+
+The existing JVM moderation pass now remains the one rendering authority. It
+renders the exact `params` text returned by the queue at the stored generator
+version, runs the real WFF validation, and uploads a PNG with the parameter hash
+and generator version. The catalog stores that private review artifact in D1.
+The Ops view can display it, but the public catalog remains parameters-only.
+
+Publication is now an atomic server-side gate: the current face must have a
+`passed` review whose hash and generator version still match and whose preview
+exists. The console also disables Publish until the app-declared row condition
+passes. The server check is authoritative; the disabled button makes the reason
+visible before an operator tries it.
+
+A scheduled GitHub Action runs the JVM pass every ten minutes. A missing schema,
+render failure, stale hash, missing preview, or missing workflow credential all
+fail closed. None can turn into a publishable row.
+
+Rejected: drawing the face in JavaScript or in the Worker. That would create a
+second renderer, so the picture used for approval could differ from what ships.
+Also rejected: accepting the phone's submitted thumbnail as trusted. A caller
+can invoke the public API without the app and pair one image with another set of
+parameters.

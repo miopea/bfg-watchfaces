@@ -2,6 +2,7 @@ import { ops } from "./ops";
 import { CONTRACT } from "./contract";
 import type { Env } from "./env";
 import { paramsHash } from "./hash";
+import { publishReviewed, recordReview } from "./review";
 import { checkRate, LIMITS, sweepRate } from "./ratelimit";
 import { identify } from "./auth";
 import { flatten, tooLarge, validateFace } from "./validate";
@@ -634,7 +635,8 @@ async function admin(
     // whether this is somebody's first face or their eleventh, and how the
     // previous ten went. No amount of looking at one face tells you that.
     const { results } = await env.DB.prepare(
-      `SELECT f.id, f.slug, f.name, f.author, f.params, f.state, f.reason, f.created,
+      `SELECT f.id, f.slug, f.name, f.author, f.params, f.params_hash,
+              f.generator_version, f.state, f.reason, f.created,
               f.author_key,
               (SELECT COUNT(*) FROM faces p WHERE p.author_key = f.author_key AND p.state = 'published') AS author_published,
               (SELECT COUNT(*) FROM faces r WHERE r.author_key = f.author_key AND r.state IN ('rejected','removed')) AS author_rejected
@@ -643,6 +645,12 @@ async function admin(
       .bind(state)
       .all();
     return json({ state, count: results.length, faces: results });
+  }
+
+  const review = /^\/admin\/faces\/([0-9a-f-]{36})\/review$/.exec(path);
+  if (method === "POST" && review?.[1]) {
+    const recorded = await recordReview(request, env, review[1]);
+    return json(recorded.body, recorded.status);
   }
 
   if (method === "GET" && path === "/admin/reports") {
@@ -675,6 +683,13 @@ async function admin(
       .bind(id)
       .first<{ slug: string }>();
     if (!row) return json({ error: "no such submission" }, 404);
+
+    if (state === "published") {
+      const published = await publishReviewed(env, id);
+      if (published.status !== 200) return json(published.body, published.status);
+      ctx.waitUntil(purge(request, row.slug));
+      return json({ id, slug: row.slug, state });
+    }
 
     await env.DB.prepare(`UPDATE faces SET state = ?, reason = ?, reviewed = ? WHERE id = ?`)
       .bind(state, reason, new Date().toISOString(), id)

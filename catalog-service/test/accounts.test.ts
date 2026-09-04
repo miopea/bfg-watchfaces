@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { get, migrate, MODERATOR, post, reset, signedIn, submission } from "./helpers";
+import { get, migrate, MODERATOR, passReview, post, reset, signedIn, submission } from "./helpers";
 
 beforeAll(migrate);
 beforeEach(reset);
@@ -109,6 +109,7 @@ describe("deleting an account", () => {
    */
   it("abandons a published face rather than removing it", async () => {
     const published = await submitAs("leaver", 26);
+    await passReview(published.id);
     await SELF.fetch(post(`/admin/faces/${published.id}/publish`, {}, MODERATOR));
 
     const before = (await (await SELF.fetch(get("/index.json"))).json()) as { count: number };
@@ -171,6 +172,7 @@ describe("what the moderator can now see", () => {
     // The main thing an account buys a moderator: whether this is somebody's
     // first face or their eleventh. No amount of looking at ONE face tells you.
     const first = await submitAs("prolific", 26);
+    await passReview(first.id);
     await SELF.fetch(post(`/admin/faces/${first.id}/publish`, {}, MODERATOR));
     const second = await submitAs("prolific", 30);
     await SELF.fetch(post(`/admin/faces/${second.id}/reject`, { reason: "not a face" }, MODERATOR));
