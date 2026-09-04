@@ -7171,6 +7171,7 @@ replaced them set the shape of everything else.
 - **Nothing has been tested on hardware.** Every claim above is verified against
   schemas, dumps, and unit tests. No face from this repo has been confirmed to
   appear on a real watch. That is step one and it gates everything else.
+
 ## 2026-09-04 — A preview is a moderation prerequisite, not decoration
 
 The Ops Console could publish a pending face while showing only its parameter
