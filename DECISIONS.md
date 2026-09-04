@@ -7200,3 +7200,26 @@ second renderer, so the picture used for approval could differ from what ships.
 Also rejected: accepting the phone's submitted thumbnail as trusted. A caller
 can invoke the public API without the app and pair one image with another set of
 parameters.
+
+## 2026-09-04 — AI advises on watch faces but never decides
+
+The operator wants the console to reduce routine attention, and almost every
+ordinary watch-face submission will be approved. The useful model task is
+therefore triage: call out abusive text or symbols, obvious spam, repeated
+low-effort submissions, and visual saturation against a small recent sample.
+Images cannot be shared into the catalog, so copyright classification is outside
+this policy. Unusual taste alone is not a rejection reason.
+
+The Worker now requests one vision recommendation after the current parameters
+receive a passed JVM review and trusted preview; the operator can explicitly
+refresh it. A repeated scheduled technical pass reuses a matching result. It sends that
+preview, bounded public metadata, author history, policy values, and up to twelve
+recent trusted published previews. The stored result is bound to the parameter
+hash and generator version, and disappears from the view when either changes.
+
+The policy is editable through the existing Ops action contract: enabled state,
+permissive/balanced/cautious sensitivity, recent-comparison count, and the
+per-author pending warning threshold. Defaults are enabled, balanced, six, and
+three. There is no automatic-publish option. An AI response writes evidence only;
+it cannot publish, reject, remove, change policy, or satisfy the technical publish
+gate. The operator remains the final arbiter through the ordinary Publish action.

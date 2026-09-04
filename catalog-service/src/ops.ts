@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { configureAiPolicy, getPolicy, recommendFace } from "./ai-review";
 import { publishReviewed } from "./review";
 
 /**
@@ -109,7 +110,7 @@ export async function ops(
   }
 
   const act = new RegExp(
-    `^/api/ops/${CAPABILITY}/actions/(publish|reject|remove)$`,
+    `^/api/ops/${CAPABILITY}/actions/(publish|reject|remove|ai-recommend|configure-ai)$`,
   ).exec(path);
   if (method === "POST" && act?.[1]) {
     const denied = authorise(request, env, "write");
@@ -136,9 +137,9 @@ export async function ops(
 async function health(env: Env): Promise<unknown> {
   const checkedAt = Date.now();
   try {
-    const row = await env.DB.prepare(
-      `SELECT COUNT(*) AS n FROM faces`,
-    ).first<{ n: number }>();
+    const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM faces`).first<{
+      n: number;
+    }>();
     return {
       status: "healthy",
       checkedAt,
@@ -161,7 +162,10 @@ async function health(env: Env): Promise<unknown> {
           name: "catalog-d1",
           kind: "database",
           status: "unhealthy",
-          detail: `read probe failed: ${(error as Error).message}`.slice(0, 500),
+          detail: `read probe failed: ${(error as Error).message}`.slice(
+            0,
+            500,
+          ),
         },
       ],
     };
@@ -255,6 +259,7 @@ async function incidents(env: Env): Promise<unknown> {
  * design. Publishing from here alone would be approving a picture nobody saw.
  */
 async function queueView(env: Env): Promise<unknown> {
+  const policy = await getPolicy(env);
   const { results } = await env.DB.prepare(
     `SELECT f.id, f.slug, f.name, f.author, f.state, f.created,
             (SELECT COUNT(*) FROM faces p WHERE p.author_key = f.author_key AND p.state = 'published') AS author_published,
@@ -267,16 +272,37 @@ async function queueView(env: Env): Promise<unknown> {
               WHEN r.params_hash = f.params_hash AND r.generator_version = f.generator_version AND r.verdict = 'passed'
                 THEN r.preview_base64
               ELSE NULL
-            END AS preview_base64
-       FROM faces f LEFT JOIN face_reviews r ON r.face_id = f.id
+            END AS preview_base64,
+            CASE
+              WHEN a.params_hash = f.params_hash AND a.generator_version = f.generator_version
+                THEN a.recommendation
+              ELSE 'not reviewed'
+            END AS ai_recommendation,
+            CASE
+              WHEN a.params_hash = f.params_hash AND a.generator_version = f.generator_version
+                THEN a.confidence
+              ELSE NULL
+            END AS ai_confidence,
+            CASE
+              WHEN a.params_hash = f.params_hash AND a.generator_version = f.generator_version
+                THEN a.rationale
+              ELSE NULL
+            END AS ai_rationale
+       FROM faces f
+       LEFT JOIN face_reviews r ON r.face_id = f.id
+       LEFT JOIN face_ai_reviews a ON a.face_id = f.id
       WHERE f.state = 'pending'
       ORDER BY f.created ASC LIMIT 100`,
   ).all();
   const rows = ((results ?? []) as Record<string, unknown>[]).map((row) => {
-    const preview = typeof row["preview_base64"] === "string" ? row["preview_base64"] : null;
+    const preview =
+      typeof row["preview_base64"] === "string" ? row["preview_base64"] : null;
     const rest = { ...row };
     delete rest["preview_base64"];
-    return { ...rest, preview: preview ? `data:image/png;base64,${preview}` : null };
+    return {
+      ...rest,
+      preview: preview ? `data:image/png;base64,${preview}` : null,
+    };
   });
   return {
     capability: CAPABILITY,
@@ -285,6 +311,9 @@ async function queueView(env: Env): Promise<unknown> {
       { key: "preview", label: "Preview", type: "image" },
       { key: "name", label: "Name", type: "string" },
       { key: "validation", label: "Technical review", type: "status" },
+      { key: "ai_recommendation", label: "AI suggestion", type: "status" },
+      { key: "ai_confidence", label: "Confidence", type: "string" },
+      { key: "ai_rationale", label: "Why", type: "string" },
       { key: "slug", label: "Slug", type: "string" },
       { key: "author", label: "Author", type: "string" },
       { key: "created", label: "Submitted", type: "timestamp" },
@@ -306,7 +335,8 @@ async function queueView(env: Env): Promise<unknown> {
     rows,
     note:
       "Previews come from the JVM renderer and exact stored parameters. " +
-      "Publish stays disabled until technical validation and preview generation pass.",
+      `AI advice is ${policy.enabled ? "enabled" : "disabled"} with ${policy.sensitivity} sensitivity; ` +
+      "it never publishes or rejects. Publish stays a human decision and remains disabled until technical validation and preview generation pass.",
   };
 }
 
@@ -340,6 +370,20 @@ function actionCatalog(): unknown {
     capability: CAPABILITY,
     actions: [
       {
+        id: "ai-recommend",
+        label: "Ask AI",
+        description:
+          "Check the trusted preview for abuse, spam and library saturation. Advice only; it never decides.",
+        destructive: false,
+        availableWhen: {
+          column: "validation",
+          equals: "passed",
+          reason:
+            "A matching passed JVM review and trusted preview are required.",
+        },
+        params: [face],
+      },
+      {
         id: "publish",
         label: "Publish",
         description: "Make this face visible in the catalog.",
@@ -347,7 +391,8 @@ function actionCatalog(): unknown {
         availableWhen: {
           column: "validation",
           equals: "passed",
-          reason: "A matching passed JVM review and trusted preview are required.",
+          reason:
+            "A matching passed JVM review and trusted preview are required.",
         },
         params: [face],
       },
@@ -364,6 +409,50 @@ function actionCatalog(): unknown {
         description: "Take a published face down.",
         destructive: true,
         params: [face, reason],
+      },
+      {
+        id: "configure-ai",
+        label: "Configure AI review",
+        description:
+          "Set the recommendation policy. This cannot enable automatic publishing.",
+        destructive: false,
+        params: [
+          {
+            key: "enabled",
+            label: "AI review",
+            type: "enum",
+            required: true,
+            options: [
+              { value: "enabled", label: "Enabled" },
+              { value: "disabled", label: "Disabled" },
+            ],
+          },
+          {
+            key: "sensitivity",
+            label: "Sensitivity",
+            type: "enum",
+            required: true,
+            options: [
+              { value: "permissive", label: "Permissive" },
+              { value: "balanced", label: "Balanced" },
+              { value: "cautious", label: "Cautious" },
+            ],
+          },
+          {
+            key: "comparisonLimit",
+            label: "Recent published faces to compare",
+            type: "number",
+            required: true,
+            help: "1 to 12 trusted previews.",
+          },
+          {
+            key: "pendingWarningAt",
+            label: "Warn when one author has this many pending",
+            type: "number",
+            required: true,
+            help: "1 to 50 submissions.",
+          },
+        ],
       },
     ],
   };
@@ -389,9 +478,18 @@ async function execute(
     /* an empty body is a missing id, handled below */
   }
   const id = typeof body["id"] === "string" ? body["id"] : "";
-  const reason = typeof body["reason"] === "string" ? body["reason"].trim() : "";
+  const reason =
+    typeof body["reason"] === "string" ? body["reason"].trim() : "";
+  if (action === "configure-ai") {
+    const configured = await configureAiPolicy(env, body);
+    return json(configured.body, configured.status);
+  }
   if (!/^[0-9a-f-]{36}$/.test(id)) {
     return json({ error: "a face id is required" }, 422);
+  }
+  if (action === "ai-recommend") {
+    const recommendation = await recommendFace(env, id, true);
+    return json(recommendation.body, recommendation.status);
   }
   const state =
     action === "publish"

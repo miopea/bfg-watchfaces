@@ -151,6 +151,23 @@ passed review exists, so the Ops Console can show the face without learning how
 to render one and cannot approve an unseen or stale image. GitHub Actions runs
 this pass every ten minutes using the repository's `BFG_MODERATOR_TOKEN` secret.
 
+The Worker automatically requests one AI recommendation when a new technically
+passed preview arrives; the Ops Console can request a refresh. Repeated scheduled
+technical passes reuse a matching stored recommendation instead of paying for it
+again. The Worker sends only the trusted candidate PNG, public-facing name and
+author, bounded author-history counts, policy values, and at most the configured
+number of recent trusted published previews. The response is stored against the
+same parameter hash and generator version. It can say `approve`, `review`, or
+`reject`, but it cannot perform any of those actions.
+
+The **Configure AI review** action controls whether recommendations are enabled,
+the sensitivity (`permissive`, `balanced`, or `cautious`), the number of recent
+faces compared (1–12, default 6), and the per-author pending warning (1–50,
+default 3). There is deliberately no automatic-publish setting. The model is
+asked about abuse, spam, near duplication, and flooding; unusual aesthetic taste
+is not a refusal reason. Each request requires an operator click and the ordinary
+Publish action remains the final decision.
+
 ## Deploying
 
 Already done once. `wrangler login --device` is the flow that works from here —
@@ -162,9 +179,11 @@ npx wrangler login --device     # only if the stored credential has expired
 npm run deploy
 ```
 
-`IP_SALT` and `MODERATOR_TOKEN` are set. The moderator token is in 1Password as
+`IP_SALT`, `MODERATOR_TOKEN`, and `ANTHROPIC_API_KEY` are set as Worker secrets.
+The moderator token is in 1Password as
 **bfg-catalog-moderator-token** (BFG vault) — it is the only credential in the
-system and the only one a human needs to read back.
+service a human needs to read back. The AI key is provider-only and gives the
+model no catalog action authority.
 
 ### What is still switched off
 

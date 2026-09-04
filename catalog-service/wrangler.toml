@@ -45,6 +45,7 @@ database_id = "9fa40371-9cfe-4fc8-a8f5-9592c447deb4"
 # is switched off, and the write endpoints fail closed rather than accepting
 # anybody.
 GOOGLE_CLIENT_ID = "819189022552-gll7rn5ic7f6ruo6oj5ii684945ke35g.apps.googleusercontent.com"
+ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 # Secrets, set with `wrangler secret put <name>` and never written here:
 #
@@ -52,6 +53,8 @@ GOOGLE_CLIENT_ID = "819189022552-gll7rn5ic7f6ruo6oj5ii684945ke35g.apps.googleuse
 #   IP_SALT            salts the hashed IP used for rate limiting AND the hashed
 #                      Google subject id stored as author_key, so neither a raw
 #                      address nor a raw subject id is ever written down
+#   ANTHROPIC_API_KEY  vision adviser for operator-requested recommendations;
+#                      it has no publish or rejection authority
 # Stamped BY HAND, and it drifted: it read 5bbed9c through several deploys
 # after that commit, which makes `curl /config` agree with itself while
 # naming the wrong build. Update it in the same commit as any deploy --

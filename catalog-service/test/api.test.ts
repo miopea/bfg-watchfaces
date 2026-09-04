@@ -153,6 +153,76 @@ describe("publishing", () => {
       equals: "passed",
       reason: "A matching passed JVM review and trusted preview are required.",
     });
+    expect(actions.actions.find((a) => a.id === "ai-recommend")?.availableWhen).toEqual({
+      column: "validation",
+      equals: "passed",
+      reason: "A matching passed JVM review and trusted preview are required.",
+    });
+  });
+
+  it("stores bounded AI advice without deciding the submission", async () => {
+    const { id } = await submit();
+    const beforeReview = await SELF.fetch(
+      post("/api/ops/inbox/actions/ai-recommend", { id }, MODERATOR)
+    );
+    expect(beforeReview.status).toBe(409);
+
+    await passReview(id);
+    const response = await SELF.fetch(
+      post("/api/ops/inbox/actions/ai-recommend", { id }, MODERATOR)
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      id,
+      recommendation: "approve",
+      confidence: "high",
+    });
+
+    const face = await env.DB.prepare("SELECT state FROM faces WHERE id = ?")
+      .bind(id)
+      .first<{ state: string }>();
+    expect(face?.state).toBe("pending");
+
+    const view = (await (await SELF.fetch(get("/api/ops/inbox", MODERATOR))).json()) as {
+      rows: Record<string, unknown>[];
+    };
+    expect(view.rows[0]).toMatchObject({
+      id,
+      ai_recommendation: "approve",
+      ai_confidence: "high",
+      ai_rationale: "No concrete abuse or saturation signal is visible.",
+    });
+  });
+
+  it("validates and persists the operator's AI recommendation policy", async () => {
+    const invalid = await SELF.fetch(
+      post("/api/ops/inbox/actions/configure-ai", {
+        enabled: "enabled",
+        sensitivity: "balanced",
+        comparisonLimit: 0,
+        pendingWarningAt: 3,
+      }, MODERATOR)
+    );
+    expect(invalid.status).toBe(422);
+
+    const response = await SELF.fetch(
+      post("/api/ops/inbox/actions/configure-ai", {
+        enabled: "disabled",
+        sensitivity: "permissive",
+        comparisonLimit: 4,
+        pendingWarningAt: 5,
+      }, MODERATOR)
+    );
+    expect(response.status).toBe(200);
+    const row = await env.DB.prepare(
+      "SELECT enabled, sensitivity, comparison_limit, pending_warn FROM moderation_policy WHERE id = 1"
+    ).first<Record<string, unknown>>();
+    expect(row).toMatchObject({
+      enabled: 0,
+      sensitivity: "permissive",
+      comparison_limit: 4,
+      pending_warn: 5,
+    });
   });
 
   it("makes a face visible, with its parameters byte-for-byte as submitted", async () => {

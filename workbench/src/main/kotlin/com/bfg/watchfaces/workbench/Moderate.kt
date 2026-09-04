@@ -217,6 +217,15 @@ object Moderate {
         }
         post(base, token, "/admin/faces/${review.id}/review", payload)
         println("        technical review: ${if (passed) "passed" else "failed"} (synced)")
+        if (passed) {
+            val advice = Json.obj(Json.parse(post(base, token, "/admin/faces/${review.id}/ai-review", "{}")))
+            val deduplicated = advice["deduplicated"] == true
+            println(
+                "        AI suggestion: ${Json.str(advice, "recommendation", "unavailable")}" +
+                    " (${Json.str(advice, "confidence", "unknown")}" +
+                    if (deduplicated) ", reused)" else ")"
+            )
+        }
     }
 
     private fun reports(base: String, token: String) {

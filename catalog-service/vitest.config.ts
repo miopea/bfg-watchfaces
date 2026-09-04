@@ -20,6 +20,22 @@ export default defineConfig({
         // Anything else the Worker tries to fetch fails loudly here rather than
         // quietly reaching the internet.
         outboundService: (request: Request) => {
+          if (new URL(request.url).hostname === "api.anthropic.com") {
+            return new Response(
+              JSON.stringify({
+                content: [{
+                  type: "text",
+                  text: JSON.stringify({
+                    recommendation: "approve",
+                    confidence: "high",
+                    rationale: "No concrete abuse or saturation signal is visible.",
+                    signals: ["distinct from recent faces"],
+                  }),
+                }],
+              }),
+              { headers: { "content-type": "application/json" } }
+            );
+          }
           if (new URL(request.url).pathname === "/oauth2/v3/certs") {
             return new Response(JSON.stringify({ keys: [TEST_PUBLIC_JWK] }), {
               headers: { "content-type": "application/json" },
@@ -34,6 +50,8 @@ export default defineConfig({
           GOOGLE_CLIENT_ID: "test-client-id.apps.googleusercontent.com",
           MODERATOR_TOKEN: "test-moderator-token",
           IP_SALT: "test-salt",
+          ANTHROPIC_API_KEY: "test-anthropic-key",
+          ANTHROPIC_MODEL: "claude-haiku-4-5-20251001",
         },
       },
     }),

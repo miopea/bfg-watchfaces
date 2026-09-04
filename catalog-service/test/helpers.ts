@@ -31,10 +31,14 @@ export async function migrate(): Promise<void> {
  * service returning the wrong thing.
  */
 export async function reset(): Promise<void> {
+  await env.DB.prepare("DELETE FROM face_ai_reviews").run();
   await env.DB.prepare("DELETE FROM face_reviews").run();
   await env.DB.prepare("DELETE FROM faces").run();
   await env.DB.prepare("DELETE FROM reports").run();
   await env.DB.prepare("DELETE FROM rate").run();
+  await env.DB.prepare(
+    "UPDATE moderation_policy SET enabled = 1, sensitivity = 'balanced', comparison_limit = 6, pending_warn = 3 WHERE id = 1"
+  ).run();
   await caches.default.delete("https://catalog.test/index.json");
 }
 

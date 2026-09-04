@@ -1,5 +1,6 @@
 import { ops } from "./ops";
 import { CONTRACT } from "./contract";
+import { recommendFace } from "./ai-review";
 import type { Env } from "./env";
 import { paramsHash } from "./hash";
 import { publishReviewed, recordReview } from "./review";
@@ -651,6 +652,12 @@ async function admin(
   if (method === "POST" && review?.[1]) {
     const recorded = await recordReview(request, env, review[1]);
     return json(recorded.body, recorded.status);
+  }
+
+  const aiReview = /^\/admin\/faces\/([0-9a-f-]{36})\/ai-review$/.exec(path);
+  if (method === "POST" && aiReview?.[1]) {
+    const recommendation = await recommendFace(env, aiReview[1]);
+    return json(recommendation.body, recommendation.status);
   }
 
   if (method === "GET" && path === "/admin/reports") {

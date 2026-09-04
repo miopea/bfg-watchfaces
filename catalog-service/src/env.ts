@@ -1,7 +1,7 @@
 /**
  * What the Worker is given at runtime.
  *
- * The three secrets are set with `wrangler secret put` and are never in
+ * Runtime secrets are set with `wrangler secret put` and are never in
  * `wrangler.toml`, which is committed.
  */
 export interface Env {
@@ -39,6 +39,10 @@ export interface Env {
    */
   readonly OPS_TOKEN_READ?: string;
   readonly OPS_TOKEN_WRITE?: string;
+
+  /** Vision-only moderation adviser. It can write a recommendation, never a decision. */
+  readonly ANTHROPIC_API_KEY?: string;
+  readonly ANTHROPIC_MODEL?: string;
 
   /** The SHA being served, so a stale deploy is observable. */
   readonly BUILD_SHA?: string;
