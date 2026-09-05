@@ -106,7 +106,7 @@ export async function ops(
   if (method === "GET" && path === `/api/ops/${CAPABILITY}/actions`) {
     const denied = authorise(request, env, "read");
     if (denied) return denied;
-    return json(actionCatalog());
+    return json(await actionCatalog(env));
   }
 
   const act = new RegExp(
@@ -351,7 +351,8 @@ async function queueView(env: Env): Promise<unknown> {
  * `destructive` drives a server-enforced confirmation in the console. It is a
  * behaviour, not a label.
  */
-function actionCatalog(): unknown {
+async function actionCatalog(env: Env): Promise<unknown> {
+  const policy = await getPolicy(env);
   const face = {
     key: "id",
     label: "Face",
@@ -412,6 +413,8 @@ function actionCatalog(): unknown {
       },
       {
         id: "configure-ai",
+        settingsGroup: "ai",
+        settingsSummary: `Provider: Anthropic. Model: ${env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001"}. ${env.ANTHROPIC_API_KEY ? "Provider credential configured." : "Provider credential missing; reviews cannot run."} Review mode: recommendations only. Uses the trusted preview, public name and author, author-history counts and up to ${policy.comparison_limit} published previews.`,
         label: "Configure AI review",
         description:
           "Set the recommendation policy. This cannot enable automatic publishing.",
@@ -419,6 +422,7 @@ function actionCatalog(): unknown {
         params: [
           {
             key: "enabled",
+            currentValue: policy.enabled ? "enabled" : "disabled",
             label: "AI review",
             type: "enum",
             required: true,
@@ -429,6 +433,7 @@ function actionCatalog(): unknown {
           },
           {
             key: "sensitivity",
+            currentValue: policy.sensitivity,
             label: "Sensitivity",
             type: "enum",
             required: true,
@@ -440,6 +445,7 @@ function actionCatalog(): unknown {
           },
           {
             key: "comparisonLimit",
+            currentValue: policy.comparison_limit,
             label: "Recent published faces to compare",
             type: "number",
             required: true,
@@ -447,6 +453,7 @@ function actionCatalog(): unknown {
           },
           {
             key: "pendingWarningAt",
+            currentValue: policy.pending_warn,
             label: "Warn when one author has this many pending",
             type: "number",
             required: true,

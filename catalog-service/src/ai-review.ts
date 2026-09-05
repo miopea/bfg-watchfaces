@@ -62,6 +62,7 @@ export async function recommendFace(
     const existing = await env.DB.prepare(
       `SELECT recommendation, confidence FROM face_ai_reviews
         WHERE face_id = ? AND params_hash = ? AND generator_version = ? AND model = ?
+          AND json_extract(signals, '$.policy') = ?
           AND json_extract(signals, '$.deterministic.exactDuplicatePreventedByDatabase') IS NULL`,
     )
       .bind(
@@ -69,6 +70,7 @@ export async function recommendFace(
         face.params_hash,
         Number(face.generator_version),
         env.ANTHROPIC_MODEL ?? DEFAULT_MODEL,
+        JSON.stringify(policy),
       )
       .first<{ recommendation: Recommendation; confidence: Confidence }>();
     if (existing) {
@@ -217,7 +219,7 @@ export async function recommendFace(
       parsed.recommendation,
       parsed.confidence,
       parsed.rationale,
-      JSON.stringify({ deterministic: signals, model: parsed.signals }),
+      JSON.stringify({ deterministic: signals, model: parsed.signals, policy }),
       new Date().toISOString(),
     )
     .run();

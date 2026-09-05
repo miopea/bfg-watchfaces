@@ -183,6 +183,13 @@ describe("publishing", () => {
       .first<{ state: string }>();
     expect(face?.state).toBe("pending");
 
+    const cached = await SELF.fetch(post(`/admin/faces/${id}/ai-review`, {}, MODERATOR));
+    expect(await cached.json()).toMatchObject({ deduplicated: true });
+    await env.DB.prepare("UPDATE moderation_policy SET sensitivity = 'cautious' WHERE id = 1").run();
+    const changedPolicy = await SELF.fetch(post(`/admin/faces/${id}/ai-review`, {}, MODERATOR));
+    expect(changedPolicy.status).toBe(200);
+    expect(await changedPolicy.json()).not.toHaveProperty("deduplicated");
+
     const stored = await env.DB.prepare("SELECT signals FROM face_ai_reviews WHERE face_id = ?")
       .bind(id).first<{ signals: string }>();
     expect(JSON.parse(stored!.signals).deterministic).not.toHaveProperty("exactDuplicatePreventedByDatabase");
@@ -233,6 +240,13 @@ describe("publishing", () => {
       comparison_limit: 4,
       pending_warn: 5,
     });
+    const catalog = await (await SELF.fetch(get("/api/ops/inbox/actions", MODERATOR))).json() as {
+      actions: { id: string; settingsGroup?: string; params: { key: string; currentValue?: unknown }[] }[];
+    };
+    const settings = catalog.actions.find((action) => action.id === "configure-ai")!;
+    expect(settings.settingsGroup).toBe("ai");
+    expect(Object.fromEntries(settings.params.map((param) => [param.key, param.currentValue])))
+      .toEqual({ enabled: "disabled", sensitivity: "permissive", comparisonLimit: 4, pendingWarningAt: 5 });
   });
 
   it("makes a face visible, with its parameters byte-for-byte as submitted", async () => {
