@@ -183,6 +183,16 @@ describe("publishing", () => {
       .first<{ state: string }>();
     expect(face?.state).toBe("pending");
 
+    const stored = await env.DB.prepare("SELECT signals FROM face_ai_reviews WHERE face_id = ?")
+      .bind(id).first<{ signals: string }>();
+    expect(JSON.parse(stored!.signals).deterministic).not.toHaveProperty("exactDuplicatePreventedByDatabase");
+
+    // Advice created with the misleading old safeguard flag must be recomputed.
+    await env.DB.prepare("UPDATE face_ai_reviews SET recommendation = 'reject', signals = ? WHERE face_id = ?")
+      .bind(JSON.stringify({ deterministic: { exactDuplicatePreventedByDatabase: true } }), id).run();
+    const retried = await SELF.fetch(post(`/admin/faces/${id}/ai-review`, {}, MODERATOR));
+    expect(await retried.json()).toMatchObject({ recommendation: "approve" });
+
     const view = (await (await SELF.fetch(get("/api/ops/inbox", MODERATOR))).json()) as {
       rows: Record<string, unknown>[];
     };
