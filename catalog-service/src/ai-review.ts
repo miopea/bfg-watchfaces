@@ -61,11 +61,13 @@ export async function recommendFace(
       "a matching passed JVM review and trusted preview are required",
     );
 
+  const libraryRevision = Number((await env.DB.prepare("SELECT revision FROM catalog_revision WHERE id=1").first<{ revision: number }>())?.revision ?? -1);
   if (!refresh) {
     const existing = await env.DB.prepare(
       `SELECT recommendation, confidence FROM face_ai_reviews
         WHERE face_id = ? AND params_hash = ? AND generator_version = ? AND model = ?
           AND json_extract(signals, '$.policy') = ?
+          AND json_extract(signals, '$.libraryRevision') = ?
           AND json_extract(signals, '$.deterministic.exactDuplicatePreventedByDatabase') IS NULL`,
     )
       .bind(
@@ -74,6 +76,7 @@ export async function recommendFace(
         Number(face.generator_version),
         env.ANTHROPIC_MODEL ?? DEFAULT_MODEL,
         JSON.stringify(policy),
+        libraryRevision,
       )
       .first<{ recommendation: Recommendation; confidence: Confidence }>();
     if (existing) {
@@ -223,7 +226,7 @@ export async function recommendFace(
       parsed.recommendation,
       parsed.confidence,
       parsed.rationale,
-      JSON.stringify({ deterministic: signals, model: parsed.signals, policy }),
+      JSON.stringify({ deterministic: signals, model: parsed.signals, policy, libraryRevision }),
       new Date().toISOString(),
     )
     .run();
@@ -279,6 +282,11 @@ export async function configureAiPolicy(
       pendingWarningAt,
     )
     , env.DB.prepare("UPDATE automatic_approval_policy SET mode = ?, max_per_hour = ?, max_per_author_day = ? WHERE id = 1").bind(mode === "automatic" ? "automatic" : "recommendations", maxPerHour, maxPerAuthorDay)]);
+  if (JSON.stringify(await getPolicy(env)) !== JSON.stringify(current)) {
+    await env.DB.prepare(`UPDATE moderation_jobs SET status='waiting',stage='preview',attempts=0,lease=NULL,lease_until=0,
+      next_attempt=0,last_error=NULL,updated_at=? WHERE lease_until<=? AND face_id IN (SELECT id FROM faces WHERE state='pending')`)
+      .bind(Date.now(), Date.now()).run();
+  }
   return {
     status: 200,
     body: {

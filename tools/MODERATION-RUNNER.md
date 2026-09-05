@@ -27,6 +27,8 @@ Apply D1 migration `0004-moderation-processing.sql` before deploying the matchin
 Worker, then `0005-automatic-approval.sql` for the optional approval policy and
 audit history. Its default preserves recommendation mode. Update this isolated checkout to the tested release when deploying runner
 changes. A failed run or heartbeat older than five minutes degrades catalog health.
+Migration `0006-library-review-revision.sql` invalidates advice when published
+faces or their trusted previews change. Usage counts do not invalidate advice.
 The heartbeat reports runner availability; per-submission failures remain in the
 inbox even if the following run is healthy.
 

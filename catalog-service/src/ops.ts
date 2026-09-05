@@ -341,11 +341,13 @@ async function queueView(env: Env): Promise<unknown> {
             END AS ai_rationale
        FROM faces f
        LEFT JOIN face_reviews r ON r.face_id = f.id
-       LEFT JOIN face_ai_reviews a ON a.face_id = f.id
+       LEFT JOIN face_ai_reviews a ON a.face_id = f.id AND a.model = ?
+         AND json_extract(a.signals, '$.policy') = ?
+         AND json_extract(a.signals, '$.libraryRevision') = (SELECT revision FROM catalog_revision WHERE id=1)
        LEFT JOIN moderation_jobs j ON j.face_id = f.id AND j.params_hash = f.params_hash AND j.generator_version = f.generator_version
       WHERE f.state = 'pending'
       ORDER BY f.created ASC LIMIT 100`,
-  ).all();
+  ).bind(env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001", JSON.stringify(policy)).all();
   const rows = ((results ?? []) as Record<string, unknown>[]).map((row) => {
     const preview =
       typeof row["preview_base64"] === "string" ? row["preview_base64"] : null;

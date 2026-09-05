@@ -15,7 +15,7 @@ export async function migrate(): Promise<void> {
     .split("\n")
     .filter((line) => !line.trimStart().startsWith("--"))
     .join("\n")
-    .split(";")
+    .split(/;\s*(?=(?:CREATE|INSERT|UPDATE|DELETE|DROP)\b|$)/i)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
   for (const statement of statements) {
@@ -38,6 +38,7 @@ export async function reset(): Promise<void> {
   await env.DB.prepare("DELETE FROM face_ai_reviews").run();
   await env.DB.prepare("DELETE FROM face_reviews").run();
   await env.DB.prepare("DELETE FROM faces").run();
+  await env.DB.prepare("UPDATE catalog_revision SET revision = 0 WHERE id = 1").run();
   await env.DB.prepare("DELETE FROM reports").run();
   await env.DB.prepare("DELETE FROM rate").run();
   await env.DB.prepare(

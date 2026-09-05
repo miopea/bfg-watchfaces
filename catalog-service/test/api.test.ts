@@ -250,6 +250,24 @@ describe("publishing", () => {
     });
   });
 
+  it("invalidates advice after publication and removal, but not install counts", async () => {
+    const { id } = await submit(); await passReview(id);
+    await SELF.fetch(post(`/admin/faces/${id}/ai-review`, {}, MODERATOR));
+    const other = crypto.randomUUID();
+    await env.DB.prepare(`INSERT INTO faces(id,slug,name,author,params,params_hash,engine,dial_color,ink_color,generator_version,state,created)
+      SELECT ?,?,name,author,params,?,engine,dial_color,ink_color,generator_version,'pending',created FROM faces WHERE id=?`)
+      .bind(other, 'comparison', 'f'.repeat(64), id).run();
+    expect((await publish(other)).status).toBe(200);
+    const afterPublish = await SELF.fetch(post(`/admin/faces/${id}/ai-review`, {}, MODERATOR));
+    expect(await afterPublish.json()).not.toHaveProperty('deduplicated');
+    await env.DB.prepare("UPDATE faces SET installs=installs+1 WHERE id=?").bind(other).run();
+    expect(await (await SELF.fetch(post(`/admin/faces/${id}/ai-review`, {}, MODERATOR))).json()).toHaveProperty('deduplicated', true);
+    await SELF.fetch(post('/api/ops/library/actions/remove', { id: other, reason: 'Test removal' }, MODERATOR));
+    const stale = await (await SELF.fetch(get('/api/ops/inbox', MODERATOR))).json() as { rows: { ai_recommendation: string }[] };
+    expect(stale.rows[0]?.ai_recommendation).toBe('not reviewed');
+    expect(await (await SELF.fetch(post(`/admin/faces/${id}/ai-review`, {}, MODERATOR))).json()).not.toHaveProperty('deduplicated');
+  });
+
   it("validates and persists the operator's AI recommendation policy", async () => {
     const invalid = await SELF.fetch(
       post("/api/ops/inbox/actions/configure-ai", {

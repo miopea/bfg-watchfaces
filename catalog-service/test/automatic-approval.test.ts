@@ -14,7 +14,8 @@ async function seed(author?: string, preview?: string): Promise<string> {
   const at = new Date().toISOString();
   await env.DB.prepare("INSERT INTO faces(id,slug,name,author,params,params_hash,engine,dial_color,ink_color,generator_version,author_key,state,created) VALUES(?,?,?,'Author','{}',?,'knotwork','#000000','#ffffff',1,?,'pending',?)").bind(id, id, "Candidate", hash, author ?? id, at).run();
   await env.DB.prepare("INSERT INTO face_reviews VALUES(?,?,1,'passed','[]',?,?)").bind(id, hash, preview ?? btoa("\x89PNG\r\n\x1a\n" + id), at).run();
-  await env.DB.prepare("INSERT INTO face_ai_reviews VALUES(?,?,1,?,'approve','high','No concerns',?,?)").bind(id, hash, env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001", JSON.stringify({ policy: await getPolicy(env) }), at).run();
+  const libraryRevision = (await env.DB.prepare("SELECT revision FROM catalog_revision WHERE id=1").first<{ revision: number }>())!.revision;
+  await env.DB.prepare("INSERT INTO face_ai_reviews VALUES(?,?,1,?,'approve','high','No concerns',?,?)").bind(id, hash, env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001", JSON.stringify({ policy: await getPolicy(env), libraryRevision }), at).run();
   await env.DB.prepare("INSERT INTO moderation_jobs(face_id,params_hash,generator_version,status,stage,lease,updated_at) VALUES(?,?,1,'complete','ai',?,?)").bind(id, hash, "lease-" + id, Date.now()).run();
   return id;
 }
@@ -47,6 +48,7 @@ it.each([
   "UPDATE faces SET author_key=NULL",
   "UPDATE moderation_policy SET sensitivity='cautious'",
   "UPDATE automatic_approval_policy SET mode='recommendations'",
+  "UPDATE catalog_revision SET revision=revision+1 WHERE id=1",
 ])("withholds approval when a safeguard changes: %s", async sql => {
   const id = await seed(); await env.DB.prepare(sql).run();
   expect((await approve(id)).published).toBe(false);
@@ -65,6 +67,8 @@ it("enforces the global limit when two candidates finish concurrently", async ()
   const ids = await Promise.all([seed(), seed()]);
   const outcomes = await Promise.all(ids.map(approve));
   expect(outcomes.filter(outcome => outcome.published)).toHaveLength(1);
+  const fresh = await seed();
+  expect((await approve(fresh)).published).toBe(false);
 });
 it("keeps blocked authors and saturated author queues for a human", async () => {
   const blocked = await seed("blocked");

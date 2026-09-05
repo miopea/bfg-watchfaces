@@ -25,6 +25,7 @@ export async function applyAutomaticApproval(env: Env, faceId: string, lease: st
       AND r.verdict='passed' AND r.preview_base64 IS NOT NULL
       AND ai.recommendation='approve' AND ai.confidence='high' AND ai.created>=? AND ai.model=?
       AND json_extract(ai.signals,'$.policy')=?
+      AND json_extract(ai.signals,'$.libraryRevision')=(SELECT revision FROM catalog_revision WHERE id=1)
       AND p.enabled=1 AND a.mode='automatic' AND a.max_per_hour=? AND a.max_per_author_day=?
       AND p.sensitivity=? AND p.comparison_limit=? AND p.pending_warn=?
       AND NOT EXISTS (SELECT 1 FROM blocked_authors b WHERE b.author_key=f.author_key)
