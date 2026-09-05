@@ -1,5 +1,7 @@
 # Independent moderation runner
 
+<!-- cspell:words journalctl -->
+
 The user systemd timer runs the JVM renderer every two minutes after the previous
 run finishes. D1 leases prevent overlapping GitHub and server runs from reviewing
 the same revision concurrently. Failures retry with backoff up to five attempts;
