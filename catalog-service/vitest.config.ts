@@ -19,8 +19,14 @@ export default defineConfig({
         //
         // Anything else the Worker tries to fetch fails loudly here rather than
         // quietly reaching the internet.
-        outboundService: (request: Request) => {
+        outboundService: async (request: Request) => {
           if (new URL(request.url).hostname === "api.anthropic.com") {
+            const payload = await request.json() as { max_tokens: number; output_config?: { format?: { type?: string; schema?: { additionalProperties?: boolean } } } };
+            if (payload.output_config?.format?.type !== "json_schema" ||
+                payload.output_config.format.schema?.additionalProperties !== false ||
+                payload.max_tokens < 800) {
+              return new Response("Moderation requires bounded structured output", { status: 400 });
+            }
             return new Response(
               JSON.stringify({
                 content: [{
