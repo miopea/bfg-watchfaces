@@ -1,5 +1,5 @@
 import type { Env } from "./env";
-import { getPolicy } from "./ai-review";
+import { getPolicy, reviewModel } from "./ai-review";
 
 /** The operator's deterministic publishing policy, never a model tool call.
  * The audit insert and publication share one atomic D1 batch. */
@@ -11,7 +11,7 @@ export async function applyAutomaticApproval(env: Env, faceId: string, lease: st
   const hourAgo = new Date(now - 3_600_000).toISOString();
   const dayAgo = new Date(now - 86_400_000).toISOString();
   const eventId = crypto.randomUUID();
-  const model = env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
+  const model = reviewModel(env, policy);
   const result = await env.DB.batch([
     env.DB.prepare(`INSERT INTO automatic_publications(id,face_id,params_hash,generator_version,model,policy,created)
       SELECT ?, f.id, f.params_hash, f.generator_version, ai.model, ?, ?
@@ -27,7 +27,7 @@ export async function applyAutomaticApproval(env: Env, faceId: string, lease: st
       AND json_extract(ai.signals,'$.policy')=?
       AND json_extract(ai.signals,'$.libraryRevision')=(SELECT revision FROM catalog_revision WHERE id=1)
       AND p.enabled=1 AND a.mode='automatic' AND a.max_per_hour=? AND a.max_per_author_day=?
-      AND p.sensitivity=? AND p.comparison_limit=? AND p.pending_warn=?
+      AND p.sensitivity=? AND p.comparison_limit=? AND p.pending_warn=? AND p.model IS ?
       AND NOT EXISTS (SELECT 1 FROM blocked_authors b WHERE b.author_key=f.author_key)
       AND NOT EXISTS (SELECT 1 FROM faces duplicate LEFT JOIN face_reviews dr ON dr.face_id=duplicate.id
         WHERE duplicate.state='published' AND duplicate.id<>f.id AND
@@ -37,7 +37,7 @@ export async function applyAutomaticApproval(env: Env, faceId: string, lease: st
       AND (SELECT COUNT(*) FROM faces published WHERE published.author_key=f.author_key AND published.state='published' AND published.reviewed>=?) < a.max_per_author_day
       AND (SELECT COUNT(*) FROM automatic_publications WHERE created>=?) < a.max_per_hour`)
       .bind(eventId, JSON.stringify(policy), created, faceId, lease, now - 300_000, hourAgo, model, JSON.stringify(policy),
-        policy.max_per_hour, policy.max_per_author_day, policy.sensitivity, policy.comparison_limit, policy.pending_warn, dayAgo, hourAgo),
+        policy.max_per_hour, policy.max_per_author_day, policy.sensitivity, policy.comparison_limit, policy.pending_warn, policy.model ?? null, dayAgo, hourAgo),
     env.DB.prepare(`UPDATE faces SET state='published',reason=NULL,reviewed=? WHERE id=? AND state='pending'
       AND EXISTS(SELECT 1 FROM automatic_publications e WHERE e.id=? AND e.face_id=faces.id
         AND e.params_hash=faces.params_hash AND e.generator_version=faces.generator_version)`)

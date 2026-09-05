@@ -322,7 +322,30 @@ describe("publishing", () => {
     const settings = catalog.actions.find((action) => action.id === "configure-ai")!;
     expect(settings.settingsGroup).toBe("ai");
     expect(Object.fromEntries(settings.params.map((param) => [param.key, param.currentValue])))
-      .toEqual({ mode: "manual", maxPerHour: 5, maxPerAuthorDay: 1, sensitivity: "permissive", comparisonLimit: 4, pendingWarningAt: 5 });
+      .toEqual({ model: "claude-haiku-4-5-20251001", mode: "manual", maxPerHour: 5, maxPerAuthorDay: 1, sensitivity: "permissive", comparisonLimit: 4, pendingWarningAt: 5 });
+  });
+
+  it("requires fresh advice after a model change and sends the selected model", async () => {
+    const { id } = await submit(); await passReview(id);
+    await SELF.fetch(post(`/admin/faces/${id}/ai-review`, {}, MODERATOR));
+    const policy = { mode: "recommendations", sensitivity: "balanced", comparisonLimit: 6, pendingWarningAt: 3 };
+    const unchanged = await SELF.fetch(post("/api/ops/inbox/actions/configure-ai", { ...policy, model: "claude-haiku-4-5-20251001" }, MODERATOR));
+    expect(unchanged.status).toBe(200);
+    expect(await (await SELF.fetch(post(`/admin/faces/${id}/ai-review`, {}, MODERATOR))).json()).toHaveProperty("deduplicated", true);
+    const rejected = await SELF.fetch(post("/api/ops/inbox/actions/configure-ai", { ...policy, model: "unknown" }, MODERATOR));
+    expect(rejected.status).toBe(422);
+    expect(await env.DB.prepare("SELECT model FROM moderation_policy WHERE id=1").first()).toEqual({ model: null });
+    const saved = await SELF.fetch(post("/api/ops/inbox/actions/configure-ai", { ...policy, model: "claude-sonnet-4-6" }, MODERATOR));
+    expect(saved.status).toBe(200);
+    const view = await (await SELF.fetch(get("/api/ops/inbox", MODERATOR))).json() as { rows: { ai_recommendation: string }[] };
+    expect(view.rows[0]?.ai_recommendation).toBe("not reviewed");
+    const reviewed = await SELF.fetch(post(`/admin/faces/${id}/ai-review`, {}, MODERATOR));
+    expect(reviewed.status).toBe(200);
+    expect(await reviewed.json()).not.toHaveProperty("deduplicated");
+    const row = await env.DB.prepare("SELECT model,signals FROM face_ai_reviews WHERE face_id=?").bind(id).first<{model: string; signals: string}>();
+    expect(row?.model).toBe("claude-sonnet-4-6");
+    expect(JSON.parse(row!.signals).model).toContain("request model: claude-sonnet-4-6");
+    expect(await env.DB.prepare("SELECT state FROM faces WHERE id=?").bind(id).first()).toEqual({state:"pending"});
   });
 
   it("makes a face visible, with its parameters byte-for-byte as submitted", async () => {

@@ -43,6 +43,7 @@ it.each([
   "UPDATE face_ai_reviews SET recommendation='review'",
   "UPDATE face_ai_reviews SET created='2000-01-01T00:00:00.000Z'",
   "UPDATE face_ai_reviews SET params_hash='stale'",
+  "UPDATE moderation_policy SET model='claude-sonnet-4-6'",
   "UPDATE face_reviews SET verdict='failed'",
   "UPDATE face_reviews SET params_hash='stale'",
   "UPDATE faces SET author_key=NULL",

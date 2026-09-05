@@ -21,7 +21,7 @@ export default defineConfig({
         // quietly reaching the internet.
         outboundService: async (request: Request) => {
           if (new URL(request.url).hostname === "api.anthropic.com") {
-            const payload = await request.json() as { max_tokens: number; output_config?: { format?: { type?: string; schema?: { additionalProperties?: boolean } } } };
+            const payload = await request.json() as { model: string; max_tokens: number; output_config?: { format?: { type?: string; schema?: { additionalProperties?: boolean } } } };
             if (payload.output_config?.format?.type !== "json_schema" ||
                 payload.output_config.format.schema?.additionalProperties !== false ||
                 payload.max_tokens < 800) {
@@ -35,7 +35,7 @@ export default defineConfig({
                     recommendation: "approve",
                     confidence: "high",
                     rationale: "No concrete abuse or saturation signal is visible.",
-                    signals: ["distinct from recent faces"],
+                    signals: ["distinct from recent faces", `request model: ${payload.model}`],
                   }),
                 }],
               }),

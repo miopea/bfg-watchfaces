@@ -115,7 +115,8 @@ CREATE TABLE IF NOT EXISTS moderation_policy (
   enabled          INTEGER NOT NULL CHECK (enabled IN (0,1)),
   sensitivity      TEXT NOT NULL CHECK (sensitivity IN ('permissive','balanced','cautious')),
   comparison_limit INTEGER NOT NULL CHECK (comparison_limit BETWEEN 1 AND 12),
-  pending_warn     INTEGER NOT NULL CHECK (pending_warn BETWEEN 1 AND 50)
+  pending_warn     INTEGER NOT NULL CHECK (pending_warn BETWEEN 1 AND 50),
+  model            TEXT CHECK (model IS NULL OR model IN ('claude-haiku-4-5-20251001', 'claude-sonnet-4-6'))
 );
 
 INSERT OR IGNORE INTO moderation_policy

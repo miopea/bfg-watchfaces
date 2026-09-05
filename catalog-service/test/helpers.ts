@@ -42,7 +42,7 @@ export async function reset(): Promise<void> {
   await env.DB.prepare("DELETE FROM reports").run();
   await env.DB.prepare("DELETE FROM rate").run();
   await env.DB.prepare(
-    "UPDATE moderation_policy SET enabled = 1, sensitivity = 'balanced', comparison_limit = 6, pending_warn = 3 WHERE id = 1"
+    "UPDATE moderation_policy SET enabled = 1, sensitivity = 'balanced', comparison_limit = 6, pending_warn = 3, model = NULL WHERE id = 1"
   ).run();
   await caches.default.delete("https://catalog.test/index.json");
 }

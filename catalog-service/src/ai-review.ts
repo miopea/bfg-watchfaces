@@ -5,6 +5,7 @@ type Recommendation = "approve" | "review" | "reject";
 type Confidence = "low" | "medium" | "high";
 
 interface Policy {
+  model?: string;
   mode: "manual" | "recommendations" | "automatic";
   max_per_hour: number;
   max_per_author_day: number;
@@ -25,6 +26,13 @@ interface FaceForReview {
 }
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+export const REVIEW_MODELS = [
+  { value: DEFAULT_MODEL, label: "Claude Haiku 4.5 — everyday review" },
+  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 — detailed review" },
+] as const;
+export function reviewModel(env: Env, policy: Policy): string {
+  return policy.model ?? env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
+}
 const API_URL = "https://api.anthropic.com/v1/messages";
 
 /**
@@ -74,7 +82,7 @@ export async function recommendFace(
         id,
         face.params_hash,
         Number(face.generator_version),
-        env.ANTHROPIC_MODEL ?? DEFAULT_MODEL,
+        reviewModel(env, policy),
         JSON.stringify(policy),
         libraryRevision,
       )
@@ -157,7 +165,7 @@ export async function recommendFace(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: env.ANTHROPIC_MODEL ?? DEFAULT_MODEL,
+        model: reviewModel(env, policy),
         max_tokens: 800,
         output_config: {
           format: {
@@ -222,7 +230,7 @@ export async function recommendFace(
       id,
       face.params_hash,
       Number(face.generator_version),
-      env.ANTHROPIC_MODEL ?? DEFAULT_MODEL,
+      reviewModel(env, policy),
       parsed.recommendation,
       parsed.confidence,
       parsed.rationale,
@@ -246,6 +254,9 @@ export async function configureAiPolicy(
   body: Record<string, unknown>,
 ): Promise<ReviewWriteResult> {
   const current = await getPolicy(env);
+  const requestedModel = body["model"] ?? current.model ?? null;
+  if (requestedModel !== null && !REVIEW_MODELS.some((item) => item.value === requestedModel)) return result(422, "unsupported review model");
+  const model = current.model === undefined && requestedModel === reviewModel(env, current) ? null : requestedModel;
   const mode = body["mode"] ?? (body["enabled"] === "disabled" ? "manual" : current.mode === "manual" ? "recommendations" : current.mode);
   if (!["manual", "recommendations", "automatic"].includes(String(mode))) return result(422, "invalid review mode");
   const enabled = body["mode"] === undefined ? body["enabled"] : mode === "manual" ? "disabled" : "enabled";
@@ -273,13 +284,14 @@ export async function configureAiPolicy(
     return result(422, "pending warning must be from 1 to 50");
   await env.DB.batch([env.DB.prepare(
     `UPDATE moderation_policy SET enabled = ?, sensitivity = ?,
-       comparison_limit = ?, pending_warn = ? WHERE id = 1`,
+       comparison_limit = ?, pending_warn = ?, model = ? WHERE id = 1`,
   )
     .bind(
       enabled === "enabled" ? 1 : 0,
       sensitivity,
       comparisonLimit,
       pendingWarningAt,
+      model,
     )
     , env.DB.prepare("UPDATE automatic_approval_policy SET mode = ?, max_per_hour = ?, max_per_author_day = ? WHERE id = 1").bind(mode === "automatic" ? "automatic" : "recommendations", maxPerHour, maxPerAuthorDay)]);
   if (JSON.stringify(await getPolicy(env)) !== JSON.stringify(current)) {
@@ -295,7 +307,7 @@ export async function configureAiPolicy(
       sensitivity,
       comparisonLimit,
       pendingWarningAt,
-      mode, maxPerHour, maxPerAuthorDay,
+      mode, maxPerHour, maxPerAuthorDay, model: model ?? reviewModel(env, current),
     },
   };
 }
@@ -303,9 +315,15 @@ export async function configureAiPolicy(
 export async function getPolicy(env: Env): Promise<Policy> {
   const row = await env.DB.prepare(
     `SELECT p.enabled, p.sensitivity, p.comparison_limit, p.pending_warn,
-       CASE WHEN p.enabled = 0 THEN 'manual' ELSE a.mode END AS mode, a.max_per_hour, a.max_per_author_day
+       CASE WHEN p.enabled = 0 THEN 'manual' ELSE a.mode END AS mode, a.max_per_hour, a.max_per_author_day, p.model
        FROM moderation_policy p JOIN automatic_approval_policy a ON a.id = p.id WHERE p.id = 1`,
-  ).first<Policy>();
+  ).first<Omit<Policy, "model"> & { model: string | null }>();
+  // Preserve the existing policy fingerprint when no model override is saved.
+  // The model is already bound separately on cached reviews and publications.
+  if (row) {
+    const { model, ...policy } = row;
+    return model === null ? policy : { ...policy, model };
+  }
   return (
     row ?? {
       enabled: 1,

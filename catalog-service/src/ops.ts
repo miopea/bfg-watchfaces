@@ -1,5 +1,5 @@
 import type { Env } from "./env";
-import { configureAiPolicy, getPolicy, recommendFace } from "./ai-review";
+import { configureAiPolicy, getPolicy, recommendFace, reviewModel, REVIEW_MODELS } from "./ai-review";
 import { publishReviewed } from "./review";
 import { retryProcessing } from "./processing";
 
@@ -347,7 +347,7 @@ async function queueView(env: Env): Promise<unknown> {
        LEFT JOIN moderation_jobs j ON j.face_id = f.id AND j.params_hash = f.params_hash AND j.generator_version = f.generator_version
       WHERE f.state = 'pending'
       ORDER BY f.created ASC LIMIT 100`,
-  ).bind(env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001", JSON.stringify(policy)).all();
+  ).bind(reviewModel(env, policy), JSON.stringify(policy)).all();
   const rows = ((results ?? []) as Record<string, unknown>[]).map((row) => {
     const preview =
       typeof row["preview_base64"] === "string" ? row["preview_base64"] : null;
@@ -479,12 +479,17 @@ async function actionCatalog(env: Env): Promise<unknown> {
       {
         id: "configure-ai",
         settingsGroup: "ai",
-        settingsSummary: `Provider: Anthropic. Model: ${env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001"}. ${env.ANTHROPIC_API_KEY ? "Provider credential configured." : "Provider credential missing; reviews cannot run."} Review mode: ${policy.mode}. Uses the trusted preview, public name and author, author-history counts and up to ${policy.comparison_limit} published previews.`,
+        settingsSummary: `Provider: Anthropic. Model: ${reviewModel(env, policy)}. ${env.ANTHROPIC_API_KEY ? "Provider credential configured." : "Provider credential missing; reviews cannot run."} Review mode: ${policy.mode}. Uses the trusted preview, public name and author, author-history counts and up to ${policy.comparison_limit} published previews.`,
         label: "Configure AI review",
         description:
           "Automatic mode publishes only fresh high-confidence approvals with a matching technical preview and author/library safeguards. Uncertain submissions wait for you. Nothing is automatically rejected or removed.",
         destructive: false,
         params: [
+          {
+            key: "model", label: "Review model", type: "enum", required: true,
+            currentValue: reviewModel(env, policy), options: [...REVIEW_MODELS],
+            help: "Haiku is the default. Sonnet offers more detailed review and uses more of your AI budget. Changing models requires fresh advice before automatic approval.",
+          },
           {
             key: "mode",
             currentValue: policy.mode,
