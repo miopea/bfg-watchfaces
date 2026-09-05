@@ -113,8 +113,15 @@ tasks.register("prepareModerationRunner") {
     inputs.files(runtime)
     outputs.file(output)
     doLast {
-        check(runtime.files.all { it.exists() }) { "Moderation runtime is incomplete" }
-        output.get().asFile.writeText(runtime.asPath)
+        check(configurations.runtimeClasspath.get().files.all { it.exists() }) {
+            "Moderation runtime dependencies are incomplete"
+        }
+        // Gradle includes an empty Java output directory in this Kotlin-only module.
+        val files = runtime.files.filter { it.exists() }
+        check(files.any { it.isDirectory && it.resolve("com/bfg/watchfaces/workbench/Moderate.class").isFile }) {
+            "The moderation entry point was not compiled"
+        }
+        output.get().asFile.writeText(files.joinToString(java.io.File.pathSeparator) { it.absolutePath })
     }
 }
 

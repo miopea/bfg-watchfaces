@@ -5,8 +5,8 @@ After=network-online.target
 [Service]
 Type=oneshot
 EnvironmentFile=%h/.config/bfg-admin/moderation.env
-WorkingDirectory=%h/projects/personal/bfg-moderation-runner
-ExecStart=/usr/bin/python3 %h/projects/personal/bfg-moderation-runner/tools/run-moderation.py
+WorkingDirectory=%h/projects/personal/bfg-moderation-env-runner
+ExecStart=/usr/bin/python3 %h/projects/personal/bfg-moderation-env-runner/tools/run-moderation.py
 Environment=JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 TimeoutStartSec=240
 KillMode=control-group
