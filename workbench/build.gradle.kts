@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins { alias(libs.plugins.kotlin.jvm) }
 
 // Dev tooling. Pure JVM like :generator -- no Android, no emulator, no device.
@@ -121,7 +123,7 @@ tasks.register("prepareModerationRunner") {
         check(files.any { it.isDirectory && it.resolve("com/bfg/watchfaces/workbench/Moderate.class").isFile }) {
             "The moderation entry point was not compiled"
         }
-        output.get().asFile.writeText(files.joinToString(java.io.File.pathSeparator) { it.absolutePath })
+        output.get().asFile.writeText(files.joinToString(File.pathSeparator) { it.absolutePath })
     }
 }
 
