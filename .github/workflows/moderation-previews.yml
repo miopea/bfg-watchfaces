@@ -1,11 +1,9 @@
 name: moderation previews
 
 on:
+  # Manual recovery path. The BGS Dev systemd timer owns recurring processing;
+  # GitHub schedules were delayed by over an hour in production.
   workflow_dispatch:
-  schedule:
-    # New submissions normally wait less than ten minutes for their trusted
-    # preview. Approval still belongs to the operator in the Ops Console.
-    - cron: "*/10 * * * *"
 
 concurrency:
   group: bfg-watchfaces-moderation-previews
