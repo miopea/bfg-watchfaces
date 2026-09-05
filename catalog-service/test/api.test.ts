@@ -22,6 +22,45 @@ async function publish(id: string): Promise<Response> {
   return SELF.fetch(post(`/admin/faces/${id}/publish`, {}, MODERATOR));
 }
 
+describe("approved library", () => {
+  it("shows trusted published previews and removes without erasing review history", async () => {
+    expect(await (await SELF.fetch(get("/api/ops/library", MODERATOR))).json()).toMatchObject({ rows: [], nextCursor: null });
+    const face = await submit();
+    expect((await SELF.fetch(post("/api/ops/library/actions/remove", { id: face.id, reason: "not published" }, MODERATOR))).status).toBe(404);
+    await publish(face.id);
+    const publicRead = await SELF.fetch(get(`/faces/${face.slug}`));
+    expect(publicRead.status).toBe(200);
+    expect(publicRead.headers.get("cache-control")).toBe("no-store");
+    expect(await (await SELF.fetch(get("/api/ops/library", MODERATOR))).json()).toMatchObject({
+      rows: [{ id: face.id, state: "published", preview: "data:image/png;base64,iVBORw0KGgo=" }],
+    });
+    expect((await SELF.fetch(post("/api/ops/library/actions/remove", { id: face.id }, MODERATOR))).status).toBe(422);
+    expect((await SELF.fetch(post("/api/ops/library/actions/remove", { id: face.id, reason: "Withdrawn by moderator" }, MODERATOR))).status).toBe(200);
+    expect(await (await SELF.fetch(get("/api/ops/library", MODERATOR))).json()).toMatchObject({ rows: [] });
+    expect((await SELF.fetch(get(`/faces/${face.slug}`))).status).toBe(404);
+    expect(await (await SELF.fetch(get("/index.json"))).json()).toMatchObject({ count: 0 });
+    expect(await env.DB.prepare("SELECT state, reason FROM faces WHERE id = ?").bind(face.id).first()).toEqual({ state: "removed", reason: "Withdrawn by moderator" });
+    expect(await env.DB.prepare("SELECT verdict FROM face_reviews WHERE face_id = ?").bind(face.id).first()).toMatchObject({ verdict: "passed" });
+  });
+
+  it("pages equal publication timestamps without gaps and excludes nonpublished states", async () => {
+    const face = await submit();
+    await publish(face.id);
+    for (let i = 0; i < 28; i++) {
+      await env.DB.prepare(`INSERT INTO faces (id, slug, name, author, params, params_hash, engine, dial_color, ink_color, generator_version, state, created, reviewed)
+        SELECT ?, ?, name, author, params, ?, engine, dial_color, ink_color, generator_version, ?, created, reviewed FROM faces WHERE id = ?`)
+        .bind(crypto.randomUUID(), `page_${i}`, i.toString(16).padStart(64, "0"), i < 26 ? "published" : i === 26 ? "removed" : "pending", face.id).run();
+    }
+    const first = await (await SELF.fetch(get("/api/ops/library", MODERATOR))).json() as { rows: { id: string }[]; nextCursor: string };
+    expect(first.rows).toHaveLength(25);
+    const second = await (await SELF.fetch(get(`/api/ops/library?cursor=${encodeURIComponent(first.nextCursor)}`, MODERATOR))).json() as { rows: { id: string }[]; nextCursor: string | null };
+    expect(second.rows).toHaveLength(2);
+    expect(second.nextCursor).toBeNull();
+    expect(new Set([...first.rows, ...second.rows].map((row) => row.id)).size).toBe(27);
+    expect((await SELF.fetch(get("/api/ops/library?cursor=bad", MODERATOR))).status).toBe(400);
+  });
+});
+
 describe("submitting", () => {
   it("accepts a real face and puts it in the queue, visible to nobody", async () => {
     const { id, slug, state } = await submit();

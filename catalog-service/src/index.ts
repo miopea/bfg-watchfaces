@@ -32,14 +32,11 @@ import { flatten, tooLarge, validateFace } from "./validate";
  */
 
 /**
- * How long the edge may serve a published read without asking again.
- *
- * The published catalog changes only when a maintainer approves something, so
- * this is the difference between a gallery that costs nothing to browse and one
- * that queries a database per view. Moderation actions purge the cache
- * explicitly, so the window is not how long a removal takes to take effect.
+ * Published reads recheck the database so removals take effect on every path.
+ * Caching may return only with a shared revision/invalidation mechanism.
  */
-const CACHE_SECONDS = 300;
+// Recheck publication state on every read; edge-local purges cannot revoke
+// copies in other locations or browsers.
 
 interface FaceRow {
   id: string;
@@ -132,9 +129,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
  * Ordered by installs, which is the cost the popularity ordering was accepted
  * with: the app has to report installs for this column to mean anything.
  */
-async function getIndex(env: Env, ctx: ExecutionContext, request: Request): Promise<Response> {
-  const cached = await caches.default.match(request);
-  if (cached) return cached;
+async function getIndex(env: Env, _ctx: ExecutionContext, _request: Request): Promise<Response> {
 
   const { results } = await env.DB.prepare(
     `SELECT slug, name, author, engine, dial_color, ink_color, generator_version, created, installs
@@ -164,20 +159,17 @@ async function getIndex(env: Env, ctx: ExecutionContext, request: Request): Prom
     faces,
   };
 
-  const response = json(body, 200, { "cache-control": `public, max-age=${CACHE_SECONDS}` });
-  ctx.waitUntil(caches.default.put(request, response.clone()));
+  const response = json(body, 200, { "cache-control": "no-store" });
   return response;
 }
 
 /** One published face, in the catalog's own on-disk shape. */
 async function getFace(
   env: Env,
-  ctx: ExecutionContext,
-  request: Request,
+  _ctx: ExecutionContext,
+  _request: Request,
   slug: string,
 ): Promise<Response> {
-  const cached = await caches.default.match(request);
-  if (cached) return cached;
 
   const row = await env.DB.prepare(
     `SELECT slug, name, author, params, created FROM faces WHERE slug = ? AND state = 'published'`,
@@ -191,9 +183,8 @@ async function getFace(
   if (!row) return json({ error: "no such face" }, 404);
 
   const response = json(faceDocument(row), 200, {
-    "cache-control": `public, max-age=${CACHE_SECONDS}`,
+    "cache-control": "no-store",
   });
-  ctx.waitUntil(caches.default.put(request, response.clone()));
   return response;
 }
 

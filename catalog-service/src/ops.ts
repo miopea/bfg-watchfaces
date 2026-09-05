@@ -74,7 +74,7 @@ export async function ops(
       contractVersion: 1,
       buildSha: env.BUILD_SHA ?? null,
       environment: "production",
-      capabilities: [CAPABILITY],
+      capabilities: [CAPABILITY, "library"],
       pushIntervalSec: null,
     });
   }
@@ -101,6 +101,29 @@ export async function ops(
     const denied = authorise(request, env, "read");
     if (denied) return denied;
     return json(await queueView(env));
+  }
+
+  if (method === "GET" && path === "/api/ops/library") {
+    const denied = authorise(request, env, "read");
+    if (denied) return denied;
+    return libraryView(request, env);
+  }
+  if (method === "GET" && path === "/api/ops/library/actions") {
+    const denied = authorise(request, env, "read");
+    if (denied) return denied;
+    return json({ capability: "library", actions: [{
+      id: "remove", label: "Remove from library", destructive: true,
+      description: "Remove this published face from the public library. Its submission and review history are retained.",
+      params: [
+        { key: "id", label: "Face", type: "string", required: true, fromColumn: "id" },
+        { key: "reason", label: "Reason", type: "string", required: true },
+      ],
+    }] });
+  }
+  if (method === "POST" && path === "/api/ops/library/actions/remove") {
+    const denied = authorise(request, env, "write");
+    if (denied) return denied;
+    return execute(request, env, "remove", "published");
   }
 
   if (method === "GET" && path === `/api/ops/${CAPABILITY}/actions`) {
@@ -477,6 +500,7 @@ async function execute(
   request: Request,
   env: Env,
   action: string,
+  expectedState: string | null = null,
 ): Promise<Response> {
   let body: Record<string, unknown> = {};
   try {
@@ -512,12 +536,55 @@ async function execute(
     return json(published.body, published.status);
   }
   const result = await env.DB.prepare(
-    `UPDATE faces SET state = ?, reason = ? WHERE id = ?`,
+    `UPDATE faces SET state = ?, reason = ? WHERE id = ? AND (? IS NULL OR state = ?)`,
   )
-    .bind(state, reason, id)
+    .bind(state, reason, id, expectedState, expectedState)
     .run();
   if (!result.meta.changes) {
     return json({ error: "no such face", id }, 404);
   }
   return json({ ok: true, id, state });
+}
+
+async function libraryView(request: Request, env: Env): Promise<Response> {
+  let before: { at: string; id: string } | null = null;
+  const cursor = new URL(request.url).searchParams.get("cursor");
+  if (cursor !== null) {
+    try {
+      const decoded = JSON.parse(atob(cursor)) as { at?: unknown; id?: unknown };
+      if (typeof decoded.at !== "string" || !Number.isFinite(Date.parse(decoded.at)) ||
+        typeof decoded.id !== "string" || !/^[0-9a-f-]{36}$/.test(decoded.id)) throw new Error("cursor");
+      before = { at: decoded.at, id: decoded.id };
+    } catch { return json({ error: "invalid library page cursor" }, 400); }
+  }
+  const { results } = await env.DB.prepare(
+    `SELECT f.id, f.name, f.author, f.slug, f.state, f.installs,
+            COALESCE(f.reviewed, f.created) AS published_at,
+            CASE WHEN r.params_hash = f.params_hash AND r.generator_version = f.generator_version
+                 AND r.verdict = 'passed' THEN r.preview_base64 ELSE NULL END AS preview_base64
+       FROM faces f LEFT JOIN face_reviews r ON r.face_id = f.id
+      WHERE f.state = 'published' AND (? IS NULL OR COALESCE(f.reviewed, f.created) < ?
+        OR (COALESCE(f.reviewed, f.created) = ? AND f.id < ?))
+      ORDER BY COALESCE(f.reviewed, f.created) DESC, f.id DESC LIMIT 26`
+  ).bind(before?.at ?? null, before?.at ?? null, before?.at ?? null, before?.id ?? null).all<Record<string, unknown>>();
+  const page = results.slice(0, 25);
+  const last = page.at(-1);
+  return json({
+    capability: "library", collectedAt: Date.now(),
+    columns: [
+      { key: "preview", label: "Preview", type: "image" },
+      { key: "name", label: "Name", type: "string" },
+      { key: "author", label: "Author", type: "string" },
+      { key: "published_at", label: "Published", type: "timestamp" },
+      { key: "installs", label: "Installs", type: "number", unit: "count" },
+      { key: "state", label: "State", type: "status" },
+      { key: "slug", label: "Slug", type: "string" },
+      { key: "id", label: "ID", type: "id" },
+    ],
+    rows: page.map(({ preview_base64, ...row }) => ({ ...row,
+      preview: typeof preview_base64 === "string" ? `data:image/png;base64,${preview_base64}` : null,
+    })),
+    nextCursor: results.length > 25 && last ? btoa(JSON.stringify({ at: last.published_at, id: last.id })) : null,
+    note: "Published faces only, newest first. Pending, rejected, removed and withdrawn submissions are excluded. Search and sorting apply to the current page.",
+  });
 }
