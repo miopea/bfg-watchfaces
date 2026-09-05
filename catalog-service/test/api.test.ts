@@ -23,6 +23,25 @@ async function publish(id: string): Promise<Response> {
 }
 
 describe("approved library", () => {
+  it("allows a fresh submission after removal, retains history and still excludes racing active duplicates", async () => {
+    const face = await submit();
+    await publish(face.id);
+    await SELF.fetch(post("/api/ops/library/actions/remove", { id: face.id, reason: "Start over" }, MODERATOR));
+    const auth = await signedIn();
+    const responses = await Promise.all([SELF.fetch(post('/faces', submission(), auth)), SELF.fetch(post('/faces', submission(), auth))]);
+    expect(responses.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(await env.DB.prepare("SELECT state FROM faces WHERE id=?").bind(face.id).first()).toEqual({ state: 'removed' });
+    expect(await env.DB.prepare("SELECT count(*) AS count FROM faces WHERE state='pending'").first()).toEqual({ count: 1 });
+    expect(await env.DB.prepare("SELECT count(*) AS count FROM face_reviews r JOIN faces f ON f.id=r.face_id WHERE f.state='pending'").first()).toEqual({ count: 0 });
+  });
+
+  it("distinguishes a previous rejection from a live library duplicate", async () => {
+    const face = await submit();
+    await SELF.fetch(post(`/admin/faces/${face.id}/reject`, { reason: "Spam" }, MODERATOR));
+    const again = await SELF.fetch(post('/faces', submission(), await signedIn()));
+    expect(again.status).toBe(409);
+    expect(await again.json()).toEqual({ error: 'this design was previously rejected; change it before submitting again' });
+  });
   it("shows trusted published previews and removes without erasing review history", async () => {
     expect(await (await SELF.fetch(get("/api/ops/library", MODERATOR))).json()).toMatchObject({ rows: [], nextCursor: null });
     const face = await submit();

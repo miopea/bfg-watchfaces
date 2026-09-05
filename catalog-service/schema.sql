@@ -52,11 +52,12 @@ CREATE INDEX IF NOT EXISTS faces_by_installs ON faces(state, installs DESC);
 -- nothing. Anything less exact is somebody's judgement about colour and scale,
 -- and refereeing that needs a threshold nobody can defend.
 --
--- Partial, excluding withdrawn: taking your own face back has to leave you able
--- to submit it again. Enforced by the engine rather than by a SELECT first,
+-- Removed and withdrawn faces are history, so their parameters may be submitted
+-- for a fresh review. Rejected designs remain blocked, with an explicit reason.
+-- Enforced by the engine rather than by a SELECT first,
 -- because two submissions racing would both find nothing and both insert.
 CREATE UNIQUE INDEX IF NOT EXISTS faces_by_hash
-  ON faces(params_hash) WHERE state <> 'withdrawn';
+  ON faces(params_hash) WHERE state NOT IN ('withdrawn', 'removed');
 
 -- A report is a MESSAGE, not an action. Nothing here hides a face: with no
 -- accounts, "N people reported it" is one person and a loop, and auto-hiding on

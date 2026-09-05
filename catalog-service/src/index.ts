@@ -278,16 +278,18 @@ async function getSubmission(env: Env, id: string): Promise<Response> {
 /**
  * Whether these exact parameters are already here under some name.
  *
- * Excludes withdrawn rows, matching the partial unique index: taking your own
- * face back has to leave you able to submit it again.
+ * Removed and withdrawn copies are history, not library duplicates. A prior
+ * rejection still blocks an unchanged design, but must not claim it is live.
  */
-async function duplicateExists(env: Env, hash: string): Promise<boolean> {
+async function submissionConflict(env: Env, hash: string): Promise<string | null> {
   const row = await env.DB.prepare(
-    `SELECT 1 AS hit FROM faces WHERE params_hash = ? AND state <> 'withdrawn' LIMIT 1`,
+    `SELECT state FROM faces WHERE params_hash = ? AND state NOT IN ('withdrawn', 'removed') LIMIT 1`,
   )
     .bind(hash)
-    .first<{ hit: number }>();
-  return row !== null;
+    .first<{ state: string }>();
+  return row === null ? null : row.state === 'rejected'
+    ? 'this design was previously rejected; change it before submitting again'
+    : 'that face has already been submitted';
 }
 
 function faceDocument(row: FaceRow): unknown {
@@ -362,8 +364,9 @@ async function postFace(request: Request, env: Env, ctx: ExecutionContext): Prom
   // Ask before inserting. The ordinary duplicate is a plain lookup, and it
   // gives a clean answer without depending on what a constraint violation
   // happens to say.
-  if (await duplicateExists(env, hash)) {
-    return json({ error: "that face has already been submitted" }, 409);
+  const conflict = await submissionConflict(env, hash);
+  if (conflict) {
+    return json({ error: conflict }, 409);
   }
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -399,8 +402,9 @@ async function postFace(request: Request, env: Env, ctx: ExecutionContext): Prom
       // an interface, it differs between SQLite builds, and getting it wrong
       // turns a duplicate into five pointless retries and a 503 -- which is
       // exactly what it did.
-      if (await duplicateExists(env, hash)) {
-        return json({ error: "that face has already been submitted" }, 409);
+      const conflict = await submissionConflict(env, hash);
+      if (conflict) {
+        return json({ error: conflict }, 409);
       }
       // Otherwise the four random characters collided. A different four will do.
     }
