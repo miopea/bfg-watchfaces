@@ -4,6 +4,7 @@ import { recommendFace } from "./ai-review";
 import type { Env } from "./env";
 import { paramsHash } from "./hash";
 import { publishReviewed, recordReview } from "./review";
+import { claimProcessing, reportProcessing, runnerHeartbeat, validProcessingLease } from "./processing";
 import { checkRate, LIMITS, sweepRate } from "./ratelimit";
 import { identify } from "./auth";
 import { flatten, tooLarge, validateFace } from "./validate";
@@ -630,23 +631,46 @@ async function admin(
       `SELECT f.id, f.slug, f.name, f.author, f.params, f.params_hash,
               f.generator_version, f.state, f.reason, f.created,
               f.author_key,
+              CASE WHEN v.params_hash = f.params_hash AND v.generator_version = f.generator_version THEN v.verdict ELSE 'pending' END AS validation,
               (SELECT COUNT(*) FROM faces p WHERE p.author_key = f.author_key AND p.state = 'published') AS author_published,
               (SELECT COUNT(*) FROM faces r WHERE r.author_key = f.author_key AND r.state IN ('rejected','removed')) AS author_rejected
-         FROM faces f WHERE f.state = ? ORDER BY f.created ASC LIMIT 100`,
+         FROM faces f
+         LEFT JOIN face_reviews v ON v.face_id = f.id
+         LEFT JOIN moderation_jobs j ON j.face_id = f.id AND j.params_hash = f.params_hash AND j.generator_version = f.generator_version
+         WHERE f.state = ? AND (? = 0 OR j.face_id IS NULL OR
+           (j.status IN ('waiting','retry','running') AND j.lease_until <= ? AND j.next_attempt <= ? AND j.attempts < 5))
+         ORDER BY f.created ASC LIMIT 100`,
     )
-      .bind(state)
+      .bind(state, url.searchParams.get("due") === "1" ? 1 : 0, Date.now(), Date.now())
       .all();
     return json({ state, count: results.length, faces: results });
   }
 
+  if (method === "POST" && path === "/admin/processing/heartbeat") {
+    const body = await request.json() as { success?: unknown };
+    if (typeof body.success !== "boolean") return json({ error: "success must be a boolean" }, 422);
+    await runnerHeartbeat(env, body.success);
+    return json({ ok: true });
+  }
+  const processing = /^\/admin\/faces\/([0-9a-f-]{36})\/processing\/(claim|report)$/.exec(path);
+  if (method === "POST" && processing?.[1]) {
+    const result = processing[2] === "claim" ? await claimProcessing(env, processing[1]) :
+      await reportProcessing(env, processing[1], await request.json() as Record<string, unknown>);
+    return json(result.body, result.status);
+  }
+
   const review = /^\/admin\/faces\/([0-9a-f-]{36})\/review$/.exec(path);
   if (method === "POST" && review?.[1]) {
+    const lease = request.headers.get("X-Moderation-Lease");
+    if (lease && !await validProcessingLease(env, review[1], lease)) return json({ error: "processing lease expired" }, 409);
     const recorded = await recordReview(request, env, review[1]);
     return json(recorded.body, recorded.status);
   }
 
   const aiReview = /^\/admin\/faces\/([0-9a-f-]{36})\/ai-review$/.exec(path);
   if (method === "POST" && aiReview?.[1]) {
+    const lease = request.headers.get("X-Moderation-Lease");
+    if (lease && !await validProcessingLease(env, aiReview[1], lease)) return json({ error: "processing lease expired" }, 409);
     const recommendation = await recommendFace(env, aiReview[1]);
     return json(recommendation.body, recommendation.status);
   }

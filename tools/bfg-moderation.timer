@@ -1,0 +1,11 @@
+[Unit]
+Description=Process due BFG moderation work every two minutes
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=120s
+AccuracySec=10s
+Unit=bfg-moderation.service
+
+[Install]
+WantedBy=timers.target

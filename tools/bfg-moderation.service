@@ -1,0 +1,12 @@
+[Unit]
+Description=BFG trusted preview and AI moderation processing
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/personal/bfg-moderation-runner
+ExecStart=/usr/bin/python3 %h/projects/personal/bfg-moderation-runner/tools/run-moderation.py
+Environment=JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+TimeoutStartSec=240
+KillMode=control-group
+UMask=0077

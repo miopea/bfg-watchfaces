@@ -1,6 +1,7 @@
 import type { Env } from "./env";
 import { configureAiPolicy, getPolicy, recommendFace } from "./ai-review";
 import { publishReviewed } from "./review";
+import { retryProcessing } from "./processing";
 
 /**
  * The BFG ops contract, so this catalog appears in the ops console as a
@@ -133,7 +134,7 @@ export async function ops(
   }
 
   const act = new RegExp(
-    `^/api/ops/${CAPABILITY}/actions/(publish|reject|remove|ai-recommend|configure-ai)$`,
+    `^/api/ops/${CAPABILITY}/actions/(publish|reject|remove|ai-recommend|configure-ai|retry-review)$`,
   ).exec(path);
   if (method === "POST" && act?.[1]) {
     const denied = authorise(request, env, "write");
@@ -163,10 +164,18 @@ async function health(env: Env): Promise<unknown> {
     const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM faces`).first<{
       n: number;
     }>();
+    const runner = await env.DB.prepare("SELECT last_seen, last_success, last_error FROM moderation_runner WHERE id = 1")
+      .first<{ last_seen: number; last_success: number; last_error: string | null }>();
+    const runnerHealthy = !!runner && runner.last_seen > checkedAt - 5 * 60_000 && !runner.last_error && runner.last_success > 0;
     return {
-      status: "healthy",
+      status: runnerHealthy ? "healthy" : "degraded",
       checkedAt,
       checks: [
+        {
+          name: "moderation-runner", kind: "job", status: runnerHealthy ? "healthy" : "degraded",
+          detail: runner?.last_error ?? (runnerHealthy ? "Remote moderation runner completed successfully within five minutes." : "No recent successful moderation runner heartbeat; new reviews may be delayed."),
+          observed: runner?.last_seen ? checkedAt - runner.last_seen : 0, threshold: 300_000, unit: "ms",
+        },
         {
           name: "catalog-d1",
           kind: "database",
@@ -285,6 +294,9 @@ async function queueView(env: Env): Promise<unknown> {
   const policy = await getPolicy(env);
   const { results } = await env.DB.prepare(
     `SELECT f.id, f.slug, f.name, f.author, f.state, f.created,
+            CASE WHEN j.status = 'running' AND j.lease_until <= unixepoch('now') * 1000 THEN CASE WHEN j.attempts >= 5 THEN 'failed' ELSE 'retry' END ELSE COALESCE(j.status, 'waiting') END AS processing_status, j.stage AS processing_stage,
+            j.last_error AS processing_error, j.updated_at AS processing_updated,
+            NULLIF(j.next_attempt, 0) AS next_attempt,
             (SELECT COUNT(*) FROM faces p WHERE p.author_key = f.author_key AND p.state = 'published') AS author_published,
             (SELECT COUNT(*) FROM faces x WHERE x.author_key = f.author_key AND x.state IN ('rejected','removed')) AS author_rejected,
             CASE
@@ -314,6 +326,7 @@ async function queueView(env: Env): Promise<unknown> {
        FROM faces f
        LEFT JOIN face_reviews r ON r.face_id = f.id
        LEFT JOIN face_ai_reviews a ON a.face_id = f.id
+       LEFT JOIN moderation_jobs j ON j.face_id = f.id AND j.params_hash = f.params_hash AND j.generator_version = f.generator_version
       WHERE f.state = 'pending'
       ORDER BY f.created ASC LIMIT 100`,
   ).all();
@@ -337,6 +350,11 @@ async function queueView(env: Env): Promise<unknown> {
       { key: "ai_recommendation", label: "AI suggestion", type: "status" },
       { key: "ai_confidence", label: "Confidence", type: "string" },
       { key: "ai_rationale", label: "Why", type: "string" },
+      { key: "processing_status", label: "Processing", type: "status" },
+      { key: "processing_stage", label: "Stage", type: "string" },
+      { key: "processing_error", label: "Review error", type: "string" },
+      { key: "processing_updated", label: "Last attempt", type: "timestamp" },
+      { key: "next_attempt", label: "Next retry", type: "timestamp" },
       { key: "slug", label: "Slug", type: "string" },
       { key: "author", label: "Author", type: "string" },
       { key: "created", label: "Submitted", type: "timestamp" },
@@ -393,6 +411,11 @@ async function actionCatalog(env: Env): Promise<unknown> {
   return {
     capability: CAPABILITY,
     actions: [
+      {
+        id: "retry-review", label: "Retry processing", destructive: false,
+        description: "Queue a new processing attempt. Active work is protected; no face is published by this action.",
+        params: [face],
+      },
       {
         id: "ai-recommend",
         label: "Ask AI",
@@ -521,6 +544,10 @@ async function execute(
   if (action === "ai-recommend") {
     const recommendation = await recommendFace(env, id, true);
     return json(recommendation.body, recommendation.status);
+  }
+  if (action === "retry-review") {
+    const retried = await retryProcessing(env, id);
+    return json(retried.body, retried.status);
   }
   const state =
     action === "publish"

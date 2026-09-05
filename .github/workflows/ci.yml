@@ -43,6 +43,7 @@ jobs:
       # inside the APK. Determinism, quantization budget and the ambient
       # lit-pixel ceiling are all covered here.
       - run: ./gradlew :workbench:test
+      - run: python3 tools/test-moderation-runner.py
 
       # Smoke the headless bake. This is the path build.sh depends on, and it
       # refuses to write a schema-invalid face, so a green bake is also a

@@ -144,6 +144,7 @@ export async function recommendFace(
   try {
     response = await fetch(API_URL, {
       method: "POST",
+      signal: AbortSignal.timeout(25_000),
       headers: {
         "content-type": "application/json",
         "x-api-key": env.ANTHROPIC_API_KEY,

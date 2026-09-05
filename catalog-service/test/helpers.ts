@@ -31,6 +31,8 @@ export async function migrate(): Promise<void> {
  * service returning the wrong thing.
  */
 export async function reset(): Promise<void> {
+  await env.DB.prepare("DELETE FROM moderation_jobs").run();
+  await env.DB.prepare("UPDATE moderation_runner SET last_seen = 0, last_success = 0, last_error = NULL WHERE id = 1").run();
   await env.DB.prepare("DELETE FROM face_ai_reviews").run();
   await env.DB.prepare("DELETE FROM face_reviews").run();
   await env.DB.prepare("DELETE FROM faces").run();

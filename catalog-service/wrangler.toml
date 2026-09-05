@@ -28,9 +28,8 @@ workers_dev = true
 # plus one bearer token; a spare front door is not worth the convenience.
 preview_urls = false
 
-# The published catalog changes only when a maintainer approves something, so
-# reads are served from the edge cache and the database is not touched at all on
-# a cache hit. See CACHE_SECONDS in src/index.ts.
+# Public publication reads go directly to D1 so removals take effect immediately.
+# Reintroduce caching only with shared revision invalidation across all writers.
 [observability]
 enabled = true
 

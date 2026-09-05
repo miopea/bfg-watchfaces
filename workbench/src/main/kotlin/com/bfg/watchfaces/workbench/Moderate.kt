@@ -20,7 +20,6 @@ import java.util.Base64
  * eval "$(op-login)" && export BFG_MODERATOR_TOKEN="$(op read op://…/moderator-token)"
  *
  * ./gradlew :workbench:moderate                          # review the queue, decide nothing
- * ./gradlew :workbench:moderate --args="--auto-reject"    # reject what provably fails
  * ./gradlew :workbench:moderate --args="--publish=<id>"
  * ./gradlew :workbench:moderate --args="--reject=<id> --reason=..."
  * ./gradlew :workbench:moderate --args="--reports"
@@ -73,6 +72,7 @@ object Moderate {
         val flag = { name: String -> args.firstOrNull { it.startsWith("--$name=") }?.substringAfter('=') }
 
         when {
+            args.contains("--auto-reject") -> error("Automatic rejection is disabled; failed validation requires manual review.")
             args.contains("--reports") -> reports(base, token)
             flag("publish") != null -> decide(base, token, flag("publish")!!, "publish", null)
             flag("reject") != null -> {
@@ -93,66 +93,58 @@ object Moderate {
                 }
                 decide(base, token, flag("remove")!!, "remove", reason)
             }
-            else -> queue(root, base, token, autoReject = args.contains("--auto-reject"))
+            else -> queue(root, base, token)
         }
     }
 
-    private fun queue(root: File, base: String, token: String, autoReject: Boolean) {
-        val body = get(base, token, "/admin/queue?state=pending")
+    private fun queue(root: File, base: String, token: String) {
+        val body = get(base, token, "/admin/queue?state=pending&due=1")
         val rows = Json.arr(Json.obj(Json.parse(body))["faces"]).map { Json.obj(it) }
-
-        println("pending: ${rows.size}")
-        if (rows.isEmpty()) return
-
+        println("due for processing: ${rows.size}")
         val previews = File(root, "build/moderation").apply { mkdirs() }
-        var refused = 0
-
-        // Oldest first, which is how the queue is served. Submissions are
-        // always accepted and worked through in order -- nothing is lost and
-        // nobody is turned away because strangers arrived first.
+        var failures = 0
         for (row in rows) {
-            val review = Moderation.review(root, row)
-            val mark = if (review.verdict == Moderation.Verdict.REFUSE) "REFUSE " else "look at"
-            println()
-            println("$mark ${review.slug}  \"${review.name}\"${if (review.author.isBlank()) "" else " by ${review.author}"}")
-            println("        ${review.id}")
-            review.problems.forEach { println("        - ${it.message}") }
-
-            if (review.verdict == Moderation.Verdict.REFUSE) {
-                recordReview(base, token, row, review, previewBase64 = null)
-                refused++
-                if (autoReject) {
-                    decide(base, token, review.id, "reject", review.reason())
+            val id = Json.str(row, "id", "")
+            var lease: String? = null
+            var stage = "preview"
+            try {
+                val claim = Json.obj(Json.parse(post(base, token, "/admin/faces/$id/processing/claim", "{}")))
+                if (claim["claimed"] != true) continue
+                lease = Json.str(claim, "lease", "")
+                if (Json.str(row, "validation", "pending") != "passed") {
+                    val review = Moderation.review(root, row)
+                    if (review.verdict == Moderation.Verdict.REFUSE) {
+                        recordReview(base, token, row, review, previewBase64 = null, lease = lease)
+                        report(base, token, id, lease, "attention", stage, "Technical validation requires manual review.")
+                        continue
+                    }
+                    val preview = writePreview(previews, row, review)
+                        ?: error("trusted preview generation failed")
+                    recordReview(base, token, row, review, preview.base64, lease = lease)
                 }
-                // No preview for a face that cannot render. Trying would fail
-                // in a second place for the same reason.
-                continue
-            }
-
-            val preview = writePreview(previews, row, review)
-            if (preview == null) {
-                recordReview(
-                    base, token, row, review,
-                    previewBase64 = null,
-                    overrideProblems = listOf("preview generation failed")
-                )
-            } else {
-                println("        preview: ${preview.path}")
-                recordReview(base, token, row, review, preview.base64)
+                if (claim["aiEnabled"] == true) {
+                    stage = "ai"
+                    report(base, token, id, lease, "running", stage)
+                    val advice = Json.obj(Json.parse(post(base, token, "/admin/faces/$id/ai-review", "{}", lease)))
+                    println("$id: AI recommendation ${Json.str(advice, "recommendation", "unavailable")}")
+                }
+                report(base, token, id, lease, "complete", stage)
+            } catch (failure: Exception) {
+                failures++
+                val detail = "$stage processing failed: ${failure.message?.take(180) ?: "unknown error"}"
+                System.err.println("$id: $detail")
+                if (lease != null) runCatching {
+                    report(base, token, id, lease, "retry", stage, detail)
+                }.onFailure { System.err.println("$id: failure could not be recorded; the processing lease will expire.") }
             }
         }
-
-        println()
-        println("$refused of ${rows.size} fail automated validation${if (autoReject) " and were rejected" else ""}.")
-        if (refused > 0 && !autoReject) println("Re-run with --auto-reject to record those rejections.")
-        println()
-        // Said every time, because it is the thing that gets forgotten: the
-        // automated half says nothing about whether a face is somebody's logo,
-        // somebody's name, or a slur rendered in knotwork.
-        println("The rest need a PERSON. Nothing above says a face is not somebody's")
-        println("trademark, impersonation, or harassment -- look at ${previews.path}/ and decide.")
+        check(failures == 0) { "$failures review attempts failed; other submissions were still processed." }
     }
 
+    private fun report(base: String, token: String, id: String, lease: String, status: String, stage: String, error: String? = null) {
+        val body = "{\"lease\":${Json.quote(lease)},\"status\":${Json.quote(status)},\"stage\":${Json.quote(stage)},\"error\":${error?.let { Json.quote(it) } ?: "null"}}"
+        post(base, token, "/admin/faces/$id/processing/report", body)
+    }
     /**
      * Rasterize the face so a person can look at it.
      *
@@ -195,7 +187,8 @@ object Moderate {
         row: Map<String, Any?>,
         review: Moderation.Review,
         previewBase64: String?,
-        overrideProblems: List<String>? = null
+        overrideProblems: List<String>? = null,
+        lease: String? = null
     ) {
         val problems = overrideProblems ?: review.problems.map { it.message }
         val passed = review.verdict == Moderation.Verdict.LOOKS_FINE && previewBase64 != null
@@ -215,17 +208,8 @@ object Moderate {
             }
             append("}")
         }
-        post(base, token, "/admin/faces/${review.id}/review", payload)
+        post(base, token, "/admin/faces/${review.id}/review", payload, lease)
         println("        technical review: ${if (passed) "passed" else "failed"} (synced)")
-        if (passed) {
-            val advice = Json.obj(Json.parse(post(base, token, "/admin/faces/${review.id}/ai-review", "{}")))
-            val deduplicated = advice["deduplicated"] == true
-            println(
-                "        AI suggestion: ${Json.str(advice, "recommendation", "unavailable")}" +
-                    " (${Json.str(advice, "confidence", "unknown")}" +
-                    if (deduplicated) ", reused)" else ")"
-            )
-        }
     }
 
     private fun reports(base: String, token: String) {
@@ -258,14 +242,17 @@ object Moderate {
 
     private fun get(base: String, token: String, path: String): String =
         send(HttpRequest.newBuilder(URI.create("$base$path"))
+            .header("User-Agent", "BFG-Moderation-Runner/1.0")
             .header("authorization", "Bearer $token")
             .timeout(Duration.ofSeconds(30))
             .GET())
 
-    private fun post(base: String, token: String, path: String, body: String): String =
+    private fun post(base: String, token: String, path: String, body: String, lease: String? = null): String =
         send(HttpRequest.newBuilder(URI.create("$base$path"))
+            .header("User-Agent", "BFG-Moderation-Runner/1.0")
             .header("authorization", "Bearer $token")
             .header("content-type", "application/json")
+            .apply { if (lease != null) header("X-Moderation-Lease", lease) }
             .timeout(Duration.ofSeconds(30))
             .POST(HttpRequest.BodyPublishers.ofString(body)))
 
@@ -275,8 +262,7 @@ object Moderate {
             // The request carried the moderator token in a header. Report the
             // status and the SERVICE's message, never the request -- a stack
             // trace with the headers in it is how a token ends up in a log.
-            System.err.println("the service answered ${response.statusCode()}: ${response.body().take(300)}")
-            kotlin.system.exitProcess(1)
+            throw IllegalStateException("Moderation service answered HTTP ${response.statusCode()}")
         }
         return response.body()
     }
