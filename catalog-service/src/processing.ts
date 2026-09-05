@@ -1,5 +1,6 @@
 import type { Env } from "./env";
 import { getPolicy } from "./ai-review";
+import { applyAutomaticApproval } from "./automatic-approval";
 import type { ReviewWriteResult } from "./review";
 
 const LEASE_MS = 5 * 60_000;
@@ -49,7 +50,14 @@ export async function reportProcessing(env: Env, id: string, body: Record<string
       completed_at = CASE WHEN ? = 'complete' THEN ? ELSE completed_at END
     WHERE face_id = ? AND lease = ? AND status = 'running' AND lease_until > ?`)
     .bind(outcome, stage, detail, next, now, outcome, outcome, now, id, lease, now).run();
-  return changed.meta.changes ? { status: 200, body: { ok: true, status: outcome, nextAttempt: next || null } } : error(409, "processing lease expired");
+  if (!changed.meta.changes) return error(409, "processing lease expired");
+  let approval;
+  try { approval = outcome === "complete" ? await applyAutomaticApproval(env, id, lease) : undefined; }
+  catch {
+    await env.DB.prepare("UPDATE moderation_jobs SET status='retry',next_attempt=?,last_error='Automatic approval check failed; it will retry.' WHERE face_id=? AND lease=? AND status='complete'").bind(now + 120_000, id, lease).run();
+    return error(503, "automatic approval check could not finish; retry is scheduled");
+  }
+  return { status: 200, body: { ok: true, status: approval?.reason ? "attention" : outcome, nextAttempt: next || null, ...(approval ?? {}) } };
 }
 
 export async function retryProcessing(env: Env, id: string): Promise<ReviewWriteResult> {

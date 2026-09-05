@@ -75,9 +75,25 @@ export async function ops(
       contractVersion: 1,
       buildSha: env.BUILD_SHA ?? null,
       environment: "production",
-      capabilities: [CAPABILITY, "library"],
+      capabilities: [CAPABILITY, "library", "audit"],
       pushIntervalSec: null,
     });
+  }
+
+  if (method === "GET" && path === "/api/ops/audit") {
+    const denied = authorise(request, env, "read");
+    if (denied) return denied;
+    const { results } = await env.DB.prepare("SELECT id,face_id,params_hash,generator_version,model,policy,created FROM automatic_publications ORDER BY created DESC,id DESC LIMIT 101").all();
+    return json({ capability: "audit", collectedAt: Date.now(), columns: [
+      { key: "created", label: "Approved", type: "timestamp" },
+      { key: "face_id", label: "Face", type: "id" },
+      { key: "model", label: "Review model", type: "string" },
+      { key: "policy", label: "Operator policy", type: "string" },
+      { key: "params_hash", label: "Reviewed revision", type: "id" },
+      { key: "generator_version", label: "Generator", type: "number" },
+      { key: "id", label: "Event", type: "id" },
+    ], rows: results.slice(0, 100), truncated: results.length > 100,
+    note: "Automatic policy approvals. Operator actions initiated in BFG Admin are recorded in its activity history." });
   }
 
   if (method === "GET" && path === "/api/ops/health") {
@@ -375,9 +391,10 @@ async function queueView(env: Env): Promise<unknown> {
     ],
     rows,
     note:
-      "Previews come from the JVM renderer and exact stored parameters. " +
-      `AI advice is ${policy.enabled ? "enabled" : "disabled"} with ${policy.sensitivity} sensitivity; ` +
-      "it never publishes or rejects. Publish stays a human decision and remains disabled until technical validation and preview generation pass.",
+      "Previews are generated from validated submitted settings. " +
+      (policy.mode === "automatic" ? "Automatic approval is enabled within your saved limits. Remaining submissions need your review." :
+       policy.mode === "manual" ? "AI review is off. Publishing requires a passed technical review and preview." :
+       "AI suggests; you approve. Publishing requires a passed technical review and preview."),
   };
 }
 
@@ -460,22 +477,29 @@ async function actionCatalog(env: Env): Promise<unknown> {
       {
         id: "configure-ai",
         settingsGroup: "ai",
-        settingsSummary: `Provider: Anthropic. Model: ${env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001"}. ${env.ANTHROPIC_API_KEY ? "Provider credential configured." : "Provider credential missing; reviews cannot run."} Review mode: recommendations only. Uses the trusted preview, public name and author, author-history counts and up to ${policy.comparison_limit} published previews.`,
+        settingsSummary: `Provider: Anthropic. Model: ${env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001"}. ${env.ANTHROPIC_API_KEY ? "Provider credential configured." : "Provider credential missing; reviews cannot run."} Review mode: ${policy.mode}. Uses the trusted preview, public name and author, author-history counts and up to ${policy.comparison_limit} published previews.`,
         label: "Configure AI review",
         description:
-          "Set the recommendation policy. This cannot enable automatic publishing.",
+          "Automatic mode publishes only fresh high-confidence approvals with a matching technical preview and author/library safeguards. Uncertain submissions wait for you. Nothing is automatically rejected or removed.",
         destructive: false,
         params: [
           {
-            key: "enabled",
-            currentValue: policy.enabled ? "enabled" : "disabled",
-            label: "AI review",
+            key: "mode",
+            currentValue: policy.mode,
+            label: "Review mode",
             type: "enum",
             required: true,
             options: [
-              { value: "enabled", label: "Enabled" },
-              { value: "disabled", label: "Disabled" },
+              { value: "manual", label: "Manual — no AI review" },
+              { value: "recommendations", label: "Recommendations — I approve" },
+              { value: "automatic", label: "Automatic — approve within limits" },
             ],
+          },
+          {
+            key: "maxPerHour", currentValue: policy.max_per_hour, label: "Maximum automatic approvals per hour", type: "number", required: true, help: "1 to 100 across the library. Applies only in automatic mode.",
+          },
+          {
+            key: "maxPerAuthorDay", currentValue: policy.max_per_author_day, label: "Maximum publications per author in 24 hours", type: "number", required: true, help: "1 to 20. Includes manually published faces. Extra submissions wait for you.",
           },
           {
             key: "sensitivity",
@@ -587,6 +611,7 @@ async function libraryView(request: Request, env: Env): Promise<Response> {
   const { results } = await env.DB.prepare(
     `SELECT f.id, f.name, f.author, f.slug, f.state, f.installs,
             COALESCE(f.reviewed, f.created) AS published_at,
+            CASE WHEN EXISTS(SELECT 1 FROM automatic_publications e WHERE e.face_id=f.id AND e.params_hash=f.params_hash AND e.created=f.reviewed) THEN 'Automatic policy' ELSE 'Moderator' END AS approved_by,
             CASE WHEN r.params_hash = f.params_hash AND r.generator_version = f.generator_version
                  AND r.verdict = 'passed' THEN r.preview_base64 ELSE NULL END AS preview_base64
        FROM faces f LEFT JOIN face_reviews r ON r.face_id = f.id
@@ -603,6 +628,7 @@ async function libraryView(request: Request, env: Env): Promise<Response> {
       { key: "name", label: "Name", type: "string" },
       { key: "author", label: "Author", type: "string" },
       { key: "published_at", label: "Published", type: "timestamp" },
+      { key: "approved_by", label: "Approved by", type: "string" },
       { key: "installs", label: "Installs", type: "number", unit: "count" },
       { key: "state", label: "State", type: "status" },
       { key: "slug", label: "Slug", type: "string" },

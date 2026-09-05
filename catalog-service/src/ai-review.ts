@@ -5,6 +5,9 @@ type Recommendation = "approve" | "review" | "reject";
 type Confidence = "low" | "medium" | "high";
 
 interface Policy {
+  mode: "manual" | "recommendations" | "automatic";
+  max_per_hour: number;
+  max_per_author_day: number;
   enabled: number;
   sensitivity: "permissive" | "balanced" | "cautious";
   comparison_limit: number;
@@ -239,7 +242,13 @@ export async function configureAiPolicy(
   env: Env,
   body: Record<string, unknown>,
 ): Promise<ReviewWriteResult> {
-  const enabled = body["enabled"];
+  const current = await getPolicy(env);
+  const mode = body["mode"] ?? (body["enabled"] === "disabled" ? "manual" : current.mode === "manual" ? "recommendations" : current.mode);
+  if (!["manual", "recommendations", "automatic"].includes(String(mode))) return result(422, "invalid review mode");
+  const enabled = body["mode"] === undefined ? body["enabled"] : mode === "manual" ? "disabled" : "enabled";
+  const maxPerHour = body["maxPerHour"] ?? current.max_per_hour;
+  const maxPerAuthorDay = body["maxPerAuthorDay"] ?? current.max_per_author_day;
+  if (!Number.isInteger(maxPerHour) || Number(maxPerHour) < 1 || Number(maxPerHour) > 100 || !Number.isInteger(maxPerAuthorDay) || Number(maxPerAuthorDay) < 1 || Number(maxPerAuthorDay) > 20) return result(422, "automatic approval limits are out of range");
   const sensitivity = body["sensitivity"];
   const comparisonLimit = body["comparisonLimit"];
   const pendingWarningAt = body["pendingWarningAt"];
@@ -259,7 +268,7 @@ export async function configureAiPolicy(
     Number(pendingWarningAt) > 50
   )
     return result(422, "pending warning must be from 1 to 50");
-  await env.DB.prepare(
+  await env.DB.batch([env.DB.prepare(
     `UPDATE moderation_policy SET enabled = ?, sensitivity = ?,
        comparison_limit = ?, pending_warn = ? WHERE id = 1`,
   )
@@ -269,7 +278,7 @@ export async function configureAiPolicy(
       comparisonLimit,
       pendingWarningAt,
     )
-    .run();
+    , env.DB.prepare("UPDATE automatic_approval_policy SET mode = ?, max_per_hour = ?, max_per_author_day = ? WHERE id = 1").bind(mode === "automatic" ? "automatic" : "recommendations", maxPerHour, maxPerAuthorDay)]);
   return {
     status: 200,
     body: {
@@ -278,14 +287,16 @@ export async function configureAiPolicy(
       sensitivity,
       comparisonLimit,
       pendingWarningAt,
+      mode, maxPerHour, maxPerAuthorDay,
     },
   };
 }
 
 export async function getPolicy(env: Env): Promise<Policy> {
   const row = await env.DB.prepare(
-    `SELECT enabled, sensitivity, comparison_limit, pending_warn
-       FROM moderation_policy WHERE id = 1`,
+    `SELECT p.enabled, p.sensitivity, p.comparison_limit, p.pending_warn,
+       CASE WHEN p.enabled = 0 THEN 'manual' ELSE a.mode END AS mode, a.max_per_hour, a.max_per_author_day
+       FROM moderation_policy p JOIN automatic_approval_policy a ON a.id = p.id WHERE p.id = 1`,
   ).first<Policy>();
   return (
     row ?? {
@@ -293,6 +304,7 @@ export async function getPolicy(env: Env): Promise<Policy> {
       sensitivity: "balanced",
       comparison_limit: 6,
       pending_warn: 3,
+      mode: "recommendations", max_per_hour: 5, max_per_author_day: 1,
     }
   );
 }

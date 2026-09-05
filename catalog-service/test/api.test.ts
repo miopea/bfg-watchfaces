@@ -285,7 +285,7 @@ describe("publishing", () => {
     const settings = catalog.actions.find((action) => action.id === "configure-ai")!;
     expect(settings.settingsGroup).toBe("ai");
     expect(Object.fromEntries(settings.params.map((param) => [param.key, param.currentValue])))
-      .toEqual({ enabled: "disabled", sensitivity: "permissive", comparisonLimit: 4, pendingWarningAt: 5 });
+      .toEqual({ mode: "manual", maxPerHour: 5, maxPerAuthorDay: 1, sensitivity: "permissive", comparisonLimit: 4, pendingWarningAt: 5 });
   });
 
   it("makes a face visible, with its parameters byte-for-byte as submitted", async () => {

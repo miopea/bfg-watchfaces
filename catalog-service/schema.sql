@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS face_reviews (
 );
 
 -- A revision-bound recommendation, kept separate from the technical verdict.
--- This row can inform a person but can never satisfy the publish gate.
+-- This row cannot replace the technical review or the operator's approval policy.
 CREATE TABLE IF NOT EXISTS face_ai_reviews (
   face_id           TEXT PRIMARY KEY REFERENCES faces(id) ON DELETE CASCADE,
   params_hash       TEXT NOT NULL,
@@ -107,8 +107,8 @@ CREATE TABLE IF NOT EXISTS face_ai_reviews (
   created           TEXT NOT NULL
 );
 
--- One small, operator-editable policy. Automatic publishing is deliberately
--- absent; enabling this table only enables advice.
+-- AI advice settings. Automatic publication requires the separate operator
+-- policy below as well as the revision, confidence and library safeguards.
 CREATE TABLE IF NOT EXISTS moderation_policy (
   id               INTEGER PRIMARY KEY CHECK (id = 1),
   enabled          INTEGER NOT NULL CHECK (enabled IN (0,1)),
@@ -169,3 +169,20 @@ CREATE TABLE IF NOT EXISTS moderation_runner (
 );
 INSERT OR IGNORE INTO moderation_runner(id) VALUES (1);
 
+CREATE TABLE IF NOT EXISTS automatic_approval_policy (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  mode TEXT NOT NULL CHECK (mode IN ('recommendations','automatic')),
+  max_per_hour INTEGER NOT NULL CHECK (max_per_hour BETWEEN 1 AND 100),
+  max_per_author_day INTEGER NOT NULL CHECK (max_per_author_day BETWEEN 1 AND 20)
+);
+INSERT OR IGNORE INTO automatic_approval_policy VALUES (1, 'recommendations', 5, 1);
+CREATE TABLE IF NOT EXISTS automatic_publications (
+  id TEXT PRIMARY KEY,
+  face_id TEXT NOT NULL REFERENCES faces(id),
+  params_hash TEXT NOT NULL,
+  generator_version INTEGER NOT NULL,
+  model TEXT NOT NULL,
+  policy TEXT NOT NULL,
+  created TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS automatic_publications_created ON automatic_publications(created);
