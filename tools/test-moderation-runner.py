@@ -8,6 +8,7 @@ from pathlib import Path
 
 ids = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"]
 reports = []
+heartbeats = []
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_args):
         pass
@@ -20,6 +21,10 @@ class Handler(BaseHTTPRequestHandler):
         self.answer(200, {"faces": [{"id": item, "validation": "passed"} for item in ids]})
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        if self.path == "/admin/processing/heartbeat":
+            heartbeats.append(body["success"])
+            self.answer(200, {"ok": True})
+            return
         item = self.path.split("/")[3]
         if self.path.endswith("/claim"):
             self.answer(200, {"claimed": True, "lease": "lease-" + item, "aiEnabled": True})
@@ -35,11 +40,12 @@ class Handler(BaseHTTPRequestHandler):
 server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 try:
-    result = subprocess.run(["./gradlew", ":workbench:moderate", "--console=plain"],
+    result = subprocess.run(["python3", "tools/run-moderation.py"],
         cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True, timeout=180,
         env={**os.environ, "BFG_CATALOG_URL": f"http://127.0.0.1:{server.server_port}", "BFG_MODERATOR_TOKEN": "isolated-test-token"})
     assert result.returncode != 0, "failed attempts must remain visible to the runner"
     assert (ids[0], "retry") in reports and (ids[1], "complete") in reports, reports
+    assert heartbeats == [False], heartbeats
     assert "isolated-test-token" not in result.stdout + result.stderr
     print("Moderation failure isolation and credential-safe logging verified.")
 finally:

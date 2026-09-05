@@ -104,6 +104,20 @@ tasks.register<JavaExec>("contract") {
 }
 
 /** Work the catalog service's moderation queue. */
+tasks.register("prepareModerationRunner") {
+    group = "bfg"
+    description = "Compile the unattended moderator and record its runtime classpath"
+    dependsOn(tasks.named("classes"), configurations.runtimeClasspath)
+    val runtime = sourceSets["main"].runtimeClasspath
+    val output = layout.buildDirectory.file("moderation-classpath.txt")
+    inputs.files(runtime)
+    outputs.file(output)
+    doLast {
+        check(runtime.files.all { it.exists() }) { "Moderation runtime is incomplete" }
+        output.get().asFile.writeText(runtime.asPath)
+    }
+}
+
 tasks.register<JavaExec>("moderate") {
     group = "bfg"
     description = "Review, publish or reject faces in the catalog service's queue"
