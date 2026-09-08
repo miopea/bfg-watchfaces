@@ -190,6 +190,8 @@ export async function recommendFace(
           "Do not reject unusual taste and do not speculate about copyright. Prefer approve when there is no concrete concern. " +
           "Database uniqueness safeguards are not evidence that this candidate is a duplicate. " +
           "Infer near-duplication only from actual supplied comparisons; no comparisons means no visual duplicate evidence. " +
+          "Trusted previews use the same synthetic time, date, activity counts, battery values, and complication labels. Those sample values are not authored content and must never be evidence of duplication, spam, or saturation. " +
+          "Common watch functions and default information layouts alone are not a concern. Compare distinctive authored artwork, ornamentation, and composition; name the concrete matching design features when flagging near-duplication. " +
           "Return only JSON with recommendation (approve, review, or reject), confidence (low, medium, or high), rationale (under 400 characters), and signals (an array of at most 5 short strings). " +
           "This is advice only; a human makes the final decision.",
         messages: [{ role: "user", content }],
