@@ -7,7 +7,7 @@ One failed review does not stop later submissions. Five failed attempts require
 operator attention. GitHub's moderation workflow is a manual recovery path.
 
 The deployed checkout is
-`/home/bschleifer/projects/personal/bfg-moderation-env-runner`.
+`~/projects/personal/bfg-moderation-env-runner`.
 The service uses Java 21 and prebuilt classes. During installation or an update,
 populate the schema and validator dependencies using `scripts/bootstrap.sh`,
 then build with `./gradlew :workbench:prepareModerationRunner`. Verify with

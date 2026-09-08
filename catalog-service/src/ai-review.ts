@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { CONTRACT } from "./contract";
 import type { ReviewWriteResult } from "./review";
 
 type Recommendation = "approve" | "review" | "reject";
@@ -23,8 +24,10 @@ interface FaceForReview {
   params_hash: string;
   generator_version: number;
   preview_base64: string;
+  params: string;
 }
 
+const REVIEW_VERSION = 2;
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 export const REVIEW_MODELS = [
   { value: DEFAULT_MODEL, label: "Claude Haiku 4.5 — everyday review" },
@@ -54,7 +57,7 @@ export async function recommendFace(
 
   const face = await env.DB.prepare(
     `SELECT f.id, f.name, f.author, f.author_key, f.params_hash,
-            f.generator_version, r.preview_base64
+            f.generator_version, f.params, r.preview_base64
        FROM faces f JOIN face_reviews r ON r.face_id = f.id
       WHERE f.id = ? AND f.state = 'pending'
         AND r.params_hash = f.params_hash
@@ -76,6 +79,7 @@ export async function recommendFace(
         WHERE face_id = ? AND params_hash = ? AND generator_version = ? AND model = ?
           AND json_extract(signals, '$.policy') = ?
           AND json_extract(signals, '$.libraryRevision') = ?
+          AND json_extract(signals, '$.reviewVersion') = ?
           AND json_extract(signals, '$.deterministic.exactDuplicatePreventedByDatabase') IS NULL`,
     )
       .bind(
@@ -85,6 +89,7 @@ export async function recommendFace(
         reviewModel(env, policy),
         JSON.stringify(policy),
         libraryRevision,
+        REVIEW_VERSION,
       )
       .first<{ recommendation: Recommendation; confidence: Confidence }>();
     if (existing) {
@@ -110,7 +115,7 @@ export async function recommendFace(
     }>();
 
   const comparisons = await env.DB.prepare(
-    `SELECT f.name, r.preview_base64
+    `SELECT f.name, f.params, r.preview_base64
        FROM faces f JOIN face_reviews r ON r.face_id = f.id
       WHERE f.state = 'published'
         AND r.params_hash = f.params_hash
@@ -119,7 +124,7 @@ export async function recommendFace(
       ORDER BY f.reviewed DESC LIMIT ?`,
   )
     .bind(policy.comparison_limit)
-    .all<{ name: string; preview_base64: string }>();
+    .all<{ name: string; params: string; preview_base64: string }>();
 
   const signals = {
     authorPending: Number(counts?.pending ?? 0),
@@ -129,6 +134,7 @@ export async function recommendFace(
     comparisonCount: comparisons.results.length,
   };
   const content: Record<string, unknown>[] = [
+    { type: "text", text: "Candidate preview to review (image 1):" },
     image(face.preview_base64),
     {
       type: "text",
@@ -137,6 +143,7 @@ export async function recommendFace(
           name: face.name.slice(0, 120),
           author: face.author.slice(0, 120),
           generatorVersion: Number(face.generator_version),
+          design: designSummary(face.params),
         },
         policy: {
           sensitivity: policy.sensitivity,
@@ -149,7 +156,7 @@ export async function recommendFace(
   for (const [index, comparison] of comparisons.results.entries()) {
     content.push({
       type: "text",
-      text: `Recent published comparison ${index + 1}: ${JSON.stringify(comparison.name.slice(0, 120))}`,
+      text: `Published comparison ${index + 1} (image ${index + 2}): ${JSON.stringify({ name: comparison.name.slice(0, 120), design: designSummary(comparison.params) })}`,
     });
     content.push(image(comparison.preview_base64));
   }
@@ -191,6 +198,7 @@ export async function recommendFace(
           "Database uniqueness safeguards are not evidence that this candidate is a duplicate. " +
           "Infer near-duplication only from actual supplied comparisons; no comparisons means no visual duplicate evidence. " +
           "Trusted previews use the same synthetic time, date, activity counts, battery values, and complication labels. Those sample values are not authored content and must never be evidence of duplication, spam, or saturation. " +
+          "Each image has an explicit role and validated design facts. Keep candidate and comparison separate. Use clockMode, engine and colours to ground what you see; never describe different clock modes or pattern engines as identical. A shared built-in pattern alone is not spam. " +
           "Common watch functions and default information layouts alone are not a concern. Compare distinctive authored artwork, ornamentation, and composition; name the concrete matching design features when flagging near-duplication. " +
           "Return only JSON with recommendation (approve, review, or reject), confidence (low, medium, or high), rationale (under 400 characters), and signals (an array of at most 5 short strings). " +
           "This is advice only; a human makes the final decision.",
@@ -236,7 +244,7 @@ export async function recommendFace(
       parsed.recommendation,
       parsed.confidence,
       parsed.rationale,
-      JSON.stringify({ deterministic: signals, model: parsed.signals, policy, libraryRevision }),
+      JSON.stringify({ deterministic: signals, model: parsed.signals, policy, libraryRevision, reviewVersion: REVIEW_VERSION }),
       new Date().toISOString(),
     )
     .run();
@@ -335,6 +343,22 @@ export async function getPolicy(env: Env): Promise<Policy> {
       mode: "recommendations", max_per_hour: 5, max_per_author_day: 1,
     }
   );
+}
+
+/** Only public visual properties: never device providers, shortcuts or arbitrary metadata. */
+export function designSummary(serialized: string): Record<string, string | boolean> {
+  let params: unknown;
+  try { params = JSON.parse(serialized); } catch { return {}; }
+  if (!isRecord(params)) return {};
+  const design: Record<string, string | boolean> = {};
+  if (params.clockMode === "ANALOG" || params.clockMode === "DIGITAL") design.clockMode = params.clockMode;
+  if (typeof params.analogDigital === "boolean") design.analogDigital = params.analogDigital;
+  if (typeof params.engine === "string" && CONTRACT.enums.engine?.includes(params.engine)) design.engine = params.engine;
+  for (const key of ["dialColor", "inkColor"] as const) {
+    const value = params[key];
+    if (typeof value === "string" && /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value)) design[key] = value;
+  }
+  return design;
 }
 
 function image(data: string): Record<string, unknown> {
