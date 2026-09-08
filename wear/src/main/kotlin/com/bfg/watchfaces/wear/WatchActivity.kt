@@ -12,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -117,9 +119,43 @@ class WatchActivity : ComponentActivity() {
                 AppScaffold {
                     val listState = rememberTransformingLazyColumnState()
                     ScreenScaffold(scrollState = listState) { contentPadding ->
+                        // THE SCREEN IS ROUND, AND THE FONT IS NOT OURS.
+                        //
+                        // Rejected by Play on 2026-09-08, Wear App Quality
+                        // Guidelines: "if the user selects a larger font size,
+                        // ensure that text and controls are not cut off by
+                        // screen edges". Google's evidence was this screen with
+                        // its lines running off the left and right of the
+                        // circle.
+                        //
+                        // The list itself was never the problem — it scrolls.
+                        // The problem is horizontal: items carried a flat
+                        // 12.dp, and a fixed inset cannot describe a circle.
+                        // Near the top and bottom of a round display the
+                        // available width collapses, so the same 12.dp that
+                        // looks generous beside the centre line leaves the
+                        // first and last rows hanging over the bezel — and a
+                        // larger system font pushes more rows into exactly
+                        // that band by making every one of them taller.
+                        //
+                        // A PROPORTION, not a constant: the margin has to
+                        // shrink and grow with the display, because the bezel
+                        // does. 10% a side leaves the middle 80%, which stays
+                        // inside the circle at the vertical offsets this list
+                        // actually puts text at, on every round size Wear ships.
+                        //
+                        // The vertical halves come from ScreenScaffold, which
+                        // knows about the time text and the edge button; only
+                        // the horizontal is ours to decide.
+                        val sideMargin = LocalConfiguration.current.screenWidthDp.dp * 0.10f
                         TransformingLazyColumn(
                             state = listState,
-                            contentPadding = contentPadding,
+                            contentPadding = PaddingValues(
+                                start = sideMargin,
+                                end = sideMargin,
+                                top = contentPadding.calculateTopPadding(),
+                                bottom = contentPadding.calculateBottomPadding()
+                            ),
                             modifier = Modifier.fillMaxSize(),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
@@ -249,7 +285,6 @@ class WatchActivity : ComponentActivity() {
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(horizontal = 12.dp)
                                 )
                             }
                             item { Spacer(Modifier.height(8.dp)) }
@@ -378,7 +413,7 @@ class WatchActivity : ComponentActivity() {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
         )
     }
 
@@ -390,7 +425,7 @@ class WatchActivity : ComponentActivity() {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
         )
     }
 
@@ -398,7 +433,7 @@ class WatchActivity : ComponentActivity() {
     @Composable
     private fun PermissionLine(name: String, state: String) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(name, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
@@ -430,7 +465,7 @@ class WatchActivity : ComponentActivity() {
             else -> "${faces.count} faces from this app"
         }
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(headline, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)

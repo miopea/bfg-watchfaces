@@ -48,6 +48,7 @@
       android:dataExtractionRules="@xml/data_extraction_rules"
       android:label="BFG Watch Faces"
       android:icon="@mipmap/ic_launcher"
+      android:theme="@style/Theme.BfgWatchFaces"
       android:roundIcon="@mipmap/ic_launcher_round">
     <!--
       TRUE, and this is what stops the app appearing in the Play Store on a

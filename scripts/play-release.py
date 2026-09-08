@@ -145,7 +145,26 @@ def main() -> None:
         print("dry run: edit deleted, nothing published")
         return
 
-    call(token, "POST", "%s/applications/%s/edits/%s:commit" % (API, a.package, edit_id))
+    # changesNotSentForReview=true, ALWAYS, and it is not optional any more.
+    #
+    # From 2026-09-08 Play began refusing the bare commit outright:
+    #
+    #     Changes cannot be sent for review automatically. Please set the query
+    #     parameter changesNotSentForReview to true. Once committed, the changes
+    #     in this edit can be sent for review from the Google Play Console UI.
+    #
+    # It started when the app picked up an outstanding policy rejection: while
+    # one is open Play will not let an API commit decide, on its own, that the
+    # app should go back into review. Fair, and it is also the right flag for
+    # this script regardless — it only ever writes TESTING tracks, and a testing
+    # track is exempt from review, so there was never anything here to send.
+    #
+    # The flag says "commit these bits, do not dispatch them", which is exactly
+    # what an internal build wants. Production still goes through the console,
+    # which this script refuses to touch by design.
+    call(token, "POST",
+         "%s/applications/%s/edits/%s:commit?changesNotSentForReview=true"
+         % (API, a.package, edit_id))
     print("committed. live on '%s' for your testers." % a.track)
 
 
