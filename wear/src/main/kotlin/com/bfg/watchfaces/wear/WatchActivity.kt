@@ -35,6 +35,8 @@ import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ListHeader
+import androidx.wear.compose.material3.ListHeaderDefaults
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
@@ -121,50 +123,70 @@ class WatchActivity : ComponentActivity() {
                     ScreenScaffold(scrollState = listState) { contentPadding ->
                         // THE SCREEN IS ROUND, AND THE FONT IS NOT OURS.
                         //
-                        // Rejected by Play on 2026-09-08, Wear App Quality
-                        // Guidelines: "if the user selects a larger font size,
-                        // ensure that text and controls are not cut off by
-                        // screen edges". Google's evidence was this screen with
-                        // its lines running off the left and right of the
-                        // circle.
+                        // Rejected by Play TWICE on this guideline — 2026-09-08
+                        // and again 2026-09-10 against this very build — so the
+                        // reasoning that failed is written down beside the fix.
                         //
-                        // The list itself was never the problem — it scrolls.
-                        // The problem is horizontal: items carried a flat
-                        // 12.dp, and a fixed inset cannot describe a circle.
-                        // Near the top and bottom of a round display the
-                        // available width collapses, so the same 12.dp that
-                        // looks generous beside the centre line leaves the
-                        // first and last rows hanging over the bezel — and a
-                        // larger system font pushes more rows into exactly
-                        // that band by making every one of them taller.
+                        // "Your app must conform to the font size set by the
+                        // user in System Settings. If the user selects a larger
+                        // font size, ensure that text and controls are not cut
+                        // off by screen edges."
                         //
-                        // A PROPORTION, not a constant: the margin has to
-                        // shrink and grow with the display, because the bezel
-                        // does. 10% a side leaves the middle 80%, which stays
-                        // inside the circle at the vertical offsets this list
-                        // actually puts text at, on every round size Wear ships.
+                        // FIRST ATTEMPT, AND WHY IT WAS WRONG. I read this as a
+                        // horizontal problem and gave the list a 10% side
+                        // margin. Google's second screenshot still showed the
+                        // title with its leading "B" sliced off and the last
+                        // line cut mid-word. A side margin cannot fix it,
+                        // because the width available on a circle is a function
+                        // of HEIGHT: the chord at the top of the display is far
+                        // narrower than the one through the middle, so the
+                        // first and last rows are clipped at any horizontal
+                        // inset that still leaves the middle usable.
                         //
-                        // The vertical halves come from ScreenScaffold, which
-                        // knows about the time text and the edge button; only
-                        // the horizontal is ours to decide.
-                        val sideMargin = LocalConfiguration.current.screenWidthDp.dp * 0.10f
+                        // The fix is therefore VERTICAL as much as horizontal:
+                        // push the first and last items out of the narrow band
+                        // entirely. Wear ships the numbers for it, which is the
+                        // part I should have looked for the first time —
+                        // ListHeaderDefaults exposes a minimum top and bottom
+                        // list padding that exists for exactly this, and a
+                        // ListHeader is the component meant to sit in it.
+                        //
+                        // Taking the LARGER of Wear's minimum and the
+                        // scaffold's own value, because the scaffold is
+                        // reserving space for the time text and an edge button
+                        // and knows nothing about the curve.
+                        val sideMargin = LocalConfiguration.current.screenWidthDp.dp * 0.12f
+                        val topPadding = maxOf(
+                            contentPadding.calculateTopPadding(),
+                            ListHeaderDefaults.minimumTopListContentPadding
+                        )
+                        val bottomPadding = maxOf(
+                            contentPadding.calculateBottomPadding(),
+                            ListHeaderDefaults.minimumBottomListContentPadding
+                        )
                         TransformingLazyColumn(
                             state = listState,
                             contentPadding = PaddingValues(
                                 start = sideMargin,
                                 end = sideMargin,
-                                top = contentPadding.calculateTopPadding(),
-                                bottom = contentPadding.calculateBottomPadding()
+                                top = topPadding,
+                                bottom = bottomPadding
                             ),
                             modifier = Modifier.fillMaxSize(),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            // A ListHeader, not a bare Text. It is the component
+                            // Wear pairs with the minimum top padding above, and
+                            // it carries the header inset that keeps a title off
+                            // the curve when the font grows.
                             item {
-                                Text(
-                                    "BFG Watch Faces",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    textAlign = TextAlign.Center
-                                )
+                                ListHeader {
+                                    Text(
+                                        "BFG Watch Faces",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
 
                             // WHAT IS ON THE WATCH, first.
