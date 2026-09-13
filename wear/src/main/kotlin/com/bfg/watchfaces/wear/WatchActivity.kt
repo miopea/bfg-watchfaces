@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -99,6 +100,11 @@ class WatchActivity : ComponentActivity() {
             PackageManager.PERMISSION_GRANTED
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // BEFORE super.onCreate, and that ordering is the API's, not a style
+        // choice: the call swaps the launch theme for postSplashScreenTheme, so
+        // after super it is too late and the splash the reviewer is looking for
+        // never gets drawn. See res/values/themes.xml for the three rejections.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         if (!notificationsGranted()) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         setContent {

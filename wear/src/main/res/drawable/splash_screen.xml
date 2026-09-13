@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The splash icon, sized rather than handed over loose.
+
+  THE DRAWABLE IS @mipmap/ic_launcher, NOT THE FOREGROUND LAYER. The guideline
+  says "the splash screen icon must match the app launcher icon", and the
+  launcher icon is the adaptive icon: the plum mark on the blush ground, masked
+  to a circle. Version 1030 passed @drawable/ic_launcher_foreground instead —
+  the mark alone, in #80475C, drawn to sit on that blush — so what reached a
+  black splash was dark plum hairlines at about 3:1 contrast and no disc at all.
+  Rejected for it on 2026-09-13.
+
+  The layer-list is what makes the size a fact instead of an inference. Passed
+  straight to windowSplashScreenAnimatedIcon a drawable is scaled by the system
+  into whatever slot it keeps; wrapped here with an explicit width, height and
+  gravity it is 48dp, centred, which is the number the reviewer is checking.
+  This is Google's own construction from the Wear splash guide, copied rather
+  than re-derived.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+  <item
+      android:width="@dimen/splash_screen_icon_size"
+      android:height="@dimen/splash_screen_icon_size"
+      android:drawable="@mipmap/ic_launcher"
+      android:gravity="center" />
+</layer-list>

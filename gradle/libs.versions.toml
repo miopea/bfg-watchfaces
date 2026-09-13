@@ -28,6 +28,10 @@ activityCompose = "1.12.4"
 fragment = "1.3.6"
 lifecycle = "2.9.4"
 coreKtx = "1.17.0"
+# Wear's branded-launch splash. 1.0.1+ is what carries "support for default
+# Wear OS dimensions"; Google's own Wear splash recipe prescribes this library
+# rather than the bare platform attributes. See wear/src/main/res/values/themes.xml.
+coreSplashscreen = "1.2.0"
 # Google sign-in, and it is only ever used to PUBLISH a face. Credential Manager
 # rather than the deprecated GoogleSignInClient, which is the path Google now
 # refuses new integrations on. Held at 1.3.0 for the same reason as everything
@@ -62,6 +66,7 @@ androidx-activity = { module = "androidx.activity:activity-ktx", version.ref = "
 androidx-fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
 androidx-lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 androidx-credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 google-id = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }

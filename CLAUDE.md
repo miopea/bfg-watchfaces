@@ -253,6 +253,30 @@ On Google Play (2026-08-29):
   save, never an API commit; and if a human is meant to press the button, do
   the listing FIRST and the release last. Use `--dry-run` to prove Play accepts
   the assets — it stages and then deletes the edit, changing nothing.
+- **Wear branded launch has cost three review cycles. Follow the page, not the
+  attribute list.** The guideline is a 48x48dp circular icon, on black, that
+  "must match the app launcher icon", and Google publishes the exact recipe at
+  `developer.android.com/training/wearables/apps/splash-screen`:
+  `androidx.core:core-splashscreen` (1.0.1+ "for support for default Wear OS
+  dimensions"), a `Theme.SplashScreen` child as the LAUNCH theme on the launcher
+  ACTIVITY, `postSplashScreenTheme` back to the running theme, the icon wrapped
+  in a `layer-list` at an explicit `@dimen/splash_screen_icon_size`, and
+  `installSplashScreen()` before `super.onCreate()`. Three builds were rejected
+  writing those attributes by hand: no theme at all, then the mark on the blush
+  ground instead of black, then `@drawable/ic_launcher_foreground` unsized — the
+  foreground LAYER is `#80475C` line art drawn for a blush ground, so on black it
+  is about 3:1 contrast with no disc, and it is not the launcher icon. Each of
+  the three fixes was a reasonable inference and each cost a cycle.
+- **A policy fix is not verified by looking right on a wrist.** 1030 was loaded
+  on a real Pixel Watch 5 and showed a black splash with the mark on it; Play
+  rejected it anyway, naming that version code. Device verification catches
+  "does it work"; only the published requirement catches "does it comply".
+- **Check which version code a rejection names before theorising.** The policy
+  email says it in as many words ("Version code 1030"), and
+  `edits.tracks.list` says what every track is actually serving. On 2026-09-13
+  those two between them refuted "a stale bundle is still on another track" and
+  "this is enforcement against the older live version" in one API call, before
+  any code was read.
 - **Target age is declared 18 and over**, and the "restrict users Google
   determines to be minors" box is deliberately LEFT OFF — that box would block
   installs, the age declaration alone does not. 18+ keeps the app out of the

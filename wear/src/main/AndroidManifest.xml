@@ -130,10 +130,19 @@
           android:value="0" />
     </service>
 
+    <!--
+      THE LAUNCH THEME GOES HERE, NOT ON <application>.
+
+      This is the activity a person starts, so this is the window whose splash
+      Wear's branded launch is about. Version 1030 set the splash attributes on
+      <application> and nothing on the activity; the launch theme has to be the
+      one the starting window resolves. See res/values/themes.xml.
+    -->
     <activity
         android:name=".WatchActivity"
         android:exported="true"
         android:label="BFG Watch Faces"
+        android:theme="@style/Theme.BfgWatchFaces.Starting"
         android:taskAffinity="">
       <!--
         Opened BY THE PHONE, through RemoteActivityHelper, at the one moment it

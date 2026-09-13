@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The size Wear's branded launch asks for, in the name core-splashscreen reads.
+
+  "48x48dp app icon on a black background" is the literal wording of both the
+  guideline and the rejection, and this is the number. It is 48 rather than 36
+  because our icon IS round: Wear masks every launcher icon to a circle, so the
+  icon may take the whole default space. 36dp is for a non-round icon that needs
+  a background circle drawn behind it.
+-->
+<resources>
+  <dimen name="splash_screen_icon_size">48dp</dimen>
+</resources>

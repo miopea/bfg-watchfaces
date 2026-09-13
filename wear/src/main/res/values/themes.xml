@@ -1,38 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The watch app's theme, and the only reason it exists is the splash screen.
+  The watch app's themes, and the only reason they exist is the splash screen.
 
-  Rejected by Play on 2026-09-08, Wear App Quality Guidelines: "Missing app icon
-  in splash screen". The cause was not a wrong icon — it was that `:wear` had no
-  theme AT ALL. No `<application android:theme>`, no themes.xml, nothing but a
-  Translucent theme on the activation activity. With nothing declared, the
-  launch window had no icon to show and came up bare.
+  ## Three rejections, and what each one actually said
 
-  From Android 12 the system draws the splash itself and reads it from the
-  theme, so the fix is a theme rather than a layout or a library: minSdk here is
-  36, so `androidx.core:core-splashscreen` buys nothing and is not used.
+  Rejected 2026-09-08, Wear App Quality Guidelines: "Missing app icon in splash
+  screen". `:wear` had no theme AT ALL — no <application android:theme>, no
+  themes.xml, nothing but a Translucent theme on the activation activity — so
+  the launch window had no icon to show and came up bare.
 
-  THE BACKGROUND IS BLACK BECAUSE THE GUIDELINE SAYS BLACK. Rejected a second
-  time on 2026-09-10, and the wording is exact: "Your app does not show a
-  48x48dp app icon on a black background during app startup." The first attempt
-  put the mark on @color/ic_launcher_background — the blush the launcher icon
-  uses — because reproducing the launcher icon looked like the coherent choice.
-  It is not a matter of taste: Wear's branded launch specifies black, and a
-  pink ground fails the check however well it matches the icon.
+  Rejected 2026-09-10. The first fix put the mark on @color/ic_launcher_background
+  — the blush the launcher icon uses — because reproducing the launcher icon
+  looked like the coherent choice. The guideline's wording is exact and it is not
+  a matter of taste: BLACK.
 
-  The FOREGROUND layer is named rather than the adaptive `@mipmap/ic_launcher`
-  because the system masks this drawable to a circle and would drop an adaptive
-  icon's background layer, compositing the result over the colour above — the
-  same picture drawn twice with only one of them under our control.
+  Rejected 2026-09-13, against version code 1030, the build that finally had a
+  black background. Two things were wrong and both came from writing these
+  attributes by hand instead of following Google's Wear splash guide:
+
+    1. The icon was @drawable/ic_launcher_foreground — the adaptive icon's
+       FOREGROUND LAYER ONLY. That layer is the mark in #80475C, drawn to sit on
+       a blush ground. On black it is dark plum hairlines at roughly 3:1
+       contrast with no disc behind them. The guideline says the splash icon
+       "must match the app launcher icon", and a launcher icon is both layers.
+    2. Nothing sized it. A drawable handed straight to
+       windowSplashScreenAnimatedIcon is scaled into the system's own slot, so
+       "48x48dp" was never asserted anywhere.
+
+  ## So this is Google's construction, copied
+
+  From the Wear OS splash screen guide: androidx.core:core-splashscreen, a
+  Theme.SplashScreen child as the LAUNCH theme on the launcher activity,
+  postSplashScreenTheme pointing back at the real theme, the icon wrapped in a
+  layer-list at @dimen/splash_screen_icon_size, and installSplashScreen() called
+  before super.onCreate(). The library is used even though minSdk is 36 — the
+  guide calls for 1.0.1 or higher because that is what carries "support for
+  default Wear OS dimensions", which the bare platform attributes do not have.
+
+  The earlier note here argued the opposite: that the library bought nothing
+  above API 31 and that naming the foreground layer avoided drawing the icon's
+  background twice. Both readings were reasonable and both were wrong, and the
+  cost of each was a review cycle. Where this page and a reasonable inference
+  disagree, follow the page.
 
   windowBackground is black because this is a watch and the app's own surface is
   dark: without it the window flashes the platform default between the splash
   and the first Compose frame.
 -->
 <resources>
+  <!-- What the app actually wears, once it is running. -->
   <style name="Theme.BfgWatchFaces" parent="@android:style/Theme.DeviceDefault.NoActionBar">
-    <item name="android:windowSplashScreenBackground">@android:color/black</item>
-    <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
     <item name="android:windowBackground">@android:color/black</item>
+  </style>
+
+  <!--
+    The LAUNCH theme, on WatchActivity only. These three names are the library's
+    own attributes, so they carry no `android:` prefix — prefixing them reads as
+    a typo fix and silently drops the splash back to the platform defaults.
+  -->
+  <style name="Theme.BfgWatchFaces.Starting" parent="Theme.SplashScreen">
+    <item name="windowSplashScreenBackground">@android:color/black</item>
+    <item name="windowSplashScreenAnimatedIcon">@drawable/splash_screen</item>
+    <item name="postSplashScreenTheme">@style/Theme.BfgWatchFaces</item>
   </style>
 </resources>

@@ -19,8 +19,8 @@ android {
         // the phone and watch apps ship as two artefacts under one listing. The
         // scheme is "wear = phone + 1000", so the two never collide and it stays
         // obvious which is which in the console.
-        versionCode = 1030
-        versionName = "1.37"
+        versionCode = 1031
+        versionName = "1.38"
     }
     /**
      * Release signing. Identical to `:mobile`'s and deliberately so: both
@@ -68,6 +68,15 @@ android {
 dependencies {
     implementation(project(":appcore"))
     implementation(libs.androidx.core.ktx)
+    // Wear's branded launch, and NOT optional despite minSdk 36.
+    //
+    // The first two attempts set the platform splash attributes directly and
+    // argued the library "buys nothing above API 31". Google's Wear splash
+    // guide prescribes it anyway, and says 1.0.1+ carries "support for default
+    // Wear OS dimensions" -- a Wear-specific behaviour the bare platform
+    // attributes do not have. Two policy rejections came out of reasoning past
+    // that page instead of following it. See themes.xml.
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity)
     // Explicit, not transitive. activity-ktx drags in fragment 1.1.0, and
     // registerForActivityResult needs 1.3.0+: below that, FragmentActivity does

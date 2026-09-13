@@ -1,5 +1,67 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-13 — The third splash rejection, and reasoning past the page that answers it
+
+Version code 1030 was rejected for "Missing app icon in splash screen" — the
+same guideline that rejected 1029 and, before it, the build that had no theme at
+all. The operator had loaded 1030 on a Pixel Watch 5 and seen a black splash with
+the mark on it. Google still said no.
+
+### What the evidence actually said
+
+Every hypothesis that did not require the fix to be wrong was checked first and
+refuted:
+
+- **A stale bundle on another track.** `edits.tracks.list` showed `production`
+  and `internal` on 81, `wear:production` and `wear:internal` on 1030, nothing
+  else anywhere. No noncompliant artefact was being served.
+- **Enforcement against the older live version.** The policy email names
+  `Version code 1030`. It is the new bundle that failed.
+
+### Two defects, one cause
+
+The guideline says the splash icon "must match the app launcher icon" and is a
+48x48dp circular icon on black. 1030 got both halves wrong:
+
+1. `windowSplashScreenAnimatedIcon` pointed at `@drawable/ic_launcher_foreground`
+   — the adaptive icon's FOREGROUND LAYER alone. That layer is the mark in
+   `#80475C`, drawn to sit on the blush ground; on black it is dark plum
+   hairlines at roughly 3:1 contrast with no disc behind them. A launcher icon
+   is both layers, so it did not match the launcher icon and was barely visible.
+2. Nothing asserted a size. A drawable handed straight to that attribute is
+   scaled into the system's own slot, so "48dp" appeared nowhere in the build.
+
+The cause of both is the same: the attributes were written from first principles
+instead of from Google's Wear splash guide.
+
+### What was rejected, and it was our own earlier reasoning
+
+The previous note in `themes.xml` argued two things, both plausible, both wrong:
+
+- *"minSdk is 36, so `androidx.core:core-splashscreen` buys nothing."* The Wear
+  guide asks for 1.0.1 or higher specifically because that is what carries
+  "support for default Wear OS dimensions". The library is not a compatibility
+  shim here; it is the thing that knows the Wear numbers.
+- *"Name the foreground layer, because the system would drop the adaptive icon's
+  background and composite it over our colour twice."* The layer-list in the
+  guide is what controls that — the icon is drawn once, at a size we state.
+
+### What ships instead
+
+Google's construction, copied rather than re-derived: `core-splashscreen`, a
+`Theme.SplashScreen` child used as the LAUNCH theme on `WatchActivity` only,
+`postSplashScreenTheme` pointing back at the running theme, `@mipmap/ic_launcher`
+wrapped in a `layer-list` at `@dimen/splash_screen_icon_size` = 48dp centred, and
+`installSplashScreen()` before `super.onCreate()`. Shipped as 1.38 / 1031.
+
+### The rule this leaves behind
+
+Where a Google quality guideline and a reasonable inference disagree, follow the
+guideline. Both earlier fixes were defensible and each cost a review cycle;
+neither was checked against the page that defines the requirement. And a fix for
+a policy rejection is not verified by the fix looking right on a wrist — 1030
+looked right on a wrist. It is verified by matching the published recipe.
+
 ## 2026-09-03 — A default on a font family is a bug generator; both previews lost one
 
 Two defects reported in one email, and they turned out to be the same mistake
