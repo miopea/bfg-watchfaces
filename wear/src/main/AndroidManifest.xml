@@ -37,6 +37,37 @@
     route to the one irreversible question. Without this permission `notify` is
     a silent no-op and the ask simply never happens.
   -->
+  <!--
+    WITHOUT THIS THE SLOT PICKER CAN ONLY OFFER OUR OWN COMPLICATION.
+
+    From Android 11 a package is invisible to queryIntentServices unless it is
+    declared here, and NEITHER launcher activities NOR services for a custom
+    action are automatically visible. minSdk is 36, so the filtering is fully
+    in force and ProviderCatalog was querying into a room with one thing in it.
+
+    The symptom is confusing because it looks device-specific: a bare EMULATOR
+    reported 37 providers, a real Pixel Watch 5 reported exactly one — ours. The
+    difference is not the query, it is what counts as automatically visible.
+    An emulator's apps are preinstalled system packages, which are; Fitbit and
+    anything else that arrives through Play is not. Reported by the operator on
+    2026-09-19 as "I don't see any of the Google health options", and the reason
+    he could not see them is that the watch app could not either.
+
+    The MAIN/LAUNCHER intent is here for the same reason. `launchable()` appears
+    to work today, but only because the apps it happens to find — Play services,
+    the Play Store, the media app — are system packages. Anything installed by a
+    person was already invisible to it, silently.
+  -->
+  <queries>
+    <intent>
+      <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+    </intent>
+    <intent>
+      <action android:name="android.intent.action.MAIN" />
+      <category android:name="android.intent.category.LAUNCHER" />
+    </intent>
+  </queries>
+
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
   <uses-permission android:name="com.google.wear.permission.PUSH_WATCH_FACES" />
