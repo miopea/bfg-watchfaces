@@ -161,7 +161,8 @@
     "Ykxo",
     "zipalign",
     "zygote",
-    "unsendable"
+    "unsendable",
+    "plannable"
   ],
   "flagWords": [],
   "minWordLength": 4

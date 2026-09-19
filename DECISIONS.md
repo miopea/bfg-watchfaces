@@ -1,5 +1,52 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-19 — The Data Layer transport stays wrist-first, and that is a decision rather than a gap
+
+Everything between "the bytes left the phone" and "the face is on the watch" —
+`ChannelClient`, `receiveFile`, the Data Layer path and the DWF receiver — has
+no test that can run on this host, and it is now agreed it never will. First run
+is on a wrist, every time, deliberately.
+
+### Why the alternatives were rejected
+
+**Waiting for a KVM host.** This box cannot run an Android emulator at all:
+`/dev/kvm` is unreachable, gid 993 unmapped, and the fix needs root. The ticket
+sat blocked on that for weeks and the condition is a static property of the
+machine, not something that decays toward resolution.
+
+**An emulator pair would not have settled it anyway**, which is the part worth
+keeping. A face installed on a Wear EMULATOR appears in the carousel; the same
+package sideloaded onto a real Pixel Watch 5 never does, because a face is only
+a face once the DWF receiver installs it into a slot. The emulator proved a path
+that does not generalise — recorded 2026-09-03 and unchanged. So the thing the
+hold was waiting for would have bought a weaker signal than the one already
+available.
+
+**Faking a seam**, the way `InstallPlan` lifted the install DECISIONS into pure
+functions in `:appcore`. That worked because the decisions were decisions. The
+predecessor ticket found this layer REACTIVE rather than plannable: there is no
+obvious point where the transport chooses anything, so there may be no seam to
+fake, and finding that out costs days.
+
+### What this actually costs, stated plainly
+
+A transport regression is seen first by a person, not by a test. That is a real
+cost and it is accepted rather than waved away.
+
+Two things make it survivable. `BfgFaceSender` logs every stage with the sizes
+and the watch's own verdict, and on 2026-09-18 that log was enough to take a
+field failure apart over an adb bridge in one session. What was NOT enough was
+the phone's user-facing message: `ours()` reduces a precise Xerces error to
+"something went wrong on our end", which is why that session needed a tunnel to
+a phone rather than a screenshot. **The mitigation for wrist-first testing is
+therefore not more tests, it is that a failure must describe itself** — filed
+separately.
+
+### What was NOT decided
+
+Nothing about the operator's laptop. That is their machine and it is
+environmental; the standing rule holds.
+
 ## 2026-09-18 — Black text made a face unsendable, and the validator is only the XSD
 
 Reported from the shipped 1.80 build: pull in a community face, save it, change
