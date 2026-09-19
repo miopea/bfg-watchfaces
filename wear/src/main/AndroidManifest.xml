@@ -115,6 +115,31 @@
         <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
         <data android:scheme="wear" android:host="*" android:pathPrefix="/bfg-watchfaces" />
       </intent-filter>
+      <!--
+        WITHOUT THIS, onMessageReceived IS NEVER CALLED. A
+        WearableListenerService only receives the event types its filter
+        DECLARES, and this one declared CHANNEL_EVENT alone — so the class had
+        an onMessageReceived override that the system had no reason to invoke.
+
+        Two things were broken by it, and only the second was noticed:
+
+        "Note from your phone" has never worked. NoteSender sends the note on
+        MessageClient, which is fire-and-forget, so the phone reported success
+        every time and the watch was never told. That is the same shape as the
+        transfer bug in DECISIONS.md 2026-08-30 — an API that reports success
+        for delivery it cannot see.
+
+        And the catalog request added on 2026-09-19 went nowhere, which is what
+        finally surfaced it: the operator updated both apps, opened the picker,
+        and the list still did not change.
+
+        The pathPrefix covers both — /bfg-watchfaces/note and
+        /bfg-watchfaces/catalog — so nothing here needs to know the paths.
+      -->
+      <intent-filter>
+        <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+        <data android:scheme="wear" android:host="*" android:pathPrefix="/bfg-watchfaces" />
+      </intent-filter>
     </service>
 
     <!--
