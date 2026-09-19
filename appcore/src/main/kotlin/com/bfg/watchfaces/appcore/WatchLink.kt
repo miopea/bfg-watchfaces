@@ -73,6 +73,38 @@ object WatchLink {
     const val NOTE_PATH = "/bfg-watchfaces/note"
 
     /**
+     * ASKING the watch what complications it has, without sending a face.
+     *
+     * The catalog has always ridden back on a successful send, which was the
+     * cheap thing to do and is genuinely fine for freshness — an app installed
+     * since the last send is one send away from appearing. What it is not fine
+     * for is DISCOVERY: the operator updated both apps to pick up a package
+     * visibility fix on 2026-09-19, opened the picker, and saw the same list,
+     * because nothing had asked the watch since. Nobody would guess that
+     * sending an unrelated face is how you refresh a list of complications.
+     *
+     * So the picker asks, on open. A message rather than a channel for the same
+     * reason [NOTE_PATH] is one: the question is empty and the answer is a few
+     * kilobytes of JSON.
+     */
+    const val CATALOG_REQUEST_PATH = "/bfg-watchfaces/catalog"
+
+    /** The watch's answer to [CATALOG_REQUEST_PATH]. */
+    const val CATALOG_REPLY_PATH = "/bfg-watchfaces/catalog-reply"
+
+    /**
+     * The two catalogs as one payload: providers, then launchable apps.
+     *
+     * Deliberately the SAME shape as the lines that follow a send's verdict, so
+     * there is one encoding of "what this watch has" rather than two that can
+     * drift. [Report.catalogIn] and [Report.launchersIn] read those by index
+     * after a verdict, so this prepends an empty verdict line and they work
+     * unchanged.
+     */
+    fun catalogReply(providers: String, launchers: String): String =
+        Report.SEPARATOR + providers + Report.SEPARATOR + launchers
+
+    /**
      * The token from a channel path, or null when the path is not one of ours.
      *
      * Undoes [channelPathFor]'s encoding. A segment that is not valid URL-safe

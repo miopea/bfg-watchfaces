@@ -104,7 +104,27 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 
+// A TEST HARNESS FOR :mobile, which had none.
+//
+// src/test existed and was empty, and the module declared no test
+// dependencies, so everything here was unverifiable by construction. That is
+// not a neutral gap: on 2026-09-18 a shipped build could not send any face
+// with dark text, and on 2026-09-19 the complication picker's tail had no
+// order — both decided in this module, neither catchable without a device.
+//
+// This does NOT make Compose testable, and is not trying to. It makes the
+// PURE things here testable — which source sits under which heading, what a
+// failure report says — and those are the ones that decide what a person sees.
+// Anything genuinely Android still belongs in :appcore where it can be pure.
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+    testLogging { events("passed", "failed", "skipped") }
+}
+
 dependencies {
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+
     implementation(project(":generator"))
     implementation(project(":appcore"))
 

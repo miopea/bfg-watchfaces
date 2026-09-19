@@ -729,15 +729,38 @@ private fun SlotPicker(
                         HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     }
                     val ctx = LocalContext.current
-                    val fromWatch = ProviderCache.load(ctx)
-                    val openable = ProviderCache.launchers(ctx)
-                    for ((heading, group) in listOf(
-                        null to Presentation.PICKER_COMMON,
+                    // ASK THE WATCH, on open.
+                    //
+                    // ProviderCache is filled by a successful send, which keeps
+                    // the list fresh and is hopeless for DISCOVERING it: the
+                    // operator updated both apps for a package-visibility fix,
+                    // opened this sheet and saw the same entries, because
+                    // nothing had asked the watch in between. Nobody would
+                    // guess that sending an unrelated face is how you refresh a
+                    // list of complications.
+                    //
+                    // Keyed on Unit so it runs once per opening of the sheet.
+                    // Nothing waits on it: the list below renders from the
+                    // cache immediately and grows if the watch answers, so a
+                    // watch charging in another room costs nothing but
+                    // freshness.
+                    var refreshed by remember { mutableStateOf(0) }
+                    LaunchedEffect(Unit) {
+                        if (WatchProviders.refresh(ctx)) refreshed++
+                    }
+                    val fromWatch = remember(refreshed) { ProviderCache.load(ctx) }
+                    val openable = remember(refreshed) { ProviderCache.launchers(ctx) }
+                    for ((heading, group) in buildList {
+                        add(null to Presentation.PICKER_COMMON)
                         // Shortcuts open something when pressed rather than
                         // showing a reading, so they read better apart.
-                        "Tap to open" to Presentation.PICKER_SHORTCUTS,
-                        "More" to Presentation.PICKER_REST
-                    )) {
+                        add("Tap to open" to Presentation.PICKER_SHORTCUTS)
+                        // The tail, by kind rather than by the order things
+                        // were added to the enum. See Presentation.SourceGroup.
+                        Presentation.PICKER_GROUPED.forEach { (g, sources) ->
+                            add(g.heading to sources)
+                        }
+                    }) {
                         if (heading != null) {
                             HorizontalDivider(Modifier.padding(vertical = 8.dp))
                             Text(

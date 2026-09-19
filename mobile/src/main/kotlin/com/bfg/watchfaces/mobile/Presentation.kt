@@ -175,13 +175,114 @@ object Presentation {
         ComplicationSource.WATCH_BATTERY
     )
 
-    /** Everything else, in the enum's own order. */
     /** The tappable shortcuts, grouped so they read as buttons not readings. */
     val PICKER_SHORTCUTS: List<ComplicationSource> =
         ComplicationSource.entries.filter { it.isShortcut }
 
-    val PICKER_REST: List<ComplicationSource> =
-        ComplicationSource.entries.filter { it !in PICKER_COMMON && !it.isShortcut }
+    /**
+     * What KIND of thing a source is, for the part of the picker below the
+     * curated six.
+     *
+     * ## Why this exists
+     *
+     * That tail used to be "everything else, in the enum's own order" — which
+     * is the order things were ADDED to `ComplicationSource` over months, and
+     * carries no meaning to anyone who has not read the file. Reported as
+     * "the complications options seem a bit disorganized" on 2026-09-19, and
+     * it was: the six at the top read deliberately, then the list stopped
+     * meaning anything.
+     *
+     * It also stops being a small problem. Until the watch could see other
+     * apps' providers, this tail was about fourteen entries; a bare emulator
+     * reports thirty-seven.
+     *
+     * ## Why it is a group and not a sort
+     *
+     * Alphabetical was the other candidate and was rejected for the reason the
+     * curated six exist at all: it puts unrelated things beside each other, so
+     * "Battery" lands between two weather readings. Kinds keep the answer to
+     * "what sort of thing am I looking for" in one place on the screen.
+     *
+     * ## Presentation, deliberately
+     *
+     * This is a second table of words about an enum `:generator` owns, and this
+     * repo has been bitten by exactly that — `OneVocabularyTest` exists because
+     * a duplicate label table let the phone's picker and the watch's editor
+     * disagree. So a group carries NO name for the source: it only says which
+     * heading it sits under. The source's own name still comes from
+     * [Complications.label], in one place.
+     */
+    enum class SourceGroup(val heading: String) {
+        BODY("Body"),
+        ACTIVITY("Weather and outdoors"),
+        TIME("Time and date"),
+        DEVICE("Your watch"),
+        APPS("Apps and people")
+    }
+
+    /**
+     * Which heading a source sits under.
+     *
+     * A `when` over the enum on purpose rather than a map: adding a source to
+     * `:generator` then fails to compile here, instead of silently landing in
+     * whatever bucket a `getOrDefault` chose. The picker showing everything is
+     * the property worth defending — a source nobody can find is a source that
+     * does not exist.
+     */
+    fun groupOf(source: ComplicationSource): SourceGroup = when (source) {
+        ComplicationSource.HEART_RATE -> SourceGroup.BODY
+
+        ComplicationSource.STEP_COUNT,
+        ComplicationSource.SUNRISE_SUNSET,
+        ComplicationSource.WEATHER_TEMPERATURE,
+        ComplicationSource.WEATHER_CONDITION,
+        ComplicationSource.WEATHER_TEMP_CONDITION,
+        ComplicationSource.WEATHER_HIGH_LOW,
+        ComplicationSource.WEATHER_RAIN,
+        ComplicationSource.WEATHER_LATER,
+        ComplicationSource.WEATHER_TOMORROW,
+        ComplicationSource.WEATHER_TOMORROW_SKY,
+        ComplicationSource.WEATHER_UV -> SourceGroup.ACTIVITY
+
+        ComplicationSource.DAY_AND_DATE,
+        ComplicationSource.TIME_AND_DATE,
+        ComplicationSource.DATE,
+        ComplicationSource.DAY_OF_WEEK,
+        ComplicationSource.WORLD_CLOCK,
+        ComplicationSource.NEXT_EVENT -> SourceGroup.TIME
+
+        ComplicationSource.WATCH_BATTERY,
+        ComplicationSource.UNREAD_NOTIFICATION_COUNT,
+        ComplicationSource.NONE -> SourceGroup.DEVICE
+
+        ComplicationSource.APP_SHORTCUT,
+        ComplicationSource.FAVORITE_CONTACT -> SourceGroup.APPS
+
+        // Shortcuts have their own section above and never reach this tail.
+        // Named rather than caught by an else, so adding one still fails here
+        // if the section above ever stops covering them.
+        ComplicationSource.SHORTCUT_MUSIC,
+        ComplicationSource.SHORTCUT_ALARM,
+        ComplicationSource.SHORTCUT_SETTINGS,
+        ComplicationSource.SHORTCUT_PHONE,
+        ComplicationSource.SHORTCUT_CALENDAR,
+        ComplicationSource.SHORTCUT_MESSAGES,
+        ComplicationSource.SHORTCUT_APP -> SourceGroup.APPS
+    }
+
+    /**
+     * The tail, as headed sections in a fixed order.
+     *
+     * Empty groups are dropped rather than drawn as a heading with nothing
+     * under it — which is what would happen today if every weather source were
+     * curated into the top six.
+     */
+    val PICKER_GROUPED: List<Pair<SourceGroup, List<ComplicationSource>>> =
+        SourceGroup.entries.map { group ->
+            group to ComplicationSource.entries.filter {
+                it !in PICKER_COMMON && !it.isShortcut && groupOf(it) == group
+            }
+        }.filter { (_, sources) -> sources.isNotEmpty() }
 
     /**
      * Slot labels are NOT here either. They are [Complications.slotLabel].

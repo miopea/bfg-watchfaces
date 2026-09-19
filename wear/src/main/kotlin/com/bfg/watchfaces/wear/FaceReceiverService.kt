@@ -64,6 +64,18 @@ class FaceReceiverService : WearableListenerService() {
      * arrive at an unpredictable time or look like it never arrived.
      */
     override fun onMessageReceived(event: com.google.android.gms.wearable.MessageEvent) {
+        // ASKED DIRECTLY, rather than told as a side effect of a send.
+        //
+        // The catalog still rides back on every successful send and that is
+        // unchanged. This exists because a send is a terrible way to DISCOVER
+        // the list: the operator updated both apps to pick up a package
+        // visibility fix on 2026-09-19, opened the picker, and saw the same
+        // entries, because nothing had asked the watch since. Nobody would
+        // guess that sending an unrelated face is how you refresh it.
+        if (event.path == WatchLink.CATALOG_REQUEST_PATH) {
+            answerCatalog(event.sourceNodeId)
+            return
+        }
         if (event.path != WatchLink.NOTE_PATH) {
             super.onMessageReceived(event)
             return
@@ -72,6 +84,33 @@ class FaceReceiverService : WearableListenerService() {
         val stored = PhoneNote.save(applicationContext.filesDir, text)
         Log.i(TAG, if (stored.isEmpty()) "note cleared" else "note set (${stored.length} chars)")
         PhoneNoteService.notifyChanged(applicationContext)
+    }
+
+    /**
+     * Send back what this watch can see, to whoever asked.
+     *
+     * Built from the same two [ProviderCatalog] calls a send reports with, and
+     * encoded by the same [WatchLink.catalogReply] the phone parses with its
+     * send-report readers — one encoding of "what this watch has", not two
+     * that can drift.
+     *
+     * Failures are logged and dropped rather than retried. The phone treats a
+     * silent watch as "keep what you had", which is the honest outcome: the
+     * cached list is stale rather than wrong, and a picker that refuses to
+     * open because a watch is charging in another room would be worse than one
+     * showing last week's answer.
+     */
+    private fun answerCatalog(nodeId: String) {
+        val payload = WatchLink.catalogReply(
+            ProviderCatalog.toJson(ProviderCatalog.installed(this)),
+            ProviderCatalog.toJson(ProviderCatalog.launchable(this))
+        )
+        Log.i(TAG, "catalog asked for by $nodeId; answering with ${payload.length} chars")
+        runCatching {
+            Wearable.getMessageClient(this).sendMessage(
+                nodeId, WatchLink.CATALOG_REPLY_PATH, payload.toByteArray(Charsets.UTF_8)
+            )
+        }.onFailure { Log.w(TAG, "could not answer the catalog request", it) }
     }
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
