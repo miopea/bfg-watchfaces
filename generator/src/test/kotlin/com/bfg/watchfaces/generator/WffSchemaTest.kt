@@ -965,4 +965,85 @@ class ComplicationSchemaTest {
         }
     }
 
+    /**
+     * A DARK INK MUST NOT MAKE A FACE UNSENDABLE.
+     *
+     * ## The bug this exists for
+     *
+     * Reported from a shipped build on 2026-09-18: a community face was saved,
+     * the ink was changed to black, and every send from then on failed with
+     * "something went wrong on our end". Google's on-device validator — which
+     * is nothing but an XSD 1.1 check — was rejecting the face, so it never
+     * reached the watch at all.
+     *
+     * From v3 a dark ink is lifted for ambient, and that lift is emitted as
+     * `<Variant mode="AMBIENT" target="color">`. The complication path puts it
+     * on the `PartText`, which is legal. The DRAWN path — weather — put the
+     * same string inside `<Font>`, which is not:
+     *
+     *     cvc-complex-type.2.4.a: Invalid content was found starting with
+     *     element 'Variant'. One of '{Shadow, Outline, OutGlow, Underline,
+     *     StrikeThrough, InlineImage, Template, Upper, Lower}' is expected.
+     *
+     * The element is only emitted when `inkNeedsLift` is true, so every test
+     * and every preset passed: they all used a light ink. The face was
+     * schema-valid until somebody chose black, and then it was silently
+     * unsendable forever.
+     *
+     * ## Why it sweeps the ink rather than testing black
+     *
+     * "Black" is not the condition — `relativeLuminance < MIN_LUMINANCE` is,
+     * and that catches `#333333` just as surely as `#000000`. Testing one
+     * colour would pin the symptom and leave the rule untested.
+     */
+    @Test
+    fun `a dark ink emits schema-valid WFF, in every slot and at every version`() {
+        val inks = listOf("#000000", "#111111", "#1C181A", "#333333", "#4A4A4A", "#FCF9F1")
+        val failures = mutableListOf<String>()
+        for (ink in inks) {
+            val lifted = AmbientPalette.relativeLuminance(ink) < AmbientPalette.MIN_LUMINANCE
+            // Both sides of WeatherFallback.SINCE_VERSION: below it the drawn
+            // text is emitted bare, at or above it the same text is wrapped in
+            // a Condition with a second copy in the Default branch. The bug was
+            // in both, and only the wrapped one is reachable on a new face.
+            for (version in listOf(WeatherFallback.SINCE_VERSION - 1, CURRENT_GENERATOR_VERSION)) {
+                for (source in ComplicationSource.entries) {
+                    for (pos in SlotPosition.entries) {
+                        val p = DialParams(generatorVersion = version, inkColor = ink)
+                            .withSlot(pos, source)
+                        val errors = validate(WffEmitter.emit(p, "Dark"))
+                        if (errors.isNotEmpty()) {
+                            failures += "ink=$ink lifted=$lifted v$version $pos=$source -> ${errors.first()}"
+                        }
+                    }
+                }
+            }
+        }
+        assertTrue(failures.isEmpty()) {
+            "${failures.size} dark-ink combinations emit invalid WFF:\n" +
+                failures.take(5).joinToString("\n")
+        }
+    }
+
+    /**
+     * The ambient colour lift is emitted where the SCHEMA allows it.
+     *
+     * A companion to the sweep above, and the reason it is separate: the sweep
+     * proves the document validates, this proves WHY. `<Font>` is the parent
+     * the bug chose, and a future edit that moves the variant back into it
+     * should fail with a sentence that says so rather than with a line number
+     * out of Xerces.
+     */
+    @Test
+    fun `the ambient colour variant is never a child of Font`() {
+        for (pos in SlotPosition.entries) {
+            val p = DialParams(inkColor = "#000000").withSlot(pos, ComplicationSource.WEATHER_TEMP_CONDITION)
+            val xml = WffEmitter.emit(p, "Dark")
+            val offending = Regex("""<Font[^>]*>\s*<Variant""").find(xml)
+            assertTrue(offending == null) {
+                "a <Variant> is emitted inside <Font> for $pos, which the schema forbids: " +
+                    "it belongs on the PartText, as the complication path already does"
+            }
+        }
+    }
 }

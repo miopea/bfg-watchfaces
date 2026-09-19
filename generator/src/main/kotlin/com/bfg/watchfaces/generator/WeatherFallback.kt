@@ -106,9 +106,9 @@ object WeatherFallback {
       </Compare>
       <Default>
         <PartText x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" alpha="255">
-          <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
+          <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>$ambientColorVariant
           <Text align="CENTER">
-            <Font family="$family" size="$fontSize" color="$ink">$ambientColorVariant$PLACEHOLDER</Font>
+            <Font family="$family" size="$fontSize" color="$ink">$PLACEHOLDER</Font>
           </Text>
         </PartText>
       </Default>

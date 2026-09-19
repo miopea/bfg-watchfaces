@@ -593,11 +593,25 @@ ${handPair("MinuteHand", "hand_minute")}$second
         // which ships two TimeText elements. So the only way its ambient colour
         // can differ is a colour Variant.
         //
-        // Schema-valid -- verified against Google's XSD, and asserted by a test.
-        // RUNTIME support is NOT verified: no face from this repo has been
-        // confirmed on a watch yet. If the runtime ignores an unknown Variant
-        // target, this degrades to the previous behaviour rather than to
-        // something worse. Confirm it during the first hardware test.
+        // WHERE THIS STRING IS INTERPOLATED IS THE WHOLE PROBLEM. It is a
+        // legal child of PartText and an ILLEGAL child of Font, and it is
+        // pasted into both by callers below.
+        //
+        // The comment here used to say "schema-valid -- verified against
+        // Google's XSD, and asserted by a test", and that was true of the
+        // complication path and false of the drawn one, which put it inside
+        // <Font>. Nothing caught it because the element is only emitted when
+        // inkNeedsLift is true: every preset, every catalog face and every test
+        // used a light ink, so the face was valid right up until somebody chose
+        // black. Then Google's validator refused it and the app could only say
+        // "something went wrong on our end" -- measured on a shipped 1.80 build
+        // on 2026-09-18. See ComplicationSchemaTest, which now sweeps a dark
+        // ink across every source, slot and version.
+        //
+        // RUNTIME support is still NOT verified: a face from this repo renders
+        // on a watch, but nothing has confirmed the watch HONOURS a colour
+        // Variant on a PartText. If it ignores it, this degrades to the
+        // previous look rather than to something worse.
         val ambientColorVariant =
             if (p.generatorVersion >= 3 && inkNeedsLift)
                 "\n          <Variant mode=\"AMBIENT\" target=\"color\" value=\"$inkDim\"/>"
@@ -669,9 +683,9 @@ ${handPair("MinuteHand", "hand_minute")}$second
                 val face = FaceFont.of(l.fontFamily).wff
                 val text = """
     <PartText x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" alpha="255">
-      <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
+      <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>$ambientColorVariant
       <Text align="CENTER">
-        <Font family="$face" size="${drawn.fontSize}" color="$ink">$ambientColorVariant
+        <Font family="$face" size="${drawn.fontSize}" color="$ink">
           <Template><![CDATA[${drawn.format}]]>${drawn.expressions.joinToString("") { """<Parameter expression="$it"/>""" }}</Template>
         </Font>
       </Text>

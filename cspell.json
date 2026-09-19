@@ -160,7 +160,8 @@
     "xmltree",
     "Ykxo",
     "zipalign",
-    "zygote"
+    "zygote",
+    "unsendable"
   ],
   "flagWords": [],
   "minWordLength": 4

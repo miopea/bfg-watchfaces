@@ -86,6 +86,24 @@ keyed on `generatorVersion` and leave older branches untouched.
 signs, installs — and then silently never appears in the carousel. There is no
 runtime error. That test is the only signal you get.
 
+**`WffSchemaTest` IS the device gate, not an approximation of it.** Google's
+on-device check — the one `FaceBuilder.validate` runs, which reports "Watch Face
+Format validator run / The content of the watchface definition files does not
+match the Watch Face Format specification" — is NOTHING BUT an XSD 1.1
+validation. Read it in `google/watchface`,
+`third_party/wff/specification/validator`: the whole of
+`WatchFaceXmlValidator.validate` is a `SchemaFactory` for XSD 1.1, a `newSchema`
+and a `validate`, and the device throws the line number away.
+
+So anything that test misses, it missed because of the INPUTS it was given —
+never because the device checks more. On 2026-09-18 a shipped face was
+unsendable for exactly that reason: the emitter put a `<Variant>` inside
+`<Font>`, which is illegal, but only when the ink is dark enough to need an
+ambient lift, and every preset, catalog face and test used a light ink. **When
+you add a branch keyed on a PARAMETER, sweep that parameter — one more example
+in the middle of the range proves nothing about the edge that has its own
+code.** See `DECISIONS.md` 2026-09-18.
+
 **Do not add AGP to the watch face APK build.** Gradle injects `kotlin/` and
 `DebugProbesKt.bin`, which Play accepts but Watch Face Push rejects.
 `watchface-template/build.sh` uses aapt2 directly for this reason and asserts

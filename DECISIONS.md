@@ -1,5 +1,70 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-18 — Black text made a face unsendable, and the validator is only the XSD
+
+Reported from the shipped 1.80 build: pull in a community face, save it, change
+the text to black, and every send from then on fails with "something went wrong
+on our end". Reproduced on the operator's Pixel 11 Pro XL over the adb bridge.
+
+### The defect
+
+From v3 a dark ink is lifted for ambient so it clears a contrast floor against
+black, and the lift is emitted as `<Variant mode="AMBIENT" target="color">`.
+One string, `ambientColorVariant`, is interpolated by two callers:
+
+- the COMPLICATION path put it on the `PartText` — legal;
+- the DRAWN path (weather) put it inside `<Font>` — **not legal**:
+
+```text
+cvc-complex-type.2.4.a: Invalid content was found starting with element
+'Variant'. One of '{Shadow, Outline, OutGlow, Underline, StrikeThrough,
+InlineImage, Template, Upper, Lower}' is expected.
+```
+
+`WeatherFallback.wrap` repeated the same mistake in its `Default` branch, so a
+face at v14 emitted two invalid elements and the same face at v13 emitted one.
+
+It is fixed by moving the variant onto the `PartText`, where the complication
+path already had it. No geometry changed and no version was bumped: a face this
+affected could never be installed at all, so there is no stored face whose
+appearance this alters.
+
+### Why nothing caught it
+
+The element is only emitted when `inkNeedsLift` is true, and **every preset,
+every catalog face and every test used a light ink**. The condition is not
+"black" but `relativeLuminance < 0.175`, which `#333333` meets as surely as
+`#000000`. The face was schema-valid right up until somebody chose a dark text
+colour, and then it was silently unsendable forever.
+
+The comment above the emission said "schema-valid — verified against Google's
+XSD, and asserted by a test". That was true of the path it was written for and
+false of the one beside it.
+
+### The fact worth keeping
+
+**Google's on-device check is NOTHING BUT an XSD 1.1 validation.** Read from
+`google/watchface`, `third_party/wff/specification/validator` — the whole of
+`WatchFaceXmlValidator.validate` is `SchemaFactory.newInstance(XSD 1.1)`, a
+`newSchema`, and a `validate`. The failure it reports, "Watch Face Format
+validator run / The content of the watchface definition files does not match the
+Watch Face Format specification", is a schema error with the line number thrown
+away.
+
+So `WffSchemaTest` is not an approximation of the device gate — it IS the device
+gate, and anything it misses it missed because of the INPUTS it was given, never
+because the device checks more. A sweep is worth more here than another example.
+
+### What was rejected
+
+Bisecting on the device found the answer, but six wrong theories were eliminated
+first — the save path, the generatorVersion stamp, the name/slug, the complication
+size, the typeface and process state — each by an A/B send rather than by
+argument. That was the right method and it was slow because the app throws the
+cause away: `ours()` reduces a precise Xerces error to one sentence with no
+detail and no way to report it. Surfacing the real reason is filed separately;
+it is the reason this took a bridge to a phone rather than a screenshot.
+
 ## 2026-09-13 — The third splash rejection, and reasoning past the page that answers it
 
 Version code 1030 was rejected for "Missing app icon in splash screen" — the
