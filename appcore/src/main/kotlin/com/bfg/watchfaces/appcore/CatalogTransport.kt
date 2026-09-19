@@ -2,7 +2,7 @@ package com.bfg.watchfaces.appcore
 
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
 
 /**
  * THE SEAM.
@@ -61,8 +61,29 @@ class HttpTransport(
         body: String?,
         bearer: String?
     ): CatalogTransport.Reply {
+        // URI.create, not the deprecated URL(String) — and the STRICTNESS is
+        // the reason to welcome the change rather than merely tolerate it.
+        //
+        // The old constructor parsed leniently and would happily build a URL
+        // from a string containing a space or a control character. Most of
+        // what is interpolated into these addresses is a slug that arrived
+        // FROM THE CATALOG, so lenient parsing meant a server could put
+        // characters into a path this app then requested. URI.create refuses
+        // them here, before anything is sent.
+        //
+        // Both failures below become Unreachable so callers are unchanged: a
+        // gallery read still falls back to the cached index rather than
+        // throwing something new at a screen. But the MESSAGES are kept apart,
+        // because "that is not an address" and "that address would not open"
+        // send an investigation to different places, and Unreachable's own
+        // documentation promises it means the latter.
+        val target = try {
+            URI.create(url).toURL()
+        } catch (e: Exception) {
+            throw CatalogTransport.Unreachable("not a usable address: $url", e)
+        }
         val connection = try {
-            (URL(url).openConnection() as HttpURLConnection)
+            (target.openConnection() as HttpURLConnection)
         } catch (e: Exception) {
             throw CatalogTransport.Unreachable("could not open $url", e)
         }
