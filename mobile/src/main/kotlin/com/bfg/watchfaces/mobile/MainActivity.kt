@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.bfg.watchfaces.appcore.ActivationConsent
 import com.bfg.watchfaces.appcore.WatchLink
+import com.bfg.watchfaces.appcore.FailureReport
 import com.bfg.watchfaces.appcore.FaceLibrary
 import com.bfg.watchfaces.appcore.FaceCodec
 import com.bfg.watchfaces.appcore.Json
@@ -257,12 +258,22 @@ class MainActivity : ComponentActivity() {
                 var picking by remember { mutableStateOf(false) }
                 var pickingDial by remember { mutableStateOf(true) }
                 var naming by remember { mutableStateOf(false) }
+                /**
+                 * The cause of the last failure, while its sheet is open.
+                 *
+                 * Held here rather than inside the send coroutine because the
+                 * snackbar that offers it has already been dismissed by the
+                 * time the sheet opens, and a sheet owned by a finished
+                 * coroutine dies with it.
+                 */
+                var failureDetail by remember { mutableStateOf<String?>(null) }
                 val tuneState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
                 // Opens fully rather than half: the hex field and the buttons sit below the
                 // pad, and at the partial height they were off screen with no hint that
                 // scrolling would reach them.
                 val colorState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                 val nameState = rememberModalBottomSheetState()
+                val failureState = rememberModalBottomSheetState()
 
                 /**
                  * Send [name], explaining the flow the first time only.
@@ -323,13 +334,27 @@ class MainActivity : ComponentActivity() {
                         // instruction. Google's guidance is to OFFER the
                         // install; this app used to say "install it and try
                         // again", which is a sentence, not a fix.
+                        // ONE action slot, so the two contenders are ranked.
+                        // A missing watch app gets it first because that action
+                        // is a FIX -- Google's guidance is to offer the install,
+                        // and this app used to say "install it and try again",
+                        // which is a sentence, not a fix. "What went wrong?"
+                        // takes the slot only when there is nothing to fix,
+                        // which is exactly the case that used to be a dead end.
+                        val offeringInstall = report.offerWatchInstall
+                        val offeringDetail = !offeringInstall && report.detail != null
                         val result = snackbar.showSnackbar(
                             report.message,
-                            actionLabel = if (report.offerWatchInstall) "Install on watch" else null,
+                            actionLabel = when {
+                                offeringInstall -> "Install on watch"
+                                offeringDetail -> "What went wrong?"
+                                else -> null
+                            },
                             duration = SnackbarDuration.Long
                         )
                         if (result == SnackbarResult.ActionPerformed) {
-                            WatchAppInstall.openListingOnWatch(context) { ok ->
+                            if (offeringDetail) failureDetail = report.detail
+                            else WatchAppInstall.openListingOnWatch(context) { ok ->
                                 scope.launch {
                                     snackbar.showSnackbar(
                                         if (ok) "Opened the Play Store on your watch. Install it there, then send again."
@@ -572,6 +597,13 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+                failureDetail?.let { detail ->
+                    FailureSheet(
+                        detail = detail,
+                        sheetState = failureState,
+                        onDismiss = { failureDetail = null }
+                    )
+                }
                 if (naming) {
                     NameSheet(
                         existing = { FaceStorage.existing(context, it) },
@@ -736,8 +768,38 @@ class MainActivity : ComponentActivity() {
          * learned that lesson once, when "landed" was derived from the wording
          * and two different outcomes shared a sentence shape.
          */
-        val offerWatchInstall: Boolean = false
+        val offerWatchInstall: Boolean = false,
+        /**
+         * The technical cause, for [FailureSheet], or null when there is none
+         * worth showing.
+         *
+         * Deliberately NOT folded into [message]. The sentence is for the
+         * person whose face did not send; this is for the person willing to
+         * help find out why, and they are usually the same person in a
+         * different mood five seconds later.
+         */
+        val detail: String? = null
     )
+
+    /**
+     * The Android half of a failure report: the version and the throwable.
+     *
+     * The WORDS and their order live in [FailureReport] in `:appcore`, where
+     * they are tested. This gathers the two things only a running app knows —
+     * which build this is, and what was thrown — and hands them over.
+     */
+    private fun cause(
+        context: android.content.Context,
+        stage: FailureReport.Stage,
+        name: String,
+        t: Throwable
+    ): String {
+        val version = runCatching {
+            val info = context.packageManager.getPackageInfo(context.packageName, 0)
+            "${info.versionName} (${info.longVersionCode})"
+        }.getOrDefault("unknown version")
+        return FailureReport.text(version, stage, name, t::class.simpleName.orEmpty(), t.message)
+    }
 
     private fun buildThenSend(
         context: android.content.Context,
@@ -751,7 +813,8 @@ class MainActivity : ComponentActivity() {
         val built = runCatching { FaceBuilder.build(context, name, params) }
             .getOrElse {
                 Log.e(TAG, "build failed for “$name”", it)
-                return SendReport(ours(name), landed = false)
+                return SendReport(ours(name), landed = false,
+                    detail = cause(context, FailureReport.Stage.BUILD, name, it))
             }
 
         // Validate BEFORE looking for a watch. A schema-invalid face installs
@@ -761,7 +824,8 @@ class MainActivity : ComponentActivity() {
         val token = runCatching { FaceBuilder.validate(context, built.apk) }
             .getOrElse {
                 Log.e(TAG, "validation failed for “$name”", it)
-                return SendReport(ours(name), landed = false)
+                return SendReport(ours(name), landed = false,
+                    detail = cause(context, FailureReport.Stage.VALIDATE, name, it))
             }
 
         val target = runCatching { FaceSender.findTarget(context) }
