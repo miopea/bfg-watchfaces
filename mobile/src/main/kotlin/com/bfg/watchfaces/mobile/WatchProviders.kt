@@ -6,10 +6,11 @@ import com.bfg.watchfaces.appcore.WatchLink
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Wearable
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.resume
 
 /**
  * Asking the watch what complications it has, instead of waiting to be told.
@@ -55,17 +56,32 @@ object WatchProviders {
      */
     suspend fun refresh(context: Context): Boolean {
         val client = Wearable.getMessageClient(context)
-        val reply = withTimeoutOrNull(TIMEOUT_MS) {
-            suspendCancellableCoroutine { cont ->
-                val listener = MessageClient.OnMessageReceivedListener { event ->
-                    if (event.path == WatchLink.CATALOG_REPLY_PATH && cont.isActive) {
-                        cont.resume(runCatching { String(event.data, Charsets.UTF_8) }.getOrNull())
-                    }
-                }
-                client.addListener(listener, android.net.Uri.parse("wear://*" + WatchLink.CATALOG_REPLY_PATH), MessageClient.FILTER_LITERAL)
-                cont.invokeOnCancellation { client.removeListener(listener) }
+        val answer = CompletableDeferred<String?>()
 
-                val sent = runCatching {
+        // NO URI FILTER. The handler already checks the path, and the filter
+        // was a second thing that had to be right for this to work at all --
+        // it was one of two suspects when this did not fire, and removing it
+        // leaves one.
+        val listener = MessageClient.OnMessageReceivedListener { event ->
+            if (event.path == WatchLink.CATALOG_REPLY_PATH) {
+                answer.complete(runCatching { String(event.data, Charsets.UTF_8) }.getOrNull())
+            }
+        }
+        client.addListener(listener)
+        try {
+            // OFF THE MAIN THREAD, and this is the whole bug it was written
+            // with. Tasks.await BLOCKS, this is called from a LaunchedEffect,
+            // and blocking the main thread throws -- which the runCatching
+            // below then swallowed into "no catalog answer". Measured on the
+            // operator's phone 2026-09-19: the note arrived on the watch while
+            // this request never left, and the two differ only here.
+            //
+            // DesignsScreen carries the same scar twenty lines from where this
+            // was written: "OFF the main thread ... which reportInstall's own
+            // runCatching then swallows. The counter has never incremented on
+            // hardware."
+            val asked = withContext(Dispatchers.IO) {
+                runCatching {
                     val nodes = Tasks.await(
                         Wearable.getNodeClient(context).connectedNodes, 4, TimeUnit.SECONDS
                     )
@@ -73,27 +89,39 @@ object WatchProviders {
                     // watches paired means asking both, and taking whichever
                     // answers first rather than guessing which is worn.
                     for (node in nodes) {
-                        client.sendMessage(node.id, WatchLink.CATALOG_REQUEST_PATH, ByteArray(0))
+                        Tasks.await(
+                            client.sendMessage(
+                                node.id, WatchLink.CATALOG_REQUEST_PATH, ByteArray(0)
+                            ), 4, TimeUnit.SECONDS
+                        )
                     }
                     nodes.isNotEmpty()
-                }.getOrElse { false }
-
-                if (!sent && cont.isActive) {
-                    client.removeListener(listener)
-                    cont.resume(null)
+                }.getOrElse {
+                    // LOGGED, not swallowed. A silent catch is what hid this
+                    // for a whole evening.
+                    Log.w(TAG, "could not ask the watch for its catalog", it)
+                    false
                 }
             }
-        }
+            if (!asked) {
+                Log.i(TAG, "no watch to ask; keeping the cached list")
+                return false
+            }
 
-        if (reply.isNullOrBlank()) {
-            Log.i(TAG, "no catalog answer; keeping the cached list")
-            return false
+            val reply = withTimeoutOrNull(TIMEOUT_MS) { answer.await() }
+            if (reply.isNullOrBlank()) {
+                Log.i(TAG, "asked, but no catalog answer; keeping the cached list")
+                return false
+            }
+            // Read with the SEND REPORT's own parsers, because the watch
+            // encoded it with the send report's own shape. One encoding, not
+            // two.
+            WatchLink.Report.catalogIn(reply)?.let { ProviderCache.save(context, it) }
+            WatchLink.Report.launchersIn(reply)?.let { ProviderCache.saveLaunchers(context, it) }
+            Log.i(TAG, "catalog refreshed from the watch")
+            return true
+        } finally {
+            client.removeListener(listener)
         }
-        // Read with the SEND REPORT's own parsers, because the watch encoded it
-        // with the send report's own shape. One encoding, not two.
-        WatchLink.Report.catalogIn(reply)?.let { ProviderCache.save(context, it) }
-        WatchLink.Report.launchersIn(reply)?.let { ProviderCache.saveLaunchers(context, it) }
-        Log.i(TAG, "catalog refreshed from the watch")
-        return true
     }
 }
