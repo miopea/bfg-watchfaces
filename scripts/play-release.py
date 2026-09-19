@@ -91,6 +91,50 @@ def call(token: str, method: str, url: str, body=None, content_type=None):
         sys.exit("\n%s %s\nHTTP %s\n%s" % (method, url.split("?")[0], e.code, detail))
 
 
+def commit(token: str, package: str, edit_id: str) -> None:
+    """Commit the edit, whichever way Play is demanding today.
+
+    PLAY'S REQUIREMENT FLIPS WITH THE APP'S POLICY STATE, and it refuses the
+    wrong one outright. Both of these are real, from this app, ten days apart:
+
+        2026-09-08, with a policy rejection open --
+            Changes cannot be sent for review automatically. Please set the
+            query parameter changesNotSentForReview to true.
+
+        2026-09-18, once the app was approved --
+            Changes are sent for review automatically. The query parameter
+            changesNotSentForReview must not be set.
+
+    So neither form can be hardcoded. The bare commit is tried first because it
+    is the normal state, and the flag is only added when Play's own error names
+    it -- never as a blind retry, which would swallow an unrelated 400.
+
+    Committing bare is safe here regardless: this script writes TESTING tracks
+    only and refuses production by design, and a testing track is exempt from
+    review, so there is nothing for a commit to dispatch.
+    """
+    url = "%s/applications/%s/edits/%s:commit" % (API, package, edit_id)
+    failed = attempt(token, url)
+    if failed is None:
+        return
+    if "changesNotSentForReview" not in failed:
+        sys.exit("\ncommit refused:\n" + failed)
+    held = attempt(token, url + "?changesNotSentForReview=true")
+    if held is not None:
+        sys.exit("\ncommit refused both ways.\nbare:\n%s\nheld back:\n%s" % (failed, held))
+
+
+def attempt(token: str, url: str):
+    """POST [url]; None when it worked, else the server's message."""
+    req = urllib.request.Request(
+        url, headers={"Authorization": "Bearer " + token}, method="POST")
+    try:
+        with urllib.request.urlopen(req):
+            return None
+    except urllib.error.HTTPError as e:
+        return e.read().decode()[:900]
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--package", default="com.bfg.watchfaces")
@@ -145,26 +189,7 @@ def main() -> None:
         print("dry run: edit deleted, nothing published")
         return
 
-    # changesNotSentForReview=true, ALWAYS, and it is not optional any more.
-    #
-    # From 2026-09-08 Play began refusing the bare commit outright:
-    #
-    #     Changes cannot be sent for review automatically. Please set the query
-    #     parameter changesNotSentForReview to true. Once committed, the changes
-    #     in this edit can be sent for review from the Google Play Console UI.
-    #
-    # It started when the app picked up an outstanding policy rejection: while
-    # one is open Play will not let an API commit decide, on its own, that the
-    # app should go back into review. Fair, and it is also the right flag for
-    # this script regardless — it only ever writes TESTING tracks, and a testing
-    # track is exempt from review, so there was never anything here to send.
-    #
-    # The flag says "commit these bits, do not dispatch them", which is exactly
-    # what an internal build wants. Production still goes through the console,
-    # which this script refuses to touch by design.
-    call(token, "POST",
-         "%s/applications/%s/edits/%s:commit?changesNotSentForReview=true"
-         % (API, a.package, edit_id))
+    commit(token, a.package, edit_id)
     print("committed. live on '%s' for your testers." % a.track)
 
 
