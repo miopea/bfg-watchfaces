@@ -41,6 +41,25 @@ import com.bfg.watchfaces.appcore.FaceLibrary
  *
  * A COLLISION, because two different names can slug to one package. Saving over
  * somebody's face silently is the kind of loss there is no undo for.
+ *
+ * ## [suggested] is the difference between naming and confirming
+ *
+ * A face from the gallery ALREADY HAS A NAME — somebody chose it, and the
+ * catalog carries it beside the parameters. Opening one and being asked to
+ * invent a name for it reads as though the app lost it. Reported by the
+ * operator on 2026-09-18: "it makes me save a name and that is a different
+ * issue — it should use the community name."
+ *
+ * So a suggestion pre-fills the field and the words change with it: naming when
+ * there is nothing to go on, confirming when there is. It is still a FIELD
+ * rather than a silent save, because the slug and the collision above do not
+ * stop mattering just because a name arrived from somewhere else — two people
+ * may both have published "Midnight", and the second one to arrive would
+ * otherwise replace the first on the watch with no warning.
+ *
+ * A PRESET deliberately sends no suggestion. `CLAUDE.md` is explicit that a
+ * style is a starting point rather than a face, and "Rosette Noir" is the name
+ * of the style, not of the thing somebody is making from it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,9 +67,13 @@ fun NameSheet(
     existing: (String) -> FaceLibrary.StoredFace?,
     sheetState: SheetState,
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    onSave: (String) -> Unit,
+    /** The name this design arrived with, if it had one. Empty for a preset. */
+    suggested: String = ""
 ) {
-    var name by remember { mutableStateOf("") }
+    // Keyed on the suggestion so reopening the sheet for a DIFFERENT face
+    // starts from that face's name rather than the previous one's.
+    var name by remember(suggested) { mutableStateOf(suggested) }
     val trimmed = name.trim()
     val slug = if (trimmed.isEmpty()) "" else FaceLibrary.slugify(trimmed)
     val clash = if (trimmed.isEmpty()) null else existing(trimmed)
@@ -62,11 +85,18 @@ fun NameSheet(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp)
         ) {
-            Text("Name this face", style = MaterialTheme.typography.titleLarge)
+            Text(
+                if (suggested.isEmpty()) "Name this face" else "Keep this name?",
+                style = MaterialTheme.typography.titleLarge
+            )
             Spacer(Modifier.height(6.dp))
             Text(
-                "This is what you will look for on your watch, so give it a name of " +
-                    "your own rather than the style you started from.",
+                if (suggested.isEmpty())
+                    "This is what you will look for on your watch, so give it a name of " +
+                        "your own rather than the style you started from."
+                else
+                    "This is what you will look for on your watch. It came with this " +
+                        "name — keep it, or make it your own.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

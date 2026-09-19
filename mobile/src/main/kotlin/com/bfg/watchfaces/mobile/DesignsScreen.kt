@@ -74,7 +74,16 @@ import kotlinx.coroutines.withContext
 private const val TILE_PX = 220
 
 @Composable
-fun DesignsScreen(onPick: (DialParams) -> Unit, modifier: Modifier = Modifier) {
+/**
+ * [onPick] carries the name the design ARRIVED with, or null when it has none.
+ *
+ * Both grids feed one callback and only one of them has a name to give. A
+ * community face was named by whoever published it; a style is a starting
+ * point and `CLAUDE.md` is explicit that it is not a face yet. Passing the
+ * name rather than dropping it is what lets the naming sheet ask somebody to
+ * confirm a name instead of invent one — see NameSheet.
+ */
+fun DesignsScreen(onPick: (DialParams, String?) -> Unit, modifier: Modifier = Modifier) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     Column(modifier = modifier.fillMaxSize()) {
         SecondaryTabRow(selectedTabIndex = tab) {
@@ -89,7 +98,7 @@ fun DesignsScreen(onPick: (DialParams) -> Unit, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun StyleGrid(onPick: (DialParams) -> Unit) {
+private fun StyleGrid(onPick: (DialParams, String?) -> Unit) {
     val presets = remember { Presets.ALL.entries.toList() }
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -99,7 +108,9 @@ private fun StyleGrid(onPick: (DialParams) -> Unit) {
         modifier = Modifier.fillMaxSize()
     ) {
         items(presets, key = { it.key }) { (name, params) ->
-            PresetTile(name, params) { onPick(params) }
+            // NULL, not `name`. The preset's name belongs to the STYLE --
+            // "Rosette Noir" is where somebody started, not what they made.
+            PresetTile(name, params) { onPick(params, null) }
         }
     }
 }
@@ -172,7 +183,7 @@ private fun PresetTile(name: String, params: DialParams, onClick: () -> Unit) {
  * layer up.
  */
 @Composable
-private fun CommunityGrid(onPick: (DialParams) -> Unit) {
+private fun CommunityGrid(onPick: (DialParams, String?) -> Unit) {
     val context = LocalContext.current
     val service = remember { CatalogAccess.service(context) }
     val scope = rememberCoroutineScope()
@@ -269,7 +280,10 @@ private fun CommunityGrid(onPick: (DialParams) -> Unit) {
                 // has never incremented on hardware, and it is what orders
                 // the gallery.
                 scope.launch { withContext(Dispatchers.IO) { service.reportInstall(face.slug) } }
-                faceCache[face.slug]?.let(onPick)
+                // The face's own name travels with it. It was already shown
+                // on the sheet this button sits on, so losing it here is the
+                // app forgetting something the person just read.
+                faceCache[face.slug]?.let { onPick(it, face.name) }
                 opened = null
             },
             onReport = { reporting = face; opened = null },

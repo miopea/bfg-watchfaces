@@ -130,6 +130,18 @@ class MainActivity : ComponentActivity() {
                  * that was open.
                  */
                 var openSlug by rememberSaveable { mutableStateOf<String?>(null) }
+                /**
+                 * The name the design in [params] arrived with, before it is
+                 * anybody's face.
+                 *
+                 * Separate from [openSlug], which means "this IS a saved face
+                 * and Save updates it". A community design has neither — it is
+                 * not saved here yet — but it does have a name somebody chose,
+                 * and the naming sheet should offer that rather than a blank
+                 * field. Null for a preset, which is a starting point with no
+                 * identity to carry.
+                 */
+                var arrivedAs by rememberSaveable { mutableStateOf<String?>(null) }
                 var tab by rememberSaveable { mutableStateOf(Tab.DESIGNS) }
                 var ambient by rememberSaveable { mutableStateOf(false) }
                 // The explanation is a one-time modal now, not a screen in the
@@ -373,7 +385,17 @@ class MainActivity : ComponentActivity() {
                         Tab.DESIGNS -> DesignsScreen(
                             // A style is a starting point, not a face: it has
                             // no identity yet, so Save must ask for a name.
-                            onPick = { params = it; openSlug = null; tab = Tab.STUDIO },
+                            // A COMMUNITY face is different — it was named by
+                            // whoever published it, and that name rides along
+                            // so the sheet can ask somebody to confirm it
+                            // rather than invent one. openSlug stays null
+                            // either way: neither is saved on this phone yet.
+                            onPick = { picked, name ->
+                                params = picked
+                                openSlug = null
+                                arrivedAs = name
+                                tab = Tab.STUDIO
+                            },
                             modifier = Modifier.padding(inner)
                         )
 
@@ -491,6 +513,11 @@ class MainActivity : ComponentActivity() {
                             onOpen = {
                                 params = it.params
                                 openSlug = it.slug
+                                // It has a real identity now, so there is
+                                // nothing left to suggest -- and a stale
+                                // suggestion would pre-fill "Save as a new
+                                // face" with a name from a different design.
+                                arrivedAs = null
                                 tab = Tab.STUDIO
                             },
                             onSend = { requestSend(it.name, it.params) },
@@ -549,6 +576,7 @@ class MainActivity : ComponentActivity() {
                     NameSheet(
                         existing = { FaceStorage.existing(context, it) },
                         sheetState = nameState,
+                        suggested = arrivedAs.orEmpty(),
                         onDismiss = { naming = false; nameThenSend = false },
                         onSave = { name ->
                             // Same reason as the in-place save above: the stamp
@@ -556,6 +584,9 @@ class MainActivity : ComponentActivity() {
                             params = FaceStorage.save(context, name, params).params
                             faces = FaceStorage.list(context)
                             naming = false
+                            // Saved, so it has an identity of its own and the
+                            // name it arrived with stops being a suggestion.
+                            arrivedAs = null
                             // Naming was the price of sending, so sending is
                             // what happens next. Saving and then stopping would
                             // leave the button that was pressed unfulfilled.
