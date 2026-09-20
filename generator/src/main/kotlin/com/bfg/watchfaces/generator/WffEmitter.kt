@@ -727,7 +727,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
                       isCustomizable="FALSE">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
-      <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>${rangedComplication(p, box, fitted, glyph, valueText, ink, ambientAlpha)}
+      <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>${rangedComplication(p, box, fitted, glyph, valueText, ink)}
       <Complication type="SHORT_TEXT">$glyph$valueText
       </Complication>
     </ComplicationSlot>"""
@@ -811,6 +811,16 @@ ${glareLayer(p)}
      * palette. A bar is a label for the number above it and has to stay quieter
      * than the number; anything strong enough to be its own colour competes.
      *
+     * ## No ambient Variant here, deliberately
+     *
+     * The enclosing `<ComplicationSlot>` already carries one, and alpha
+     * compounds. Setting it again on this PartDraw rendered the bar at roughly
+     * 30% in ambient on the TOP slot where the slot itself is at 140 -- visibly
+     * dimmer than the number directly above it, while both previews drew it at
+     * the slot's alpha. The in-slot glyph has never carried one for the same
+     * reason; only the SHORTCUT PartDraw does, and that one is a top-level
+     * element with no slot around it.
+     *
      * ## Rounded, and what that costs at zero
      *
      * `cornerRadius` is half the thickness, so the bar is a pill. At a value of
@@ -826,8 +836,7 @@ ${glareLayer(p)}
         fitted: Int,
         glyph: String,
         valueText: String,
-        ink: String,
-        ambientAlpha: Int
+        ink: String
     ): String {
         val bar = SlotGeometry.bar(box, fitted, p.generatorVersion)
         if (!p.showsBars || bar == null) return ""
@@ -838,7 +847,6 @@ ${glareLayer(p)}
         return """
       <Complication type="RANGED_VALUE">$glyph$valueText
         <PartDraw x="${bar.x}" y="${bar.y}" width="${bar.w}" height="${bar.h}">
-          <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
           <RoundRectangle x="0" y="0" width="${bar.w}" height="${bar.h}"
                           cornerRadiusX="$radius" cornerRadiusY="$radius">
             <Fill color="$track"/>
