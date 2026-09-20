@@ -72,9 +72,24 @@ object CycleDay {
      * with nothing in it looks like an empty slot rather than like a broken
      * feature. The explanation belongs on the phone, where there is room to
      * give one.
+     *
+     * ## The number is BARE, and that is the point
+     *
+     * No "Day", no unit, no word of any kind -- decision `01a0ba48`, and the
+     * reason is privacy rather than taste. A dial reading "Day 18" tells anyone
+     * who glances at her wrist what the slot IS; a dial reading "18" beside a
+     * step count and a temperature tells them nothing at all.
+     *
+     * It shipped as "Day 18" anyway, because the rule lived in a spec and
+     * nothing executed it, and the person whose wrist it is noticed before any
+     * of this did. `CycleDayTest` now fails on any label carrying a letter.
+     *
+     * The spoken description is the exception and is built in CycleDayService,
+     * not here: a screen reader is not a glance over her shoulder, it is her
+     * asking.
      */
     fun label(start: LocalDate?, today: LocalDate): String =
-        dayNumber(start, today)?.let { "Day $it" } ?: EMPTY_PLACEHOLDER
+        dayNumber(start, today)?.toString() ?: EMPTY_PLACEHOLDER
 
     /** Shown when there is no start date, matching the other empty slots. */
     const val EMPTY_PLACEHOLDER = "—"
@@ -87,7 +102,7 @@ object CycleDay {
      * day rather than the word "preview", matching how every other slot
      * previews.
      */
-    const val PREVIEW_LABEL = "Day 14"
+    const val PREVIEW_LABEL = "14"
 
     /**
      * Remember the start date the phone sent.

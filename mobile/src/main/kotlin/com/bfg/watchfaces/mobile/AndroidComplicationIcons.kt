@@ -21,7 +21,16 @@ object AndroidComplicationIcons {
         canvas: Canvas,
         source: ComplicationSource,
         x: Float, y: Float, size: Float,
-        color: Int
+        color: Int,
+        /**
+         * The provider named on this slot, when there is one.
+         *
+         * LAST and defaulted, deliberately. A parameter added in the middle of
+         * a positional list is how `cycleLabel` once silently re-bound `now`
+         * and `is24` in `Complications.sampleFor` -- the call still compiled
+         * and drew the wrong thing.
+         */
+        provider: String? = null
     ) {
         if (!source.enabled) return
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -34,7 +43,7 @@ object AndroidComplicationIcons {
         canvas.translate(x, y)
         val k = size / ComplicationGlyphs.GRID.toFloat()
         canvas.scale(k, k)
-        for (shape in ComplicationGlyphs.shapes(source)) render(canvas, shape, paint)
+        for (shape in ComplicationGlyphs.shapesFor(source, provider)) render(canvas, shape, paint)
         canvas.restoreToCount(saved)
     }
 

@@ -36,7 +36,14 @@ import java.awt.geom.RoundRectangle2D
  */
 object ComplicationIcons {
 
-    fun draw(g: Graphics2D, source: ComplicationSource, x: Double, y: Double, size: Double, color: Color) {
+    fun draw(
+        g: Graphics2D,
+        source: ComplicationSource,
+        x: Double, y: Double, size: Double,
+        color: Color,
+        /** The provider named on this slot, if any. LAST and defaulted: see AndroidComplicationIcons. */
+        provider: String? = null
+    ) {
         if (!source.enabled) return
         val old = g.transform
         val oldStroke = g.stroke
@@ -48,7 +55,7 @@ object ComplicationIcons {
             BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND
         )
 
-        for (shape in ComplicationGlyphs.shapes(source)) render(g, shape)
+        for (shape in ComplicationGlyphs.shapesFor(source, provider)) render(g, shape)
 
         g.transform = old
         g.stroke = oldStroke

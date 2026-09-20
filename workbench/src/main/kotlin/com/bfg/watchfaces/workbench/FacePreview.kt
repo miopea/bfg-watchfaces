@@ -115,7 +115,10 @@ object FacePreview {
             // Honours iconSlots, or the toggles appear to do nothing in the one
             // view somebody uses to judge them.
             if (p.hasIcon(pos)) {
-                ComplicationIcons.draw(g, source, box.x + (box.w - iconSize) / 2.0, box.y.toDouble(), iconSize, c)
+                ComplicationIcons.draw(
+                    g, source, box.x + (box.w - iconSize) / 2.0, box.y.toDouble(), iconSize, c,
+                    provider = p.providers[pos]
+                )
             }
             val textY = SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)
             // The emitter asks SlotGeometry which wording fits and at what

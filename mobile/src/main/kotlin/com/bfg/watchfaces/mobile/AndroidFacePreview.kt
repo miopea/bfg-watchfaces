@@ -162,7 +162,8 @@ object AndroidFacePreview {
                     x = box.x + (box.w - iconSize) / 2f,
                     y = box.y.toFloat(),
                     size = iconSize,
-                    color = c
+                    color = c,
+                    provider = p.providers[pos]
                 )
             }
             // Which wording and what size both come from SlotGeometry, the

@@ -96,6 +96,15 @@ tasks.register<JavaExec>("brand") {
     workingDir = rootProject.projectDir
 }
 
+/** Regenerate the watch's glyph drawables. Writes a checked-in file. */
+tasks.register<JavaExec>("glyphs") {
+    group = "bfg"
+    description = "Write wear/src/main/res/drawable from ComplicationGlyphs"
+    mainClass.set("com.bfg.watchfaces.workbench.Glyphs")
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
 /** Regenerate the catalog service's params contract. Writes a checked-in file. */
 tasks.register<JavaExec>("contract") {
     group = "bfg"

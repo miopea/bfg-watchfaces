@@ -5,6 +5,8 @@ import android.content.Context
 import android.util.Log
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
+import android.graphics.drawable.Icon
+import androidx.wear.watchface.complications.data.MonochromaticImage
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
@@ -75,6 +77,22 @@ class CycleDayService : SuspendingComplicationDataSourceService() {
         return shortText(CycleDay.PREVIEW_LABEL)
     }
 
+    /**
+     * The ring the dial draws above the number.
+     *
+     * Monochromatic on purpose: the WATCH FACE tints it with the wearer's ink,
+     * which is why the drawable is white and carries no colour of its own. The
+     * face already asks for `[COMPLICATION.MONOCHROMATIC_IMAGE]` for any named
+     * provider, so supplying this is the whole of what makes the mark appear.
+     *
+     * `setAmbientImage(null)` is deliberate rather than an omission: the slot
+     * already carries an ambient alpha Variant, and a second ambient asset
+     * would be a second thing to keep in step for no gain.
+     */
+    private fun ring() = MonochromaticImage.Builder(
+        image = Icon.createWithResource(this, R.drawable.ic_cycle_ring)
+    ).setAmbientImage(null).build()
+
     private fun shortText(text: String) = ShortTextComplicationData.Builder(
         text = PlainComplicationText.Builder(text).build(),
         // Read aloud, this is the one place the slot says what it is. On the
@@ -82,9 +100,12 @@ class CycleDayService : SuspendingComplicationDataSourceService() {
         // glance over her shoulder shows nothing. A screen reader is not a
         // glance over her shoulder; it is her, asking.
         contentDescription = PlainComplicationText.Builder(
-            if (text == CycleDay.EMPTY_PLACEHOLDER) "Cycle day not available" else "Cycle $text"
+            // "Cycle day 18", not "Cycle 18". The number is bare on the DIAL
+            // so a glance shows nothing; read aloud it needs its noun back, or
+            // it is a number with no subject.
+            if (text == CycleDay.EMPTY_PLACEHOLDER) "Cycle day not available" else "Cycle day $text"
         ).build()
-    ).build()
+    ).setMonochromaticImage(ring()).build()
 
     companion object {
         private const val TAG = "BfgCycleDay"

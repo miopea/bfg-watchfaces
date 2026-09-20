@@ -40,9 +40,7 @@ import kotlinx.coroutines.withContext
  * literal here: the same string decides whether a face can be SHARED, and two
  * copies of it would agree right up until somebody renamed the service.
  */
-fun isCycleProvider(component: String?): Boolean =
-    component != null &&
-        component.substringAfter('/').endsWith(DialParams.CYCLE_PROVIDER_CLASS)
+fun isCycleProvider(component: String?): Boolean = DialParams.isCycleProvider(component)
 
 /**
  * The explanation and the permission, on the phone, where there is room.

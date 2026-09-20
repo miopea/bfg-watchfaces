@@ -88,6 +88,71 @@ object ComplicationGlyphs {
         }
     }
 
+    /**
+     * What to draw for a slot, given the provider actually named on it.
+     *
+     * [shapes] is keyed on the SOURCE, which is the whole vocabulary for every
+     * slot the watch fills itself. A slot pointed at one of this app's own
+     * providers is different: its source is the DATE fallback (see
+     * `DialParams.effectiveSlot`), so asking [shapes] for it draws a calendar,
+     * which is the wrong icon rather than no icon.
+     *
+     * On the DIAL this never mattered, because the emitter draws
+     * `[COMPLICATION.MONOCHROMATIC_IMAGE]` for any named provider and the watch
+     * supplies it. The previews have no watch, so they ask here instead. Both
+     * then draw the same ring.
+     */
+    fun shapesFor(source: ComplicationSource, provider: String?): List<Shape> =
+        if (provider != null && DialParams.isCycleProvider(provider)) cycleRing()
+        else shapes(source)
+
+    /**
+     * The cycle mark: a thin ring that does not quite close.
+     *
+     * ## Why a ring, and why it has a gap
+     *
+     * Chosen by the operator on 2026-09-20 over a crescent, a ring with a
+     * position dot, and a shaded disc. A crescent reads as night or sleep to
+     * everyone else on the watch; a dot walking the ring is unmistakably a
+     * cycle mark AND invites reading a nearly-closed ring as "period due",
+     * which is prediction and the line this app does not cross. A plain ring
+     * carries nothing and identifies nothing.
+     *
+     * The gap is what makes it a mark rather than a circle. It sits at the
+     * BOTTOM, where the value below it is, so the number reads as sitting in
+     * the opening rather than beside a closed O.
+     *
+     * ## It is deliberately not very legible as a symbol
+     *
+     * Decision `01a0ba48` asked for no icon at all, so that a glance at her
+     * wrist showed nothing. The operator revisited that on 2026-09-20 and chose
+     * a mark on both surfaces. This is the most anonymous shape that still
+     * works as one: to anyone who does not already know, it is a ring.
+     */
+    fun cycleRing(): List<Shape> = listOf(
+        // Inset so the 1.8 stroke stays inside the 24-grid, matching the other
+        // outlined glyphs. GAP_DEGREES is centred on 6 o'clock: AWT measures
+        // counter-clockwise from 3 o'clock, so that is 270.
+        Shape.Arc(
+            RING_INSET, RING_INSET,
+            GRID - 2 * RING_INSET, GRID - 2 * RING_INSET,
+            270.0 + GAP_DEGREES / 2.0,
+            360.0 - GAP_DEGREES
+        )
+    )
+
+    /** Leaves the 1.8 stroke inside the grid with the same air as the others. */
+    private const val RING_INSET = 3.0
+
+    /**
+     * How much of the ring is missing, in degrees.
+     *
+     * Fifty. Enough to read as deliberate at complication size -- a gap much
+     * under forty closes up into an O once the glyph is scaled down to a slot
+     * -- and not so much that it stops reading as a ring.
+     */
+    private const val GAP_DEGREES = 50.0
+
     /** What to draw for a source. Empty when the slot shows nothing. */
     fun shapes(source: ComplicationSource): List<Shape> = when (source) {
         // A drawn source has no glyph: the icons come from the provider's

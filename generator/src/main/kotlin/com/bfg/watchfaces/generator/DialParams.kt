@@ -902,6 +902,10 @@ data class DialParams(
             PRIVATE_PROVIDER_CLASSES.any { c.substringAfter('/').endsWith(it) }
         }
 
+    /** Whether any slot points at this app's cycle provider. */
+    val hasCycleProvider: Boolean
+        get() = providers.values.any { isCycleProvider(it) }
+
     /** The source at [pos], or NONE when the stored list is short/absent. */
     /**
      * Whether this slot draws a glyph above its value.
@@ -1026,6 +1030,24 @@ data class DialParams(
         const val CYCLE_PROVIDER_CLASS = "CycleDayService"
 
         val PRIVATE_PROVIDER_CLASSES: List<String> = listOf(CYCLE_PROVIDER_CLASS)
+
+        /**
+         * Whether a component string names this app's cycle provider.
+         *
+         * The comment on [CYCLE_PROVIDER_CLASS] says "three callers, one
+         * string" and stops one character short of the thing that actually
+         * repeated: the MATCH. `substringAfter('/').endsWith(...)` was written
+         * out separately in `Complications`, in the phone's `CycleSetup` and
+         * inline in [hasPrivateProvider], so a face could be judged private by
+         * one and shareable by another -- and the sharing rule is the one that
+         * decides whether her cycle data leaves the phone.
+         *
+         * Matched on the CLASS, not the whole component: the package belongs to
+         * the watch app and is asserted elsewhere, and a face hand-edited to
+         * name the same class under another package should be caught too.
+         */
+        fun isCycleProvider(component: String?): Boolean =
+            component != null && component.substringAfter('/').endsWith(CYCLE_PROVIDER_CLASS)
 
         /**
          * What a stored colour looks like: `#RRGGBB`, either case.

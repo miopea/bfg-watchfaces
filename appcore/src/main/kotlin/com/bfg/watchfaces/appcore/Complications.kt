@@ -75,7 +75,7 @@ object Complications {
     fun sampleFor(p: DialParams, pos: SlotPosition, cycleLabel: String? = null): String {
         val component = p.providers[pos]
         if (component != null &&
-            component.substringAfter('/').endsWith(DialParams.CYCLE_PROVIDER_CLASS)
+            DialParams.isCycleProvider(component)
         ) {
             // The REAL day when the caller knows it, a stand-in only when it
             // does not. A preview showing "Day 14" beside a watch showing

@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.appcore
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -66,7 +67,7 @@ class CycleDayTest {
 
     @Test
     fun `the label is the number, or the same em dash every other empty slot shows`() {
-        assertEquals("Day 14", CycleDay.label(jan1, jan1.plusDays(13)))
+        assertEquals("14", CycleDay.label(jan1, jan1.plusDays(13)))
         assertEquals(CycleDay.EMPTY_PLACEHOLDER, CycleDay.label(null, jan1))
         assertEquals("—", CycleDay.EMPTY_PLACEHOLDER)
     }
@@ -103,5 +104,35 @@ class CycleDayTest {
         assertNull(CycleDay.parse(null))
         assertNull(CycleDay.parse(""))
         assertNull(CycleDay.parse("14"))
+    }
+
+    /**
+     * The label carries NO letters, on any day, ever.
+     *
+     * Decision `01a0ba48` said a plain unlabelled number and gave the reason:
+     * "Day 18" on a wrist tells anyone glancing at it what the slot is, and
+     * "18" beside a step count tells them nothing. The rule lived in a spec,
+     * nothing executed it, and "Day 18" shipped to a real wrist -- where the
+     * person whose data it is noticed, which is the worst way to find out.
+     *
+     * So this sweeps rather than checking one day. A word reintroduced on the
+     * edge of a range -- the first day, a three-digit lapse -- is exactly the
+     * shape of bug this repo has already paid for once, in the ambient Variant
+     * that only appeared on dark ink.
+     */
+    @Test
+    fun `no label anywhere in the range carries a letter`() {
+        val start = LocalDate.of(2026, 1, 1)
+        for (offset in 0..400) {
+            val label = CycleDay.label(start, start.plusDays(offset.toLong()))
+            assertTrue(label.none { it.isLetter() }) {
+                "day ${offset + 1} rendered as \"$label\"; the dial number must be bare"
+            }
+        }
+        // The empty state is a dash, not the word "none".
+        assertTrue(CycleDay.EMPTY_PLACEHOLDER.none { it.isLetter() })
+        // And the PICKER preview is the same shape, so what she sees while
+        // choosing is what she gets after choosing.
+        assertTrue(CycleDay.PREVIEW_LABEL.none { it.isLetter() })
     }
 }
