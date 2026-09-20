@@ -699,7 +699,27 @@ ${handPair("MinuteHand", "hand_minute")}$second
                 )
             }
 
-            val valueText = """
+            /**
+             * The value, or -- in diagnostic mode -- the raw numbers behind it.
+             *
+             * A FUNCTION of the flag rather than two strings, because the box,
+             * the font, the ambient lift and the offset must be identical
+             * either way. Building the diagnostic copy separately is how the
+             * two drift, and a diagnostic that renders differently from the
+             * thing it is diagnosing is worse than none.
+             *
+             * The format comes from the SOURCE and is not always "%s" -- the
+             * battery's is "%s%%" -- so this composes a new template rather
+             * than editing the built one.
+             */
+            fun valueText(debug: Boolean): String {
+                val template = if (debug) "%s/%s-%s" else source.format
+                val params = if (debug) listOf(
+                    "[COMPLICATION.RANGED_VALUE_VALUE]",
+                    "[COMPLICATION.RANGED_VALUE_MIN]",
+                    "[COMPLICATION.RANGED_VALUE_MAX]"
+                ) else listOf("[COMPLICATION.TEXT]")
+                return """
         <PartText x="0" y="${SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)}" width="${box.w}" height="$textH">$ambientColorVariant
           <Text align="CENTER">
             <Font family="${FaceFont.of(l.fontFamily).wff}" size="$fontSize" color="$ink">
@@ -712,10 +732,11 @@ ${handPair("MinuteHand", "hand_minute")}$second
                 with no TITLE at all, so there is still no per cent sign.
                 SHORT_TEXT is what the provider chose to show in a small slot.
               -->
-              <Template><![CDATA[${source.format}]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
+              <Template><![CDATA[$template]]>${params.joinToString("") { """<Parameter expression="$it"/>""" }}</Template>
             </Font>
           </Text>
         </PartText>"""
+            }
 
             val glyph = if (!p.hasIcon(pos)) "" else glyphElement(source, box, iconW, iconH, ink)
 
@@ -727,8 +748,8 @@ ${handPair("MinuteHand", "hand_minute")}$second
                       isCustomizable="FALSE">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
       <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
-      <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>${rangedComplication(p, box, fitted, glyph, valueText, ink)}
-      <Complication type="SHORT_TEXT">$glyph$valueText
+      <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>${rangedComplication(p, box, fitted, glyph, ::valueText, ink)}
+      <Complication type="SHORT_TEXT">$glyph${valueText(false)}
       </Complication>
     </ComplicationSlot>"""
         }.joinToString("\n")
@@ -779,19 +800,22 @@ ${glareLayer(p)}
     /**
      * What each slot will accept from a provider.
      *
-     * `RANGED_VALUE` first when the face draws bars, because that is the point:
-     * a source that publishes a value with a range and no short string was
-     * simply unselectable before -- nine of Fitbit's ten complications on the
-     * operator's watch. The watch offers the wearer whatever intersects this
-     * list, so the list IS the picker.
+     * `RANGED_VALUE` on EVERY v15 face, not only one that draws bars. The watch
+     * offers the wearer whatever intersects this list, so the list IS the
+     * picker -- and a source that publishes a value with a range and no short
+     * string was simply unselectable before, which was nine of the ten Fitbit
+     * complications on the operator's watch.
      *
-     * `SHORT_TEXT` stays alongside it. A ranged face must still accept the
-     * ordinary sources, and a slot whose provider sends only short text falls
-     * through to the `SHORT_TEXT` complication below with no bar and no gap
-     * where one should be.
+     * It was briefly tied to the bar setting instead, and that was the same
+     * fault one step further in: the sources existed but sat behind a switch
+     * nobody would think to flip. Drawing a bar is a look; accepting the source
+     * is what makes the data reachable at all.
+     *
+     * `SHORT_TEXT` stays alongside it, so a provider that sends only text falls
+     * through to the `SHORT_TEXT` complication with nothing missing.
      */
     private fun supportedTypes(p: DialParams): String =
-        if (p.showsBars) "RANGED_VALUE SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY"
+        if (p.acceptsRanged) "RANGED_VALUE SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY"
         else "SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY"
 
     /**
@@ -835,17 +859,25 @@ ${glareLayer(p)}
         box: SlotGeometry.Box,
         fitted: Int,
         glyph: String,
-        valueText: String,
+        valueText: (debug: Boolean) -> String,
         ink: String
     ): String {
-        val bar = SlotGeometry.bar(box, fitted, p.generatorVersion)
-        if (!p.showsBars || bar == null) return ""
+        if (!p.acceptsRanged) return ""
+
+        // Bars off: the slot still takes a ranged provider, and renders it as
+        // the same glyph and the same number the SHORT_TEXT block would. The
+        // two blocks are then interchangeable, which is what lets the watch
+        // pick either one without the face changing appearance.
+        val bar = if (p.showsBars) SlotGeometry.bar(box, fitted, p.generatorVersion) else null
+        if (bar == null) return """
+      <Complication type="RANGED_VALUE">$glyph${valueText(p.debugRanged)}
+      </Complication>"""
         val radius = bar.h / 2.0
         // The track's alpha, written into the colour rather than set on the
         // part: a PartDraw's alpha would take the FILL down with it.
         val track = "#40" + ink.removePrefix("#").takeLast(6)
         return """
-      <Complication type="RANGED_VALUE">$glyph$valueText
+      <Complication type="RANGED_VALUE">$glyph${valueText(p.debugRanged)}
         <PartDraw x="${bar.x}" y="${bar.y}" width="${bar.w}" height="${bar.h}">
           <RoundRectangle x="0" y="0" width="${bar.w}" height="${bar.h}"
                           cornerRadiusX="$radius" cornerRadiusY="$radius">

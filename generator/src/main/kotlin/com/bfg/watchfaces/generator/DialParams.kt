@@ -659,6 +659,32 @@ data class DialParams(
     val rangedBars: Boolean = false,
 
     /**
+     * Diagnostic: show a ranged complication's RAW numbers instead of its value.
+     *
+     * ## Why this exists at all
+     *
+     * The bar's fill is a Watch Face Format expression, and WFF validates every
+     * expression that is a string -- see [SlotGeometry.barFillExpression]. So a
+     * bar that renders empty, full, or not at all cannot be told apart HERE from
+     * a provider sending a useless range. The only place the answer exists is a
+     * wrist, and the last three watch-side guesses in this project each cost a
+     * build cycle.
+     *
+     * With this on the slot reads `4210/0-10000`: value, minimum, maximum,
+     * straight from the provider. Empty bar with sane numbers means the
+     * expression is wrong. Empty bar with `0/0-0` means the provider is. One
+     * trip instead of three.
+     *
+     * ## NOT part of the stored format
+     *
+     * [com.bfg.watchfaces.appcore.FaceCodec] does not read or write it, so it
+     * cannot arrive from a saved face, a shared face or the catalog, and
+     * `CatalogContract` never sees it. It is set at build time from a device
+     * setting and forgotten. A test pins that.
+     */
+    val debugRanged: Boolean = false,
+
+    /**
      * Digital numerals or hands. Exclusive, and the reason is layout.
      *
      * Hands sweep the WHOLE dial, so the digital assumption -- reserve a centre
@@ -859,16 +885,34 @@ data class DialParams(
     fun hasIcon(pos: SlotPosition): Boolean = pos in iconSlots && !slot(pos).isDrawn
 
     /**
-     * Whether this face draws progress bars, asked once so nobody asks it twice.
+     * Whether a slot on this face will ACCEPT a ranged source.
      *
-     * [rangedBars] alone is not the answer: the geometry, the emitted
-     * `supportedTypes` and both previews all need "on, AND this face is new
-     * enough to have the layout for it". Spelling that out at each call site is
-     * how a preview ends up disagreeing with the watch -- the mistake
-     * [SlotGeometry] exists to prevent.
+     * Separate from [showsBars], and the separation is the point. Accepting the
+     * source and drawing a bar are independent: a ranged provider also sends
+     * printable text, so a slot can take one and render a plain number.
+     *
+     * The first version tied them together, and it was wrong in the way that
+     * mattered most. The complaint that started this feature was "I don't see
+     * any of the Google health options" -- and tying acceptance to the bar
+     * setting left those sources hidden behind a switch nobody knew to look
+     * for, which is the same complaint one step further in. Every v15 face
+     * accepts them; the setting only decides whether a bar is drawn.
+     */
+    val acceptsRanged: Boolean
+        get() = generatorVersion >= SlotGeometry.FIRST_RANGED_VERSION
+
+    /**
+     * Whether this face DRAWS a progress bar, asked once so nobody asks twice.
+     *
+     * [rangedBars] alone is not the answer: the geometry and both previews need
+     * "on, AND this face is new enough to have the layout for it". Spelling
+     * that out at each call site is how a preview ends up disagreeing with the
+     * watch -- the mistake [SlotGeometry] exists to prevent.
+     *
+     * This gates the BAR and the box growth that pays for it, and nothing else.
      */
     val showsBars: Boolean
-        get() = rangedBars && generatorVersion >= SlotGeometry.FIRST_RANGED_VERSION
+        get() = rangedBars && acceptsRanged
 
     fun slot(pos: SlotPosition): ComplicationSource =
         complications.getOrElse(pos.ordinal) { ComplicationSource.NONE }

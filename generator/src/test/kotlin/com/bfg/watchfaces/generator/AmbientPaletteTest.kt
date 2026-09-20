@@ -133,12 +133,29 @@ class AmbientComplicationColourTest {
         return errors
     }
 
+    /**
+     * Counted per COMPLICATION BLOCK, not per slot.
+     *
+     * It was per slot, and that was the same thing while a slot held exactly
+     * one block. From v15 a slot holds two -- `SHORT_TEXT` and `RANGED_VALUE`
+     * -- because the watch picks between them from what the provider sends,
+     * and the face has no say in which. Both draw the ink, so BOTH need the
+     * lift; one without it is a slot that goes unreadable in ambient only for
+     * the wearers whose provider happens to report a range.
+     *
+     * That is exactly the shape of the 2026-09-18 bug: correct for every input
+     * anyone happened to test, wrong for one nobody did.
+     */
     @Test
-    fun `a dark ink gets an ambient colour variant on every slot, and it validates`() {
+    fun `a dark ink gets an ambient colour variant on every complication block, and it validates`() {
         val xml = WffEmitter.emit(DialParams(inkColor = "#1A1A1A"))
         val variants = Regex("""target="color"""").findAll(xml).count()
+        val blocks = Regex("""<Complication type=""").findAll(xml).count()
+        assertEquals(blocks, variants) { "a complication block draws the ink with no ambient lift" }
+        // And the slots really do carry two blocks each now, so the count above
+        // is not passing because something stopped emitting one of them.
         val slots = Regex("""<ComplicationSlot """).findAll(xml).count()
-        assertEquals(slots, variants) { "expected one ambient colour variant per slot" }
+        assertEquals(slots * 2, blocks) { "expected a SHORT_TEXT and a RANGED_VALUE block per slot" }
         assertTrue(validate(xml).isEmpty()) { validate(xml).joinToString("\n") }
     }
 

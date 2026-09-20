@@ -100,8 +100,16 @@ object FaceBuilder {
         // photo costs what a face already cost.
         val texture = Textures.forFace(context, params)
 
+        // The one place a face is actually built, so the one place the wrist
+        // diagnostic is applied. It is a DEVICE setting, never part of the
+        // design -- see Diagnostics, and the FaceCodec test that pins that it
+        // cannot be stored or shared.
+        val emitted = params.copy(
+            debugRanged = com.bfg.watchfaces.mobile.Diagnostics.rangedReadout(context)
+        )
+
         val resources = buildList {
-            add(PackBridge.Resource.of("raw", "watchface.xml", WffEmitter.emit(params, name)))
+            add(PackBridge.Resource.of("raw", "watchface.xml", WffEmitter.emit(emitted, name)))
             add(PackBridge.Resource.of("values", "strings.xml", strings(name)))
             add(PackBridge.Resource.of("xml", "watch_face_info.xml", WATCH_FACE_INFO))
             // drawable-nodpi, not drawable: these are authored at 456x456 dial

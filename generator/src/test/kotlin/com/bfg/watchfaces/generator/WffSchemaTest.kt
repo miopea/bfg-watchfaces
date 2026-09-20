@@ -879,18 +879,20 @@ class WffSchemaTest {
     }
 
     /**
-     * The whole promise of the version bump, stated as an equality.
+     * The promise of the version bump, stated as an equality.
      *
-     * v15 with bars off must emit what v14 emitted -- not "look similar", not
-     * "pass the same tests". Community faces are stored as parameters, so the
-     * generator IS the renderer for the file format: anything that changes here
-     * silently rewrites every face already saved.
+     * v15 with bars off must LAY OUT exactly as v14 laid out. Not "look
+     * similar" -- the same boxes, to the pixel, for every engine and both icon
+     * settings. That is the whole reason the bar is opt-in: the box has to grow
+     * to hold one, and a taller box costs the complication size ceiling.
      *
-     * Only the generator's own version comment may differ, and it is normalised
-     * out rather than excused, so this fails if anything else moves.
+     * NOT byte-identical XML, and that is deliberate. A v15 face also declares
+     * `RANGED_VALUE` and carries a second complication block so the Fitbit
+     * sources are reachable, which is the point of the feature. What must not
+     * move is where anything sits.
      */
     @Test
-    fun `v15 with bars off emits exactly what v14 emitted`() {
+    fun `v15 with bars off lays out exactly as v14 did`() {
         for (engine in Engine.entries) {
             for (icons in listOf(true, false)) {
                 val base = DialParams(engine = engine, generatorVersion = 14)
@@ -898,13 +900,63 @@ class WffSchemaTest {
                     .withSlot(SlotPosition.LEFT, ComplicationSource.STEP_COUNT)
                     .withSlot(SlotPosition.BOTTOM, ComplicationSource.WEATHER_TEMPERATURE)
                     .copy(iconSlots = if (icons) SlotPosition.entries.toSet() else emptySet())
-                val v14 = WffEmitter.emit(base)
-                val v15 = WffEmitter.emit(base.copy(generatorVersion = 15))
-                fun strip(x: String) = x.replace(Regex("generator, v\\d+"), "generator, vN")
-                assertEquals(strip(v14), strip(v15)) {
-                    "$engine icons=$icons: v15 changed a face that never asked for bars"
+                val fifteen = base.copy(generatorVersion = 15)
+                assertEquals(SlotGeometry.boxes(base), SlotGeometry.boxes(fifteen)) {
+                    "$engine icons=$icons: v15 moved a face that never asked for bars"
+                }
+                for (pos in SlotPosition.entries) {
+                    assertEquals(SlotGeometry.sizeAt(base, pos), SlotGeometry.sizeAt(fifteen, pos)) {
+                        "$engine icons=$icons $pos: the size ceiling moved"
+                    }
                 }
             }
+        }
+    }
+
+    /**
+     * And turning bars ON is the only thing that costs any room.
+     *
+     * Pins the measurement the opt-in decision was made on, so a later tweak to
+     * the bar's thickness cannot quietly spend more of the size ceiling than
+     * anyone agreed to.
+     */
+    @Test
+    fun `only turning bars on grows the slot box`() {
+        val off = DialParams(generatorVersion = 15).withSlot(SlotPosition.LEFT, ComplicationSource.STEP_COUNT)
+        val on = off.copy(rangedBars = true)
+        val offBox = SlotGeometry.boxes(off)[SlotPosition.LEFT]!!
+        val onBox = SlotGeometry.boxes(on)[SlotPosition.LEFT]!!
+        assertTrue(onBox.h > offBox.h) { "bars on did not reserve any room for a bar" }
+        assertEquals(offBox.w, onBox.w) { "a bar should cost height, never width" }
+    }
+
+    /**
+     * With bars off the two complication blocks are INTERCHANGEABLE.
+     *
+     * This is what makes always accepting `RANGED_VALUE` safe. The watch
+     * chooses which block to render from what the provider sends, and the face
+     * has no say in it -- so if the ranged block drew anything the short-text
+     * block does not, a slot would change appearance when the wearer swapped to
+     * a provider that happens to report a range. With bars off both blocks hold
+     * the same glyph and the same value, so the choice is invisible.
+     */
+    @Test
+    fun `with bars off the ranged block matches the short text block`() {
+        val xml = WffEmitter.emit(
+            DialParams(generatorVersion = 15).withSlot(SlotPosition.LEFT, ComplicationSource.STEP_COUNT)
+        )
+        assertTrue(xml.contains("<Complication type=\"RANGED_VALUE\">")) {
+            "a v15 face must accept a ranged provider even with bars off"
+        }
+        // Not "no RoundRectangle" -- several complication GLYPHS are drawn with
+        // one. The bar is the thing whose width is bound to a value.
+        assertTrue(!xml.contains("<Transform target=\"width\"")) {
+            "bars are off; nothing should be driving a width from the complication"
+        }
+        fun block(type: String): String =
+            xml.substringAfter("<Complication type=\"$type\">").substringBefore("</Complication>")
+        assertEquals(block("RANGED_VALUE").trim(), block("SHORT_TEXT").trim()) {
+            "the two blocks differ, so the slot would change appearance depending on the provider"
         }
     }
 
@@ -925,6 +977,55 @@ class WffSchemaTest {
     }
 
     /**
+     * Diagnostic mode is a branch keyed on a parameter, so it gets swept.
+     *
+     * The rule CLAUDE.md wrote after the dark-ink `<Variant>` shipped
+     * unsendable. This one rewrites a `<Template>` and its `<Parameter>` list,
+     * which is precisely the shape that broke then, and it runs on a build the
+     * operator installs from a testing track -- so "it is only diagnostic" is
+     * not a reason to check it less.
+     *
+     * Swept against the source's own format, because they are not all "%s":
+     * the battery's is "%s%%", and a template with the wrong number of
+     * parameters for its placeholders is a face that renders nothing.
+     */
+    @ParameterizedTest
+    @EnumSource(SlotPosition::class)
+    fun `diagnostic mode emits schema-valid WFF for every source`(pos: SlotPosition) {
+        for (bars in listOf(true, false)) {
+            for (source in ComplicationSource.entries.filter { it.enabled && !it.isDrawn && !it.isShortcut }) {
+                val p = DialParams(rangedBars = bars, debugRanged = true).withSlot(pos, source)
+                val errors = validate(WffEmitter.emit(p))
+                assertTrue(errors.isEmpty()) {
+                    "$pos bars=$bars $source:\n" + errors.joinToString("\n")
+                }
+            }
+        }
+    }
+
+    /**
+     * And it touches ONLY the ranged block.
+     *
+     * A slot whose provider sends plain text has to stay readable while another
+     * slot is being interrogated, or the diagnostic costs a usable face to run.
+     */
+    @Test
+    fun `diagnostic mode leaves the short text block alone`() {
+        val xml = WffEmitter.emit(
+            DialParams(debugRanged = true).withSlot(SlotPosition.LEFT, ComplicationSource.WATCH_BATTERY)
+        )
+        val shortText = xml.substringAfter("<Complication type=\"SHORT_TEXT\">").substringBefore("</Complication>")
+        assertTrue(shortText.contains("[COMPLICATION.TEXT]")) { "the plain reading was replaced too" }
+        assertTrue(!shortText.contains("RANGED_VALUE_MIN")) { "diagnostics leaked into the normal block" }
+
+        val ranged = xml.substringAfter("<Complication type=\"RANGED_VALUE\">").substringBefore("</Complication>")
+        assertTrue(ranged.contains("[COMPLICATION.RANGED_VALUE_MIN]")) { "no diagnostic readout emitted" }
+        // The battery's format is "%s%%", so a naive edit of the built string
+        // would have left a stray per-cent sign and a parameter count mismatch.
+        assertTrue(ranged.contains("<![CDATA[%s/%s-%s]]>")) { "the template was edited rather than composed" }
+    }
+
+    /**
      * The bar is bound, not baked.
      *
      * A RoundRectangle's width is a plain float in the schema -- there is an
@@ -939,8 +1040,15 @@ class WffSchemaTest {
             DialParams(rangedBars = true).withSlot(SlotPosition.LEFT, ComplicationSource.STEP_COUNT)
         )
         assertTrue(xml.contains("<Complication type=\"RANGED_VALUE\">")) { "no ranged block emitted" }
-        assertTrue(xml.contains("supportedTypes=\"RANGED_VALUE SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY\"")) {
-            "the slot does not accept a ranged provider, so the picker will not offer one"
+        // Every v15 face, bars or not -- this is what puts the sources in the picker.
+        for (bars in listOf(true, false)) {
+            val any = WffEmitter.emit(
+                DialParams(generatorVersion = 15, rangedBars = bars)
+                    .withSlot(SlotPosition.LEFT, ComplicationSource.STEP_COUNT)
+            )
+            assertTrue(any.contains("supportedTypes=\"RANGED_VALUE SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY\"")) {
+                "bars=$bars: the slot refuses ranged providers, so the picker cannot offer them"
+            }
         }
         assertTrue(xml.contains("<Transform target=\"width\"")) { "the fill is not bound to anything" }
         assertTrue(xml.contains("[COMPLICATION.RANGED_VALUE_VALUE]")) { "the value is never read" }

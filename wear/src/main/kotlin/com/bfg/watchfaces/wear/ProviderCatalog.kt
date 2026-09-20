@@ -46,8 +46,21 @@ object ProviderCatalog {
         val app: String,
         /** Whether it can fill a `SHORT_TEXT` slot, which every face accepts. */
         val shortText: Boolean = true,
-        /** Whether it can fill a `RANGED_VALUE` slot, which only a bar face accepts. */
-        val ranged: Boolean = false
+        /** Whether it can fill a `RANGED_VALUE` slot. */
+        val ranged: Boolean = false,
+        /**
+         * What the provider DECLARED, verbatim, for diagnosis.
+         *
+         * The two booleans above are this string interpreted, and the
+         * interpretation is the part that can be wrong -- a type this parser
+         * does not recognise reads as absent rather than as unknown. Carrying
+         * the raw value means a question about a provider can be answered from
+         * a phone in the field instead of from a guess here.
+         *
+         * Empty when the provider declared nothing at all, which is itself the
+         * answer to a different question.
+         */
+        val declaredTypes: String = ""
     )
 
     /**
@@ -97,7 +110,8 @@ object ProviderCatalog {
             label = label.ifEmpty { app },
             app = app,
             shortText = shortText,
-            ranged = ranged
+            ranged = ranged,
+            declaredTypes = declared.orEmpty()
         )
     }
 
@@ -149,7 +163,7 @@ object ProviderCatalog {
     /** The catalog as JSON, for the message the phone asks for. */
     fun toJson(providers: List<Provider>): String =
         providers.joinToString(",", prefix = "[", postfix = "]") {
-            """{"component":${Json.quote(it.component)},"label":${Json.quote(it.label)},"app":${Json.quote(it.app)},"shortText":${it.shortText},"ranged":${it.ranged}}"""
+            """{"component":${Json.quote(it.component)},"label":${Json.quote(it.label)},"app":${Json.quote(it.app)},"shortText":${it.shortText},"ranged":${it.ranged},"types":${Json.quote(it.declaredTypes)}}"""
         }
 
 }

@@ -41,7 +41,9 @@ object ProviderCache {
         val label: String,
         val app: String,
         val shortText: Boolean = true,
-        val ranged: Boolean = false
+        val ranged: Boolean = false,
+        /** What the provider declared, verbatim. Empty from a watch too old to send it. */
+        val declaredTypes: String = ""
     )
 
     fun save(context: Context, json: String) {
@@ -69,7 +71,8 @@ object ProviderCache {
                 label = o["label"] as? String ?: component,
                 app = o["app"] as? String ?: "",
                 shortText = o["shortText"] as? Boolean ?: true,
-                ranged = o["ranged"] as? Boolean ?: false
+                ranged = o["ranged"] as? Boolean ?: false,
+                declaredTypes = o["types"] as? String ?: ""
             )
         }
     }.getOrElse { emptyList() }

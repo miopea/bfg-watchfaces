@@ -10,6 +10,7 @@ import com.bfg.watchfaces.generator.Engine
 import com.bfg.watchfaces.generator.Layout
 import com.bfg.watchfaces.generator.SlotPosition
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -84,12 +85,29 @@ class FaceCodecTest {
         // round-trip tests below, which is the stronger check -- this one only
         // catches a field nobody wired anywhere at all.
         val folded = setOf("layout", "launchers")
+
+        // DELIBERATELY not in the stored format, which is a different thing
+        // from being forgotten.
+        //
+        // `debugRanged` swaps a complication's reading for its raw min/value/max
+        // so the bar can be diagnosed on a wrist. It is set from a device
+        // setting at build time. If it round-tripped it could be SHARED, and a
+        // catalog face rendering "4210/0-10000" on a stranger's watch would look
+        // like a broken app with nothing to explain it. See the test at the
+        // bottom of this file, which pins the exclusion from the other side.
+        val deviceOnly = setOf("debugRanged")
+
         val missing = fieldNames().filter { name ->
-            name !in folded && !query.contains("$name=")
+            name !in folded && name !in deviceOnly && !query.contains("$name=")
         }
         assertTrue(missing.isEmpty()) {
             "FaceCodec.toQuery drops ${missing.joinToString(", ")} -- every face " +
                 "saved with those set loses them. Add them to fromQuery, toQuery and toJson."
+        }
+        // And the exclusions must still BE fields, or this list silently rots
+        // into a set of names that no longer mean anything.
+        assertTrue(fieldNames().containsAll(folded + deviceOnly)) {
+            "the folded/device-only lists name a field DialParams no longer has"
         }
     }
 
@@ -222,6 +240,39 @@ class FaceCodecTest {
         for (v in listOf(0.0, 40.0, 100.0)) {
             val q = parse(FaceCodec.toQuery(DialParams(glare = v)))
             assertEquals(v, FaceCodec.fromQuery(q).glare, 1e-9) { "glare=$v did not survive" }
+        }
+    }
+
+    /**
+     * `debugRanged` must never survive a round trip.
+     *
+     * It is a device-side diagnostic that swaps a complication's reading for
+     * its raw minimum, value and maximum. If it could be stored it could be
+     * SHARED -- and a catalog face that renders "4210/0-10000" on somebody
+     * else's wrist would look like a broken app, with nothing in the design to
+     * explain it and no way for them to turn it off.
+     *
+     * The protection is that the codec simply does not know the field. This
+     * pins that, because the natural instinct when adding a parameter is to add
+     * it everywhere.
+     */
+    @Test
+    fun `the ranged diagnostic is never written to a face`() {
+        val on = DialParams(rangedBars = true, debugRanged = true)
+        val json = FaceCodec.toJson(on)
+        assertFalse(json.contains("debugRanged")) { "a diagnostic flag reached the stored format" }
+        assertFalse(FaceCodec.toQuery(on).contains("debugRanged")) { "it reached the query form" }
+        // And it comes back OFF, however it was stored.
+        assertFalse(FaceCodec.fromJson(Json.obj(Json.parse(json))).debugRanged) {
+            "a face round-tripped with diagnostics still on"
+        }
+        assertFalse(FaceCodec.fromQuery(mapOf("debugRanged" to "true")).debugRanged) {
+            "a hand-written query turned diagnostics on"
+        }
+        // Everything else about the face must survive, or this test would pass
+        // by the codec being broken.
+        assertTrue(FaceCodec.fromJson(Json.obj(Json.parse(json))).rangedBars) {
+            "rangedBars was lost, so this proves nothing"
         }
     }
 }

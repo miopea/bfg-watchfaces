@@ -418,7 +418,7 @@ fun StudioScreen(
             SwitchRow(
                 title = "Show progress bars",
                 detail = "A small bar under readings that count towards a goal, like steps or activity. " +
-                    "It also lets you pick sources that only report progress.",
+                    "Slots get a little taller to fit it.",
                 checked = params.rangedBars
             ) { onParams(params.copy(rangedBars = it)) }
         }
@@ -438,7 +438,7 @@ fun StudioScreen(
                 iconOn = pos in params.iconSlots,
                 component = params.providers[pos],
                 launcher = params.launchers[pos],
-                barsOn = params.showsBars,
+                acceptsRanged = params.acceptsRanged,
                 onSelect = {
                     // Choosing a system or drawn source clears any provider
                     // app: a slot holds ONE thing.
@@ -694,8 +694,8 @@ private fun SlotPicker(
     component: String?,
     /** The app this slot opens, when it is a shortcut to one. */
     launcher: String?,
-    /** Whether this face draws progress bars, which decides what may fill a slot. */
-    barsOn: Boolean,
+    /** Whether this face accepts a source that reports progress. */
+    acceptsRanged: Boolean,
     onSelect: (ComplicationSource) -> Unit,
     onApp: (String) -> Unit,
     onOpenApp: (String) -> Unit,
@@ -777,17 +777,26 @@ private fun SlotPicker(
                     // the current selection would make the picker look like it
                     // had forgotten, and leave no way to change it.
                     val allFromWatch = remember(refreshed) { ProviderCache.load(ctx) }
-                    val fromWatch = remember(allFromWatch, barsOn, component) {
+                    // Keyed on whether the FACE accepts a ranged source, which
+                    // every design made in this version does -- NOT on whether
+                    // it draws a bar. Those were briefly the same thing, and it
+                    // meant the Fitbit sources sat behind a switch nobody would
+                    // think to flip, which is the complaint that started this.
+                    //
+                    // Older designs still filter: a face saved before v15
+                    // declares only SHORT_TEXT, so a ranged-only provider would
+                    // leave its slot blank with nothing to explain it.
+                    //
+                    // The one already chosen always stays, so the picker never
+                    // hides the current selection and leaves no way to change it.
+                    val fromWatch = remember(allFromWatch, acceptsRanged, component) {
                         allFromWatch.filter {
-                            it.shortText || (barsOn && it.ranged) || it.component == component
+                            it.shortText || (acceptsRanged && it.ranged) || it.component == component
                         }
                     }
-                    // How many are being held back, so the picker can SAY so.
-                    // The complaint that started this was "I don't see any of
-                    // the Google health options" -- and the honest answer was
-                    // that they existed, on the watch, and nothing in the app
-                    // mentioned them. A list that silently omits things is
-                    // indistinguishable from a watch that does not have them.
+                    // How many an OLD design is holding back, so the picker can
+                    // say so rather than looking like the watch does not have
+                    // them. On a current design this is zero.
                     val hiddenRanged = remember(allFromWatch, fromWatch) {
                         allFromWatch.size - fromWatch.size
                     }
@@ -875,10 +884,10 @@ private fun SlotPicker(
                             Text(
                                 if (hiddenRanged == 1)
                                     "One more on your watch shows progress towards a goal. " +
-                                        "Turn on \u201cShow progress bars\u201d to use it."
+                                        "This design is too old to use it \u2014 start a new one from Designs."
                                 else
                                     "$hiddenRanged more on your watch show progress towards a goal. " +
-                                        "Turn on \u201cShow progress bars\u201d to use them.",
+                                        "This design is too old to use them \u2014 start a new one from Designs.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 8.dp)

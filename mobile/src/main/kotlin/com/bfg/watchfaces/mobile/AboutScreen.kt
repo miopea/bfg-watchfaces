@@ -3,6 +3,7 @@ package com.bfg.watchfaces.mobile
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.painterResource
+import android.content.ClipData
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,9 +21,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -151,6 +162,8 @@ fun AboutScreen(modifier: Modifier = Modifier) {
                 .clickable { open("https://bfgsolutions.net") }
                 .padding(vertical = 8.dp)
         )
+        // Last, below the links, where nobody arrives by accident.
+        DiagnosticsSection()
         Spacer(Modifier.height(28.dp))
     }
 }
@@ -335,4 +348,94 @@ private fun ProductLogo(product: Product) {
         contentDescription = null,
         modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
     )
+}
+
+/**
+ * The quiet corner of About where a problem can be interrogated.
+ *
+ * Deliberately last, deliberately plain, and deliberately not in Studio. A
+ * person browsing their design controls should never meet any of this; someone
+ * being walked through a fault can be told where it is.
+ *
+ * Two things live here, and both exist because of the same gap: the watch is
+ * the only place some answers exist, and the person holding it usually cannot
+ * run adb. That gap already cost a day on 2026-09-18, when a shipped build
+ * could not send a dark-text face and the only report available was "it doesn't
+ * work".
+ */
+@Composable
+fun DiagnosticsSection(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    var readout by remember { mutableStateOf(Diagnostics.rangedReadout(context)) }
+    var copied by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        HorizontalDivider(Modifier.padding(vertical = 16.dp))
+        Text(
+            "Diagnostics",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Only useful if someone has asked you to look here.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline
+        )
+        Spacer(Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Show raw values on progress slots", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "A slot that tracks a goal shows its number, lowest and highest " +
+                        "instead of its reading \u2014 like 4210/0-10000. Send the face again " +
+                        "after changing this. Your saved designs are not affected.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Switch(
+                checked = readout,
+                onCheckedChange = {
+                    readout = it
+                    Diagnostics.setRangedReadout(context, it)
+                }
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
+        Text("What your watch reported", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "The complication sources your watch offered, and what each one says " +
+                "it can show. Copy this if you have been asked for it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+            TextButton(onClick = {
+                // The same clipboard route FailureSheet uses: LocalClipboard
+                // rather than the deprecated LocalClipboardManager, and the set
+                // suspends, so it goes through the composition's scope.
+                scope.launch {
+                    clipboard.setClipEntry(
+                        ClipEntry(
+                            ClipData.newPlainText(
+                                "BFG Watch Faces", Diagnostics.providerReport(context)
+                            )
+                        )
+                    )
+                    copied = true
+                }
+            }) { Text(if (copied) "Copied" else "Copy watch report") }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
 }
