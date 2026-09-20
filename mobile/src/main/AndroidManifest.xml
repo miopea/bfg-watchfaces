@@ -16,6 +16,29 @@
 
   <uses-permission android:name="android.permission.INTERNET" />
 
+  <!--
+    The day of her cycle, read from Health Connect and shown on her own watch.
+
+    READ only. There is no WRITE permission of any kind here and the app never
+    writes to Health Connect. One record type is read, MenstruationPeriodRecord,
+    and one field is taken from it: the start of the most recent period. See
+    CycleSource, which is the only code that touches it, and
+    docs/specs/cycle-complication-declarations.md for what Google was told.
+
+    The WATCH app holds no health permission at all. It receives a date.
+  -->
+  <uses-permission android:name="android.permission.health.READ_MENSTRUATION" />
+
+  <!--
+    Health Connect shipped as an installable app before Android 14 and as part
+    of the platform from 14 onward. On API 28 to 33 it is a separate package,
+    and package visibility means we cannot see it, ask it for permissions, or
+    open its settings without naming it here.
+  -->
+  <queries>
+    <package android:name="com.google.android.apps.healthdata" />
+  </queries>
+
   <application
       android:label="BFG Watch Faces"
       android:icon="@mipmap/ic_launcher"
@@ -47,5 +70,43 @@
         <data android:scheme="bfgwatchfaces" android:host="open" />
       </intent-filter>
     </activity>
+
+    <!--
+      Where Health Connect sends somebody who asks WHY this app wants her
+      period data. Both of these are required and they are required on
+      DIFFERENT Android versions, which is why there are two.
+
+      Android 14 and up: the platform Health Connect opens
+      VIEW_PERMISSION_USAGE, guarded by START_VIEW_PERMISSION_USAGE so only the
+      system can launch it.
+
+      Android 13 and below: the Health Connect APK opens the older
+      SHOW_PERMISSIONS_RATIONALE action instead.
+
+      Both land on MainActivity. The app has one screen stack and the honest
+      answer lives in it, next to the switch that turns the feature on. A
+      separate page that exists only to be linked to from a system dialog is a
+      page nobody maintains.
+    -->
+    <activity-alias
+        android:name=".ViewPermissionUsageActivity"
+        android:exported="true"
+        android:targetActivity=".MainActivity"
+        android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+        <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+      </intent-filter>
+    </activity-alias>
+
+    <activity-alias
+        android:name=".PermissionsRationaleActivity"
+        android:exported="true"
+        android:targetActivity=".MainActivity">
+      <intent-filter>
+        <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+      </intent-filter>
+    </activity-alias>
+
   </application>
 </manifest>

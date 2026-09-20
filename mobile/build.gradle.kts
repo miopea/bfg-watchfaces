@@ -136,6 +136,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.core.ktx)
     implementation(libs.play.services.wearable)   // Data Layer: Channel/Message/Capability
+    // Health Connect, read-only, for ONE record type. The app asks for
+    // READ_MENSTRUATION and nothing else, takes one date out of it, and never
+    // writes. See docs/specs/cycle-complication.md and the Play declaration
+    // that describes exactly this.
+    implementation(libs.androidx.health.connect)
     // Lets the phone OPEN the watch app. The activation permission can only be
     // asked for on the watch, and a wearer has no reason to know that.
     implementation(libs.wear.remote.interactions)

@@ -154,11 +154,27 @@ would make the rest of the declaration false.
 
 ### Data Safety answers
 
+**The "Shared" row is the one to get right, and it is not obvious.** Read the
+form's own definitions before answering it: Data Safety requires disclosing data
+*"transferred from your server to a third party, or transferred to another third
+party app on the same device"*. Publishing the day count as a Wear OS
+complication data source makes it readable by other watch faces on the wearer's
+own watch, which is literally that.
+
+There is a countervailing exemption — sharing a person **initiates themselves**
+is exempt, and pointing a watch face at a complication source is a deliberate,
+specific act by the wearer. So an argument exists for "No".
+
+**Answer "Yes" anyway, and describe it.** Under-declaring is the failure that
+costs; over-declaring costs a sentence. The disclosure paragraph in the health
+justification above already says it plainly, and an answer here that contradicts
+that paragraph is worse than either answer alone.
+
 | Question | Answer |
 | --- | --- |
 | Data type | Health and fitness → Health info |
 | Collected | No — the data is never sent to a server |
-| Shared | No third parties. On-device availability disclosed above |
+| Shared | Yes — readable by other watch faces on the wearer's own device, via the standard complication mechanism, after she points one at it. No third-party servers, no developer access |
 | Processed ephemerally | No — the derived date is stored on the watch |
 | Required or optional | Optional; the app is fully usable without it |
 | Purpose | App functionality |
@@ -170,10 +186,39 @@ would make the rest of the declaration false.
 
 - Re-read the permitted use-case wording on the live policy page. It was read on
   2026-09-19; the pages change and the wording is the whole argument.
-- Confirm the build matches the description. Submitting a justification for
-  behaviour that has not been written yet is a claim about a future, and the
-  reviewer will look at the app.
-- File this BEFORE building, per the order of work. It can be refused.
+- Confirm the build matches the description. As of 2026-09-20 it does: the
+  feature is built and the description above was checked against the code, not
+  against an intention.
+
+### Where this actually gets filed, corrected 2026-09-20
+
+The console was driven and the earlier assumption here was wrong.
+
+**Play Console → App content → Health apps is a FEATURE CHECKLIST**, plus a
+"Regional requirements" step which currently says none apply to this app. The
+box is **"Period tracking"** under Health and fitness
+(`POLICY_RESPONSE_CHOICE_ID_HEALTH_CYCLE_TRACKING`). It is mutually exclusive
+with "My app does not have any health features" — while that one is ticked, all
+eighteen feature boxes are `disabled`, which looks exactly like a broken page.
+Untick it first.
+
+**There is no justification field in that form.** So the wording drafted above
+does not go there, and the "approval that can be refused" this document warned
+about is not what that form produces. Where the `READ_MENSTRUATION` justification
+is actually demanded — at bundle review, or on a separate Health Connect form —
+is **not yet established**, and the wording remains worth having whenever it is
+asked for.
+
+**Saving stages; it does not submit.** A save lands in Publishing overview as
+"changes not yet submitted for review", and a separate button sends them. That
+is the same save-versus-commit distinction `CLAUDE.md` records for the API.
+
+**The original "file before building" order was abandoned**, deliberately, on
+2026-09-20. It rested on the premise that filing would buy an early approve or
+refuse; it does not. Declaring a period-tracking feature the app did not have —
+and, worse, putting "collects health data" on a public store listing while the
+app collected none — would have been a false statement to find out nothing. The
+feature was built first instead, so every answer above describes something real.
 
 ## What to check before acting on any of this
 

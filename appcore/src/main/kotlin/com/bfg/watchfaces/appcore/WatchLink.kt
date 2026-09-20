@@ -73,6 +73,31 @@ object WatchLink {
     const val NOTE_PATH = "/bfg-watchfaces/note"
 
     /**
+     * The date her most recent period started, for the watch to count from.
+     *
+     * A DATE, not a day number, and that is the whole design. A number is
+     * correct for one day and silently wrong the next, so something would have
+     * to wake at midnight to refresh it — a background job, a reliance on the
+     * phone being reachable, and a value that goes stale exactly when nobody is
+     * looking. A date is correct forever: the watch re-derives the day whenever
+     * it is asked. See [CycleDay].
+     *
+     * Sent as ISO-8601 with no time and no zone (`2026-09-14`), because a start
+     * date has none of those. An instant would drag a timezone into it and the
+     * watch would have to decide which day the instant fell on, which is the
+     * bug this shape exists to avoid.
+     *
+     * An EMPTY payload clears it — she revoked the permission, deleted the
+     * records, or turned the feature off, and the slot must go back to an em
+     * dash rather than keeping the last number it saw forever.
+     *
+     * THIS IS THE ONLY THING DERIVED FROM HEALTH DATA THAT CROSSES. The raw
+     * records never leave Health Connect on the phone; what travels is one
+     * date, to her own watch, over a direct device-to-device channel.
+     */
+    const val CYCLE_START_PATH = "/bfg-watchfaces/cycle-start"
+
+    /**
      * ASKING the watch what complications it has, without sending a face.
      *
      * The catalog has always ridden back on a successful send, which was the

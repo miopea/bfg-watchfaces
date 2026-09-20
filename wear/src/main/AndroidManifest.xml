@@ -170,6 +170,37 @@
       a file that is almost always the same. PhoneNoteService.notifyChanged
       pushes instead, at the one moment there is something new.
     -->
+    <!--
+      The day of her cycle, counted on the watch from a date the phone sends.
+
+      SHORT_TEXT only, and UPDATE_PERIOD_SECONDS 0 for the same reason
+      PhoneNoteService uses 0: the value changes at midnight, and the system
+      already re-requests complication data when the date rolls. Polling would
+      wake the watch to re-read a file that is the same all day.
+
+      The label is what she sees in the watch's own complication picker, so it
+      says what the source IS. The value on the dial stays a bare number, per
+      decision 01a0ba48, so a glance over her shoulder shows nothing.
+
+      This service holds no health permission and never touches Health Connect.
+      It has one date, sent by her own phone.
+    -->
+    <service
+        android:name=".CycleDayService"
+        android:exported="true"
+        android:label="Cycle day"
+        android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+      <intent-filter>
+        <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+      </intent-filter>
+      <meta-data
+          android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+          android:value="SHORT_TEXT" />
+      <meta-data
+          android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+          android:value="0" />
+    </service>
+
     <service
         android:name=".PhoneNoteService"
         android:exported="true"

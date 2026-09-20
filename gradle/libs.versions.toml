@@ -8,6 +8,11 @@ wfp-validator = "1.1.0-alpha01"
 apksig = "2.3.0"
 bouncycastle = "1.85"
 playServicesWearable = "18.2.0"
+# Health Connect, for ONE record type: the start of her most recent period.
+# 1.1.0 is the latest stable; the 1.2.0 line is still alpha and this is not a
+# place to be on an alpha. Read-only -- the app requests READ_MENSTRUATION and
+# no WRITE permission of any kind, and never writes to Health Connect.
+healthConnect = "1.1.0"
 watchfacePush = "1.0.0"
 junit = "5.11.3"
 # 2026.02.00, not the newest: Compose 1.12 requires compileSdk 37 and AGP 8.13.2
@@ -43,6 +48,7 @@ googleid = "1.1.1"
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "1.11.3" }
 play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "playServicesWearable" }
+androidx-health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
 wear-complications-data-source = { module = "androidx.wear.watchface:watchface-complications-data-source-ktx", version = "1.2.1" }
 wear-watchface-push = { module = "androidx.wear.watchfacepush:watchfacepush", version.ref = "watchfacePush" }
 wear-remote-interactions = { module = "androidx.wear:wear-remote-interactions", version = "1.1.0" }

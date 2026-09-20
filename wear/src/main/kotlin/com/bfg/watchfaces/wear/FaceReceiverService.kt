@@ -76,6 +76,24 @@ class FaceReceiverService : WearableListenerService() {
             answerCatalog(event.sourceNodeId)
             return
         }
+        // The date her most recent period started. A DATE, not a day number --
+        // the watch derives the number itself whenever it is asked, so nothing
+        // goes stale at midnight. See CycleDay.
+        //
+        // An empty payload CLEARS it: she revoked the permission, deleted the
+        // records, or turned the feature off, and the slot has to go back to an
+        // em dash rather than keeping the last number it ever saw.
+        if (event.path == WatchLink.CYCLE_START_PATH) {
+            val raw = runCatching { String(event.data, Charsets.UTF_8) }.getOrDefault("")
+            val date = com.bfg.watchfaces.appcore.CycleDay.parse(raw)
+            com.bfg.watchfaces.appcore.CycleDay.save(applicationContext.filesDir, date)
+            // Logged WITHOUT the date. It is health-derived, it is hers, and a
+            // logcat line is the one place in this system where it would sit in
+            // plain text on a device we do not control the lifetime of.
+            Log.i(TAG, if (date == null) "cycle start cleared" else "cycle start set")
+            CycleDayService.notifyChanged(applicationContext)
+            return
+        }
         if (event.path != WatchLink.NOTE_PATH) {
             super.onMessageReceived(event)
             return

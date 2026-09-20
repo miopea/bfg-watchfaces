@@ -861,16 +861,46 @@ data class DialParams(
     }
 
     /**
-     * True when this face depends on a LOCAL image and cannot enter the catalog.
+     * True when this face cannot enter the catalog.
      *
-     * A [BuiltInDial] is explicitly not local: its bytes ship inside the app, so
-     * whoever installs the face already has the picture and there is nothing of
-     * anybody's to upload. Those are the only shareable `TEXTURE` faces.
+     * Two reasons, and the second is not about pictures at all.
+     *
+     * **A local image.** The bytes are the person's own and the catalog stores
+     * parameters, so there is nothing to share. A [BuiltInDial] is explicitly
+     * NOT local: its bytes ship inside the app, so whoever installs the face
+     * already has the picture. Those are the only shareable `TEXTURE` faces.
+     *
+     * **A slot pointing at the cycle complication.** No health VALUE is ever in
+     * a face -- the JSON holds a provider's component name, not a reading -- so
+     * it is tempting to think sharing is harmless. It is not. A published face
+     * naming this provider tells everyone who downloads it that its author
+     * tracks a menstrual cycle. That is the disclosure, and parametric sharing
+     * does nothing to prevent it, because the component name IS a parameter.
+     *
+     * Caught here rather than at the share button because this is the one seam
+     * `CatalogService` already checks, so every path that could publish is
+     * covered by extending it -- and a second rule somewhere else is how one of
+     * them ends up not having it.
      */
     val isLocalOnly: Boolean
+        get() = hasLocalTexture || hasPrivateProvider
+
+    private val hasLocalTexture: Boolean
         get() = engine == Engine.TEXTURE &&
             texture.isNotBlank() &&
             BuiltInDial.byId(texture) == null
+
+    /**
+     * Whether any slot names a provider that would disclose something personal.
+     *
+     * Matched on the CLASS, not the whole component: the package belongs to the
+     * watch app and is asserted in one place already, and a face hand-edited to
+     * name the same class under another package should be caught too.
+     */
+    private val hasPrivateProvider: Boolean
+        get() = providers.values.any { c ->
+            PRIVATE_PROVIDER_CLASSES.any { c.substringAfter('/').endsWith(it) }
+        }
 
     /** The source at [pos], or NONE when the stored list is short/absent. */
     /**
@@ -933,6 +963,23 @@ data class DialParams(
     }
 
     companion object {
+        /**
+         * Complication providers whose PRESENCE in a face discloses something.
+         *
+         * Not the value -- a face never carries a reading. The component name
+         * itself is the disclosure: a published face naming the cycle provider
+         * says that its author tracks a menstrual cycle, to everyone who
+         * downloads it. See [isLocalOnly].
+         *
+         * A list rather than one string, because the next provider of this kind
+         * should be added here and not given its own special case somewhere
+         * else. `PhoneNoteService` is deliberately NOT on it: the note is
+         * whatever she typed, it is on the face because she put it there, and
+         * nothing about the provider's name reveals anything she did not
+         * choose to write.
+         */
+        val PRIVATE_PROVIDER_CLASSES: List<String> = listOf("CycleDayService")
+
         /**
          * What a stored colour looks like: `#RRGGBB`, either case.
          *

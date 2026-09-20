@@ -174,6 +174,44 @@ None of this has run. In particular:
   justification and an approval that can be refused — see the declarations doc.
   Nothing should be built past the point of no return until that is answered.
 
+## Built on 2026-09-20
+
+What exists, and where:
+
+| Piece | Where | What it does |
+| --- | --- | --- |
+| `CycleDay` | `:appcore` | The arithmetic. Day 1 is the first day of the period. Stores and parses the date. Pure, 9 tests. |
+| `CycleSource` | `:mobile` | The ONLY code that touches Health Connect. Reads `MenstruationPeriodRecord`, returns one `LocalDate`. |
+| `CycleSender` | `:mobile` | Sends that date over `MessageClient`. Sends an EMPTY payload to clear. |
+| `CycleSetup` | `:mobile` | The explanation and the permission, shown only once a slot points at the cycle source. |
+| `CycleDayService` | `:wear` | The complication provider. Derives the number from the stored date on every request. |
+| `WatchLink.CYCLE_START_PATH` | `:appcore` | The one wire path. |
+
+Three things worth knowing that the plan above did not anticipate:
+
+**Day 1 is the first day of the period, not the day after.** That is what the
+phrase means to everyone who uses it, and an off-by-one here is invisible to us
+and obvious to her. Pinned by a test.
+
+**A large day count is shown rather than hidden.** No staleness ceiling. If the
+last logged period was ninety days ago it says `Day 90`, which is strange and
+TRUE, and tells her the tracking or the sync has lapsed. A slot she deliberately
+chose going quietly blank is the failure this repo keeps paying for.
+
+**A future start date shows nothing.** The phone and the watch can be in
+different timezones and an instant near midnight lands on different dates on
+each. `Day -3` on a wrist is worse than a blank.
+
+### Sharing is blocked through `isLocalOnly`
+
+A face naming the cycle provider is now `isLocalOnly`, alongside a face carrying
+an imported photo. `CatalogService` already refuses anything local-only, so
+extending that one property covers every path that could publish — rather than a
+second rule at the share button which one path would eventually not have.
+
+`PhoneNoteService` is deliberately NOT on that list: the note is whatever she
+typed, and the provider's name discloses nothing she did not choose to write.
+
 ## Order of work
 
 1. The Play permission declaration form, because it can be refused and

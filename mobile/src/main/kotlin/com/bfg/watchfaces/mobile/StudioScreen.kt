@@ -410,6 +410,16 @@ fun StudioScreen(
             }
         }
 
+        // The cycle explanation and its permission, shown ONLY once a slot
+        // actually points at the cycle source. Asking for menstrual data before
+        // being told what it is for has no answer to "why"; this way the ask
+        // arrives with its reason already on the screen. See CycleSetup.
+        if (params.providers.values.any { isCycleProvider(it) }) {
+            Spacer(Modifier.height(8.dp))
+            CycleSetup()
+            Spacer(Modifier.height(8.dp))
+        }
+
         // Only offered on a face new enough to have the room for it. A design
         // saved before this existed keeps the version it was saved at, and its
         // slot boxes were measured without a bar -- so the switch would be a
