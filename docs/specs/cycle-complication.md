@@ -207,6 +207,23 @@ wife logs in Google Health, and a complication she cannot reach from her own dat
 is not a competitor to her. But "nobody has this" was the wrong argument to build
 on, and the permission justification must not lean on it.
 
+## Seen on a wrist, 2026-09-20
+
+All of it, on the operator's Pixel Watch 5 running 1.51 (1044) from
+`wear:internal`, with the phone on 1.96 (97) from `internal` — Play builds on
+both, not sideloads, so this is what a tester actually gets.
+
+- **The complication** renders the day on a face, as a bare number.
+- **The tile** appears in the carousel, shows the ring, the number and the
+  caption, and carries the extra facts.
+- **Tapping the tile** opens the cycle section of Google Health on the phone.
+
+That last one took two goes. It shipped with its activity `exported="false"`,
+which makes a tile's tap silently inert, because the TILE HOST starts the
+activity and it is a different process. See `DECISIONS.md` 2026-09-20.
+
+Still unproven: the midnight rollover, on either surface.
+
 ## What is not verified, and has to be
 
 None of this has run. In particular:

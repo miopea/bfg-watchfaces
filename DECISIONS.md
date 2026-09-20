@@ -37,17 +37,24 @@ permission, and its entire behaviour is to open one fixed URI on the paired
 phone. There is nothing to abuse, and a tile launch target has no other
 configuration available.
 
-### What is still NOT known
+### VERIFIED ON A WRIST, 2026-09-20, watch 1.51 (1044)
 
-Whether the handoff itself works once the activity can actually run. The watch's
-Wear companion may or may not forward a custom `fitbit://` scheme —
-`RemoteActivityHelper` documents ACTION_VIEW + data URI + CATEGORY_BROWSABLE and
-says nothing about schemes, and there is no https route to the cycle page to
-fall back on (checked: Google Health's https filters cover device-management,
-identity-migration and OAuth, not cycle). If the tap now produces a toast but
-still no phone activity, that is the second bug and it needs a different route —
-probably bouncing through our own phone app, which is foregrounded and may start
-another activity.
+Exporting the activity was the whole fix. The operator tapped the card on his
+Pixel Watch 5 and Google Health opened on his phone, on the cycle page:
+"This works perfectly. Opened right to the app."
+
+**So `RemoteActivityHelper` DOES forward a custom scheme.** That was the open
+question and the answer matters beyond this feature: the API documents
+ACTION_VIEW + a data URI + CATEGORY_BROWSABLE and says nothing about schemes,
+and the common assumption is that only http/https survive the hop to the phone.
+`fitbit://minerva` survives it. There was no https route to fall back on —
+Google Health's https filters cover device-management, identity-migration and
+OAuth, not cycle — so had the assumption been true this feature would have
+needed a different architecture.
+
+The contingency that was drafted and is NOT needed: bouncing through our own
+phone app to get a foreground context. Recorded because the reasoning is sound
+and would apply to any app whose deep link genuinely is not forwarded.
 
 ## 2026-09-20 — The health gate is on the BUNDLE, and `--dry-run` cannot see it
 
