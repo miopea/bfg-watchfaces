@@ -297,10 +297,19 @@ On Google Play (2026-08-29):
   committed to `wear:internal` normally. So the gate is on the BUNDLE'S
   permissions, not on the app as a whole — a watch release can ship while a
   phone release carrying health data cannot.
-- **A refused commit leaves no trace.** Verified the same day against submission
-  activity either side: no new submission row, and the running review still
-  `In review`. So a refused release is safe to attempt, and attempting one is
-  the only way to learn whether the gate has lifted.
+- **A refused commit disturbs no REVIEW, which is narrower than "no trace".**
+  Verified 2026-09-20 against submission activity either side of a refusal: no
+  new submission row, and the running review still `In review`. So a refused
+  release is safe to attempt, and attempting one is the only way to learn
+  whether the gate has lifted — nothing reports it.
+  **But the TRACK does change.** A later `edits.tracks.list` showed a `draft`
+  release on `internal` that was not there before the day's uploads, and it
+  carried the WEAR bundle (`1043 (1.50)`) rather than the phone bundle that was
+  refused. It read `codes=None` on one call and filled in seconds later, so Play
+  populates it asynchronously. A draft publishes nothing and a Wear bundle is
+  refused on the phone track anyway, so it is residue rather than a hazard —
+  but do not read "submission activity is unchanged" as "nothing changed", and
+  check the tracks as well as the submissions.
 - **Wear branded launch has cost three review cycles. Follow the page, not the
   attribute list.** The guideline is a 48x48dp circular icon, on black, that
   "must match the app launcher icon", and Google publishes the exact recipe at
