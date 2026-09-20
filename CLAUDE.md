@@ -280,8 +280,27 @@ On Google Play (2026-08-29):
   There is no confirmation step and the script cannot know one was wanted.
   So on this app the last action before an intended pause must be a console
   save, never an API commit; and if a human is meant to press the button, do
-  the listing FIRST and the release last. Use `--dry-run` to prove Play accepts
-  the assets — it stages and then deletes the edit, changing nothing.
+  the listing FIRST and the release last. `--dry-run` stages and then deletes
+  the edit, changing nothing.
+- **`--dry-run` does NOT prove Play will accept a release.** It stages and
+  deletes without ever committing, and the COMMIT is where Play's policy gates
+  live. Measured 2026-09-20: a dry run of phone bundle 97 reported "staged 97 on
+  track 'internal'" and the real run of the same bundle was refused `403 You
+  must let us know whether your app includes any health features`. A green dry
+  run means the upload parsed, nothing more.
+- **A bundle carrying a health permission is refused while the Health apps
+  declaration is IN REVIEW. Submitting it is not enough — it has to be
+  approved.** Measured 2026-09-20 with the declaration filed that morning
+  (submission 12, `In review`): phone bundle 97, which carries
+  `android.permission.health.READ_MENSTRUATION`, was refused with that 403;
+  minutes later watch bundle 1043, which carries no health permission,
+  committed to `wear:internal` normally. So the gate is on the BUNDLE'S
+  permissions, not on the app as a whole — a watch release can ship while a
+  phone release carrying health data cannot.
+- **A refused commit leaves no trace.** Verified the same day against submission
+  activity either side: no new submission row, and the running review still
+  `In review`. So a refused release is safe to attempt, and attempting one is
+  the only way to learn whether the gate has lifted.
 - **Wear branded launch has cost three review cycles. Follow the page, not the
   attribute list.** The guideline is a 48x48dp circular icon, on black, that
   "must match the app launcher icon", and Google publishes the exact recipe at
@@ -312,9 +331,12 @@ On Google Play (2026-08-29):
   Families programme, which is the right side of the line while the community
   catalog accepts user-submitted faces.
 - `com.bfg.watchfaces` is live on **internal testing** in the BFG Solutions org
-  account — phone `versionCode 1` on `internal`, watch `versionCode 1001` on
-  `wear:internal`. Opt-in:
+  account. Opt-in:
   `https://play.google.com/apps/internaltest/4701563329381059441`
+  Read the live numbers from `edits.tracks.list` rather than from here — this
+  line has been wrong before. As of 2026-09-20: phone `88` on `internal` and
+  `83` on `production`; watch `1043` on `wear:internal` and `1031` on
+  `wear:production`.
 - Publish with `scripts/play-release.py`, not the console. It reads the service
   account from 1Password, uploads and commits in one command. **A Wear bundle
   cannot go on the phone track** — Play rejects the commit — so phone and watch

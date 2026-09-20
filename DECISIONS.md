@@ -1,5 +1,70 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-20 — The health gate is on the BUNDLE, and `--dry-run` cannot see it
+
+Trying to put the cycle feature in front of a tester produced three measured
+facts that contradict things this repo believed.
+
+### `--dry-run` proves the upload parsed, and nothing else
+
+`CLAUDE.md` said to use it "to prove Play accepts the assets". It cannot: it
+stages an edit and deletes it without ever committing, and the COMMIT is where
+Play's policy gates live.
+
+Measured minutes apart on the same bundle. The dry run printed `staged 97 on
+track 'internal'` and exited clean. The real run printed the same line and then
+`403 You must let us know whether your app includes any health features`.
+
+A green dry run is now documented as meaning the file uploaded, full stop.
+
+### Submitting the Health apps declaration is not enough. It has to be APPROVED
+
+Earlier in the same week the identical 403 was read as "the declaration was
+saved but not submitted", and submitting it was the fix. It is submitted —
+submission 12, filed 10:45 that morning, sitting at `In review` on the
+publishing overview — and the 403 is unchanged.
+
+So the condition is approval, not filing, and the wait is a review cycle rather
+than a form.
+
+### But the gate is on the BUNDLE'S permissions, not on the app
+
+This is the part that was worth finding, because it decides what can ship today.
+
+Phone bundle 97 carries `android.permission.health.READ_MENSTRUATION` and was
+refused. Watch bundle 1043 carries no health permission, and **committed to
+`wear:internal` normally**, minutes later, with the same review still running
+and the same service account.
+
+So "the app has an unapproved health declaration" does not freeze the app. It
+freezes the artefacts that ask for health data. The watch half of a feature can
+be in testers' hands while the phone half waits.
+
+### A refused commit leaves no trace, so attempting one is cheap
+
+Checked submission activity immediately either side of the refusal: no new
+submission row, and submission 12 still `In review`. Nothing was cancelled and
+nothing restarted.
+
+That matters because it makes the refusal a free PROBE. There is no other way to
+discover whether the gate has lifted — no field anywhere reports it — so the
+answer is to try the release and read the error.
+
+Committing to `wear:internal` during the review was equally invisible, which
+reproduces the 2026-09-03 measurement that testing tracks are exempt from the
+cancel-and-restart rule.
+
+### What this does not change
+
+The justification in `cycle-complication-declarations.md` was amended the same
+day because the feature had outgrown it. None of that reached Google: the
+console's Health apps step is a feature checklist with no justification field,
+and the Data Safety answers that were submitted — Health info, not collected,
+shared via the complication mechanism, not ephemeral, app functionality — are
+unaffected by the tile showing period length and an average. The amendment keeps
+our own record true; there is nothing to resubmit, and resubmitting would cancel
+the review that is the only thing standing between here and shipping.
+
 ## 2026-09-20 — "Day 18" was never the decision, and the icon half is amended
 
 ### The rule existed, in prose, and the code disagreed with it
