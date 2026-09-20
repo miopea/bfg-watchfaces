@@ -978,7 +978,22 @@ data class DialParams(
          * nothing about the provider's name reveals anything she did not
          * choose to write.
          */
-        val PRIVATE_PROVIDER_CLASSES: List<String> = listOf("CycleDayService")
+        /**
+         * The cycle complication's class, named ONCE.
+         *
+         * `:wear` registers it, `:mobile` decides whether to show the cycle
+         * setup from it, and the sharing rule below is keyed on it. Three
+         * callers, one string -- the alternative is three string literals that
+         * agree until somebody renames the service, which is the failure
+         * [SlotGeometry] exists as a monument to.
+         *
+         * Here rather than in `:appcore` because the sharing rule is a property
+         * of the stored file format, and `:generator` is where the file format
+         * is defined. `:appcore` depends on `:generator`, never the reverse.
+         */
+        const val CYCLE_PROVIDER_CLASS = "CycleDayService"
+
+        val PRIVATE_PROVIDER_CLASSES: List<String> = listOf(CYCLE_PROVIDER_CLASS)
 
         /**
          * What a stored colour looks like: `#RRGGBB`, either case.

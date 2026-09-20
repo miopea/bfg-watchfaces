@@ -1,5 +1,96 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-20 — Cycle day is built before it is declared, not after
+
+The app now reads one Health Connect record type and shows the day of her cycle
+on her own watch. The order it was done in is the decision worth recording.
+
+### The plan was to file the Play declaration FIRST, and that was wrong
+
+Both specs said to file before building, because the declaration "carries a
+justification and an approval that can be refused", so building first risked
+wasting the work. The operator authorised exactly that.
+
+Driving the Console disproved the premise. **Play Console → App content → Health
+apps is a feature checklist**, plus a regional-requirements step that currently
+asks nothing. There is no justification field anywhere in it, so it does not
+produce the approve-or-refuse answer the whole ordering existed to obtain.
+
+Worse, filing first meant declaring a period-tracking feature the app did not
+have, and putting "collects health data" on a PUBLIC store listing while the app
+collected none. That is a false statement made to learn nothing, on an app that
+has already spent several review cycles. So: build it, then declare what is
+actually there. Operator's call, taken with the evidence in front of him.
+
+### A DATE crosses, never a number
+
+The phone sends the start of the most recent period; the watch derives "Day 14"
+whenever it is asked. A number is right for one day and silently wrong the next,
+so something would have to wake at midnight — a background job, a dependency on
+the phone being reachable, and a value that goes stale exactly when nobody is
+looking. A date is right forever.
+
+It also keeps the declaration honest: one date, to her own watch, over a direct
+device-to-device channel. The raw records never leave Health Connect, and
+neither side ever logs the value.
+
+### Day 1 is the first day of the period
+
+Not the day after. That is what the phrase means to everyone who uses it, and an
+off-by-one here is invisible to us and obvious to her. A test pins it, because
+nothing else would have.
+
+### A large count is shown; a future one is not
+
+No staleness ceiling: ninety days says `Day 90`, which is strange and TRUE and
+tells her the tracking or the sync has lapsed. Hiding it would be a slot she
+deliberately chose going quietly blank, which is the failure this repo keeps
+paying for.
+
+A FUTURE start date shows nothing. Two devices in different zones can disagree
+about which day an instant falls on, and `Day -3` on a wrist is worse than a
+blank.
+
+### The empty state is the only state for a lot of people
+
+Health Connect is a store, not a source. Something must WRITE those records.
+**Google Health writes Cycle health (Periods, Flow, Intermenstrual bleeding)**,
+which is why this works for the person it was built for. **Clue writes nothing
+at all** — it has no Health Connect integration — so a Clue user would find this
+permanently empty however the permission is set.
+
+So "no records" is not a rare edge. For a large group it is permanent, and it
+must never read as her having done something wrong, and must never be answered
+by asking again for a permission she has already granted. It says the app she
+tracks in may not be sharing, because that is usually the truth.
+
+### A cycle face cannot be shared, and the reason is not the obvious one
+
+No health VALUE is ever in a face — the stored JSON holds a provider's component
+name, not a reading — so it looks harmless to publish. It is not. **A published
+face naming this provider tells everyone who downloads it that its author tracks
+a menstrual cycle.** The component name IS the disclosure, and parametric
+sharing does nothing about it.
+
+Enforced by extending `DialParams.isLocalOnly`, which `CatalogService` already
+refuses, so every path that could publish is covered by one property rather than
+a second rule at the share button that one path would eventually not have.
+`PhoneNoteService` is deliberately NOT private: the note is whatever she typed.
+
+### Rejected: making it a tile, or reading on the watch
+
+Health Connect exists on Wear OS, so the watch could read directly and always be
+fresh. Rejected: it would put a restricted health permission in a SECOND app,
+doubling the Play surface, and nothing here could verify whether menstruation
+records actually sync to a watch's Health Connect store. That is the class of
+assumption this project has paid for repeatedly.
+
+### What is still unverified, and can only be answered on a wrist
+
+`UPDATE_PERIOD_SECONDS` is 0, on the reasoning that the system re-requests
+complication data when the date rolls. **If the number sticks across midnight,
+that reasoning was wrong and it needs a timer.** No test here can produce that.
+
 ## 2026-09-19 — A ranged complication is drawn as a bar, and the face opts in
 
 Nine of the ten Fitbit complications were unreachable on the operator's Pixel

@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.health.connect.client.PermissionController
+import com.bfg.watchfaces.generator.DialParams
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -34,9 +35,14 @@ import kotlinx.coroutines.withContext
  * Matched on the class rather than the whole component, because the package is
  * the watch app's and that is asserted in one place already. A slot pointing
  * here is what makes the cycle setup worth showing at all.
+ *
+ * The class name comes from [DialParams.CYCLE_PROVIDER_CLASS] rather than a
+ * literal here: the same string decides whether a face can be SHARED, and two
+ * copies of it would agree right up until somebody renamed the service.
  */
 fun isCycleProvider(component: String?): Boolean =
-    component != null && component.substringAfter('/').endsWith("CycleDayService")
+    component != null &&
+        component.substringAfter('/').endsWith(DialParams.CYCLE_PROVIDER_CLASS)
 
 /**
  * The explanation and the permission, on the phone, where there is room.
@@ -103,6 +109,19 @@ fun CycleSetup(modifier: Modifier = Modifier) {
         Column(Modifier.padding(16.dp)) {
             Text("Cycle day", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(6.dp))
+
+            // Said HERE, once, rather than discovered as a missing Share
+            // button -- the same reasoning PhotoRow gives for saying it beside
+            // the photo picker. A face with this slot is isLocalOnly, and the
+            // reason is not obvious: no reading is ever stored in a face, but
+            // the provider's NAME is, and publishing it would tell everyone who
+            // downloaded the face that its author tracks a cycle.
+            Text(
+                "A design with this on it stays on your phone and can't be shared.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(10.dp))
 
             when (val s = state) {
                 null -> Text("Checking…", style = MaterialTheme.typography.bodyMedium)
