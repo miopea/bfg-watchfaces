@@ -214,15 +214,31 @@
     </service>
 
     <!--
-      Where a tap on the cycle card lands. Not exported: the only thing that
-      starts it is this app's own tile, and it exists solely because a tile's
-      click can start an activity on the watch and nothing else. It draws no
-      UI, so it gets a translucent theme and no title bar; a visible blank
-      screen between the tap and the phone would read as the tap failing.
+      Where a tap on the cycle card lands.
+
+      EXPORTED, and it has to be. This shipped as exported="false" with a
+      comment reasoning that "the only thing that starts it is this app's own
+      tile" - which is the wrong model and the reason the tap did nothing at
+      all on a real watch. A tile's click is not dispatched by us. The TILE
+      HOST, the Wear system UI, is a different app and it calls startActivity
+      on our behalf; a non-exported target refuses it with a SecurityException
+      that the host swallows, so the tap has no effect and no error.
+
+      The evidence was already in hand and was walked past: adb shell could not
+      start this activity either, for exactly the same reason, and that was
+      recorded at the time as a testing limitation rather than read as the bug.
+
+      What exporting costs: any app on the watch can start it. It takes no
+      extras, reads nothing, and its whole behaviour is to open a fixed URI on
+      the paired phone. There is nothing here to abuse.
+
+      It draws no UI, so it keeps a translucent theme and no title bar; a
+      visible blank screen between the tap and the phone would read as the tap
+      failing.
     -->
     <activity
         android:name=".CycleOpenActivity"
-        android:exported="false"
+        android:exported="true"
         android:excludeFromRecents="true"
         android:noHistory="true"
         android:theme="@android:style/Theme.Translucent.NoTitleBar" />

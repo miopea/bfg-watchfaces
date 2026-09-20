@@ -1,5 +1,54 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-20 — A tile's tap target must be EXPORTED, and the proof was already in hand
+
+The cycle card's tap did nothing on a real watch. No phone activity, no toast,
+no error — nothing at all.
+
+`CycleOpenActivity` shipped as `android:exported="false"`, with a comment
+reasoning that "the only thing that starts it is this app's own tile". **That
+model is wrong.** A tile's `Clickable` is not dispatched by the app that owns the
+tile. The TILE HOST — the Wear system UI, a separate process — calls
+`startActivity` on our behalf. A non-exported target refuses it with a
+`SecurityException`, and the host swallows it, so the tap is inert and silent.
+
+### The evidence was collected and then filed as a limitation
+
+Earlier the same day, `adb shell am start` on that activity failed with a
+`SecurityException`. That was recorded as "adb cannot start a non-exported
+activity, so the tap chain isn't verifiable from here" — a note about TESTING.
+It was the bug, stated exactly, an hour before it shipped.
+
+Two guards were in place and both passed: the two halves really were each
+proven — `fitbit://minerva` resolves on the phone, and `RemoteActivityHelper`
+already ships in `WatchActivity` — and the handoff really was flagged as
+unverified. Neither helps when the thing that fails is the step BEFORE both of
+them.
+
+**The rule: when a permission error blocks your test harness, ask whether the
+real caller is in the same position as the harness.** Here it was. `adb shell`
+and the tile host are both external processes, and the activity refused both for
+one reason.
+
+### What exporting costs
+
+Any app on the watch can start it. It takes no extras, reads nothing, holds no
+permission, and its entire behaviour is to open one fixed URI on the paired
+phone. There is nothing to abuse, and a tile launch target has no other
+configuration available.
+
+### What is still NOT known
+
+Whether the handoff itself works once the activity can actually run. The watch's
+Wear companion may or may not forward a custom `fitbit://` scheme —
+`RemoteActivityHelper` documents ACTION_VIEW + data URI + CATEGORY_BROWSABLE and
+says nothing about schemes, and there is no https route to the cycle page to
+fall back on (checked: Google Health's https filters cover device-management,
+identity-migration and OAuth, not cycle). If the tap now produces a toast but
+still no phone activity, that is the second bug and it needs a different route —
+probably bouncing through our own phone app, which is foregrounded and may start
+another activity.
+
 ## 2026-09-20 — The health gate is on the BUNDLE, and `--dry-run` cannot see it
 
 Trying to put the cycle feature in front of a tester produced three measured
