@@ -27,7 +27,23 @@ publishing overview — and the 403 is unchanged.
 So the condition is approval, not filing, and the wait is a review cycle rather
 than a form.
 
-### But the gate is on the BUNDLE'S permissions, not on the app
+### CORRECTED SAME DAY: the gate is the API's, and the Console ships anyway
+
+Everything below was written before the other path was tried, and it is wrong in
+its conclusion. The operator uploaded **the same bundle 97** through Create
+release in the Play Console hours later, with submission 12 still sitting at `In
+review` and nothing approved in between, and it went live on `internal`.
+
+So the refusal is a property of `edits:commit`, not of Play, not of approval and
+not of the artefact. `play-release.py` cannot ship a phone build carrying
+`READ_MENSTRUATION` right now; the Console can, today.
+
+I asserted "we have to wait for approval" twice before testing the other path.
+The lesson is not about Play: an API refusing is evidence about the API, and
+treating one client's error as the platform's policy is how a five-hour wait got
+invented. The rest of this section stands as the measurement it was.
+
+### The measurement as taken: the API gate follows the bundle's permissions
 
 This is the part that was worth finding, because it decides what can ship today.
 

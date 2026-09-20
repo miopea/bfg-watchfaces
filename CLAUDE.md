@@ -288,15 +288,18 @@ On Google Play (2026-08-29):
   track 'internal'" and the real run of the same bundle was refused `403 You
   must let us know whether your app includes any health features`. A green dry
   run means the upload parsed, nothing more.
-- **A bundle carrying a health permission is refused while the Health apps
-  declaration is IN REVIEW. Submitting it is not enough — it has to be
-  approved.** Measured 2026-09-20 with the declaration filed that morning
-  (submission 12, `In review`): phone bundle 97, which carries
-  `android.permission.health.READ_MENSTRUATION`, was refused with that 403;
-  minutes later watch bundle 1043, which carries no health permission,
-  committed to `wear:internal` normally. So the gate is on the BUNDLE'S
-  permissions, not on the app as a whole — a watch release can ship while a
-  phone release carrying health data cannot.
+- **That 403 is the API's, not Play's. THE CONSOLE SHIPS THE SAME BUNDLE.**
+  Measured 2026-09-20, same app, same bundle, same day, declaration untouched
+  at `In review` the whole time: `play-release.py` was refused committing phone
+  bundle 97 to `internal`, and hours later the operator rolled out **that exact
+  bundle** through Create release in the Console and it went live on `internal`.
+  Submission activity never changed and submission 12 is still `In review`, so
+  nothing was approved in between.
+  So the gate is on `edits:commit`, not on approval, not on the artifact, and
+  not on the app. **A phone release carrying health data ships from the Console
+  today; only the API path is blocked.** I asserted the opposite twice before
+  testing it — the API refusing is not Play refusing, and the only way that
+  distinction shows up is to try the other path.
 - **A refused commit disturbs no REVIEW, which is narrower than "no trace".**
   Verified 2026-09-20 against submission activity either side of a refusal: no
   new submission row, and the running review still `In review`. So a refused
