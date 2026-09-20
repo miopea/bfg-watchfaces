@@ -72,7 +72,7 @@ class CycleDayService : SuspendingComplicationDataSourceService() {
      */
     override fun getPreviewData(type: ComplicationType): ComplicationData? {
         if (type != ComplicationType.SHORT_TEXT) return null
-        return shortText("Day 14")
+        return shortText(CycleDay.PREVIEW_LABEL)
     }
 
     private fun shortText(text: String) = ShortTextComplicationData.Builder(

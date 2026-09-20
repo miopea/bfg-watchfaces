@@ -461,11 +461,20 @@ fun StudioScreen(
                     )
                 },
                 onApp = { component ->
-                    // The system source stays as the fallback for a watch that
-                    // does not have the app. DefaultProviderPolicy requires one.
+                    // The system source stays as the FALLBACK for a watch that
+                    // does not have the app; DefaultProviderPolicy requires one.
+                    //
+                    // But not every source can be one. A SHORTCUT emits a
+                    // Launch and a DRAWN source emits our own text, and both
+                    // emit no ComplicationSlot at all -- so the provider was
+                    // silently discarded and the slot kept doing what it did
+                    // before. Reported from a wrist on 2026-09-20: a Music slot
+                    // switched to the cycle complication went on showing music,
+                    // and the picker showed both as chosen.
+                    val current = params.slot(pos)
+                    val usable = current.enabled && !current.isShortcut && !current.isDrawn
                     val withFallback =
-                        if (params.slot(pos).enabled) params
-                        else params.withSlot(pos, ComplicationSource.DATE)
+                        if (usable) params else params.withSlot(pos, ComplicationSource.DATE)
                     onParams(withFallback.copy(providers = withFallback.providers + (pos to component)))
                 },
                 onIcon = { on ->
@@ -840,7 +849,13 @@ private fun SlotPicker(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = source == selected,
+                                // Nothing in this list is selected while a
+                                // provider from the watch is chosen: the
+                                // provider fills the slot, and the source
+                                // behind it is only a fallback. Showing both
+                                // lit is what made a Music slot look like it
+                                // was still music after picking Cycle.
+                                selected = component == null && source == selected,
                                 onClick = { onSelect(source); open = false }
                             )
                             SourceGlyph(source)

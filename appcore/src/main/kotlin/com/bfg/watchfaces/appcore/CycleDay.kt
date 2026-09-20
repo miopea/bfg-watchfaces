@@ -80,6 +80,16 @@ object CycleDay {
     const val EMPTY_PLACEHOLDER = "—"
 
     /**
+     * The day a PREVIEW pretends it is.
+     *
+     * Used by both dial previews and by the watch's own complication picker, so
+     * what she sees while choosing is what she sees after choosing. A plausible
+     * day rather than the word "preview", matching how every other slot
+     * previews.
+     */
+    const val PREVIEW_LABEL = "Day 14"
+
+    /**
      * Remember the start date the phone sent.
      *
      * Stored as ISO-8601 (`2026-09-14`) — a DATE with no time and no zone,

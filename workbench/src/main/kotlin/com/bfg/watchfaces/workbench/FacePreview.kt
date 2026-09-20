@@ -106,7 +106,9 @@ object FacePreview {
             val iconSize = SlotGeometry.iconHeight(fitted, p.generatorVersion).toDouble()
             val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
             val fontSize = SlotGeometry.fontSize(fitted).toDouble()
-            val source = p.slot(pos)
+            // effectiveSlot, matching WffEmitter: a slot with a named provider
+            // never draws its shortcut or drawn source, so neither does this.
+            val source = p.effectiveSlot(pos)
             val a = if (ambient) (if (pos == SlotPosition.TOP) 140 else 0) else 255
             if (a <= 0) continue
             val c = withAlpha(if (ambient) ambientSlotInk else ink, a)
@@ -120,7 +122,10 @@ object FacePreview {
             // size; so does this. A preview that shortened differently from
             // the watch would be a preview of a different face.
             val drawn = SlotGeometry.drawnText(source, box, fontSize.toInt(), p.generatorVersion, pos)
-            drawCenteredIn(g, drawn.sample ?: Complications.sample(source),
+            // sampleFor, not sample: a slot with a named provider is filled
+            // by that provider, so previewing its fallback source shows
+            // something the watch will never display.
+            drawCenteredIn(g, drawn.sample ?: Complications.sampleFor(p, pos),
                 box.x, box.y + textY, box.w, textH,
                 drawn.fontSize.toDouble(), Font.PLAIN, c, face)
 

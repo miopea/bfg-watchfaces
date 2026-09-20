@@ -948,6 +948,38 @@ data class DialParams(
         complications.getOrElse(pos.ordinal) { ComplicationSource.NONE }
 
     /**
+     * The source a slot actually emits with, once a named provider is taken
+     * into account.
+     *
+     * ## The bug this exists to stop
+     *
+     * A slot holds two things: a SOURCE and, optionally, a named provider app.
+     * Two sources emit no `<ComplicationSlot>` at all -- a SHORTCUT is a glyph
+     * with a `<Launch>`, and a DRAWN source is a `<PartText>` we fill ourselves
+     * -- so both return before the provider is ever read. Naming a provider on
+     * such a slot therefore did NOTHING on the watch, silently.
+     *
+     * Reported from a wrist on 2026-09-20: a Music slot, switched to the cycle
+     * complication, kept showing music, and the picker showed both as selected.
+     *
+     * The provider wins, because it was chosen second and it is the specific
+     * thing asked for. The source falls back to [ComplicationSource.DATE],
+     * which exists only to satisfy `DefaultProviderPolicy` -- WFF requires a
+     * `defaultSystemProvider`, a SHORTCUT has none (`wff` is null), and
+     * emitting `defaultSystemProvider="null"` would fail the schema and make
+     * the face vanish from the carousel.
+     *
+     * Substituting HERE rather than only in the picker fixes faces already
+     * saved in the broken state, and does it without a `require()` that would
+     * throw while loading one.
+     */
+    fun effectiveSlot(pos: SlotPosition): ComplicationSource {
+        val s = slot(pos)
+        if (providers[pos] == null) return s
+        return if (s.enabled && !s.isShortcut && !s.isDrawn) s else ComplicationSource.DATE
+    }
+
+    /**
      * The same face with one slot changed.
      *
      * Pads with NONE rather than failing on a short list, because [slot] already

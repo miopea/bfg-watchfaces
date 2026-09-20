@@ -135,7 +135,9 @@ object AndroidFacePreview {
             val iconSize = SlotGeometry.iconHeight(fitted, p.generatorVersion).toFloat()
             val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)
             val fontSize = SlotGeometry.fontSize(fitted).toFloat()
-            val source = p.slot(pos)
+            // effectiveSlot, matching WffEmitter: a slot with a named provider
+            // never draws its shortcut or drawn source, so neither does this.
+            val source = p.effectiveSlot(pos)
             val a = if (ambient) (if (pos == SlotPosition.TOP) 140 else 0) else 255
             if (a <= 0) continue
             val c = withAlpha(if (ambient) ambientSlotInk else ink, a)
@@ -154,7 +156,10 @@ object AndroidFacePreview {
             // same call the emitter makes. It shortens before it shrinks.
             val drawn = SlotGeometry.drawnText(source, box, fontSize.toInt(), p.generatorVersion, pos)
             drawCenteredIn(
-                canvas, drawn.sample ?: Complications.sample(source),
+                // sampleFor, not sample: a slot with a named provider is
+                // filled by that provider, so previewing its fallback source
+                // shows something the watch will never display.
+                canvas, drawn.sample ?: Complications.sampleFor(p, pos),
                 box.x.toFloat(),
                 (box.y + SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)).toFloat(),
                 box.w.toFloat(), textH.toFloat(),

@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.appcore
 
 import com.bfg.watchfaces.generator.ComplicationSource
+import com.bfg.watchfaces.generator.DialParams
 import com.bfg.watchfaces.generator.SlotPosition
 
 /**
@@ -57,6 +58,30 @@ object Complications {
      * the layout survives a value of about this size. They are not live data and
      * are not pretending to be.
      */
+    /**
+     * What the preview shows in a slot, taking a NAMED PROVIDER into account.
+     *
+     * A slot can hold a source and, on top of it, a provider app chosen from
+     * the watch. When one is named it is the provider that fills the slot, so
+     * previewing the source's sample shows something the watch will never
+     * display. That is the shape of bug reported from a wrist on 2026-09-20:
+     * a slot pointed at the cycle complication previewed as its old source.
+     *
+     * Only the providers this app itself supplies can be previewed honestly --
+     * for anyone else's we have no idea what the value looks like, so the
+     * fallback source's sample stays the best available guess about WIDTH,
+     * which is all [sample] ever claimed to be.
+     */
+    fun sampleFor(p: DialParams, pos: SlotPosition): String {
+        val component = p.providers[pos]
+        if (component != null &&
+            component.substringAfter('/').endsWith(DialParams.CYCLE_PROVIDER_CLASS)
+        ) {
+            return CycleDay.PREVIEW_LABEL
+        }
+        return sample(p.effectiveSlot(pos))
+    }
+
     fun sample(s: ComplicationSource): String = when (s) {
         ComplicationSource.NONE -> ""
         ComplicationSource.STEP_COUNT -> "8,412"

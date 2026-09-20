@@ -618,7 +618,11 @@ ${handPair("MinuteHand", "hand_minute")}$second
             else ""
 
         val slots = boxes.entries.map { (pos, box) ->
-            val source = p.slot(pos)
+            // effectiveSlot, not slot: a SHORTCUT or a DRAWN source emits no
+            // ComplicationSlot at all and would silently discard a named
+            // provider. Reported from a wrist on 2026-09-20 -- a Music slot
+            // switched to the cycle complication kept showing music.
+            val source = p.effectiveSlot(pos)
             val fitted = SlotGeometry.sizeAt(p, pos)
             val iconH = SlotGeometry.iconHeight(fitted, p.generatorVersion)
             val textH = SlotGeometry.textHeight(fitted, p.generatorVersion)

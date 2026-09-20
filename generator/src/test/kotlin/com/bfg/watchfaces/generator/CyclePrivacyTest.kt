@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.generator
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -68,5 +69,53 @@ class CyclePrivacyTest {
         val photo = DialParams(engine = Engine.TEXTURE, texture = "sha1-of-her-photo")
         assertTrue(photo.isLocalOnly)
         assertFalse(DialParams(engine = Engine.TEXTURE, texture = "").isLocalOnly)
+    }
+
+    /**
+     * Reported from a wrist on 2026-09-20: a Music slot switched to the cycle
+     * complication kept showing music, and the picker showed both as selected.
+     *
+     * The cause was silent and structural. A SHORTCUT source emits a PartDraw
+     * with a `<Launch>` and returns BEFORE any `<ComplicationSlot>`, so the
+     * named provider was never read. Same for a DRAWN source. Naming a provider
+     * on such a slot did nothing at all on the watch, with nothing to see.
+     */
+    @Test
+    fun `a named provider beats a shortcut source, which would otherwise discard it`() {
+        val p = DialParams()
+            .withSlot(SlotPosition.LEFT, ComplicationSource.SHORTCUT_MUSIC)
+            .let { it.copy(providers = it.providers + (SlotPosition.LEFT to "com.bfg.watchfaces/.CycleDayService")) }
+
+        assertEquals(ComplicationSource.DATE, p.effectiveSlot(SlotPosition.LEFT)) {
+            "a shortcut cannot host a provider, so the slot must fall back to a real source"
+        }
+        val xml = WffEmitter.emit(p)
+        assertTrue(xml.contains("""primaryProvider="com.bfg.watchfaces/.CycleDayService"""")) {
+            "the chosen provider never reached the face"
+        }
+        // And the shortcut's Launch must be gone from that slot, or the face
+        // would both open music and show a complication.
+        assertTrue(!xml.contains("<Launch target=\"MUSIC_PLAYER\"")) {
+            "the slot still launches music as well as naming a provider"
+        }
+    }
+
+    /** The same hole existed for a DRAWN source, which also returns early. */
+    @Test
+    fun `a named provider beats a drawn source too`() {
+        val p = DialParams()
+            .withSlot(SlotPosition.LEFT, ComplicationSource.WEATHER_TEMPERATURE)
+            .let { it.copy(providers = it.providers + (SlotPosition.LEFT to "com.x/.CycleDayService")) }
+        assertEquals(ComplicationSource.DATE, p.effectiveSlot(SlotPosition.LEFT))
+        assertTrue(WffEmitter.emit(p).contains("""primaryProvider="com.x/.CycleDayService""""))
+    }
+
+    /** An ordinary source with a provider is left exactly alone. */
+    @Test
+    fun `a provider on a normal slot does not change its source`() {
+        val p = DialParams()
+            .withSlot(SlotPosition.LEFT, ComplicationSource.STEP_COUNT)
+            .let { it.copy(providers = it.providers + (SlotPosition.LEFT to "com.fitbit/.Steps")) }
+        assertEquals(ComplicationSource.STEP_COUNT, p.effectiveSlot(SlotPosition.LEFT))
     }
 }
