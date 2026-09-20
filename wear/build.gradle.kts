@@ -19,8 +19,8 @@ android {
         // the phone and watch apps ship as two artefacts under one listing. The
         // scheme is "wear = phone + 1000", so the two never collide and it stays
         // obvious which is which in the console.
-        versionCode = 1039
-        versionName = "1.46"
+        versionCode = 1040
+        versionName = "1.47"
     }
     /**
      * Release signing. Identical to `:mobile`'s and deliberately so: both
@@ -68,6 +68,14 @@ android {
 dependencies {
     implementation(project(":appcore"))
     implementation(libs.androidx.core.ktx)
+    // The swipe carousel. TileService still serves it on the operator's watch
+    // (Android 17 / SDK 37) alongside Fitbit's and Maps' tiles; Wear OS 7
+    // renames the surface to widgets and migrates tiles into it, and the APIs
+    // stay backward compatible. See CycleTileService.
+    implementation(libs.androidx.wear.tiles)
+    implementation(libs.androidx.protolayout)
+    implementation(libs.androidx.protolayout.expression)
+    implementation(libs.androidx.protolayout.material3)
     // Wear's branded launch, and NOT optional despite minSdk 36.
     //
     // The first two attempts set the platform splash attributes directly and

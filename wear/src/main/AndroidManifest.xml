@@ -185,6 +185,34 @@
       This service holds no health permission and never touches Health Connect.
       It has one date, sent by her own phone.
     -->
+    <!--
+      The cycle day as a CARD IN THE CAROUSEL, swiped to from the watch face.
+
+      A different surface from the complication below, and not a duplicate of
+      it: a complication is a value ON the face, competing with three others
+      for room, and this is a whole screen you swipe to.
+
+      TILES rather than "widgets". Wear OS 7 renames the carousel and migrates
+      tiles into it, but this watch (Android 17, SDK 37) still has its carousel
+      served by TileService, with Fitbit's and Maps' tiles in it right now. The
+      APIs are backward compatible, so this is what actually appears today.
+
+      BIND_TILE_PROVIDER is the system permission that stops anything other
+      than the carousel binding this.
+    -->
+    <service
+        android:name=".CycleTileService"
+        android:exported="true"
+        android:label="Cycle day"
+        android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+      <intent-filter>
+        <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+      </intent-filter>
+      <meta-data
+          android:name="androidx.wear.tiles.PREVIEW"
+          android:resource="@mipmap/ic_launcher" />
+    </service>
+
     <service
         android:name=".CycleDayService"
         android:exported="true"
