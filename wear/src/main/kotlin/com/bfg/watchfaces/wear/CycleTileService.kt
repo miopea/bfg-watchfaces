@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.wear
 
+import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders.expand
 import androidx.wear.protolayout.LayoutElementBuilders
@@ -93,6 +94,35 @@ class CycleTileService : TileService() {
         val layout = LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
             .setHeight(expand())
+            // The WHOLE card is the tap target, not a button in it. There is
+            // one thing to do here and a card this sparse has nowhere sensible
+            // to put a control; a 200px target also beats a 48dp one on a
+            // wrist. See CycleOpenActivity for where it goes and why the phone
+            // rather than the watch.
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setClickable(
+                        ModifiersBuilders.Clickable.Builder()
+                            .setId("open-cycle")
+                            .setOnClick(
+                                ActionBuilders.LaunchAction.Builder()
+                                    .setAndroidActivity(
+                                        ActionBuilders.AndroidActivity.Builder()
+                                            .setPackageName(packageName)
+                                            .setClassName(CycleOpenActivity::class.java.name)
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .setSemantics(
+                        ModifiersBuilders.Semantics.Builder()
+                            .setContentDescription(semantics(day, headline, caption))
+                            .build()
+                    )
+                    .build()
+            )
             .addContent(
                 LayoutElementBuilders.Column.Builder()
                     .addContent(
@@ -168,6 +198,19 @@ class CycleTileService : TileService() {
                 .build()
         )
     }
+
+    /**
+     * What a screen reader says, as one sentence rather than three fragments.
+     *
+     * The card is written to be GLANCED at -- "Day 18" over "since your last
+     * period" reads at arm's length and says nothing to somebody listening to
+     * it in pieces. Read aloud it should be a sentence, and it should say what
+     * the tap does, because a tap target that announces nothing is a tap target
+     * nobody finds. Same reasoning as CycleDayService's contentDescription.
+     */
+    private fun semantics(day: Int?, headline: String, caption: String): String =
+        if (day == null) "Cycle day not available. $caption."
+        else "Cycle day $day, $caption. Opens Google Health on your phone."
 
     override fun onTileResourcesRequest(
         requestParams: RequestBuilders.ResourcesRequest

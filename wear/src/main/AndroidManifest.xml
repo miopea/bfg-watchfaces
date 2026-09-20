@@ -213,6 +213,20 @@
           android:resource="@mipmap/ic_launcher" />
     </service>
 
+    <!--
+      Where a tap on the cycle card lands. Not exported: the only thing that
+      starts it is this app's own tile, and it exists solely because a tile's
+      click can start an activity on the watch and nothing else. It draws no
+      UI, so it gets a translucent theme and no title bar; a visible blank
+      screen between the tap and the phone would read as the tap failing.
+    -->
+    <activity
+        android:name=".CycleOpenActivity"
+        android:exported="false"
+        android:excludeFromRecents="true"
+        android:noHistory="true"
+        android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
     <service
         android:name=".CycleDayService"
         android:exported="true"
