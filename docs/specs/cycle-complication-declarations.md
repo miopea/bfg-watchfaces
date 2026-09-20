@@ -50,7 +50,10 @@ has already spent five, three of them on Wear branded launch alone.
   data is not shared with third parties and not used for ads, which is true and
   costs nothing to assert.
 - **Manifest**: `android.permission.health.READ_MENSTRUATION` on `:mobile`
-  only. The watch never reads Health Connect; it receives a number.
+  only. The watch never reads Health Connect; it receives a DATE and computes
+  the day number itself. (This said "a number" until 2026-09-19; the build spec
+  settled on sending the start date so the value cannot go stale. The watch
+  still touches no health data either way.)
 
 ## What is already true and worth keeping true
 
@@ -67,13 +70,21 @@ it is not discovered late.
 Minimum-necessary also applies and is easy to satisfy: one record type, reduced
 on the phone to a single integer. The raw records never leave Health Connect.
 
-## What is NOT settled
+## Settled on 2026-09-19
 
-Whether to do this at all. The disclosure SHAPE is settled — decision
-`01a0ba48`, a plain unlabelled number like any other complication — but nobody
-has asked the operator whether to spend an approval and a review cycle on it,
-and that is the question this document exists to let him answer with numbers
-rather than vibes.
+**The operator authorised it**, having been offered and having declined a
+version with no Health Connect at all (she types a start date; no permission, no
+declaration, no approval to wait on). He took the harder route knowingly,
+because the manual version drifts as soon as she stops maintaining it.
+
+The disclosure SHAPE was already settled — decision `01a0ba48`, a plain
+unlabelled number like any other complication. Everything else the build needs
+is in [`cycle-complication.md`](cycle-complication.md).
+
+The cost stated above has not changed and is now a cost being deliberately
+spent: a form, a justification, an approval that can be refused, and only then a
+review cycle. **The form goes first.** Nothing past the point of no return gets
+built until Google has answered.
 
 ## What to check before acting on any of this
 
