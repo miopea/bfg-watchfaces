@@ -94,6 +94,18 @@ class FaceReceiverService : WearableListenerService() {
             CycleDayService.notifyChanged(applicationContext)
             return
         }
+        // The richer facts for the carousel card, on their own path so the
+        // complication's date cannot be broken by a field added here. See
+        // WatchLink.CYCLE_DETAIL_PATH.
+        if (event.path == WatchLink.CYCLE_DETAIL_PATH) {
+            val raw = runCatching { String(event.data, Charsets.UTF_8) }.getOrDefault("")
+            val facts = com.bfg.watchfaces.appcore.CycleFacts.decode(raw)
+            com.bfg.watchfaces.appcore.CycleFacts.save(applicationContext.filesDir, facts)
+            // Logged WITHOUT any of it, same rule as the date.
+            Log.i(TAG, if (facts == null) "cycle detail cleared" else "cycle detail set")
+            CycleTileService.notifyChanged(applicationContext)
+            return
+        }
         if (event.path != WatchLink.NOTE_PATH) {
             super.onMessageReceived(event)
             return

@@ -7,6 +7,7 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.MenstruationPeriodRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import com.bfg.watchfaces.appcore.CycleFacts
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -65,8 +66,8 @@ object CycleSource {
         /** Installed, but she has not granted the read. */
         data object NotGranted : Availability
 
-        /** Granted, and there is a start date. */
-        data class Ready(val start: LocalDate) : Availability
+        /** Granted, and her own logged periods say something. */
+        data class Ready(val facts: CycleFacts) : Availability
 
         /**
          * Granted, and Health Connect holds no period records.
@@ -122,9 +123,23 @@ object CycleSource {
                     )
                 )
             ).records
-            val latest = records.maxByOrNull { it.startTime } ?: return Availability.NoRecords
-            val zone = latest.startZoneOffset ?: ZoneId.systemDefault()
-            Availability.Ready(LocalDate.ofInstant(latest.startTime, zone))
+            if (records.isEmpty()) return Availability.NoRecords
+            // EVERY period in the window, not just the latest. The extra facts
+            // the carousel card shows -- how long her last period ran, how far
+            // apart her recent ones started -- are arithmetic over the set, and
+            // they cost no additional permission because they come from the
+            // same records this already reads.
+            val periods = records.map { r ->
+                // startZoneOffset is the offset she was actually in when the
+                // period began; this phone's current zone is the fallback.
+                // Getting it wrong shifts the whole count by a day, which is
+                // invisible here and obvious to her.
+                val startZone = r.startZoneOffset ?: ZoneId.systemDefault()
+                val endZone = r.endZoneOffset ?: startZone
+                LocalDate.ofInstant(r.startTime, startZone) to
+                    LocalDate.ofInstant(r.endTime, endZone)
+            }
+            CycleFacts.from(periods)?.let { Availability.Ready(it) } ?: Availability.NoRecords
         }.getOrElse {
             // No date, no record count, nothing about her in the log. The fact
             // that a read failed is ours; what it would have contained is hers.

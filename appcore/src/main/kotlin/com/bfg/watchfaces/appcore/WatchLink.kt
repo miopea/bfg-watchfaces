@@ -111,6 +111,25 @@ object WatchLink {
     const val REPLY_TIMEOUT_SECONDS = 3L
 
     /**
+     * The richer cycle facts, for the carousel card.
+     *
+     * A SECOND path rather than a bigger payload on [CYCLE_START_PATH], and
+     * that is deliberate. The complication only needs the start date, it is
+     * proven working on hardware, and a watch running an older build parses
+     * that path's payload as a bare date -- appending fields to it would make
+     * every mismatched pair show a blank slot. A path an old watch has never
+     * heard of is simply ignored.
+     *
+     * So the two degrade independently: an old watch keeps its day count and
+     * misses the extra facts; a new watch with an old phone shows the day count
+     * and nothing more. Neither breaks.
+     *
+     * Carries [com.bfg.watchfaces.appcore.CycleFacts.encode], and an empty
+     * payload clears it for the same reason the start path has one.
+     */
+    const val CYCLE_DETAIL_PATH = "/bfg-watchfaces/cycle-detail"
+
+    /**
      * ASKING the watch what complications it has, without sending a face.
      *
      * The catalog has always ridden back on a successful send, which was the

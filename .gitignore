@@ -68,3 +68,7 @@ catalog-service/.wrangler/
 # Regenerate with tools/screenshots/README.md.
 tools/screenshots/node_modules/
 tools/screenshots/screenshots/
+
+# Kotlin compiler session and error dumps. Build noise, written by any Gradle
+# invocation, and never useful to anyone but the JVM that wrote it.
+.kotlin/

@@ -12,6 +12,7 @@ import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import com.bfg.watchfaces.appcore.CycleDay
+import com.bfg.watchfaces.appcore.CycleFacts
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import java.time.LocalDate
@@ -56,14 +57,38 @@ class CycleTileService : TileService() {
     ): ListenableFuture<TileBuilders.Tile> {
         // The WATCH's own date: she is looking at the watch, so the day it is
         // here is the day she means.
-        val start = CycleDay.load(applicationContext.filesDir)
-        val day = CycleDay.dayNumber(start, LocalDate.now())
+        val today = LocalDate.now()
+        // The richer facts when the phone has sent them, falling back to the
+        // bare date the complication uses. A watch paired with an older phone
+        // therefore still shows the day count and simply says less.
+        val facts = CycleFacts.load(applicationContext.filesDir)
+            ?: CycleDay.load(applicationContext.filesDir)?.let { CycleFacts(it) }
+        val day = facts?.dayOfCycle(today)
 
         val headline = day?.let { "Day $it" } ?: CycleDay.EMPTY_PLACEHOLDER
+
         // Never "you have no records" and never "grant a permission". The watch
         // cannot know which is true -- it only ever receives a date -- and the
         // phone is where the explanation lives and where anything can be fixed.
-        val caption = if (day == null) "Set up on your phone" else "since your last period"
+        //
+        // While she is actually bleeding, which day OF THE PERIOD it is says
+        // more than "since your last period", which would be counting from
+        // something still happening.
+        val bleedingDay = facts?.dayOfPeriod(today)
+        val caption = when {
+            day == null -> "Set up on your phone"
+            bleedingDay != null -> "day $bleedingDay of your period"
+            else -> "since your last period"
+        }
+
+        // Only what her own records support. A first period has no average and
+        // an open one has no length; inventing either would be the app making
+        // something up about her. Description only -- nothing here says when
+        // the next period is due.
+        val detail = if (facts == null) emptyList() else listOfNotNull(
+            facts.periodLengthDays?.let { "Last period $it days" },
+            facts.averageCycleDays?.let { "Average cycle $it days" }
+        )
 
         val layout = LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
@@ -102,6 +127,30 @@ class CycleTileService : TileService() {
                             )
                             .build()
                     )
+                    .apply {
+                        for (line in detail) {
+                            addContent(
+                                LayoutElementBuilders.Text.Builder()
+                                    .setText(line)
+                                    .setFontStyle(
+                                        LayoutElementBuilders.FontStyle.Builder()
+                                            .setSize(sp(12f))
+                                            .setColor(argb(MUTED))
+                                            .build()
+                                    )
+                                    .setModifiers(
+                                        ModifiersBuilders.Modifiers.Builder()
+                                            .setPadding(
+                                                ModifiersBuilders.Padding.Builder().setTop(
+                                                    androidx.wear.protolayout.DimensionBuilders.dp(4f)
+                                                ).build()
+                                            )
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                        }
+                    }
                     .build()
             )
             .build()
@@ -143,6 +192,22 @@ class CycleTileService : TileService() {
          * that is sometimes a day out with no way to tell.
          */
         private const val FRESHNESS_MS = 60L * 60L * 1000L
+
+        /**
+         * Ask the carousel to re-render, when new facts arrive from the phone.
+         *
+         * Without it the card keeps whatever it last drew until its freshness
+         * window elapses, so a period logged this morning would appear at an
+         * unpredictable time. Same reasoning as
+         * [CycleDayService.notifyChanged], different mechanism: tiles are
+         * refreshed by asking the updater, not the complication requester.
+         */
+        fun notifyChanged(context: android.content.Context) {
+            runCatching {
+                androidx.wear.tiles.TileService.getUpdater(context)
+                    .requestUpdate(CycleTileService::class.java)
+            }.onFailure { android.util.Log.w("BfgCycleTile", "could not refresh the tile", it) }
+        }
 
         /** The app's ink and a muted second line, matching the dial's palette. */
         private const val INK = 0xFFFCF9F1.toInt()

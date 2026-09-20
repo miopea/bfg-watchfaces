@@ -166,13 +166,28 @@ fun CycleSetup(modifier: Modifier = Modifier) {
                 }
 
                 is CycleSource.Availability.Ready -> {
+                    val today = java.time.LocalDate.now()
                     Text(
-                        "Your watch is showing day " +
-                            "${com.bfg.watchfaces.appcore.CycleDay.dayNumber(s.start, java.time.LocalDate.now())}" +
+                        "Your watch is showing day ${s.facts.dayOfCycle(today)}" +
                             ". It counts on from the last period you logged, so it stays right " +
                             "without this app running.",
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    // Only what her own records actually support. A first or
+                    // open period has no length and no average, and inventing
+                    // either would be the app making something up about her.
+                    val extras = listOfNotNull(
+                        s.facts.periodLengthDays?.let { "last period $it days" },
+                        s.facts.averageCycleDays?.let { "average cycle $it days" }
+                    )
+                    if (extras.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            extras.joinToString(" \u00b7 ").replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
                     TextButton(onClick = { refresh() }, enabled = !working) { Text("Update now") }
                 }

@@ -85,6 +85,36 @@ object CycleSender {
     }
 
     /**
+     * Send the richer facts for the carousel card, on their own path.
+     *
+     * Separate from [send] so the two degrade independently: a watch that has
+     * never heard of this path still gets its day count, and a failure here
+     * cannot take the complication down with it. See
+     * [WatchLink.CYCLE_DETAIL_PATH].
+     *
+     * Best effort, and quiet. The complication is the thing that matters; this
+     * is a card she may not even have added.
+     */
+    private fun sendDetail(context: Context, facts: com.bfg.watchfaces.appcore.CycleFacts?) {
+        val payload = (facts?.encode() ?: "").toByteArray(Charsets.UTF_8)
+        runCatching {
+            val nodes = Tasks.await(
+                Wearable.getNodeClient(context).connectedNodes,
+                TIMEOUT_SECONDS, TimeUnit.SECONDS
+            )
+            for (node in nodes) {
+                Tasks.await(
+                    Wearable.getMessageClient(context)
+                        .sendMessage(node.id, WatchLink.CYCLE_DETAIL_PATH, payload),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS
+                )
+            }
+            // Counts, never dates. Same rule as everywhere else this value goes.
+            Log.i(TAG, "cycle detail ${if (facts == null) "cleared" else "sent"} to ${nodes.size} watch(es)")
+        }.onFailure { Log.w(TAG, "could not send the cycle detail", it) }
+    }
+
+    /**
      * Read Health Connect and push whatever it says, including "nothing".
      *
      * The single call the UI makes. It deliberately sends a CLEAR when the read
@@ -96,8 +126,10 @@ object CycleSender {
      */
     fun sync(context: Context): CycleSource.Availability {
         val state = kotlinx.coroutines.runBlocking { CycleSource.read(context) }
-        val date = (state as? CycleSource.Availability.Ready)?.start
+        val facts = (state as? CycleSource.Availability.Ready)?.facts
+        val date = facts?.start
         send(context, date)
+        sendDetail(context, facts)
         // Kept on the PHONE too, so a preview can draw the real day instead of
         // a stand-in. The operator's watch read "Day 18" while the phone's own
         // preview said "Day 14", which is the preview telling him something the
@@ -106,7 +138,7 @@ object CycleSender {
         // Through CycleState rather than straight to disk: writing the file
         // alone lost a race with the preview, which had already run and had no
         // key that would change. See CycleState.
-        CycleState.set(context, date)
+        CycleState.set(context, facts)
         return state
     }
 }

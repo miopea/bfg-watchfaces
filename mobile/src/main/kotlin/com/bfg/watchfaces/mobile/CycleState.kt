@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.bfg.watchfaces.appcore.CycleDay
+import com.bfg.watchfaces.appcore.CycleFacts
 import java.time.LocalDate
 
 /**
@@ -42,12 +43,18 @@ object CycleState {
      * distinguished: both draw a stand-in, and a preview has nothing useful to
      * say about the difference.
      */
-    var startDate by mutableStateOf<LocalDate?>(null)
+    var facts by mutableStateOf<CycleFacts?>(null)
         private set
+
+    /** The start date alone, which is all the dial preview needs. */
+    val startDate: LocalDate? get() = facts?.start
 
     /** Seed from disk, for a process that has just started. */
     fun load(context: Context) {
-        startDate = CycleDay.load(context.filesDir)
+        facts = CycleFacts.load(context.filesDir)
+            // Fall back to the bare date a previous build stored, so an update
+            // does not blank the preview until the next Health Connect read.
+            ?: CycleDay.load(context.filesDir)?.let { CycleFacts(it) }
     }
 
     /**
@@ -56,9 +63,12 @@ object CycleState {
      * Both, in that order, because the disk copy is the durable one and the
      * state is what makes the screen notice.
      */
-    fun set(context: Context, date: LocalDate?) {
-        CycleDay.save(context.filesDir, date)
-        startDate = date
+    fun set(context: Context, value: CycleFacts?) {
+        // BOTH files. CycleDay's is what the complication path reads and is
+        // proven on hardware; CycleFacts' is the richer set the card wants.
+        CycleDay.save(context.filesDir, value?.start)
+        CycleFacts.save(context.filesDir, value)
+        facts = value
     }
 
     /** What a slot filled by the cycle provider should draw right now. */
