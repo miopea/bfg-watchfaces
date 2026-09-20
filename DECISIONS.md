@@ -1,5 +1,99 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-20 — The card, the tap, and the refresh that was never going to fire
+
+Three decisions from making the cycle feature actually work on a wrist, rather
+than work when driven.
+
+### The carousel card says more than the dial, from the same permission
+
+The complication has a 40px slot. The card has the whole screen and was using it
+to say the same thing in a bigger font. It now also shows how long her last
+period ran, how far apart her recent periods started, and, while she is
+bleeding, which day OF THE PERIOD today is.
+
+Every one of those is arithmetic over `MenstruationPeriodRecord`, which the app
+already reads under the permission it already holds. **That is the criterion, not
+a product judgement.** No new Health Connect permission, no change to the Play
+declaration, no second trip through review. A richer set of facts was available —
+flow, symptoms — and was rejected on exactly that basis.
+
+All of it is description and none of it is prediction. Nothing says when the next
+period is due or when she is fertile. That is a Play policy line rather than a
+preference, and "average cycle 29 days" is one careless sentence away from
+crossing it.
+
+**Rejected: putting the facts on the existing Data Layer path.** Appending fields
+to `CYCLE_START_PATH` would blank the slot on every phone/watch pair a build
+apart, because an older watch parses that payload as a bare date. An unknown path
+is simply ignored, so `CYCLE_DETAIL_PATH` lets the two degrade independently.
+
+**Rejected: a population average when there is only one logged period.** It is
+null. Inventing 28 days would be the app making something up about her. A gap
+outside 15..60 days is also discarded — a six-month hole in her logging is a gap,
+not a 212-day cycle. Those bounds are wide on purpose: the job is to drop the
+hole, not to opine on whether somebody's 21-day cycle is normal.
+
+### The refresh was triggered by an act of design, not by time
+
+`CycleSender.sync` had exactly one caller — `CycleSetup`, which is composed on the
+Studio tab, and only when the face being edited already points a slot at the
+cycle source.
+
+The day count survived that, because the watch holds a DATE and derives the
+number itself. **A new period did not.** The date on the watch is the start of the
+previous one, so the morning after her period begins the dial reads "Day 30" and
+keeps climbing until she happens to open Studio on a cycle face. The card is
+worse: "day 9 of your period" stays on screen after that period has ended.
+
+Now `onResume` on the phone app, whatever tab she opens. ON_RESUME rather than
+onCreate because the phone she picks up in the morning has had the process alive
+since yesterday, and that is exactly the moment the number changed.
+
+**Rejected: a background schedule.** A whole new permission story, a wake-up
+budget and a scheduler, for one integer that changes once a day on a phone she
+has to pick up for anything else anyway.
+
+**Rejected: `LifecycleEventEffect` in the composition.** It is an Activity-lifetime
+concern with nothing to do with composition, and the Compose spelling meant
+importing `LocalLifecycleOwner` from a TRANSITIVE dependency.
+
+### Tapping the card opens the phone, because the watch has nowhere to go
+
+The operator asked for the card to link to the cycle section of Google Health.
+On the watch there is no such place. Read off the Pixel Watch 5 with `dumpsys
+package com.fitbit.FitbitMobile`: three VIEW authorities — `fitbit://auth`,
+`fitbit://workouts`, `health://heartrate` — and one launcher activity, the Today
+screen. A cycle section resolves to nothing.
+
+The phone's copy of the same app has one. `fitbit://minerva` resolves to
+`MenstrualHealthDeepLink`, confirmed with `cmd package query-activities`. That is
+also where she logs, so the handoff goes where the work happens rather than to a
+screen that can only be read. **Rejected: opening the watch's Today screen as a
+near-miss** — a tap that lands somewhere adjacent reads as the feature being
+broken, and it cannot be acted on.
+
+A tile's `Clickable` can start an activity on the WATCH or reload the tile, and
+nothing else, so the click starts `CycleOpenActivity` and that does the
+`RemoteActivityHelper` handoff. The whole card is the target rather than a button
+in it: one thing to do, nowhere sensible to put a control, and 200px beats 48dp
+on a wrist.
+
+**What this did NOT verify.** adb cannot start a non-exported activity, so the two
+halves are each proven and their composition is not: the URI resolves on the
+phone, and `RemoteActivityHelper` already ships in `WatchActivity`. Tapping the
+card is the test.
+
+### A correction to an earlier conclusion in the same week
+
+This session concluded there was no published cycle complication for Wear OS,
+and that was the reason for building one. The same dump shows the watch's health
+app ships
+`OffloadableMenstrualHealthComplicationDataSourceService` — a menstrual health
+complication of its own. The feature here is still worth having, because it puts
+the day on a face from THIS library and the tile links back to where she logs.
+But "nothing like it exists" was wrong, and the record should say so.
+
 ## 2026-09-20 — Cycle day is built before it is declared, not after
 
 The app now reads one Health Connect record type and shows the day of her cycle
