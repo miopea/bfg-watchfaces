@@ -24,8 +24,25 @@ and declined for v1. If it is ever wanted, it goes through its own review cycle
 after the count has survived one intact.
 
 The wording follows decision `01a0ba48`: a plain unlabelled number, like every
-other complication on the dial. No icon that announces what it is to anyone
-glancing over her shoulder.
+other complication on the dial.
+
+**Amended 2026-09-20 on the icon half.** The decision also said "no icon that
+announces what it is to anyone glancing over her shoulder", and that half no
+longer holds. The number itself shipped as "Day 18" rather than "18" — the rule
+lived here and nothing executed it — and the person whose wrist it is raised it.
+Fixing the wording, the operator also chose to add a mark, on the dial and on
+the carousel card, having been shown that a mark gives back the recognisability
+that dropping the word removes.
+
+The mark is an open ring: a thin circle with a gap at the bottom. It was chosen
+over a crescent (which reads as night or sleep to everyone else on a watch), a
+ring with a dot marking position (unmistakably a cycle mark, and a nearly-closed
+ring invites reading as "period due", which is prediction) and a shaded disc
+(invisible at complication size). To anyone who does not already know, it is a
+ring.
+
+`CycleDayTest` now sweeps 400 days and fails on any label carrying a letter, so
+the bare-number half is executed rather than written down.
 
 ## The data path is verified, and it decides whether this works at all
 

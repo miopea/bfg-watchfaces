@@ -1,5 +1,92 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-20 — "Day 18" was never the decision, and the icon half is amended
+
+### The rule existed, in prose, and the code disagreed with it
+
+Decision `01a0ba48` settled this months ago: "a plain unlabelled number, like
+every other complication on the dial. No icon that announces what it is to
+anyone glancing over her shoulder." `docs/specs/cycle-complication.md` says it.
+`CycleDayService`'s own comment claims the dial already does it. The dial shipped
+**"Day 18"**.
+
+Nothing executed the rule, so the rule was decoration. The person whose wrist it
+is noticed, which is the worst available way to find out — and the reason was
+privacy, so the failure was not cosmetic.
+
+`CycleDayTest` now sweeps four hundred days and fails on any label carrying a
+letter. A word reintroduced on an EDGE of the range is precisely the shape this
+repo has already paid for once, in the ambient `<Variant>` that only appeared
+when the ink was dark enough to need a lift.
+
+**Two things had to move with the word.** The card's caption was "since your last
+period", which was correct under "Day 18" and wrong under a bare "18": day 18 is
+seventeen days after the start, so the pair states the elapsed count, off by one,
+in the one place being off by one is noticed. It reads "day of your cycle" now.
+And the spoken description gets the noun back — "Cycle day 18" — because a screen
+reader is not a glance over her shoulder, it is her asking.
+
+### The icon half is REVISITED, not restored by accident
+
+Dropping the word makes the slot anonymous, which was the point. The operator was
+shown that adding a mark gives that recognisability straight back, and chose a
+mark anyway, on both the dial and the card, on 2026-09-20. That is a deliberate
+amendment to `01a0ba48` rather than drift, and the spec now says so where the old
+wording was.
+
+**An open ring**, a thin circle with a gap at the bottom where the number sits.
+
+- **Rejected: a crescent.** Genuinely pretty, and its camouflage is real — a
+  stranger reads a crescent on a watch as night, sleep or do-not-disturb. That is
+  also the problem: it reads as a DIFFERENT feature rather than as nothing.
+- **Rejected: a ring with a dot marking position in the cycle.** The most
+  informative option and the most identifiable, and a dot approaching the top of
+  a nearly-closed ring reads as "period due" — prediction, which is the policy
+  line this app does not cross.
+- **Rejected: a shaded disc.** The shading that carries the information is
+  invisible at 24px, so it looks like it says more than it does.
+
+### One description, and a checked-in file that cannot drift from it
+
+The ring lives in `ComplicationGlyphs` like every other glyph. The emitter needed
+no change at all: it already draws `[COMPLICATION.MONOCHROMATIC_IMAGE]` for any
+named provider, so the provider only had to supply one.
+
+`:wear` had no glyph executor, because until now nothing on the watch drew a
+glyph — the dial's icons come from providers, and the providers were Google's.
+`GlyphVector` converts the same description to a `VectorDrawable`. It is CHECKED
+IN, because the Android build must not depend on a JVM task having been run, and
+`GlyphVectorTest` fails when the file and the description disagree. **Rejected:
+hand-writing the drawable** — `ComplicationGlyphs` exists because transcribing
+icon geometry into a second renderer is "start identical and drift", and that is
+written at the top of the file.
+
+It throws on a shape it cannot draw rather than skipping it. The bell glyph
+records what silent dropping costs: a writer that ignored an arc it did not
+understand would have shipped a bell with no bell in it.
+
+### Both previews were drawing a calendar
+
+A slot with a named provider carries the DATE fallback as its source, so
+`ComplicationGlyphs.shapes(source)` answered with a calendar. The dial never
+showed it, because the dial asks the provider. The previews have no provider to
+ask, so they now call `shapesFor(source, provider)`.
+
+### `isCycleProvider`, because "three callers, one string" was one word short
+
+The comment on `CYCLE_PROVIDER_CLASS` explains that the class name is a constant
+so three callers cannot disagree. The thing that had actually been copied three
+times was the MATCH — `substringAfter('/').endsWith(...)`, written out separately
+in `Complications`, in the phone's `CycleSetup`, and inline in
+`hasPrivateProvider`. A face could have been judged private by one and shareable
+by another, and that rule is what decides whether her cycle data can leave the
+phone.
+
+### What is NOT verified
+
+The ring was rendered through the real AWT executor at 24, 40 and 120px and
+looked at. It has not been seen on a wrist, on either surface.
+
 ## 2026-09-20 — The card, the tap, and the refresh that was never going to fire
 
 Three decisions from making the cycle feature actually work on a wrist, rather
