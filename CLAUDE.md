@@ -288,7 +288,22 @@ On Google Play (2026-08-29):
   track 'internal'" and the real run of the same bundle was refused `403 You
   must let us know whether your app includes any health features`. A green dry
   run means the upload parsed, nothing more.
-- **That 403 is the API's, not Play's. THE CONSOLE SHIPS THE SAME BUNDLE.**
+- **The health 403 is APP-WIDE, not per-bundle, and it is the API's alone.**
+  Four measurements on 2026-09-20, one rule that fits them: the API refuses any
+  commit that would leave the app containing health features while the Health
+  apps declaration is unapproved. It is about the app's resulting STATE, not
+  about the artefact being uploaded.
+  Phone 97 (carries `READ_MENSTRUATION`) → API refused, while `internal` served
+  88 with no health permission. Minutes later watch 1043 (no health permission)
+  → API committed fine. Hours later phone 97 went live via the **Console**.
+  Then watch 1044, still with no health permission and otherwise unchanged, →
+  API REFUSED. The bundle did not change between those last two; the app did.
+  So once any health-permission artefact is live, `play-release.py` cannot ship
+  ANYTHING, watch included, until the declaration clears. The Console still can.
+  **This is the third reading of this fact in one day.** The first two — "wait
+  for approval" and "the gate follows the bundle's permissions" — were each
+  written from a single measurement and each refuted within hours. Take a new
+  measurement before restating it.
   Measured 2026-09-20, same app, same bundle, same day, declaration untouched
   at `In review` the whole time: `play-release.py` was refused committing phone
   bundle 97 to `internal`, and hours later the operator rolled out **that exact
