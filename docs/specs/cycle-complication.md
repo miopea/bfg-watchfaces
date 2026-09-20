@@ -176,6 +176,37 @@ provider tells everyone who downloads it that its author tracks a cycle, even
 though no health VALUE is in the JSON at all. Parametric sharing does not
 protect against this, because the component name is a parameter.
 
+## What else exists, and the trap in finding out
+
+Research from swarm `01a0bcb1`, preserved here because that ticket closed and it
+cost real effort to get. Two of its findings already appear above — Google Health
+writes Cycle health to Health Connect, and Clue writes nothing at all. These are
+the other two.
+
+**Android home screen widgets are alive and first-class.** A confident search
+summary claimed Google removed them years ago, which would have killed a feature
+before anyone checked. It had confused them with **lock screen** widgets, gone
+since Android 5.0. The modern path is Jetpack Glance, actively developed. Anyone
+who ever wants a phone widget here should not re-derive that from a summary.
+
+**"Nobody ships an Android cycle widget" was never true.** Period Calendar Period
+Tracker (`com.popularapp.periodcalendar`, 100M+ downloads) and Period Tracker
+(`com.period.tracker.lite`) both ship one. The gap is in the BIG NAMES — Clue,
+Stardust and Flo each ship an iOS widget and no Android one — and in Google
+Health itself. The accurate framing, confirmed by the operator on the actual
+devices on 2026-09-20, is narrower and still worth building for: **the app she
+logs in shows her cycle everywhere except her home screen and her wrist.**
+
+The first pass here checked exactly the three apps whose absence proves least,
+and concluded the gap was the market's. Widening it refuted that. The lesson is
+the sampling, not the conclusion.
+
+**Flo ships Wear OS complications and tiles**, so the watch was never an untouched
+surface either. It does not follow that this feature is redundant: the operator's
+wife logs in Google Health, and a complication she cannot reach from her own data
+is not a competitor to her. But "nobody has this" was the wrong argument to build
+on, and the permission justification must not lean on it.
+
 ## What is not verified, and has to be
 
 None of this has run. In particular:
