@@ -1,0 +1,16 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    devDependencies:
+      '@shotcraft/template-play-store-phone':
+        specifier: link:../../../shotcraft/packages/template-play-store-phone
+        version: link:../../../shotcraft/packages/template-play-store-phone
+      shotcraft:
+        specifier: link:../../../shotcraft/packages/core
+        version: link:../../../shotcraft/packages/core
