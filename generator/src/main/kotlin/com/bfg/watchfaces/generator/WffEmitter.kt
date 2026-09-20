@@ -717,7 +717,24 @@ ${handPair("MinuteHand", "hand_minute")}$second
              * than editing the built one.
              */
             fun valueText(debug: Boolean): String {
-                val template = if (debug) "%s/%s-%s" else source.format
+                // A NAMED PROVIDER SUPPLIES ITS OWN COMPLETE TEXT, so the
+                // fallback source's decoration must not be wrapped around it.
+                //
+                // Seen on the operator's Pixel Watch 5, 2026-09-20: a Battery
+                // slot pointed at the cycle complication rendered "Day 18%".
+                // WATCH_BATTERY's format is "%s%%" -- it exists because the
+                // battery provider sends a bare "78" with no per cent sign --
+                // and it was being applied to a value that already reads
+                // "Day 18".
+                //
+                // The source is only the fallback for a watch without that
+                // provider, and its format belongs to ITS value, not to
+                // somebody else's.
+                val template = when {
+                    debug -> "%s/%s-%s"
+                    p.providers[pos] != null -> "%s"
+                    else -> source.format
+                }
                 val params = if (debug) listOf(
                     "[COMPLICATION.RANGED_VALUE_VALUE]",
                     "[COMPLICATION.RANGED_VALUE_MIN]",
@@ -742,7 +759,14 @@ ${handPair("MinuteHand", "hand_minute")}$second
         </PartText>"""
             }
 
-            val glyph = if (!p.hasIcon(pos)) "" else glyphElement(source, box, iconW, iconH, ink)
+            // A named provider brings its own icon too. Drawing the fallback
+            // source's glyph put a BATTERY symbol above the cycle day on the
+            // operator's watch, which is the same mistake as the format.
+            val glyph = when {
+                !p.hasIcon(pos) -> ""
+                p.providers[pos] != null -> providerGlyph(box, iconW, iconH, ink)
+                else -> glyphElement(source, box, iconW, iconH, ink)
+            }
 
             """
     <ComplicationSlot slotId="$id" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"
@@ -799,6 +823,25 @@ ${glareLayer(p)}
   </Scene>
 </WatchFace>
 """
+    }
+
+    /**
+     * The provider's OWN icon, for a slot that names one.
+     *
+     * `[COMPLICATION.MONOCHROMATIC_IMAGE]` is whatever the provider supplies,
+     * which is the only honest glyph for a slot we do not choose the contents
+     * of. Drawing our own source glyph instead is how a cycle day ended up
+     * under a battery symbol.
+     *
+     * A provider that supplies no image simply draws nothing here, which is
+     * the correct outcome: better an unlabelled number than a wrong label.
+     */
+    private fun providerGlyph(box: SlotGeometry.Box, iconW: Int, iconH: Int, ink: String): String {
+        val x = (box.w - iconW) / 2
+        return """
+        <PartImage x="$x" y="0" width="$iconW" height="$iconH">
+          <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]"/>
+        </PartImage>"""
     }
 
     /**

@@ -98,6 +98,19 @@ object WatchLink {
     const val CYCLE_START_PATH = "/bfg-watchfaces/cycle-start"
 
     /**
+     * How long the watch waits for its own reply to be delivered.
+     *
+     * The watch must stay alive until the message has actually gone: a
+     * `WearableListenerService` dies the instant its callback returns, and a
+     * `sendMessage` Task that has not completed by then is simply dropped.
+     *
+     * Shorter than the phone's own wait, deliberately. If delivery is going to
+     * take longer than the phone will listen, there is nothing to be gained by
+     * holding the service open for it.
+     */
+    const val REPLY_TIMEOUT_SECONDS = 3L
+
+    /**
      * ASKING the watch what complications it has, without sending a face.
      *
      * The catalog has always ridden back on a successful send, which was the

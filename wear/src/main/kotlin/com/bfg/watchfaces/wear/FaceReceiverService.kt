@@ -125,9 +125,31 @@ class FaceReceiverService : WearableListenerService() {
         )
         Log.i(TAG, "catalog asked for by $nodeId; answering with ${payload.length} chars")
         runCatching {
-            Wearable.getMessageClient(this).sendMessage(
-                nodeId, WatchLink.CATALOG_REPLY_PATH, payload.toByteArray(Charsets.UTF_8)
+            // AWAITED, and that is the whole bug this line was written with.
+            //
+            // sendMessage returns a Task. A WearableListenerService is torn
+            // down as soon as its callback returns -- this file's own header
+            // says so, about an install that was being cancelled halfway -- so
+            // firing the Task and returning let the process die before the
+            // message was delivered. The watch logged "answering with N chars"
+            // and the phone logged "asked, but no catalog answer", which is
+            // exactly what it looks like when both ends are telling the truth.
+            //
+            // Measured on the operator's Pixel Watch 5, 2026-09-20: a fresh
+            // install showed NO watch providers in the picker at all, because
+            // the only other way the cache gets filled is riding back on a
+            // successful face send, and a fresh install has never sent one.
+            //
+            // Awaiting keeps the service alive exactly as long as the delivery
+            // takes. Already on a background thread; this is the same blocking
+            // await onChannelOpened uses a few lines below.
+            Tasks.await(
+                Wearable.getMessageClient(this).sendMessage(
+                    nodeId, WatchLink.CATALOG_REPLY_PATH, payload.toByteArray(Charsets.UTF_8)
+                ),
+                WatchLink.REPLY_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS
             )
+            Log.i(TAG, "catalog answer delivered")
         }.onFailure { Log.w(TAG, "could not answer the catalog request", it) }
     }
 

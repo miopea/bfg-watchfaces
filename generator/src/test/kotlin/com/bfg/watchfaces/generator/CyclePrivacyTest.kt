@@ -118,4 +118,50 @@ class CyclePrivacyTest {
             .let { it.copy(providers = it.providers + (SlotPosition.LEFT to "com.fitbit/.Steps")) }
         assertEquals(ComplicationSource.STEP_COUNT, p.effectiveSlot(SlotPosition.LEFT))
     }
+
+    /**
+     * Seen on a wrist, 2026-09-20: a Battery slot pointed at the cycle
+     * complication rendered "Day 18%".
+     *
+     * WATCH_BATTERY's format is "%s%%" because the battery provider sends a
+     * bare "78" with no per cent sign. That decoration belongs to ITS value.
+     * A named provider supplies its own complete text, and wrapping somebody
+     * else's format around it produces exactly this.
+     */
+    @Test
+    fun `a named provider's value is not decorated by the fallback source`() {
+        val p = DialParams()
+            .withSlot(SlotPosition.BOTTOM, ComplicationSource.WATCH_BATTERY)
+            .let { it.copy(providers = it.providers + (SlotPosition.BOTTOM to "com.bfg.watchfaces/.CycleDayService")) }
+        val xml = WffEmitter.emit(p)
+        assertTrue(!xml.contains("<![CDATA[%s%%]]>")) {
+            "the battery's per-cent sign was wrapped around another provider's text"
+        }
+        assertTrue(xml.contains("<![CDATA[%s]]>")) { "expected a plain template for a named provider" }
+    }
+
+    /** And an ordinary battery slot KEEPS its per cent sign. */
+    @Test
+    fun `a battery slot with no provider still gets its per cent sign`() {
+        val xml = WffEmitter.emit(DialParams().withSlot(SlotPosition.BOTTOM, ComplicationSource.WATCH_BATTERY))
+        assertTrue(xml.contains("<![CDATA[%s%%]]>")) {
+            "the battery lost the per cent sign it exists to add"
+        }
+    }
+
+    /**
+     * The glyph follows the same rule: a battery symbol over a cycle day is
+     * the same mistake as a per cent sign after it.
+     */
+    @Test
+    fun `a named provider draws its own icon, not the fallback source's`() {
+        val p = DialParams()
+            .withSlot(SlotPosition.BOTTOM, ComplicationSource.WATCH_BATTERY)
+            .copy(iconSlots = SlotPosition.entries.toSet())
+            .let { it.copy(providers = it.providers + (SlotPosition.BOTTOM to "com.x/.CycleDayService")) }
+        val xml = WffEmitter.emit(p)
+        assertTrue(xml.contains("[COMPLICATION.MONOCHROMATIC_IMAGE]")) {
+            "expected the provider's own icon for a slot it fills"
+        }
+    }
 }
