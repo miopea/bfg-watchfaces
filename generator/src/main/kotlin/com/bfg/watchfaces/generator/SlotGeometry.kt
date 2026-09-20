@@ -89,13 +89,147 @@ object SlotGeometry {
     fun boxHeight(
         size: Int,
         withIcon: Boolean = true,
-        version: Int = CURRENT_GENERATOR_VERSION
-    ): Int = when {
+        version: Int = CURRENT_GENERATOR_VERSION,
+        withBar: Boolean = false
+    ): Int = (if (withBar) barBand(size, version) else 0) + when {
         version < 6 -> (size * 3.3).roundToInt()      // v1..v5: one height, icon or not
         withIcon && version >= 7 -> (size * 2.45).roundToInt()
         withIcon -> (size * 2.85).roundToInt()
         else -> textHeight(size, version)
     }
+
+    /**
+     * The first version that can draw a ranged value as a bar.
+     *
+     * Before it, every slot asked its provider for SHORT_TEXT and nothing else,
+     * so a source that only publishes a value with a range -- nine of Fitbit's
+     * ten, on the operator's watch -- could not be chosen at all. It was not
+     * that they rendered badly; they never appeared in the picker.
+     */
+    const val FIRST_RANGED_VERSION = 15
+
+    /**
+     * The bar's own thickness.
+     *
+     * Thick enough to read at arm's length on a moving wrist, thin enough that
+     * it stays a label for the number above it rather than competing with it.
+     *
+     * 0.13 was tried first and baked: at the default slot size it rounds to
+     * three pixels on a 456px dial, and the result reads as an UNDERLINE under
+     * the value rather than as a measure of anything -- a misleading affordance,
+     * since nothing there is a link. 0.22 puts it at four pixels by default and
+     * six at a large size, which is a bar.
+     *
+     * Floored at 4 because the smallest slot would otherwise round back down
+     * into hairline territory, where the dial pattern shows through it.
+     */
+    fun barThickness(size: Int): Int = max(4, (size * 0.22).roundToInt())
+
+    /**
+     * The bar plus the air above it, which is what the BOX has to grow by.
+     *
+     * There was no room to put it anywhere else. With an icon at v7+ the box
+     * runs 2.45x the slot size and the text ends at 2.40x, so the slack is one
+     * pixel; without an icon the box IS the line box and the slack is zero.
+     * Drawing into that would have put a bar through the descenders.
+     *
+     * ## Why bars are opt-in, and not simply what v15 does
+     *
+     * The first cut charged this band to every slot on every v15 face, on the
+     * reasoning that a box is sized long before anyone knows what the wearer
+     * will put in it. Measured, that costs two points off the size ceiling: a
+     * five-slot face asking for the largest complications gets 29 where v14
+     * gave 31.
+     *
+     * Small, and still the wrong trade. Everything else in this file exists
+     * because that slack was hard to win -- the note on [textHeight] is about
+     * reclaiming half a line, and "Large" being silently clamped from 28 to 25
+     * was treated as a defect, not a rounding error. Spending it again, on
+     * every face, for a bar most slots will never show, undoes that for people
+     * who did not ask for the feature.
+     *
+     * So the face says whether it wants bars ([DialParams.rangedBars]), and one
+     * that does not is laid out exactly as v14 laid it out. That is also the
+     * honest UI: a progress bar under every reading is a look, not an
+     * improvement, and it should be choosable.
+     */
+    fun barBand(size: Int, version: Int = CURRENT_GENERATOR_VERSION): Int =
+        if (version >= FIRST_RANGED_VERSION) barThickness(size) + max(2, (size * 0.07).roundToInt())
+        else 0
+
+    /**
+     * Where the bar goes inside its slot box, or null when this face has none.
+     *
+     * RELATIVE TO THE BOX, because that is the coordinate space inside a
+     * `<Complication>` -- the same space the emitted `<PartText>` already uses.
+     * Both previews draw it by adding the box origin, exactly as the watch does.
+     *
+     * Not the full box width. A slot box is 3.9x the slot size and a ranged
+     * value is usually two or three characters, so a full-width rule under it
+     * reads as a divider between slots rather than as a measure of anything.
+     */
+    data class Bar(val x: Int, val y: Int, val w: Int, val h: Int)
+
+    /**
+     * How full a PREVIEW draws the bar, and how faint its track is.
+     *
+     * A preview has no provider to ask, so it has to pick a reading. 0.68
+     * matches [StepRing.SAMPLE_PERCENT] -- the same made-up number the step
+     * ring has always previewed with -- because two invented sample values on
+     * one dial would look like two different measurements.
+     *
+     * Far enough from both ends to show that the bar has ends.
+     */
+    const val BAR_SAMPLE_FILL = 0.68
+
+    /**
+     * The track behind the fill, as an alpha on the ink.
+     *
+     * Higher than [StepRing.TRACK_ALPHA], and for a reason the ring does not
+     * have: the ring sits at the rim against a single dial colour, while this
+     * sits in the middle of the pattern. At a quarter opacity the track
+     * disappeared into the engraving and the fill read as a lone underline,
+     * which is the very thing the bar is supposed to not look like. The track
+     * is what makes a fill legible as a FRACTION.
+     */
+    const val BAR_TRACK_ALPHA = 0x5C
+
+    fun bar(box: Box, size: Int, version: Int = CURRENT_GENERATOR_VERSION): Bar? {
+        if (version < FIRST_RANGED_VERSION) return null
+        val h = barThickness(size)
+        val w = (box.w * 0.62).roundToInt()
+        return Bar(x = (box.w - w) / 2, y = box.h - h, w = w, h = h)
+    }
+
+    /**
+     * How far along the bar is filled, as a WFF arithmetic expression.
+     *
+     * [width] scales the 0..1 progress to the bar, because `<Transform>` sets
+     * the attribute outright rather than a fraction of it.
+     *
+     * ## Nothing on this machine can check this string
+     *
+     * `arithmeticExpressionType` resolves to a union that includes plain
+     * `xs:string`, so Xerces accepts ANY expression -- a misspelled function, an
+     * unknown source, a stray bracket. The long enumerations of operators and
+     * functions beside it in the schema are documentation, not a constraint.
+     *
+     * That matters here more than anywhere else in this file, because
+     * CLAUDE.md's rule is that `WffSchemaTest` IS the device gate. It still is:
+     * the device runs nothing but this XSD. But the rule covers STRUCTURE. A
+     * wrong expression validates, installs, raises no runtime error, and simply
+     * renders wrong on a wrist. Keep this as plain as it will go, and change it
+     * only against a real watch.
+     *
+     * Hence no guard on max == min, tempting as it is. The schema lists `?` and
+     * `:`, so a ternary would validate -- but whether the evaluator short
+     * circuits it, or divides first and hands `clamp` a NaN, is exactly the kind
+     * of question nothing here can answer. An unverifiable guard against a rare
+     * provider bug is a worse trade than the bug.
+     */
+    fun barFillExpression(width: Int): String =
+        "$width * clamp(([COMPLICATION.RANGED_VALUE_VALUE] - [COMPLICATION.RANGED_VALUE_MIN]) / " +
+            "([COMPLICATION.RANGED_VALUE_MAX] - [COMPLICATION.RANGED_VALUE_MIN]), 0, 1)"
 
     /**
      * The glyph, which from v7 is SMALLER than the value it labels.
@@ -515,7 +649,7 @@ object SlotGeometry {
 
         fun place(pos: SlotPosition, cx: Double, cy: Double) {
             if (!p.slot(pos).enabled) return
-            val h = boxHeight(size, pos in p.iconSlots, p.generatorVersion)
+            val h = boxHeight(size, pos in p.iconSlots, p.generatorVersion, p.showsBars)
             out[pos] = Box((cx - w / 2.0).roundToInt(), (cy - h / 2.0).roundToInt(), w, h)
         }
 
@@ -834,7 +968,8 @@ object SlotGeometry {
         fun hFor(pos: SlotPosition) = boxHeight(
             if (pos == SlotPosition.TOP) topSize else size,
             pos in p.iconSlots,
-            p.generatorVersion
+            p.generatorVersion,
+            p.showsBars
         )
 
         /**

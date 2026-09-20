@@ -86,10 +86,31 @@ enum class ComplicationSource(
      * CALENDAR, MESSAGE and friends — and this app has never used it, which is
      * why a face here could show a step count and not start the timer.
      */
-    val launch: String? = null
+    val launch: String? = null,
+    /**
+     * Whether a PREVIEW should draw a progress bar for this source.
+     *
+     * Not a fact about the file format -- the emitted slot accepts
+     * `RANGED_VALUE` from whatever the wearer chooses, and this changes no XML.
+     * It exists so the two previews do not promise a bar the watch will not
+     * draw: the box reserves the room for every slot, but only a provider that
+     * actually publishes a minimum and a maximum fills it.
+     *
+     * Deliberately CONSERVATIVE, and the asymmetry is the point. Marking a
+     * source that turns out to have no range shows a bar that never appears,
+     * which is a broken promise on a wrist. Leaving one unmarked means the
+     * wearer gets a bar the preview did not show, which is not a defect.
+     *
+     * Only the two system providers whose range is certain are marked. The
+     * sources this feature was built FOR -- Fitbit's activity complications,
+     * nine of which were unreachable before -- are not in this enum at all:
+     * they are third-party providers chosen on the watch, so no list here can
+     * anticipate them.
+     */
+    val ranged: Boolean = false
 ) {
     NONE(null),
-    STEP_COUNT("STEP_COUNT"),
+    STEP_COUNT("STEP_COUNT", ranged = true),
     HEART_RATE("HEART_RATE"),
     DAY_AND_DATE("DAY_AND_DATE"),
     // The one system provider this list used to omit. Google's
@@ -98,7 +119,7 @@ enum class ComplicationSource(
     TIME_AND_DATE("TIME_AND_DATE"),
     DATE("DATE"),
     DAY_OF_WEEK("DAY_OF_WEEK"),
-    WATCH_BATTERY("WATCH_BATTERY", "%s%%"),
+    WATCH_BATTERY("WATCH_BATTERY", "%s%%", ranged = true),
     WORLD_CLOCK("WORLD_CLOCK"),
     NEXT_EVENT("NEXT_EVENT"),
     SUNRISE_SUNSET("SUNRISE_SUNSET"),
@@ -612,6 +633,32 @@ data class DialParams(
     val showSeconds: Boolean = false,
 
     /**
+     * Draw a progress bar under a complication that has a range.
+     *
+     * ## What it unlocks
+     *
+     * Every slot used to ask its provider for `SHORT_TEXT` and nothing else, so
+     * a source that publishes a value with a minimum and a maximum -- and NOT a
+     * short string -- could not be chosen at all. On the operator's Pixel Watch
+     * 5 that was nine of Fitbit's ten complications. They did not render badly;
+     * they never reached the picker. Turning this on adds `RANGED_VALUE` to
+     * what each slot accepts, which is what puts them in the list.
+     *
+     * ## Why it is a choice and not just what v15 does
+     *
+     * The bar needs about a fifth of the slot size in vertical room, and there
+     * is none to take: with a glyph the box runs 2.45x the size and the text
+     * ends at 2.40x. So the box has to grow, and a taller box costs the size
+     * ceiling -- measured at two points on a five-slot face. See
+     * [SlotGeometry.barBand]. A face that leaves this off is laid out exactly
+     * as v14 laid it out, byte for byte.
+     *
+     * Defaults to false so every face saved before this existed emits exactly
+     * the XML it always did.
+     */
+    val rangedBars: Boolean = false,
+
+    /**
      * Digital numerals or hands. Exclusive, and the reason is layout.
      *
      * Hands sweep the WHOLE dial, so the digital assumption -- reserve a centre
@@ -811,6 +858,18 @@ data class DialParams(
      */
     fun hasIcon(pos: SlotPosition): Boolean = pos in iconSlots && !slot(pos).isDrawn
 
+    /**
+     * Whether this face draws progress bars, asked once so nobody asks it twice.
+     *
+     * [rangedBars] alone is not the answer: the geometry, the emitted
+     * `supportedTypes` and both previews all need "on, AND this face is new
+     * enough to have the layout for it". Spelling that out at each call site is
+     * how a preview ends up disagreeing with the watch -- the mistake
+     * [SlotGeometry] exists to prevent.
+     */
+    val showsBars: Boolean
+        get() = rangedBars && generatorVersion >= SlotGeometry.FIRST_RANGED_VERSION
+
     fun slot(pos: SlotPosition): ComplicationSource =
         complications.getOrElse(pos.ordinal) { ComplicationSource.NONE }
 
@@ -930,7 +989,7 @@ data class Layout(
  */
 val COMPONENT = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*/\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z0-9_$]+)*""")
 
-const val CURRENT_GENERATOR_VERSION = 14
+const val CURRENT_GENERATOR_VERSION = 15
 
 /** WFF canvas. Correct for Pixel Watch 4 and 5, both case sizes. */
 const val DIAL_SIZE = 456

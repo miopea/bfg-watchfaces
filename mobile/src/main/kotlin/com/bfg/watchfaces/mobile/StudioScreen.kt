@@ -410,6 +410,19 @@ fun StudioScreen(
             }
         }
 
+        // Only offered on a face new enough to have the room for it. A design
+        // saved before this existed keeps the version it was saved at, and its
+        // slot boxes were measured without a bar -- so the switch would be a
+        // control that silently ignores the person using it.
+        if (params.generatorVersion >= SlotGeometry.FIRST_RANGED_VERSION) {
+            SwitchRow(
+                title = "Show progress bars",
+                detail = "A small bar under readings that count towards a goal, like steps or activity. " +
+                    "It also lets you pick sources that only report progress.",
+                checked = params.rangedBars
+            ) { onParams(params.copy(rangedBars = it)) }
+        }
+
         Spacer(Modifier.height(8.dp))
         // Only the positions this face HAS. An analog face draws three, so
         // offering five was offering two that could never appear -- reported as
@@ -425,6 +438,7 @@ fun StudioScreen(
                 iconOn = pos in params.iconSlots,
                 component = params.providers[pos],
                 launcher = params.launchers[pos],
+                barsOn = params.showsBars,
                 onSelect = {
                     // Choosing a system or drawn source clears any provider
                     // app: a slot holds ONE thing.
@@ -680,6 +694,8 @@ private fun SlotPicker(
     component: String?,
     /** The app this slot opens, when it is a shortcut to one. */
     launcher: String?,
+    /** Whether this face draws progress bars, which decides what may fill a slot. */
+    barsOn: Boolean,
     onSelect: (ComplicationSource) -> Unit,
     onApp: (String) -> Unit,
     onOpenApp: (String) -> Unit,
@@ -748,7 +764,33 @@ private fun SlotPicker(
                     LaunchedEffect(Unit) {
                         if (WatchProviders.refresh(ctx)) refreshed++
                     }
-                    val fromWatch = remember(refreshed) { ProviderCache.load(ctx) }
+                    // What this FACE can actually show.
+                    //
+                    // The watch reports everything it has and says what each
+                    // one supplies; the choice of what to offer is the phone's,
+                    // because only the phone knows the face being edited. A
+                    // provider that only publishes a value with a range fills
+                    // nothing on a face without bars -- the slot would come up
+                    // blank, with no error and nothing to explain it.
+                    //
+                    // The one already chosen always stays in the list. Hiding
+                    // the current selection would make the picker look like it
+                    // had forgotten, and leave no way to change it.
+                    val allFromWatch = remember(refreshed) { ProviderCache.load(ctx) }
+                    val fromWatch = remember(allFromWatch, barsOn, component) {
+                        allFromWatch.filter {
+                            it.shortText || (barsOn && it.ranged) || it.component == component
+                        }
+                    }
+                    // How many are being held back, so the picker can SAY so.
+                    // The complaint that started this was "I don't see any of
+                    // the Google health options" -- and the honest answer was
+                    // that they existed, on the watch, and nothing in the app
+                    // mentioned them. A list that silently omits things is
+                    // indistinguishable from a watch that does not have them.
+                    val hiddenRanged = remember(allFromWatch, fromWatch) {
+                        allFromWatch.size - fromWatch.size
+                    }
                     val openable = remember(refreshed) { ProviderCache.launchers(ctx) }
                     for ((heading, group) in buildList {
                         add(null to Presentation.PICKER_COMMON)
@@ -821,7 +863,7 @@ private fun SlotPicker(
                     // successful send, because the list comes back on one --
                     // a provider is a service on the watch and the phone cannot
                     // see it.
-                    if (fromWatch.isNotEmpty()) {
+                    if (fromWatch.isNotEmpty() || hiddenRanged > 0) {
                         HorizontalDivider(Modifier.padding(vertical = 8.dp))
                         Text(
                             "From your watch",
@@ -829,6 +871,19 @@ private fun SlotPicker(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
+                        if (hiddenRanged > 0) {
+                            Text(
+                                if (hiddenRanged == 1)
+                                    "One more on your watch shows progress towards a goal. " +
+                                        "Turn on \u201cShow progress bars\u201d to use it."
+                                else
+                                    "$hiddenRanged more on your watch show progress towards a goal. " +
+                                        "Turn on \u201cShow progress bars\u201d to use them.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
                         for (p in fromWatch) {
                             Row(
                                 modifier = Modifier

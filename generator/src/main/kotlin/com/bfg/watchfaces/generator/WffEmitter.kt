@@ -699,16 +699,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
                 )
             }
 
-            """
-    <ComplicationSlot slotId="$id" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"
-                      tintColor="$ink"
-                      displayName="@string/${pos.resource}"
-                      supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY" alpha="255"
-                      isCustomizable="FALSE">
-      <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
-      <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
-      <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>
-      <Complication type="SHORT_TEXT">${if (!p.hasIcon(pos)) "" else glyphElement(source, box, iconW, iconH, ink)}
+            val valueText = """
         <PartText x="0" y="${SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)}" width="${box.w}" height="$textH">$ambientColorVariant
           <Text align="CENTER">
             <Font family="${FaceFont.of(l.fontFamily).wff}" size="$fontSize" color="$ink">
@@ -724,7 +715,20 @@ ${handPair("MinuteHand", "hand_minute")}$second
               <Template><![CDATA[${source.format}]]><Parameter expression="[COMPLICATION.TEXT]"/></Template>
             </Font>
           </Text>
-        </PartText>
+        </PartText>"""
+
+            val glyph = if (!p.hasIcon(pos)) "" else glyphElement(source, box, iconW, iconH, ink)
+
+            """
+    <ComplicationSlot slotId="$id" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"
+                      tintColor="$ink"
+                      displayName="@string/${pos.resource}"
+                      supportedTypes="${supportedTypes(p)}" alpha="255"
+                      isCustomizable="FALSE">
+      <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
+      <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
+      <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>${rangedComplication(p, box, fitted, glyph, valueText, ink, ambientAlpha)}
+      <Complication type="SHORT_TEXT">$glyph$valueText
       </Complication>
     </ComplicationSlot>"""
         }.joinToString("\n")
@@ -770,6 +774,92 @@ ${glareLayer(p)}
   </Scene>
 </WatchFace>
 """
+    }
+
+    /**
+     * What each slot will accept from a provider.
+     *
+     * `RANGED_VALUE` first when the face draws bars, because that is the point:
+     * a source that publishes a value with a range and no short string was
+     * simply unselectable before -- nine of Fitbit's ten complications on the
+     * operator's watch. The watch offers the wearer whatever intersects this
+     * list, so the list IS the picker.
+     *
+     * `SHORT_TEXT` stays alongside it. A ranged face must still accept the
+     * ordinary sources, and a slot whose provider sends only short text falls
+     * through to the `SHORT_TEXT` complication below with no bar and no gap
+     * where one should be.
+     */
+    private fun supportedTypes(p: DialParams): String =
+        if (p.showsBars) "RANGED_VALUE SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY"
+        else "SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY"
+
+    /**
+     * The `RANGED_VALUE` block: the same glyph and the same value, plus a bar.
+     *
+     * Empty string on a face that does not draw bars, which is every face below
+     * v15 and every v15 face with the setting off -- so their XML is unchanged.
+     *
+     * ## Two rectangles, not one
+     *
+     * The track is drawn at full width and the fill on top of it, because
+     * `<Transform>` sets an attribute outright: there is no way to say "the rest
+     * of this shape in another colour". Without the track a value near its
+     * minimum is a stub floating in blank dial with nothing to read it against.
+     *
+     * The track takes the ink at low alpha rather than a second colour from the
+     * palette. A bar is a label for the number above it and has to stay quieter
+     * than the number; anything strong enough to be its own colour competes.
+     *
+     * ## Rounded, and what that costs at zero
+     *
+     * `cornerRadius` is half the thickness, so the bar is a pill. At a value of
+     * exactly the minimum the fill collapses to a width of zero and the wearer
+     * sees the track alone, which is the honest picture -- but between zero and
+     * one pixel the corner radius exceeds the width, and what a renderer draws
+     * there is its own business. Not worth a branch: it is one pixel, for one
+     * instant, on the way up.
+     */
+    private fun rangedComplication(
+        p: DialParams,
+        box: SlotGeometry.Box,
+        fitted: Int,
+        glyph: String,
+        valueText: String,
+        ink: String,
+        ambientAlpha: Int
+    ): String {
+        val bar = SlotGeometry.bar(box, fitted, p.generatorVersion)
+        if (!p.showsBars || bar == null) return ""
+        val radius = bar.h / 2.0
+        // The track's alpha, written into the colour rather than set on the
+        // part: a PartDraw's alpha would take the FILL down with it.
+        val track = "#40" + ink.removePrefix("#").takeLast(6)
+        return """
+      <Complication type="RANGED_VALUE">$glyph$valueText
+        <PartDraw x="${bar.x}" y="${bar.y}" width="${bar.w}" height="${bar.h}">
+          <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
+          <RoundRectangle x="0" y="0" width="${bar.w}" height="${bar.h}"
+                          cornerRadiusX="$radius" cornerRadiusY="$radius">
+            <Fill color="$track"/>
+          </RoundRectangle>
+          <RoundRectangle x="0" y="0" width="0" height="${bar.h}"
+                          cornerRadiusX="$radius" cornerRadiusY="$radius">
+            <Fill color="$ink"/>
+            <!--
+              The sweep is bound HERE and not on the width attribute.
+              Arc and RoundRectangle take their dimensions as plain floats. The
+              schema defines an expression type for angles and then does not use
+              it, so there is no way to write a value into the attribute itself.
+              Transform is the binding mechanism, and it is the only one.
+              (An XML comment may not contain two hyphens in a row, which is why
+              this one is punctuated the way it is. aapt2 rejects the APK and
+              Xerces rejects the face.)
+            -->
+            <Transform target="width" value="${SlotGeometry.barFillExpression(bar.w)}"/>
+          </RoundRectangle>
+        </PartDraw>
+      </Complication>"""
     }
 
     /**

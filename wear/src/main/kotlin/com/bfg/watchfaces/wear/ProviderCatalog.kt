@@ -43,15 +43,29 @@ object ProviderCatalog {
         /** What to call it in a list, from the app's own label. */
         val label: String,
         /** The app it belongs to, for grouping and for disambiguating labels. */
-        val app: String
+        val app: String,
+        /** Whether it can fill a `SHORT_TEXT` slot, which every face accepts. */
+        val shortText: Boolean = true,
+        /** Whether it can fill a `RANGED_VALUE` slot, which only a bar face accepts. */
+        val ranged: Boolean = false
     )
 
     /**
-     * Everything installed that can fill a SHORT_TEXT slot.
+     * Everything installed that one of this app's slots could show.
      *
-     * Filtered to SHORT_TEXT because that is the only type this face's slots
-     * declare. Offering a provider that can only supply an image would put a
-     * name in the list that silently renders nothing.
+     * `SHORT_TEXT` or `RANGED_VALUE`, and each provider says which -- the PHONE
+     * decides what to offer, because only the phone knows whether the face
+     * being edited draws bars. Filtering here would mean the watch deciding on
+     * behalf of a face it has never seen.
+     *
+     * It was SHORT_TEXT alone, which was right while that was the only type any
+     * slot declared and wrong as soon as one did not. Measured on the
+     * operator's Pixel Watch 5: of ten Fitbit complications, nine publish a
+     * value with a range and no short string, so nine of them never reached the
+     * picker at all. They did not render badly; they were invisible.
+     *
+     * A provider that can supply NEITHER is still excluded -- one that only has
+     * an image would put a name in the list that silently renders nothing.
      */
     fun installed(context: Context): List<Provider> {
         val pm = context.packageManager
@@ -66,7 +80,10 @@ object ProviderCatalog {
 
     private fun toProvider(pm: PackageManager, info: ResolveInfo): Provider? {
         val service = info.serviceInfo ?: return null
-        if (!supportsShortText(service.metaData?.getString(SUPPORTED_TYPES))) return null
+        val declared = service.metaData?.getString(SUPPORTED_TYPES)
+        val shortText = supports(declared, "SHORT_TEXT")
+        val ranged = supports(declared, "RANGED_VALUE")
+        if (!shortText && !ranged) return null
 
         val component = "${service.packageName}/${service.name}"
         val label = runCatching { service.loadLabel(pm).toString() }.getOrNull().orEmpty()
@@ -78,22 +95,26 @@ object ProviderCatalog {
             component = component,
             // A service's own label is often the app's, and sometimes empty.
             label = label.ifEmpty { app },
-            app = app
+            app = app,
+            shortText = shortText,
+            ranged = ranged
         )
     }
 
     /**
-     * Whether a provider can fill a SHORT_TEXT slot.
+     * Whether a provider declares [type].
      *
-     * The metadata is a comma-separated list of type names. Absent metadata is
-     * treated as usable rather than excluded: a provider that does not declare
+     * The metadata is a comma-separated list of type names. Absent metadata
+     * counts as SHORT_TEXT and nothing else: a provider that does not declare
      * its types is far more likely to be one this parser does not understand
      * than one that supplies nothing, and the face falls back to its system
-     * provider anyway if the slot comes back empty.
+     * provider anyway if the slot comes back empty. Reading silence as a RANGE
+     * would be the opposite bet -- it would put untyped providers in front of
+     * people who turned bars on and leave the slot blank.
      */
-    private fun supportsShortText(declared: String?): Boolean {
-        if (declared.isNullOrBlank()) return true
-        return declared.split(",").any { it.trim().equals("SHORT_TEXT", ignoreCase = true) }
+    private fun supports(declared: String?, type: String): Boolean {
+        if (declared.isNullOrBlank()) return type == "SHORT_TEXT"
+        return declared.split(",").any { it.trim().equals(type, ignoreCase = true) }
     }
 
     /**
@@ -128,7 +149,7 @@ object ProviderCatalog {
     /** The catalog as JSON, for the message the phone asks for. */
     fun toJson(providers: List<Provider>): String =
         providers.joinToString(",", prefix = "[", postfix = "]") {
-            """{"component":${Json.quote(it.component)},"label":${Json.quote(it.label)},"app":${Json.quote(it.app)}}"""
+            """{"component":${Json.quote(it.component)},"label":${Json.quote(it.label)},"app":${Json.quote(it.app)},"shortText":${it.shortText},"ranged":${it.ranged}}"""
         }
 
 }

@@ -4,7 +4,7 @@
   "author": "The Test Suite",
   "created": "2026-08-30T00:00:00Z",
   "params": {
-    "generatorVersion": 14,
+    "generatorVersion": 15,
     "engine": "KNOTWORK",
     "scale": 26.0, "depth": 5.0, "freq": 9,
     "stroke": 1.2, "relief": 1.4, "contrast": 30.0,
@@ -12,6 +12,7 @@
     "glare": 100.0,
     "dialColor": "#7D7369", "inkColor": "#FCF9F1",
     "showSeconds": true,
+    "rangedBars": false,
     "clockMode": "DIGITAL",
     "handStyle": "BATON",
     "secondHandColor": null,

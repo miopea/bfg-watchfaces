@@ -1,5 +1,96 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-19 — A ranged complication is drawn as a bar, and the face opts in
+
+Nine of the ten Fitbit complications were unreachable on the operator's Pixel
+Watch 5. Not broken — invisible. Every slot this app emits declared
+`supportedTypes="SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY"`, so a provider that
+publishes a value with a minimum and a maximum and no short string intersected
+nothing, and the watch never offered it. v15 adds `RANGED_VALUE` to the slot and
+draws the value as a bar under the reading.
+
+### What Watch Face Format actually offers, because the reference is thin
+
+A `<Complication type="RANGED_VALUE">` can read
+`[COMPLICATION.RANGED_VALUE_VALUE]`, `_MIN` and `_MAX`, and `[COMPLICATION.TEXT]`
+alongside them — so a ranged slot keeps showing the reading AND gains a bar,
+rather than trading one for the other. Both complication blocks live in one
+`<ComplicationSlot>`, so a provider that only sends short text still renders.
+
+**The trap: shape dimensions are not expressions.** `<Arc>`'s `startAngle` and
+`<RoundRectangle>`'s `width` are `angleType` and `floatDimensionType` — plain
+floats. The schema defines an `angleExpressionType` and then does not use it on
+`Arc`. The binding mechanism is `<Transform target="width" value="…"/>`, which
+every shape accepts as a child, and it is the only one.
+
+### Why a bar and not an arc
+
+A slot box is 3.9x the slot size wide and 2.45x tall. An arc around it is either
+elliptical or spills outside the box and collides with its neighbours — the
+exact class of failure `SlotGeometry` exists to prevent. A bar stays strictly
+inside the box it is given.
+
+### Why the face opts in, instead of v15 simply having bars
+
+There is no room in the existing box: with a glyph it runs 2.45x the slot size
+and the text ends at 2.40x, so the slack is one pixel, and a slot with no glyph
+IS the line box. The box has to grow, and **a taller box costs the size
+ceiling — measured at two points**, 31 down to 29 on a five-slot face asking for
+the largest complications.
+
+Small, and still the wrong trade to make for everyone. That slack was expensive
+to win: `SlotGeometry.textHeight` exists because half a line of dead space under
+every value was silently clamping "Large" from 28 to 25, and that was treated as
+a defect. Spending it again on every face, for a bar most slots will never show,
+undoes that for people who did not ask for the feature. So `rangedBars` is a
+setting, and a face with it off emits byte-identical XML to v14 — asserted, not
+hoped, across every engine.
+
+### The preview shows a bar only where there is really a range
+
+The box reserves the room in every slot, but a date provider sends no minimum
+and no maximum, so the watch draws nothing there. The first bake put a bar under
+"MAR 10", which is a promise the wrist does not keep. `ComplicationSource.ranged`
+marks only the two system providers whose range is certain, and the asymmetry is
+deliberate: an unmarked source that turns out to have a range gives the wearer
+more than was shown, which is not a defect, while the reverse is.
+
+### Rejected: guarding the division by zero
+
+The progress ratio is `(value - min) / (max - min)`, and nothing stops a provider
+sending `min == max`. The schema lists `?` and `:`, so a ternary guard would
+validate. It is not there on purpose — see below.
+
+### What no test here can check, and it is not the usual caveat
+
+`arithmeticExpressionType` resolves to a union that includes plain `xs:string`.
+**Every expression in Watch Face Format validates**, including a misspelled
+function, an unknown source or a stray bracket; the long enumerations of
+functions and operators beside it in the schema are documentation, not
+constraints. Probed on 2026-09-19 — `clamp(…)` and four other shapes all passed,
+and so would nonsense.
+
+CLAUDE.md says `WffSchemaTest` IS the device gate, and that is still true: the
+device runs nothing but this XSD. But it means something sharper than it reads.
+A green test proves the STRUCTURE is legal and proves nothing whatever about an
+expression. A wrong expression validates, installs, raises no runtime error, and
+renders wrong on a wrist — a different risk class from the dark-ink `<Variant>`,
+which was structural and therefore WAS catchable here.
+
+That is why the guard was rejected rather than added: whether the evaluator
+short-circuits a ternary or divides first and hands `clamp` a NaN is exactly the
+kind of question nothing on this machine can answer. An unverifiable guard
+against a rare provider bug is a worse trade than the bug. **The expression needs
+the operator's watch before this ships.**
+
+### Not yet deployed, and one ordering matters
+
+`catalog-service/params-contract.json` now says `currentGeneratorVersion: 15`
+and the Worker bundles it at build time. It has NOT been redeployed. v10 shipped
+in the app while the Worker still said 9, which would have refused every
+submission the day sharing opened — so the Worker deploy has to land BEFORE any
+v15 app reaches anyone. `curl .../config` is how you check.
+
 ## 2026-09-19 — The Data Layer transport stays wrist-first, and that is a decision rather than a gap
 
 Everything between "the bytes left the phone" and "the face is on the watch" —

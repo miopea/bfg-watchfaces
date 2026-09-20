@@ -47,6 +47,7 @@ object FaceCodec {
             sheen = q.dbl("sheen", d.sheen),
             glare = q.dbl("glare", d.glare),
             showSeconds = q["showSeconds"]?.let { it == "true" || it == "1" } ?: d.showSeconds,
+            rangedBars = q["rangedBars"]?.let { it == "true" || it == "1" } ?: d.rangedBars,
             // Unknown values fall back to the default rather than throwing: a
             // face written by a NEWER build must still open here, degraded, in
             // the same way an unknown submission state reads as pending.
@@ -181,6 +182,7 @@ object FaceCodec {
   "glare": ${p.glare},
   "dialColor": "${p.dialColor}", "inkColor": "${p.inkColor}",
   "showSeconds": ${p.showSeconds},
+  "rangedBars": ${p.rangedBars},
   "clockMode": ${Json.quote(p.clockMode.name)},
   "handStyle": ${Json.quote(p.handStyle.name)},
   "secondHandColor": ${p.secondHandColor?.let { Json.quote(it) } ?: "null"},
@@ -219,6 +221,7 @@ object FaceCodec {
             "glare" to p.glare,
             "dialColor" to p.dialColor, "inkColor" to p.inkColor,
             "showSeconds" to p.showSeconds,
+            "rangedBars" to p.rangedBars,
             "clockMode" to p.clockMode.name,
             "handStyle" to p.handStyle.name,
             "secondHandColor" to (p.secondHandColor ?: ""),

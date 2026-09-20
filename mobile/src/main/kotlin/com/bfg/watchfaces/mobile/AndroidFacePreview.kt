@@ -160,6 +160,17 @@ object AndroidFacePreview {
                 box.w.toFloat(), textH.toFloat(),
                 drawn.fontSize.toFloat(), c, bold = false, family = faceFamily
             )
+
+            // The v15 progress bar, from the SAME SlotGeometry.bar the emitter
+            // and the workbench preview use, and gated the same way: only a
+            // source that actually publishes a range gets one, so the preview
+            // never shows a bar the watch will leave empty.
+            if (p.showsBars && source.ranged) {
+                SlotGeometry.bar(box, fitted, p.generatorVersion)?.let { bar ->
+                    drawSlotBar(canvas, (box.x + bar.x).toFloat(), (box.y + bar.y).toFloat(),
+                        bar.w.toFloat(), bar.h.toFloat(), c)
+                }
+            }
         }
 
         // Time: the emitter ships TWO TimeText elements, one interactive
@@ -319,6 +330,23 @@ object AndroidFacePreview {
 
     private fun withAlpha(argb: Int, a: Int) =
         (argb and 0x00FFFFFF) or ((a.coerceIn(0, 255)) shl 24)
+
+    /**
+     * The ranged bar: a faint track with the reading over it.
+     *
+     * Two shapes, matching what [com.bfg.watchfaces.generator.WffEmitter] emits
+     * and what the workbench preview draws, because all three have to agree.
+     * The fill is [SlotGeometry.BAR_SAMPLE_FILL]; on a watch it comes from the
+     * provider through a `<Transform>` and there is nothing here to ask.
+     */
+    private fun drawSlotBar(canvas: Canvas, x: Float, y: Float, w: Float, h: Float, c: Int) {
+        val r = h / 2f
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+        paint.color = withAlpha(c, ((c ushr 24) * SlotGeometry.BAR_TRACK_ALPHA) / 255)
+        canvas.drawRoundRect(x, y, x + w, y + h, r, r, paint)
+        paint.color = c
+        canvas.drawRoundRect(x, y, x + w * SlotGeometry.BAR_SAMPLE_FILL.toFloat(), y + h, r, r, paint)
+    }
 
     private fun drawCenteredIn(
         canvas: Canvas, text: String,

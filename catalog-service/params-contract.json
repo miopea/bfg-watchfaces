@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "currentGeneratorVersion": 14,
+  "currentGeneratorVersion": 15,
   "maxFaceBytes": 8192,
   "maxNameChars": 40,
   "maxAuthorChars": 40,
@@ -74,6 +74,7 @@
     "lens",
     "lensAmount",
     "providers",
+    "rangedBars",
     "relief",
     "ring",
     "rotate",

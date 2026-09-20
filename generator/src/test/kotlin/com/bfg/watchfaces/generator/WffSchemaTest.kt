@@ -832,6 +832,124 @@ class WffSchemaTest {
         assertTrue(!xml.contains("<Condition>")) { "a fixed-width clock does not need two positions" }
         assertEquals(1, Regex("format=\"ss\"").findAll(xml).count())
     }
+
+    // ---- v15: a ranged complication drawn as a bar -------------------------
+    //
+    // CLAUDE.md, after the dark-ink Variant shipped unsendable: "When you add a
+    // branch keyed on a PARAMETER, sweep that parameter -- one more example in
+    // the middle of the range proves nothing about the edge that has its own
+    // code." rangedBars IS such a parameter, so it is swept against everything
+    // that shares the slot with it rather than shown working once.
+
+    @ParameterizedTest
+    @EnumSource(SlotPosition::class)
+    fun `a ranged bar emits schema-valid WFF in every slot, with and without a glyph`(pos: SlotPosition) {
+        for (icons in listOf(true, false)) {
+            for (source in listOf(ComplicationSource.STEP_COUNT, ComplicationSource.HEART_RATE)) {
+                val p = DialParams(rangedBars = true)
+                    .withSlot(pos, source)
+                    .copy(iconSlots = if (icons) SlotPosition.entries.toSet() else emptySet())
+                val errors = validate(WffEmitter.emit(p))
+                assertTrue(errors.isEmpty()) {
+                    "$pos icons=$icons $source schema errors:\n" + errors.joinToString("\n")
+                }
+            }
+        }
+    }
+
+    /**
+     * The edge the dark-ink bug lived on, now that a second element shares the
+     * slot.
+     *
+     * A dark ink adds an ambient colour Variant, and that Variant was once
+     * emitted in a position the schema forbids -- legal for every light ink and
+     * illegal for every dark one, which is why every preset passed. The bar
+     * brings a new element into the same block, so the same sweep is owed here.
+     */
+    @ParameterizedTest
+    @EnumSource(ClockMode::class)
+    fun `a ranged bar is schema-valid against a dark ink and an analog clock`(mode: ClockMode) {
+        for (ink in listOf("#000000", "#333333", "#7A6A58", "#FFFFFF")) {
+            val p = DialParams(rangedBars = true, clockMode = mode, inkColor = ink)
+                .withSlot(SlotPosition.LEFT, ComplicationSource.STEP_COUNT)
+                .withSlot(SlotPosition.RIGHT, ComplicationSource.WATCH_BATTERY)
+            val errors = validate(WffEmitter.emit(p))
+            assertTrue(errors.isEmpty()) { "$mode ink=$ink:\n" + errors.joinToString("\n") }
+        }
+    }
+
+    /**
+     * The whole promise of the version bump, stated as an equality.
+     *
+     * v15 with bars off must emit what v14 emitted -- not "look similar", not
+     * "pass the same tests". Community faces are stored as parameters, so the
+     * generator IS the renderer for the file format: anything that changes here
+     * silently rewrites every face already saved.
+     *
+     * Only the generator's own version comment may differ, and it is normalised
+     * out rather than excused, so this fails if anything else moves.
+     */
+    @Test
+    fun `v15 with bars off emits exactly what v14 emitted`() {
+        for (engine in Engine.entries) {
+            for (icons in listOf(true, false)) {
+                val base = DialParams(engine = engine, generatorVersion = 14)
+                    .withSlot(SlotPosition.TOP, ComplicationSource.DAY_AND_DATE)
+                    .withSlot(SlotPosition.LEFT, ComplicationSource.STEP_COUNT)
+                    .withSlot(SlotPosition.BOTTOM, ComplicationSource.WEATHER_TEMPERATURE)
+                    .copy(iconSlots = if (icons) SlotPosition.entries.toSet() else emptySet())
+                val v14 = WffEmitter.emit(base)
+                val v15 = WffEmitter.emit(base.copy(generatorVersion = 15))
+                fun strip(x: String) = x.replace(Regex("generator, v\\d+"), "generator, vN")
+                assertEquals(strip(v14), strip(v15)) {
+                    "$engine icons=$icons: v15 changed a face that never asked for bars"
+                }
+            }
+        }
+    }
+
+    /**
+     * And the setting does nothing at all on a face too old to have the layout.
+     *
+     * `rangedBars` is stored in the face JSON, so an older face can arrive
+     * carrying it -- hand-edited, or round-tripped through a newer app. Honouring
+     * it would grow boxes that v14's geometry never reserved room for.
+     */
+    @Test
+    fun `rangedBars on a pre-v15 face changes nothing`() {
+        val old = DialParams(generatorVersion = 14).withSlot(SlotPosition.LEFT, ComplicationSource.STEP_COUNT)
+        assertEquals(
+            WffEmitter.emit(old),
+            WffEmitter.emit(old.copy(rangedBars = true))
+        ) { "a v14 face honoured a v15 setting" }
+    }
+
+    /**
+     * The bar is bound, not baked.
+     *
+     * A RoundRectangle's width is a plain float in the schema -- there is an
+     * expression type for angles and the shapes do not use it -- so the value
+     * has to arrive through `<Transform>`. Emitting a fixed width would validate
+     * and install and then show the same bar for every reading, which is the
+     * kind of failure nothing on this machine can see.
+     */
+    @Test
+    fun `the bar's fill is driven by the complication's value`() {
+        val xml = WffEmitter.emit(
+            DialParams(rangedBars = true).withSlot(SlotPosition.LEFT, ComplicationSource.STEP_COUNT)
+        )
+        assertTrue(xml.contains("<Complication type=\"RANGED_VALUE\">")) { "no ranged block emitted" }
+        assertTrue(xml.contains("supportedTypes=\"RANGED_VALUE SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY\"")) {
+            "the slot does not accept a ranged provider, so the picker will not offer one"
+        }
+        assertTrue(xml.contains("<Transform target=\"width\"")) { "the fill is not bound to anything" }
+        assertTrue(xml.contains("[COMPLICATION.RANGED_VALUE_VALUE]")) { "the value is never read" }
+        // The SHORT_TEXT block must survive alongside it: a provider that sends
+        // only short text still has to render.
+        assertTrue(xml.contains("<Complication type=\"SHORT_TEXT\">")) {
+            "the short-text fallback was dropped; ordinary sources would go blank"
+        }
+    }
 }
 
 /**

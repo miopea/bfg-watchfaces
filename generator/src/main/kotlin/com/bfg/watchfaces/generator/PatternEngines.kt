@@ -61,6 +61,11 @@ object PatternEngines {
         // the dial pattern is untouched, so this delegates like the eight
         // versions above it. See WeatherFallback.
         14 -> v4(p)
+        // v15 draws a progress bar under a complication that has a range, and
+        // grows the slot box to hold it. Both are SlotGeometry, and the box
+        // only grows on a face that asked for bars. The dial pattern is
+        // untouched, so this delegates like the ten versions above it.
+        15 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

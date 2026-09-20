@@ -20,7 +20,9 @@ import java.awt.Color
 import java.awt.Font
 import java.awt.RenderingHints
 import java.awt.font.TextAttribute
+import java.awt.Graphics2D
 import java.awt.geom.Ellipse2D
+import java.awt.geom.RoundRectangle2D
 import java.awt.image.BufferedImage
 import java.time.LocalDateTime
 import java.time.format.TextStyle
@@ -121,6 +123,21 @@ object FacePreview {
             drawCenteredIn(g, drawn.sample ?: Complications.sample(source),
                 box.x, box.y + textY, box.w, textH,
                 drawn.fontSize.toDouble(), Font.PLAIN, c, face)
+
+            // The v15 progress bar, from the SAME SlotGeometry.bar the emitter
+            // uses.
+            //
+            // Only where the source actually HAS a range. The box reserves the
+            // room in every slot, but a date provider sends no minimum and no
+            // maximum, so the watch draws nothing there -- and a preview
+            // showing a bar under "MAR 10" would be promising something the
+            // wrist does not deliver. See ComplicationSource.ranged, which is
+            // deliberately conservative for exactly that reason.
+            if (p.showsBars && source.ranged) {
+                SlotGeometry.bar(box, fitted, p.generatorVersion)?.let { bar ->
+                    drawSlotBar(g, box.x + bar.x, box.y + bar.y, bar.w, bar.h, c)
+                }
+            }
         }
 
         // The date the FACE draws, matching WffEmitter's PartText: centred at
@@ -272,6 +289,26 @@ object FacePreview {
     }
 
     private fun withAlpha(c: Color, a: Int) = Color(c.red, c.green, c.blue, a.coerceIn(0, 255))
+
+    /**
+     * The ranged bar: a faint full-width track with the reading over it.
+     *
+     * Two shapes, exactly as [WffEmitter] emits them, because that is what the
+     * watch draws -- a single rounded rectangle would preview a bar with no
+     * context and then look different on the wrist.
+     *
+     * The fill is [SlotGeometry.BAR_SAMPLE_FILL], a stand-in. On a watch it is
+     * whatever the provider reports, bound through `<Transform>`; there is
+     * nothing here to ask.
+     */
+    private fun drawSlotBar(g: Graphics2D, x: Int, y: Int, w: Int, h: Int, c: Color) {
+        val r = h.toDouble()
+        g.color = withAlpha(c, (c.alpha * SlotGeometry.BAR_TRACK_ALPHA) / 255)
+        g.fill(RoundRectangle2D.Double(x.toDouble(), y.toDouble(), w.toDouble(), h.toDouble(), r, r))
+        val filled = w * SlotGeometry.BAR_SAMPLE_FILL
+        g.color = c
+        g.fill(RoundRectangle2D.Double(x.toDouble(), y.toDouble(), filled, h.toDouble(), r, r))
+    }
 
     /**
      * WFF weight -> AWT style. AWT only has PLAIN and BOLD, so MEDIUM (which on

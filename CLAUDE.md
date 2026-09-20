@@ -104,6 +104,17 @@ you add a branch keyed on a PARAMETER, sweep that parameter — one more example
 in the middle of the range proves nothing about the edge that has its own
 code.** See `DECISIONS.md` 2026-09-18.
 
+**But that gate covers STRUCTURE, and nothing anywhere checks an EXPRESSION.**
+`arithmeticExpressionType` resolves to a union that includes plain `xs:string`,
+so every expression validates — a misspelled function, an unknown source, a
+stray bracket. The enumerations of functions and operators beside it in
+`common/attributes/arithmeticExpressionType.xsd` are documentation, not
+constraints; probed 2026-09-19, `clamp(...)` passes and so does nonsense. A
+wrong expression validates, installs, raises no runtime error, and renders wrong
+on a wrist. **Anything you write inside `[...]`, or into a `<Transform value=>`,
+needs a real watch — a green build says nothing about it.** See `DECISIONS.md`
+2026-09-19.
+
 **Do not add AGP to the watch face APK build.** Gradle injects `kotlin/` and
 `DebugProbesKt.bin`, which Play accepts but Watch Face Push rejects.
 `watchface-template/build.sh` uses aapt2 directly for this reason and asserts

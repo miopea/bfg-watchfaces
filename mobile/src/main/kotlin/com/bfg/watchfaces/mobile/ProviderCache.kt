@@ -27,8 +27,22 @@ object ProviderCache {
     /** Apps that can be OPENED, as opposed to ones that fill a slot. */
     private const val LAUNCHERS = "watch-launchers.json"
 
-    /** One provider, in the terms the picker needs. */
-    data class Provider(val component: String, val label: String, val app: String)
+    /**
+     * One provider, in the terms the picker needs.
+     *
+     * [shortText] and [ranged] default to the shape an OLDER WATCH reports.
+     * Before this existed the watch filtered to SHORT_TEXT before sending, so a
+     * list from one contains only short-text providers and says nothing about
+     * types -- and these defaults read that silence correctly. A phone updated
+     * ahead of its watch therefore keeps working instead of hiding everything.
+     */
+    data class Provider(
+        val component: String,
+        val label: String,
+        val app: String,
+        val shortText: Boolean = true,
+        val ranged: Boolean = false
+    )
 
     fun save(context: Context, json: String) {
         runCatching { File(context.filesDir, FILE).writeText(json) }
@@ -53,7 +67,9 @@ object ProviderCache {
             Provider(
                 component = component,
                 label = o["label"] as? String ?: component,
-                app = o["app"] as? String ?: ""
+                app = o["app"] as? String ?: "",
+                shortText = o["shortText"] as? Boolean ?: true,
+                ranged = o["ranged"] as? Boolean ?: false
             )
         }
     }.getOrElse { emptyList() }
