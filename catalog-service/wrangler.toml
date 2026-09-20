@@ -58,4 +58,4 @@ ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 # after that commit, which makes `curl /config` agree with itself while
 # naming the wrong build. Update it in the same commit as any deploy --
 # a version marker nobody moves is worse than none, because it is believed.
-BUILD_SHA = "a164916"
+BUILD_SHA = "5ece92b"
