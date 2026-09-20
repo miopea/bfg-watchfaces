@@ -72,12 +72,15 @@ object Complications {
      * fallback source's sample stays the best available guess about WIDTH,
      * which is all [sample] ever claimed to be.
      */
-    fun sampleFor(p: DialParams, pos: SlotPosition): String {
+    fun sampleFor(p: DialParams, pos: SlotPosition, cycleLabel: String? = null): String {
         val component = p.providers[pos]
         if (component != null &&
             component.substringAfter('/').endsWith(DialParams.CYCLE_PROVIDER_CLASS)
         ) {
-            return CycleDay.PREVIEW_LABEL
+            // The REAL day when the caller knows it, a stand-in only when it
+            // does not. A preview showing "Day 14" beside a watch showing
+            // "Day 18" is the preview contradicting the app.
+            return cycleLabel ?: CycleDay.PREVIEW_LABEL
         }
         return sample(p.effectiveSlot(pos))
     }

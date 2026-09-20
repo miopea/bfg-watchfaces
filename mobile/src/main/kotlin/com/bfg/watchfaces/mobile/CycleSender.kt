@@ -98,6 +98,15 @@ object CycleSender {
         val state = kotlinx.coroutines.runBlocking { CycleSource.read(context) }
         val date = (state as? CycleSource.Availability.Ready)?.start
         send(context, date)
+        // Kept on the PHONE too, so a preview can draw the real day instead of
+        // a stand-in. The operator's watch read "Day 18" while the phone's own
+        // preview said "Day 14", which is the preview telling him something the
+        // app already knew was wrong.
+        //
+        // Through CycleState rather than straight to disk: writing the file
+        // alone lost a race with the preview, which had already run and had no
+        // key that would change. See CycleState.
+        CycleState.set(context, date)
         return state
     }
 }

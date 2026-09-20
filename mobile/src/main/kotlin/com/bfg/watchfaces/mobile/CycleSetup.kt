@@ -99,7 +99,12 @@ fun CycleSetup(modifier: Modifier = Modifier) {
         refresh()
     }
 
-    LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(Unit) {
+        // Seed from disk FIRST, so a cold launch draws the day it already knew
+        // rather than a stand-in for the second or two the read takes.
+        CycleState.load(context)
+        refresh()
+    }
 
     Surface(
         modifier = modifier.fillMaxWidth(),

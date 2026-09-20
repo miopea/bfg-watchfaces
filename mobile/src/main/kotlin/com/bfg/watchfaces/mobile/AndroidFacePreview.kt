@@ -91,7 +91,20 @@ object AndroidFacePreview {
          */
         now: java.time.LocalDateTime? = null,
         /** The phone's own setting, for [HourFormat.DEVICE]. */
-        deviceIs24Hour: Boolean = false
+        deviceIs24Hour: Boolean = false,
+        /**
+         * The real cycle day, when the caller knows it.
+         *
+         * LAST in the list, and deliberately: inserting it beside [texture]
+         * silently re-bound every positional argument after it, and the
+         * compiler caught it only because the types happened to differ.
+         *
+         * Passed in for the same reason [texture] is -- this object has no
+         * Context and every caller already has one. Null draws a stand-in,
+         * which is right for a gallery tile of somebody else's design and
+         * wrong for the screen the wearer is looking at.
+         */
+        cycleLabel: String? = null
     ): Bitmap {
         val shown = now ?: SHOWROOM
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -159,7 +172,7 @@ object AndroidFacePreview {
                 // sampleFor, not sample: a slot with a named provider is
                 // filled by that provider, so previewing its fallback source
                 // shows something the watch will never display.
-                canvas, drawn.sample ?: Complications.sampleFor(p, pos),
+                canvas, drawn.sample ?: Complications.sampleFor(p, pos, cycleLabel),
                 box.x.toFloat(),
                 (box.y + SlotGeometry.textOffset(fitted, pos in p.iconSlots, p.generatorVersion)).toFloat(),
                 box.w.toFloat(), textH.toFloat(),

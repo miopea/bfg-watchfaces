@@ -591,15 +591,35 @@ private fun DialPreview(params: DialParams, ambient: Boolean) {
     val now = currentMinute()
     val is24 = android.text.format.DateFormat.is24HourFormat(context)
     val bitmap by produceState<Bitmap?>(
-        initialValue = null, key1 = params, key2 = ambient, key3 = now
+        // cycleStart is a KEY, not just an input: the sync that discovers it
+        // lands after this has already run once, and without it in the keys the
+        // preview keeps the stand-in forever. That is exactly how the phone
+        // came to show "Day 14" beside a watch showing "Day 18".
+        // The vararg form, because cycleStart is a FOURTH key and there is no
+        // key4 overload. It has to be a key, not just an input: the sync that
+        // discovers it lands after this has already run once, and without it
+        // the preview keeps the stand-in forever. That is exactly how the
+        // phone came to show "Day 14" beside a watch showing "Day 18".
+        null, params, ambient, now, CycleState.startDate
     ) {
         value = withContext(Dispatchers.Default) {
             // Resolved off the main thread with the render, not remembered
             // separately: decoding a photo is the expensive half and it belongs
             // on the same background hop the dial already takes.
             val texture = Textures.forFace(context, params)
+            // Read on the same background hop as the texture. CycleSender.sync
+            // wrote it the last time Health Connect was read; null until then,
+            // which draws the stand-in.
+
             runCatching {
-                AndroidFacePreview.render(params, ambient, DIAL_SIZE, texture, now, is24)
+                // The REAL cycle day on the screen the wearer is looking at.
+                // The watch read "Day 18" while this preview said "Day 14",
+                // which is the app contradicting itself about a number it
+                // already had.
+                AndroidFacePreview.render(
+                    params, ambient, DIAL_SIZE, texture, now, is24,
+                    cycleLabel = CycleState.label()
+                )
             }.getOrNull()
         }
     }
@@ -731,7 +751,13 @@ private fun SlotPicker(
     ) {
         // Dimmed rather than hidden when the glyph is off: the row still has to
         // say WHICH complication this is, and an empty space says nothing.
-        Box(Modifier.alpha(if (iconOn) 1f else 0.3f)) { SourceGlyph(selected) }
+        // No glyph for a named provider: SourceGlyph draws OUR symbol for the
+        // fallback source, which put a battery beside a row reading "Cycle
+        // day". We have no icon for somebody else's provider and should not
+        // invent one.
+        Box(Modifier.alpha(if (iconOn) 1f else 0.3f)) {
+            if (component == null) SourceGlyph(selected) else Spacer(Modifier.size(24.dp))
+        }
         Spacer(Modifier.size(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -739,7 +765,15 @@ private fun SlotPicker(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(Complications.label(selected), style = MaterialTheme.typography.bodyLarge)
+            // The PROVIDER's name when one is chosen, not the fallback
+            // source's. A slot pointed at the cycle complication read
+            // "Bottom / Battery" on the operator's phone, which is the label
+            // of the thing that only runs if the provider is missing.
+            Text(
+                component?.let { ProviderCache.labelFor(LocalContext.current, it) }
+                    ?: Complications.label(selected),
+                style = MaterialTheme.typography.bodyLarge
+            )
         }
         Text("›", style = MaterialTheme.typography.titleMedium,
              color = MaterialTheme.colorScheme.outline)
