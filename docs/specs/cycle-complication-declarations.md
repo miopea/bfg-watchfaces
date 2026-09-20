@@ -98,6 +98,22 @@ Every sentence below is checked against `cycle-complication.md`. If the build
 changes, this changes with it — a justification that describes something the app
 does not do is worse than none.
 
+**Amended 2026-09-20, and this is exactly the failure the sentence above was
+written to catch.** The justification described reading "one field" and deriving
+"a single number", which was true of the build it was written against and became
+false within a day. The feature grew: the carousel tile has a whole screen
+rather than a 40px slot, so it now also shows how long the last period ran, the
+average interval between recent starts, and which day of the period it is while
+one is ongoing. All of it comes from records already read under the same single
+permission — that was the criterion for adding it — so nothing about the
+PERMISSION changed. But three sentences of the justification stopped being true,
+including the one asserting no analysis is performed, and an average is the
+closest thing in the feature to an analysis.
+
+**Nothing was submitted in the meantime**, so no inaccurate statement reached
+Google. The lesson is the ordering: this file has to be re-read at the moment of
+filing, not at the moment of drafting.
+
 ### Permission requested
 
 `android.permission.health.READ_MENSTRUATION`, on the handheld module only. No
@@ -111,13 +127,19 @@ writes to Health Connect.
 > cycle, alongside the other readings a watch face carries such as steps, heart
 > rate and battery.
 >
-> The app reads one record type, `MenstruationPeriodRecord`, and uses one field
-> from it: the start time of the most recent period. From that it derives a
-> single number — how many days have elapsed since that date — and displays that
-> number on the user's own watch face. Nothing else is read, and no analysis,
-> prediction or interpretation is performed. The app does not predict future
-> periods, does not identify fertile windows or ovulation, and offers no health
-> guidance of any kind.
+> The app reads one record type, `MenstruationPeriodRecord`, over the past 365
+> days, and uses its start and end dates. From those it derives, and displays to
+> the user on their own devices: the current day of the cycle, the day of the
+> period while one is ongoing, the length of the most recent period, and the
+> average interval between recent period start dates. No other record type is
+> read, and the app never writes to Health Connect.
+>
+> The app performs no prediction or interpretation of any kind. It does not
+> predict future periods, does not identify fertile windows or ovulation, does
+> not state a cycle phase, and offers no health guidance. The average interval is
+> descriptive arithmetic over dates the user entered herself, presented as a
+> past-tense fact about her own logging; it is never used to project a future
+> date, and no future date is shown or computed anywhere in the app.
 >
 > This falls within the permitted use of allowing a user to monitor their own
 > health information. A person glancing at their own wrist is monitoring their
@@ -126,10 +148,12 @@ writes to Health Connect.
 
 ### Where the data goes, stated plainly
 
-> The raw records never leave Health Connect. The handheld app reads them, takes
-> a single date, and sends only that date to the user's own paired watch over
-> the Wear OS Data Layer, which is a direct device-to-device channel. The watch
-> derives the day count locally.
+> The raw records never leave Health Connect. The handheld app reads them and
+> sends to the user's own paired watch, over the Wear OS Data Layer — a direct
+> device-to-device channel — only: the start date of the most recent period, its
+> end date, and the average interval in days. The watch derives every displayed
+> number from those locally. No record, and no field other than those three,
+> ever leaves the handheld device.
 >
 > No menstrual data, and no value derived from it, is transmitted to any server,
 > to the developer, or to any third party. The app has no advertising, sells
@@ -140,6 +164,12 @@ writes to Health Connect.
 
 ### The disclosure that must not be omitted
 
+> On the watch the values are shown in two places, both belonging to this app:
+> a tile in the watch's own tile carousel, which the user adds deliberately, and
+> a complication on a watch face. Tapping the tile opens the cycle section of
+> the user's existing health app on the paired phone; it passes no data, it
+> launches an app.
+>
 > On the watch, the derived day count is published as a standard Wear OS
 > complication data source. This is the platform mechanism by which a watch face
 > displays a value, and it means the number is technically readable by other
@@ -175,7 +205,7 @@ that paragraph is worse than either answer alone.
 | Data type | Health and fitness → Health info |
 | Collected | No — the data is never sent to a server |
 | Shared | Yes — readable by other watch faces on the wearer's own device, via the standard complication mechanism, after she points one at it. No third-party servers, no developer access |
-| Processed ephemerally | No — the derived date is stored on the watch |
+| Processed ephemerally | No — the derived dates and the average interval are stored on the watch |
 | Required or optional | Optional; the app is fully usable without it |
 | Purpose | App functionality |
 | Used for advertising | No |
@@ -186,9 +216,14 @@ that paragraph is worse than either answer alone.
 
 - Re-read the permitted use-case wording on the live policy page. It was read on
   2026-09-19; the pages change and the wording is the whole argument.
-- Confirm the build matches the description. As of 2026-09-20 it does: the
-  feature is built and the description above was checked against the code, not
-  against an intention.
+- Confirm the build matches the description, **at the moment of filing**. It
+  drifted once already, between the drafting and now, and the drift was in the
+  direction of the app doing MORE than the form said. Re-read `CycleSource`,
+  `CycleFacts` and `CycleTileService` against the three quoted blocks above;
+  those are the three files that decide whether this document is true.
+- Confirm nothing in the app computes or displays a FUTURE date. That is the
+  single line that separates this from a prediction feature, and it is the one a
+  well-meaning addition would cross without noticing.
 
 ### Where this actually gets filed, corrected 2026-09-20
 

@@ -113,19 +113,6 @@ fun CycleSetup(modifier: Modifier = Modifier) {
             Text("Cycle day", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(6.dp))
 
-            // Said HERE, once, rather than discovered as a missing Share
-            // button -- the same reasoning PhotoRow gives for saying it beside
-            // the photo picker. A face with this slot is isLocalOnly, and the
-            // reason is not obvious: no reading is ever stored in a face, but
-            // the provider's NAME is, and publishing it would tell everyone who
-            // downloaded the face that its author tracks a cycle.
-            Text(
-                "A design with this on it stays on your phone and can't be shared.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(10.dp))
-
             when (val s = state) {
                 null -> Text("Checking…", style = MaterialTheme.typography.bodyMedium)
 
@@ -186,10 +173,33 @@ fun CycleSetup(modifier: Modifier = Modifier) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Spacer(Modifier.height(12.dp))
-                    TextButton(onClick = { refresh() }, enabled = !working) { Text("Update now") }
                 }
             }
+
+            // ## Last, and phrased as what the app DOES rather than what she
+            // cannot do
+            //
+            // This used to sit at the TOP, above the status, worded "A design
+            // with this on it stays on your phone and can't be shared." So the
+            // first thing she read on the cycle panel was a restriction, in the
+            // voice of a warning, every single time -- and the operator read it
+            // as the app warning him about something going wrong.
+            //
+            // It is not a warning. It is the app refusing to publish her cycle
+            // to a public catalog, which is the behaviour she would want if
+            // asked. Said once, at the bottom, in the app's own voice.
+            //
+            // Still said at all, because it is NOT obvious: no reading is ever
+            // stored in a face, but the provider's NAME is, and publishing that
+            // would tell everyone who downloaded the design that its author
+            // tracks a cycle.
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Designs showing your cycle day stay on this phone. They are never " +
+                    "shared to the community.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
