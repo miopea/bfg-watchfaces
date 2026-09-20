@@ -2,6 +2,7 @@ package com.bfg.watchfaces.mobile
 
 import android.content.Context
 import android.util.Log
+import com.bfg.watchfaces.appcore.CycleDay
 import com.bfg.watchfaces.appcore.WatchLink
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.Wearable
@@ -112,6 +113,45 @@ object CycleSender {
             // Counts, never dates. Same rule as everywhere else this value goes.
             Log.i(TAG, "cycle detail ${if (facts == null) "cleared" else "sent"} to ${nodes.size} watch(es)")
         }.onFailure { Log.w(TAG, "could not send the cycle detail", it) }
+    }
+
+    /**
+     * Refresh the watch on app launch, whatever screen she opens.
+     *
+     * ## The bug this exists to stop
+     *
+     * Until this existed, [sync] had exactly ONE caller: [CycleSetup], which is
+     * only composed on the Studio tab, and only when the face being edited
+     * already has a slot pointing at the cycle source. So the watch was
+     * refreshed by an act of design, not by the passage of time.
+     *
+     * That is survivable for the day count only because the watch holds a DATE
+     * and derives the number itself. It is not survivable across a new period:
+     * the date it holds is the start of the PREVIOUS one, so the day after her
+     * period begins the dial reads "Day 30" instead of "Day 1" and keeps
+     * climbing until she happens to open Studio on a cycle face. The carousel
+     * card is worse, because "day 9 of your period" stays on screen after the
+     * period it refers to has ended.
+     *
+     * Once per launch is the right frequency: the value changes at most once a
+     * day, a background schedule would be a new permission story for one
+     * integer, and she has to pick the phone up for anything else anyway.
+     *
+     * ## Why it does not always run
+     *
+     * Skipped entirely when Health Connect is absent, and when she has neither
+     * granted the read nor got a cached date from a time she had. The second
+     * half of that matters: someone who granted and later REVOKED still has a
+     * stale date on her watch, and [sync] clearing it is the whole point. Only
+     * the person who never turned this on at all does nothing.
+     *
+     * Blocking; call it off the main thread.
+     */
+    fun syncOnLaunch(context: Context) {
+        if (!CycleSource.isSupported(context)) return
+        val granted = kotlinx.coroutines.runBlocking { CycleSource.isGranted(context) }
+        if (!granted && CycleDay.load(context.filesDir) == null) return
+        sync(context)
     }
 
     /**

@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -84,6 +85,43 @@ class MainActivity : ComponentActivity() {
         STUDIO("Studio", IconStudio),
         MINE("My faces", IconMine),
         ABOUT("About", IconAbout)
+    }
+
+    /**
+     * Refresh the cycle day on the watch every time she opens the app.
+     *
+     * ## The bug this exists to stop
+     *
+     * The sync used to have exactly ONE caller: [CycleSetup], which is composed
+     * on the Studio tab, and only when the face being edited already points a
+     * slot at the cycle source. So the watch was refreshed by an act of DESIGN
+     * rather than by the passage of time. The day count survived that because
+     * the watch holds a DATE and derives the number itself -- but a NEW period
+     * never arrived, so the morning after one began the dial read "Day 30" and
+     * kept climbing until she happened to open Studio on a cycle face.
+     *
+     * ## Why onResume, and why here
+     *
+     * ON_RESUME rather than onCreate because the phone she picks up in the
+     * morning has had this process alive since yesterday, and that is exactly
+     * the moment the number changed. At the Activity rather than in a
+     * DisposableEffect because it is an Activity-lifetime concern with nothing
+     * to do with composition -- and the Compose spelling would have meant
+     * importing LocalLifecycleOwner from a TRANSITIVE dependency.
+     *
+     * [CycleSender.syncOnLaunch] decides whether there is anything to do; for
+     * anyone who never turned this on, there is not.
+     */
+    override fun onResume() {
+        super.onResume()
+        // Seeded from disk first so a preview draws the day it already knew
+        // rather than a stand-in for the second the read takes. Same order as
+        // CycleSetup.
+        CycleState.load(this)
+        // Health Connect reads and the Data Layer send both block, and
+        // Tasks.await THROWS on the main thread. lifecycleScope so a resume
+        // that is immediately backgrounded does not leak the work.
+        lifecycleScope.launch(Dispatchers.IO) { CycleSender.syncOnLaunch(this@MainActivity) }
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
