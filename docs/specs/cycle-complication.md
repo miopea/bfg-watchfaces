@@ -27,6 +27,59 @@ The wording follows decision `01a0ba48`: a plain unlabelled number, like every
 other complication on the dial. No icon that announces what it is to anyone
 glancing over her shoulder.
 
+## The data path is verified, and it decides whether this works at all
+
+Confirmed on 2026-09-19, and it was the assumption the whole feature rested on.
+Health Connect is a STORE, not a source: our complication reads
+`MenstruationPeriodRecord`, and something has to have written it.
+
+**The operator's wife logs her cycle in the Google Health app, and Google Health
+writes Periods to Health Connect.** Google's own documentation lists, under
+Cycle health, exactly three writable types: **Periods, Flow, Intermenstrual
+bleeding**. `Periods` is the interval record whose `startTime` this feature
+needs. The path is real:
+
+```text
+Google Health (she logs a period)
+  -> Health Connect        (Cycle health: Periods)
+  -> :mobile READ_MENSTRUATION
+  -> latest MenstruationPeriodRecord.startTime
+  -> the watch computes "Day 14"
+```
+
+Three things to know about it, none of them obvious:
+
+- **Fitbit and Google Health can only WRITE to Health Connect, never read.** The
+  path is one-way by design. That is fine here — we are the reader — but it
+  means Google Health can never show anything WE write, so there is no round
+  trip to design.
+- **She has to allow it.** Google Health writes only the data types she has
+  toggled on for Health Connect. A blank complication on a phone that clearly
+  has the data is most likely this, and the phone's explanation should say so
+  rather than blaming the permission we asked for.
+- **Cervical mucus, ovulation test and sexual activity are READ-ONLY** in Google
+  Health and cannot be written to Health Connect. Irrelevant to a day count, and
+  worth knowing before anyone designs a second cycle slot on the assumption that
+  everything in the app is reachable.
+
+### It does not generalise to other cycle apps
+
+The feature works for HER because of the app she uses. It is not universal, and
+the spec should not pretend otherwise:
+
+- **Clue has no Health Connect integration at all** — its support material says
+  it cannot export or sync to other apps on Android. A Clue user would see this
+  complication permanently blank, with nothing in our app able to explain why.
+- **Flo pairs with Health Connect on Android**, but its help article does not
+  state the direction and a direct read did not resolve whether it writes
+  menstruation. Unverified.
+
+So the empty state is not an edge case for a minority. For anyone whose tracker
+does not write to Health Connect it is the ONLY state, forever. That raises the
+bar on what the phone says when there is no data: "no records found" is wrong
+and blaming our own permission is worse. It has to be able to say that the app
+she tracks in may not be sharing this, and point at the Health Connect setting.
+
 ## Where the work happens
 
 Three moving parts, and the split is deliberate.
