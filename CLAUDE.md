@@ -288,33 +288,28 @@ On Google Play (2026-08-29):
   track 'internal'" and the real run of the same bundle was refused `403 You
   must let us know whether your app includes any health features`. A green dry
   run means the upload parsed, nothing more.
-- **The health 403 is APP-WIDE, not per-bundle, and it is the API's alone.**
-  Four measurements on 2026-09-20, one rule that fits them: the API refuses any
-  commit that would leave the app containing health features while the Health
-  apps declaration is unapproved. It is about the app's resulting STATE, not
-  about the artefact being uploaded.
-  Phone 97 (carries `READ_MENSTRUATION`) → API refused, while `internal` served
-  88 with no health permission. Minutes later watch 1043 (no health permission)
-  → API committed fine. Hours later phone 97 went live via the **Console**.
-  Then watch 1044, still with no health permission and otherwise unchanged, →
-  API REFUSED. The bundle did not change between those last two; the app did.
-  So once any health-permission artefact is live, `play-release.py` cannot ship
-  ANYTHING, watch included, until the declaration clears. The Console still can.
-  **This is the third reading of this fact in one day.** The first two — "wait
-  for approval" and "the gate follows the bundle's permissions" — were each
-  written from a single measurement and each refuted within hours. Take a new
-  measurement before restating it.
-  Measured 2026-09-20, same app, same bundle, same day, declaration untouched
-  at `In review` the whole time: `play-release.py` was refused committing phone
-  bundle 97 to `internal`, and hours later the operator rolled out **that exact
-  bundle** through Create release in the Console and it went live on `internal`.
-  Submission activity never changed and submission 12 is still `In review`, so
-  nothing was approved in between.
-  So the gate is on `edits:commit`, not on approval, not on the artifact, and
-  not on the app. **A phone release carrying health data ships from the Console
-  today; only the API path is blocked.** I asserted the opposite twice before
-  testing it — the API refusing is not Play refusing, and the only way that
-  distinction shows up is to try the other path.
+- **The health 403 belongs to the API, and what it tests is the whole APP.**
+  Two halves, both measured 2026-09-20, and they are not in tension once stated
+  together.
+  **Which path is gated:** `edits:commit` only. `play-release.py` was refused
+  committing phone bundle 97 to `internal`; hours later the operator rolled out
+  **that same bundle** through Create release in the Console and it went live.
+  Submission activity never moved and the declaration sat at `In review`
+  throughout, so nothing was approved in between. **The Console ships a health
+  release today; only the API path is blocked.**
+  **What that gate tests:** the app's resulting STATE, not the artefact in hand.
+  Phone 97 (carries `READ_MENSTRUATION`) → refused while `internal` served 88
+  with no health permission. Minutes later watch 1043, no health permission →
+  committed fine. After 97 went live via the Console, watch 1044 — still no
+  health permission, otherwise unchanged from 1043 — was REFUSED. The bundle did
+  not change; the app did. So once any health-permission artefact is live,
+  `play-release.py` cannot ship ANYTHING, watch included, until the declaration
+  clears.
+  **This fact was restated three times in one day and the first two were
+  wrong** — "wait for approval", then "the gate follows the bundle's
+  permissions". Each was written from a single measurement and refuted within
+  hours. An API refusing is not Play refusing, and the only way that shows up is
+  to try the other path. Take a new measurement before restating it.
 - **A refused commit disturbs no REVIEW, which is narrower than "no trace".**
   Verified 2026-09-20 against submission activity either side of a refusal: no
   new submission row, and the running review still `In review`. So a refused
