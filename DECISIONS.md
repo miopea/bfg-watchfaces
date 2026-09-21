@@ -1,5 +1,75 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-21 — Android Auto Backup is not our data flow, and two blocks reviewed
+
+Interviewing the two blocked tickets turned up one alarm that was not one, one
+question asked on a false premise, and one piece of real work.
+
+### Android Auto Backup: OUT OF SCOPE, decided
+
+Reading the full-slot remedy ("reinstall the watch app") led to what looked like
+a serious finding: the watch's `backup_rules.xml` excludes exactly one file,
+`activation.txt`, so `cycle-start.txt` and `cycle-facts.txt` ride along in
+Android Auto Backup — and the phone app declares no backup configuration at all,
+so `allowBackup` defaults to true and its copies go too. Meanwhile the health
+justification submitted that evening says no menstrual data "is transmitted to
+any server".
+
+**The operator ruled it out of scope, twice and unprompted: "this has nothing to
+do with the app", then "We don't need to change the app for Google backups", then
+"We don't need to amend. That is not our scope."**
+
+He is right, and the reasoning is worth keeping because the alarm was
+superficially convincing. Auto Backup is a PLATFORM feature: the data goes to the
+user's own Google Drive, encrypted since Android 9 with a key derived from the
+device screen lock that Google cannot read, under a setting the user controls for
+every app on the device. The app transmits nothing; it declines to opt out of
+something the OS does for everybody. A declaration sentence about what the APP
+does is not falsified by what the OS does with the device.
+
+**Rejected: excluding the cycle files from backup.** It would make the app's
+behaviour differ from every other app's for no privacy gain the user has not
+already chosen, and it would silently lose her cycle date on a device transfer.
+
+**Rejected: disclosing the backup in the Play justification.** It would put a
+data flow into a health declaration that a reviewer must then assess, in exchange
+for describing something we did not build. It also costs a restart of the review
+submitted hours earlier.
+
+If this ever does become in scope, the trigger is a CHANGE of kind rather than a
+re-reading: the app storing something it generated about her rather than a date
+she entered, or a backup path that is not end-to-end encrypted.
+
+### A question asked before checking, and the answer was already right
+
+The interview asked whether a previously DENIED activation consent survives the
+reinstall that the full-slot block prescribes, locking the person out of the one
+shot forever. **It does not, and the premise was wrong.** `activation.txt` is
+excluded from Auto Backup by both `backup_rules.xml` and
+`data_extraction_rules.xml`, and `ActivationConsent.load` returns `UNASKED` for a
+missing file — so a reinstall already starts clean, for DENIED exactly as for
+GRANTED. `reconcile` keeping DENIED applies within one install, where it is
+correct.
+
+Both files were open in the same session before the question was asked. This is
+the failure the memory already records — re-read the evidence in hand before
+forming a theory — and it cost a question the operator had to answer about a bug
+that did not exist.
+
+### The full slot: refuse before building, not explain after
+
+Decided and specified in `docs/specs/full-slot-refusal.md`. The state is already
+modelled correctly as `InstallPlan.Route.NoSlotAvailable`; what changes is when
+the person finds out, which matters now that production serves strangers rather
+than the operator.
+
+### If Google refuses READ_MENSTRUATION
+
+**Decide then, do not prepare now.** Production serves 1.82, which carries no
+health permission, so a refusal blocks the new release and breaks nothing live.
+Rejected: pre-building a feature-flagged no-health variant, which is work that is
+probably wasted and a second code path to keep true in the meantime.
+
 ## 2026-09-20 — The progress bar asked the watch for the wrong data type
 
 Bars shipped in 1.87 on 2026-09-19 and had never once been seen working. The
