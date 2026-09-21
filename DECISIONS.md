@@ -1,5 +1,58 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-20 — The progress bar asked the watch for the wrong data type
+
+Bars shipped in 1.87 on 2026-09-19 and had never once been seen working. The
+operator put one on a wrist on 2026-09-20: "I see it on the phone preview when I
+turn it on, but not on my watch."
+
+### One attribute, and the two halves each looked right
+
+From v15 the slot advertised `supportedTypes="RANGED_VALUE SHORT_TEXT ..."` and
+the emitter wrote a `<Complication type="RANGED_VALUE">` block with the bar in
+it. Both correct. But `defaultSystemProviderType` stayed hardcoded to
+`SHORT_TEXT`, so the watch bound the default provider as SHORT_TEXT, the
+RANGED_VALUE block never activated, and the bar never drew.
+
+SUPPORTED is not REQUESTED. The slot accepted ranged data and asked for text.
+
+### Why the previews lied
+
+They render the bar from `showsBars` with a sample fill and never consult a
+provider — there is no provider to consult on a JVM. So the phone drew a bar and
+the wrist did not, and the phone was the one that was wrong. This is the same
+shape as the "Day 14 versus Day 18" bug: a preview confidently drawing something
+the watch never had.
+
+### Nothing here could have caught it
+
+The XML is schema-valid both ways, so `WffSchemaTest` passes on either, and no
+JVM test can know which type a watch will bind. It is exactly the class recorded
+on 2026-09-19 — structure is gated, behaviour is not — except it is not even an
+expression this time. It is one attribute that no validator has an opinion about.
+
+`RangedProviderTypeTest` now pins the one thing that IS knowable here: the
+attribute agrees with the block. **Rejected: asserting it only for STEP_COUNT.**
+The test sweeps every source marked `ranged`, because the next one added is
+exactly the case that would slip through — the same lesson as the ambient
+`<Variant>` that only appeared on dark ink.
+
+### Narrowed to where a bar is actually drawn
+
+`defaultType` asks for RANGED_VALUE only when the face draws bars AND the source
+has a range. **Rejected: asking for it whenever the slot supports it.** A source
+with no range would trade a missing bar for an EMPTY SLOT, which is strictly
+worse than the bug being fixed.
+
+### What is still NOT known
+
+Whether the system providers marked `ranged` — `STEP_COUNT` and `WATCH_BATTERY`
+— actually serve RANGED_VALUE. That flag was set from the schema's provider list
+and has never been confirmed on a device. If a slot now comes up empty, that is
+this, and the answer is to unmark that source. The About screen's ranged readout
+exists for exactly this question: it renders the raw value, minimum and maximum
+instead of the reading.
+
 ## 2026-09-20 — A tile's tap target must be EXPORTED, and the proof was already in hand
 
 The cycle card's tap did nothing on a real watch. No phone activity, no toast,

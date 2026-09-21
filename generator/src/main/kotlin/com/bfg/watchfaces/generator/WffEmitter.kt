@@ -775,7 +775,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
                       supportedTypes="${supportedTypes(p)}" alpha="255"
                       isCustomizable="FALSE">
       <Variant mode="AMBIENT" target="alpha" value="$ambientAlpha"/>
-      <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="SHORT_TEXT"/>
+      <DefaultProviderPolicy${providerAttrs(p, pos)} defaultSystemProvider="${source.wff}" defaultSystemProviderType="${defaultType(p, source)}"/>
       <BoundingBox x="0" y="0" width="${box.w}" height="${box.h}" outlinePadding="2.0"/>${rangedComplication(p, box, fitted, glyph, ::valueText, ink)}
       <Complication type="SHORT_TEXT">$glyph${valueText(false)}
       </Complication>
@@ -861,6 +861,38 @@ ${glareLayer(p)}
      * `SHORT_TEXT` stays alongside it, so a provider that sends only text falls
      * through to the `SHORT_TEXT` complication with nothing missing.
      */
+    /**
+     * What the slot ASKS the system provider for, which is not what it accepts.
+     *
+     * ## The bug this fixes
+     *
+     * `supportedTypes` has listed `RANGED_VALUE` since v15 and the emitter has
+     * written a `<Complication type="RANGED_VALUE">` block with the bar in it.
+     * This attribute stayed hardcoded to `SHORT_TEXT`, so the watch bound the
+     * default provider as SHORT_TEXT, the RANGED_VALUE block never activated,
+     * and the bar never drew. The PREVIEWS drew it, because they render from
+     * `showsBars` with a sample fill and never ask a provider -- so the phone
+     * and the wrist disagreed, with the phone being the one that lied.
+     *
+     * Reported by the operator on 2026-09-20: "I see it on the phone preview
+     * when I turn it on, but not on my watch." Bars shipped in 1.87 and had
+     * never once been seen working.
+     *
+     * Nothing could have caught it here. The XML is schema-valid either way --
+     * `WffSchemaTest` passes on both -- and no test can know which type the
+     * watch will bind. It is the shape `DECISIONS.md` 2026-09-19 describes:
+     * structure is gated, behaviour is not.
+     *
+     * ## Only where a bar is actually drawn
+     *
+     * Asking for RANGED_VALUE on a source that has no range would be trading a
+     * missing bar for an EMPTY SLOT, which is strictly worse. So this narrows
+     * on both conditions the bar itself needs: the face draws bars, and the
+     * source is one the schema's own provider list gives a range for.
+     */
+    private fun defaultType(p: DialParams, source: ComplicationSource): String =
+        if (p.showsBars && source.ranged) "RANGED_VALUE" else "SHORT_TEXT"
+
     private fun supportedTypes(p: DialParams): String =
         if (p.acceptsRanged) "RANGED_VALUE SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY"
         else "SHORT_TEXT MONOCHROMATIC_IMAGE EMPTY"
