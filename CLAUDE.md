@@ -288,6 +288,18 @@ On Google Play (2026-08-29):
   track 'internal'" and the real run of the same bundle was refused `403 You
   must let us know whether your app includes any health features`. A green dry
   run means the upload parsed, nothing more.
+- **The Health apps declaration is CONSOLE-ONLY. The API cannot touch it.**
+  Enumerated all 145 methods of the v3 discovery document (revision 20260922)
+  on 2026-09-23: there is no health, declaration or app-content endpoint for
+  your own package. The only near-misses are
+  `POST /applications/{package}/dataSafety`, which writes Safety Labels and is a
+  DIFFERENT form, and `policyDeclarationFiles:upload`, which takes an
+  `appStorePackageName` and belongs to alternative app stores hosting apps.
+  There is also **no review-state or policy-status field** anywhere, so a
+  rejection can only be read in the Console or in the developer email.
+  And do not reach for `dataSafety` as a substitute: it is POST with NO GET, so
+  any write replaces the whole declaration blind, including the community
+  catalog's accepted answers.
 - **The health 403 belongs to the API, and what it tests is the whole APP.**
   Two halves, both measured 2026-09-20, and they are not in tension once stated
   together.
