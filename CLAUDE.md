@@ -245,6 +245,13 @@ Watch Face Push installs a face (2026-08-29):
 
 On Google Play (2026-08-29):
 
+- **PUBLISHED. Submission 17 went `Published` on 2026-09-24** — production,
+  production (Wear OS), the store listing and App content all approved in one
+  go, after 15 and 16 were rejected. The app is public: phone `1.97` (98) and
+  watch `1.51` (1044) are serving on the production tracks. Getting here cost
+  submissions 13 and 14 (cancelled by my own mid-review edits), 15 and 16
+  (Wear branded launch, then the health declaration and the privacy policy).
+  **That approval is also what unblocked the API** — see the health 403 below.
 - **Submitted for production review on 2026-09-03**, submission 2, status
   `In review` — phone AND watch together: the `1.75 — first public release`
   production release (bundle 76) and the `1.35 — watch companion` Wear OS
@@ -370,9 +377,14 @@ On Google Play (2026-08-29):
   account. Opt-in:
   `https://play.google.com/apps/internaltest/4701563329381059441`
   Read the live numbers from `edits.tracks.list` rather than from here — this
-  line has been wrong before. As of 2026-09-20: phone `88` on `internal` and
-  `83` on `production`; watch `1043` on `wear:internal` and `1031` on
+  line has been wrong before, twice. As of 2026-09-24: phone `99` on `internal`
+  and `98` on `production`; watch `1045` on `wear:internal` and `1044` on
   `wear:production`.
+  **The internal tester list is individual emails, and the API cannot see or
+  change it.** `edits.testers.get` returns `{}` on both internal tracks because
+  that resource only carries Google Groups, and none is attached. So adding a
+  tester is a Console action, and "is this person a tester?" cannot be answered
+  from here at all — do not infer it from a successful publish.
 - Publish with `scripts/play-release.py`, not the console. It reads the service
   account from 1Password, uploads and commits in one command. **A Wear bundle
   cannot go on the phone track** — Play rejects the commit — so phone and watch
