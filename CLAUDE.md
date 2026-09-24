@@ -300,28 +300,30 @@ On Google Play (2026-08-29):
   And do not reach for `dataSafety` as a substitute: it is POST with NO GET, so
   any write replaces the whole declaration blind, including the community
   catalog's accepted answers.
-- **The health 403 belongs to the API, and what it tests is the whole APP.**
-  Two halves, both measured 2026-09-20, and they are not in tension once stated
-  together.
-  **Which path is gated:** `edits:commit` only. `play-release.py` was refused
-  committing phone bundle 97 to `internal`; hours later the operator rolled out
-  **that same bundle** through Create release in the Console and it went live.
-  Submission activity never moved and the declaration sat at `In review`
-  throughout, so nothing was approved in between. **The Console ships a health
-  release today; only the API path is blocked.**
-  **What that gate tests:** the app's resulting STATE, not the artefact in hand.
-  Phone 97 (carries `READ_MENSTRUATION`) → refused while `internal` served 88
-  with no health permission. Minutes later watch 1043, no health permission →
-  committed fine. After 97 went live via the Console, watch 1044 — still no
-  health permission, otherwise unchanged from 1043 — was REFUSED. The bundle did
-  not change; the app did. So once any health-permission artefact is live,
-  `play-release.py` cannot ship ANYTHING, watch included, until the declaration
-  clears.
-  **This fact was restated three times in one day and the first two were
-  wrong** — "wait for approval", then "the gate follows the bundle's
-  permissions". Each was written from a single measurement and refuted within
-  hours. An API refusing is not Play refusing, and the only way that shows up is
-  to try the other path. Take a new measurement before restating it.
+- **The health 403: the complete rule, closed 2026-09-24 when the declaration
+  was APPROVED and the API started working again.** Three conditions, all
+  required, and it took four statements to get here because each earlier one
+  named a single condition and called it the cause:
+  1. The app must CONTAIN health features. An app with no health-permission
+     artefact live is not a health app and nothing is gated. This is why watch
+     1043 committed fine on 2026-09-20 and watch 1044 — otherwise unchanged —
+     was refused hours later: phone 97 went live via the Console in between and
+     made the app a health app. The gate reads the app's STATE, not the bundle
+     in hand.
+  2. The Health apps declaration must be UNAPPROVED. Submitted is not enough.
+     It sat at `In review` all through 2026-09-20 while every API commit was
+     refused; submission 17 was `Published` on 2026-09-24 and the same script
+     committed phone 99 and watch 1045 minutes later, first try.
+  3. You must be using `edits:commit`. **The Console is exempt and always was.**
+     It rolled out phone 97 on 2026-09-20 with the declaration unapproved.
+  So: once the app carries health data, `play-release.py` is dead until Google
+  approves the declaration, and the Console is the way through in the meantime.
+  After approval the API works normally again.
+  **Four statements, and the first three were each written from one
+  measurement**: "wait for approval" (right, but incomplete — missed that the
+  Console bypasses it), "the gate follows the bundle's permissions" (wrong),
+  "app-wide, not approval" (half right, and it contradicted its own tail). Take
+  a new measurement before restating this.
 - **A refused commit disturbs no REVIEW, which is narrower than "no trace".**
   Verified 2026-09-20 against submission activity either side of a refusal: no
   new submission row, and the running review still `In review`. So a refused
