@@ -142,4 +142,19 @@ class CycleFactsTest {
         File(dir, "cycle-facts.txt").writeText("garbage")
         assertNull(CycleFacts.load(dir))
     }
+
+    /**
+     * "Last period 1 days" reached a real wrist on 2026-09-24.
+     *
+     * Both shipped apps had written `"$it days"` inline, in two files, so the
+     * rule had nowhere to live and nothing to fail when it was wrong. One
+     * implementation, both callers -- the same reason SlotGeometry exists.
+     */
+    @Test
+    fun `one day is singular and everything else is not`() {
+        assertEquals("1 day", CycleFacts.dayCount(1))
+        assertEquals("2 days", CycleFacts.dayCount(2))
+        assertEquals("27 days", CycleFacts.dayCount(27))
+        assertEquals("0 days", CycleFacts.dayCount(0))
+    }
 }

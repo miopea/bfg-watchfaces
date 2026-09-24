@@ -96,8 +96,8 @@ class CycleTileService : TileService() {
         // something up about her. Description only -- nothing here says when
         // the next period is due.
         val detail = if (facts == null) emptyList() else listOfNotNull(
-            facts.periodLengthDays?.let { "Last period $it days" },
-            facts.averageCycleDays?.let { "Average cycle $it days" }
+            facts.periodLengthDays?.let { "Last period ${CycleFacts.dayCount(it)}" },
+            facts.averageCycleDays?.let { "Average cycle ${CycleFacts.dayCount(it)}" }
         )
 
         val layout = LayoutElementBuilders.Box.Builder()

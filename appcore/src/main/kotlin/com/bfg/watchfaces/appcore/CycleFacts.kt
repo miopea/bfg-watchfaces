@@ -149,5 +149,20 @@ data class CycleFacts(
          * opinion and this app does not have one.
          */
         private val PLAUSIBLE_CYCLE = 15..60
+
+        /**
+         * A count of days in words, singular when it is one.
+         *
+         * "Last period 1 days" reached a real wrist on 2026-09-24. Both shipped
+         * apps had written `"$it days"` inline, in two files, so there was
+         * nowhere for the rule to live and nothing to fail when it was wrong.
+         *
+         * The COUNT is shared and the LABEL is not: `:appcore` holds the words
+         * both apps must agree on, and which sentence they sit in stays with
+         * the UI that draws it -- the tile capitalises each line, the phone
+         * joins them with a separator and capitalises the first. See the
+         * `ControlInventory` split in CLAUDE.md for the same division.
+         */
+        fun dayCount(days: Int): String = if (days == 1) "1 day" else "$days days"
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.health.connect.client.PermissionController
+import com.bfg.watchfaces.appcore.CycleFacts
 import com.bfg.watchfaces.generator.DialParams
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -162,8 +163,8 @@ fun CycleSetup(modifier: Modifier = Modifier) {
                     // open period has no length and no average, and inventing
                     // either would be the app making something up about her.
                     val extras = listOfNotNull(
-                        s.facts.periodLengthDays?.let { "last period $it days" },
-                        s.facts.averageCycleDays?.let { "average cycle $it days" }
+                        s.facts.periodLengthDays?.let { "last period ${CycleFacts.dayCount(it)}" },
+                        s.facts.averageCycleDays?.let { "average cycle ${CycleFacts.dayCount(it)}" }
                     )
                     if (extras.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
