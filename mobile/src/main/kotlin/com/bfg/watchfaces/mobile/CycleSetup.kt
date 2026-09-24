@@ -163,7 +163,8 @@ fun CycleSetup(modifier: Modifier = Modifier) {
                     // open period has no length and no average, and inventing
                     // either would be the app making something up about her.
                     val extras = listOfNotNull(
-                        s.facts.periodLengthDays?.let { "last period ${CycleFacts.dayCount(it)}" },
+                        s.facts.finishedPeriodLengthDays(today)
+                            ?.let { "last period ${CycleFacts.dayCount(it)}" },
                         s.facts.averageCycleDays?.let { "average cycle ${CycleFacts.dayCount(it)}" }
                     )
                     if (extras.isNotEmpty()) {

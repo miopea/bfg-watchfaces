@@ -58,14 +58,19 @@ class CycleFactsTest {
      */
     @Test
     fun `an implausible gap is not treated as a cycle`() {
+        // FOUR periods, because the average now needs two plausible gaps and
+        // the whole point of this case is that the 212-day one does not count
+        // as one of them. Were it counted, the mean would be near 88 rather
+        // than 27, so this still fails loudly if the filter stops working.
         val f = CycleFacts.from(
             listOf(
                 d(1, 1) to d(1, 5),    // -> 212 days, a logging gap
                 d(8, 1) to d(8, 5),    // ->  28 days
-                d(8, 29) to d(9, 2)
+                d(8, 29) to d(9, 2),   // ->  26 days
+                d(9, 24) to d(9, 28)
             )
         )!!
-        assertEquals(28, f.averageCycleDays)
+        assertEquals(27, f.averageCycleDays)   // (28 + 26) / 2
     }
 
     /** One period says nothing about a cycle length, and we do not invent one. */
@@ -156,5 +161,61 @@ class CycleFactsTest {
         assertEquals("2 days", CycleFacts.dayCount(2))
         assertEquals("27 days", CycleFacts.dayCount(27))
         assertEquals("0 days", CycleFacts.dayCount(0))
+    }
+
+    /**
+     * One gap is an observation, not an average.
+     *
+     * A watch told someone who had just started logging that her average cycle
+     * was 27 days. She had nothing like the history that would support it, and
+     * her reading was that the app was making things up -- which is the right
+     * reading, and the reason the bar is now two gaps rather than one.
+     */
+    @Test
+    fun `two logged periods are not enough for an average`() {
+        val two = listOf(
+            LocalDate.of(2026, 8, 26) to LocalDate.of(2026, 8, 30),
+            LocalDate.of(2026, 9, 22) to LocalDate.of(2026, 9, 23)
+        )
+        assertNull(CycleFacts.from(two)?.averageCycleDays)
+    }
+
+    /** Three periods give two gaps, which is the first honest mean. */
+    @Test
+    fun `three logged periods do support an average`() {
+        val three = listOf(
+            LocalDate.of(2026, 7, 30) to LocalDate.of(2026, 8, 3),
+            LocalDate.of(2026, 8, 26) to LocalDate.of(2026, 8, 30),
+            LocalDate.of(2026, 9, 22) to LocalDate.of(2026, 9, 23)
+        )
+        // 27 then 27.
+        assertEquals(27, CycleFacts.from(three)?.averageCycleDays)
+    }
+
+    /**
+     * A period that is still running has no "last period" length.
+     *
+     * The number would shrink as she logged more days, which is the opposite
+     * of what a finished total does.
+     */
+    @Test
+    fun `an unfinished period reports no length`() {
+        val start = LocalDate.of(2026, 9, 22)
+        val open = CycleFacts(start = start, periodEnd = null)
+        assertNull(open.finishedPeriodLengthDays(LocalDate.of(2026, 9, 24)))
+
+        // Ends today: it can still gain a day before midnight.
+        val endingToday = CycleFacts(start = start, periodEnd = LocalDate.of(2026, 9, 24))
+        assertNull(endingToday.finishedPeriodLengthDays(LocalDate.of(2026, 9, 24)))
+    }
+
+    /** Once it is genuinely over, the length is a fact and is shown. */
+    @Test
+    fun `a finished period reports its length`() {
+        val facts = CycleFacts(
+            start = LocalDate.of(2026, 9, 22),
+            periodEnd = LocalDate.of(2026, 9, 23)
+        )
+        assertEquals(2, facts.finishedPeriodLengthDays(LocalDate.of(2026, 9, 24)))
     }
 }

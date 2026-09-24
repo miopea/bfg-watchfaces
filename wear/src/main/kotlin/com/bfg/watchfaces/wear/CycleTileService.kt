@@ -63,8 +63,29 @@ class CycleTileService : TileService() {
         // The richer facts when the phone has sent them, falling back to the
         // bare date the complication uses. A watch paired with an older phone
         // therefore still shows the day count and simply says less.
-        val facts = CycleFacts.load(applicationContext.filesDir)
-            ?: CycleDay.load(applicationContext.filesDir)?.let { CycleFacts(it) }
+        // THE DATE FILE IS AUTHORITATIVE, and the detail only survives if it
+        // agrees with it.
+        //
+        // The two arrive on SEPARATE messages -- CYCLE_START_PATH and
+        // CYCLE_DETAIL_PATH -- and the code that sends them says plainly that
+        // they degrade independently. What it did not say is what happens when
+        // only one of them lands: this read preferred the detail file whole,
+        // so a stale set of statistics rendered underneath a freshly correct
+        // day number, and every line looked equally current.
+        //
+        // Seen on 2026-09-24 -- a correct "3" over an average built from
+        // records the phone no longer had. Reading it as "the tile is wrong"
+        // is the charitable version; she read it as the app making things up.
+        //
+        // So: take the day from the date, take the detail only when it is
+        // about the SAME cycle, and otherwise say less until the phone catches
+        // up. Saying less is always available and never misleading.
+        val start = CycleDay.load(applicationContext.filesDir)
+        val facts = start?.let { authoritative ->
+            CycleFacts.load(applicationContext.filesDir)
+                ?.takeIf { it.start == authoritative }
+                ?: CycleFacts(authoritative)
+        }
         val day = facts?.dayOfCycle(today)
 
         // Bare, like the dial, and for the same reason -- decision 01a0ba48.
@@ -96,7 +117,8 @@ class CycleTileService : TileService() {
         // something up about her. Description only -- nothing here says when
         // the next period is due.
         val detail = if (facts == null) emptyList() else listOfNotNull(
-            facts.periodLengthDays?.let { "Last period ${CycleFacts.dayCount(it)}" },
+            facts.finishedPeriodLengthDays(today)
+                ?.let { "Last period ${CycleFacts.dayCount(it)}" },
             facts.averageCycleDays?.let { "Average cycle ${CycleFacts.dayCount(it)}" }
         )
 

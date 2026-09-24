@@ -67,6 +67,21 @@ data class CycleFacts(
         get() = periodEnd?.let { ChronoUnit.DAYS.between(start, it).toInt() + 1 }
 
     /**
+     * The same length, but only once the period has actually FINISHED.
+     *
+     * "Last period 2 days" while she is on day 2 of it is not a fact about a
+     * last period, it is a running total wearing the wrong label -- and it
+     * shrinks the moment she logs another day, which is the opposite of what a
+     * finished number does.
+     *
+     * A record with no end is still open by definition. A record whose end is
+     * today may still gain a day before midnight, so it does not count as
+     * finished either.
+     */
+    fun finishedPeriodLengthDays(today: LocalDate): Int? =
+        periodLengthDays?.takeIf { periodEnd != null && today.isAfter(periodEnd) }
+
+    /**
      * The wire and disk form.
      *
      * Pipe-separated rather than JSON: three fields, no nesting, and it is read
@@ -137,7 +152,8 @@ data class CycleFacts(
             return CycleFacts(
                 start = latest.first,
                 periodEnd = latest.second,
-                averageCycleDays = if (gaps.isEmpty()) null else gaps.average().toInt()
+                averageCycleDays =
+                    if (gaps.size < MIN_GAPS_FOR_AVERAGE) null else gaps.average().toInt()
             )
         }
 
@@ -149,6 +165,21 @@ data class CycleFacts(
          * opinion and this app does not have one.
          */
         private val PLAUSIBLE_CYCLE = 15..60
+
+        /**
+         * How many gaps it takes before a mean is worth the word "average".
+         *
+         * Two, which means three logged periods. One gap is a single
+         * observation, and calling it an average tells her the app knows
+         * something about her cycle that it does not.
+         *
+         * Raised from one on 2026-09-24, after a watch showed "Average cycle
+         * 27 days" to someone who had just started logging. The wearer's own
+         * reading of it: it "doesn't make any sense". A number she cannot
+         * account for is worse than a line that is not there, because she has
+         * no way to tell a real one from an artefact.
+         */
+        private const val MIN_GAPS_FOR_AVERAGE = 2
 
         /**
          * A count of days in words, singular when it is one.
