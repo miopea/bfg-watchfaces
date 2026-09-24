@@ -1,5 +1,116 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-09-24 — `isSupported()` answers the wrong question, and a wearer paid for it
+
+The operator's wife sent a face to her Pixel Watch 4 and, after a build and a
+Bluetooth transfer, read this and nothing else:
+
+```text
+Pixel Watch 4 could not install "Default": ListWatchFacesException | Unknown
+error while listing watch faces. ... | <- ListException: Unknown watch face
+receiver client error | <- ReceiverConnectionException: Binding to the watch
+face receiver was unsuccessful
+```
+
+His words asking for the fix: **"most users don't have me troubleshooting."**
+
+### The cause, from the library rather than from a device
+
+`FaceInstaller` guards on `WatchFacePushManagerFactory.isSupported()`, whose
+comment promises the right thing — "saying so here is cheap; discovering it as
+an opaque failure after a Bluetooth transfer is not". Disassembling
+watchfacepush 1.0.0 shows what it actually is, in full:
+
+```java
+public static final boolean isSupported() {
+    return Build.VERSION.SDK_INT >= 36;
+}
+```
+
+An OS version check. It does not look for the receiver, does not check whether
+it is enabled, and does not attempt a bind. `createWatchFacePushManager` throws
+on the same test, with "supported starting from API level 36" — so "supported"
+in this library means **this OS is new enough**, never **this watch can accept a
+pushed face**.
+
+Her Pixel Watch 4 is API 36, which is why the app installed at all given
+`minSdk 36`, and why the guard waved it through.
+
+**This is the THIRD distinct bind failure here and neither earlier fix covers
+it.** 2026-08-29 recorded a missing `PUSH_WATCH_FACES` permission, which throws
+`SecurityException`, and a `BroadcastReceiver` context, which throws
+`ReceiverCallNotAllowedException`. Hers is `ReceiverConnectionException` with no
+security error: nothing to bind to rather than not allowed.
+
+### No device access was needed, and the first plan wrongly assumed it was
+
+The investigation opened by naming `adb shell dumpsys package
+com.google.android.wearable.dwf.receiver` as the first step — the command that
+settled the permission question in August. The operator cannot run it: it is his
+wife's personal watch and it would need developer mode and wireless pairing.
+
+The library settled it instead. **Rejected: waiting for device access.** The fix
+never depended on why *her particular* watch lacks the receiver, because any
+watch can fail to bind and the code has to handle it either way.
+
+### The watch now OBSERVES rather than the phone inferring
+
+`PushCheck` on the watch gathers three facts before the phone sends anything:
+the OS level, how many services answer `ACTION_PUSH_WATCH_FACES`, and — the
+definitive one — **an actual `listWatchFaces()` call**. That is the same call
+that failed on her wrist; running it locally costs nothing and answers the
+question instead of predicting it. The first two facts exist to explain the
+third, which is what turns "something went wrong" into "which thing, and what
+you might do".
+
+**A `<queries>` entry was mandatory and is its own trap.** From Android 11 the
+service is invisible to `queryIntentServices` without it, so the count would
+read zero on EVERY watch including working ones — a check that reports all
+watches broken and looks exactly like a correct one. The wear manifest already
+carries this lesson at length for complication providers.
+
+### Silence is not a refusal
+
+`WatchReadiness.check` returns null when the watch does not answer, and every
+caller treats null as go-ahead. A watch out of range, slow, or running a build
+that predates this path must still be sent to. **Rejected: blocking a send on an
+unanswered question** — that trades a rare explained failure for a common
+baffling one, the same trade `InstallPlan.mayRemoveAfterFailedUpdate` exists to
+refuse.
+
+### Where the check sits, and what it does not save
+
+After the target is known, before the transfer. **Rejected: moving it before the
+build**, which is what "knowable at the start" would suggest. Validating before
+looking for a watch is deliberate and documented — a schema-invalid face should
+fail fast rather than after a watch round trip. So the build still runs; what is
+saved is the transfer, the failed install, and the opaque message, which was the
+actual injury.
+
+### A sheet, not a snackbar
+
+A snackbar holds one sentence and one action. This case needs a reason and a
+numbered list of things to try, which is why the original message ended up being
+an exception chain and nothing else. `ReadinessSheet` names the watch, says what
+is wrong in ordinary words, lists what to try, and keeps the cause one tap away
+— the same division `FailureSheet` makes.
+
+**"Send anyway" stays.** The check can be wrong and a watch can recover; an app
+that refuses to try is worse than one that warns. The refused face travels with
+the refusal so the retry sends THAT design rather than whatever Studio holds by
+then.
+
+**The advice is deliberately honest about its limits.** The no-receiver list
+ends with "some watches do not support receiving faces this way yet" rather than
+implying an update will fix it. Three Wear branded-launch rejections were each a
+reasonable inference written as fact, and each cost a release.
+
+### Not verified
+
+No watch has run this. The positive case is the one that can silently break: if
+the `<queries>` entry is wrong, a working watch reports as broken and the two
+outcomes are indistinguishable without trying both.
+
 ## 2026-09-21 — Android Auto Backup is not our data flow, and two blocks reviewed
 
 Interviewing the two blocked tickets turned up one alarm that was not one, one

@@ -305,6 +305,16 @@ class MainActivity : ComponentActivity() {
                  * coroutine dies with it.
                  */
                 var failureDetail by remember { mutableStateOf<String?>(null) }
+                /**
+                 * The watch's "I cannot take a face" answer, and the watch that
+                 * gave it.
+                 *
+                 * A SHEET rather than a snackbar, which is the whole point of
+                 * this path. A snackbar holds one sentence and one action; this
+                 * case needs a reason and a numbered list of things to try,
+                 * because the person reading it has nobody to ask.
+                 */
+                var notReady by remember { mutableStateOf<NotReady?>(null) }
                 val tuneState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
                 // Opens fully rather than half: the hex field and the buttons sit below the
                 // pad, and at the partial height they were off screen with no hint that
@@ -379,6 +389,19 @@ class MainActivity : ComponentActivity() {
                         // which is a sentence, not a fix. "What went wrong?"
                         // takes the slot only when there is nothing to fix,
                         // which is exactly the case that used to be a dead end.
+                        // A watch that TOLD us it cannot take a face gets the
+                        // sheet, not a snackbar. It is the only failure here
+                        // with steps to offer, and a snackbar cannot carry
+                        // them -- which is how the original message came to be
+                        // an exception chain and nothing else.
+                        val cannotTake = report.notReady
+                        if (cannotTake != null) {
+                            // The face travels with the refusal so "Send
+                            // anyway" re-sends THIS design rather than
+                            // whatever Studio happens to hold by then.
+                            notReady = NotReady(report.watchName, cannotTake, name, face)
+                            return@launch
+                        }
                         val offeringInstall = report.offerWatchInstall
                         val offeringDetail = !offeringInstall && report.detail != null
                         val result = snackbar.showSnackbar(
@@ -635,6 +658,28 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+                notReady?.let { refusal ->
+                    ReadinessSheet(
+                        watchName = refusal.watchName,
+                        availability = refusal.availability,
+                        sheetState = failureState,
+                        onSendAnyway = {
+                            // The check can be wrong and a watch can recover,
+                            // so this advises rather than locks the door. The
+                            // send goes through the ordinary path, readiness
+                            // check and all -- if the watch has come back, it
+                            // now says so and nothing stands in the way.
+                            val again = refusal
+                            notReady = null
+                            requestSend(again.faceName, again.face)
+                        },
+                        onShowDetail = { detail ->
+                            notReady = null
+                            failureDetail = detail
+                        },
+                        onDismiss = { notReady = null }
+                    )
+                }
                 failureDetail?.let { detail ->
                     FailureSheet(
                         detail = detail,
@@ -796,6 +841,20 @@ class MainActivity : ComponentActivity() {
      * for "it is there but not showing" and "it never confirmed", and those are
      * opposite answers to "should this become the current face".
      */
+    /**
+     * A watch that said it cannot take a face, and the face it refused.
+     *
+     * The attempt is kept so "Send anyway" re-sends THAT design. Reaching for
+     * whatever Studio holds at the moment the button is pressed would silently
+     * send something else if the person edited while the sheet was open.
+     */
+    private data class NotReady(
+        val watchName: String,
+        val availability: com.bfg.watchfaces.appcore.PushAvailability,
+        val faceName: String,
+        val face: DialParams
+    )
+
     private data class SendReport(
         val message: String,
         val landed: Boolean,
@@ -816,7 +875,22 @@ class MainActivity : ComponentActivity() {
          * help find out why, and they are usually the same person in a
          * different mood five seconds later.
          */
-        val detail: String? = null
+        val detail: String? = null,
+        /**
+         * The watch's own answer about whether it can take a face, when it said
+         * it cannot.
+         *
+         * Null in every other case, INCLUDING when the watch did not answer at
+         * all -- silence is not a refusal. See [WatchReadiness].
+         *
+         * Separate from [detail] because the two are different offers: detail
+         * is a cause to copy and send to us, this is a problem with steps the
+         * person can take themselves. The wife who hit this on 2026-09-24 had
+         * neither.
+         */
+        val notReady: com.bfg.watchfaces.appcore.PushAvailability? = null,
+        /** The watch that said so, for the sentence that names it. */
+        val watchName: String = ""
     )
 
     /**
@@ -839,7 +913,7 @@ class MainActivity : ComponentActivity() {
         return FailureReport.text(version, stage, name, t::class.simpleName.orEmpty(), t.message)
     }
 
-    private fun buildThenSend(
+    private suspend fun buildThenSend(
         context: android.content.Context,
         name: String,
         params: DialParams,
@@ -883,6 +957,36 @@ class MainActivity : ComponentActivity() {
         // The watch's name is only known now, which is why this is the second
         // beat and not part of the first.
         onStage("Sending to ${target.name}…")
+
+        // ASK BEFORE SENDING, because the watch is the only thing that knows.
+        //
+        // androidx's WatchFacePushManagerFactory.isSupported() is
+        // `Build.VERSION.SDK_INT >= 36` and nothing else, so a watch can pass
+        // every check this app used to make and still have nothing to bind to.
+        // A Pixel Watch 4 did exactly that on 2026-09-24 and its owner read a
+        // four-clause exception chain for her trouble.
+        //
+        // WHAT THIS SAVES AND WHAT IT DOES NOT. The build has already happened
+        // by here, because validating before looking for a watch is deliberate
+        // and documented above. What it saves is the Bluetooth transfer, the
+        // failed install, and -- the actual point -- the opaque message. Moving
+        // it earlier would mean a watch round trip before a schema-invalid face
+        // fails fast, which is a worse trade.
+        //
+        // A null answer means the watch did not say, and we send anyway. An old
+        // watch build has never heard of this path and must not be punished for
+        // it.
+        val readiness = WatchReadiness.check(context)
+        if (readiness != null && !readiness.usable) {
+            Log.i(TAG, "“$name” not sent: ${target.name} reports ${readiness.reason}")
+            return SendReport(
+                readiness.headline(target.name),
+                landed = false,
+                detail = readiness.detail.ifBlank { null },
+                notReady = readiness,
+                watchName = target.name
+            )
+        }
 
         // NEVER ask the watch to rebuild the slots.
         //

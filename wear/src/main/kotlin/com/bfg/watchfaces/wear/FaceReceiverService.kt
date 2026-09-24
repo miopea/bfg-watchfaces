@@ -76,6 +76,14 @@ class FaceReceiverService : WearableListenerService() {
             answerCatalog(event.sourceNodeId)
             return
         }
+        // "Can you take a face at all?", asked before the phone builds one.
+        // The phone cannot answer this: the receiver, the permission and the
+        // bind all live here. See PushCheck for why the library's own
+        // isSupported() is not the same question.
+        if (event.path == WatchLink.PUSH_CHECK_REQUEST_PATH) {
+            answerPushCheck(event.sourceNodeId)
+            return
+        }
         // The date her most recent period started. A DATE, not a day number --
         // the watch derives the number itself whenever it is asked, so nothing
         // goes stale at midnight. See CycleDay.
@@ -163,6 +171,38 @@ class FaceReceiverService : WearableListenerService() {
             )
             Log.i(TAG, "catalog answer delivered")
         }.onFailure { Log.w(TAG, "could not answer the catalog request", it) }
+    }
+
+    /**
+     * Tell the phone whether this watch can take a face, and why not if it cannot.
+     *
+     * Modelled on [answerCatalog], including the AWAITED send: a
+     * `WearableListenerService` is torn down the moment its callback returns,
+     * and the catalog reply was silently lost for exactly that reason until it
+     * was awaited. A dropped answer here is worse than none, because the phone
+     * treats silence as "ask anyway" and would send blind.
+     *
+     * `runBlocking` because [PushCheck.observe] suspends and we are already on
+     * a background thread -- the same shape the activation calls use.
+     */
+    private fun answerPushCheck(nodeId: String) {
+        runCatching {
+            val availability = runBlocking { PushCheck.observe(this@FaceReceiverService) }
+            Log.i(
+                TAG,
+                "push check: usable=${availability.usable} reason=${availability.reason} " +
+                    "sdk=${availability.sdkInt} receivers=${availability.receivers}"
+            )
+            Tasks.await(
+                Wearable.getMessageClient(this).sendMessage(
+                    nodeId,
+                    WatchLink.PUSH_CHECK_REPLY_PATH,
+                    availability.encode().toByteArray(Charsets.UTF_8)
+                ),
+                WatchLink.REPLY_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS
+            )
+            Log.i(TAG, "push check answer delivered")
+        }.onFailure { Log.w(TAG, "could not answer the push check", it) }
     }
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {

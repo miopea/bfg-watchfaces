@@ -59,6 +59,25 @@
     person was already invisible to it, silently.
   -->
   <queries>
+    <!--
+      SO THE APP CAN ASK WHETHER THIS WATCH CAN TAKE A FACE AT ALL.
+
+      androidx's own WatchFacePushManagerFactory.isSupported() is, in full,
+      `Build.VERSION.SDK_INT >= 36`. It is an OS check and nothing more: it does
+      not look for the receiver, does not check it is enabled, and does not
+      attempt a bind. On 2026-09-24 a Pixel Watch 4 passed it, failed the first
+      real call, and showed its wearer a four-clause exception chain after a
+      build and a Bluetooth transfer.
+
+      Asking queryIntentServices for this action answers the real question. And
+      the SAME package-visibility rule the complication entry above exists for
+      applies here: without this entry the query returns zero on EVERY watch,
+      including ones where Push works perfectly, which would report every watch
+      as broken and look exactly like a correct check.
+    -->
+    <intent>
+      <action android:name="com.google.wear.ACTION_PUSH_WATCH_FACES" />
+    </intent>
     <intent>
       <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
     </intent>

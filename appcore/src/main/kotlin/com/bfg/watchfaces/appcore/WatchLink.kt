@@ -144,6 +144,23 @@ object WatchLink {
      * reason [NOTE_PATH] is one: the question is empty and the answer is a few
      * kilobytes of JSON.
      */
+    /**
+     * "Can you actually take a face?", asked BEFORE the phone builds one.
+     *
+     * A separate path from the catalog request because the answers have
+     * different lifetimes and different consequences: a stale provider list
+     * shows the wrong picker entries, a stale availability answer sends a
+     * person through a build and a Bluetooth transfer to reach a failure that
+     * was knowable at the start. That is what happened on a Pixel Watch 4 on
+     * 2026-09-24. See [com.bfg.watchfaces.appcore.PushAvailability].
+     *
+     * Carries nothing. The reply carries `PushAvailability.encode()`.
+     */
+    const val PUSH_CHECK_REQUEST_PATH = "/bfg-watchfaces/push-check"
+
+    /** The watch's answer to [PUSH_CHECK_REQUEST_PATH]. */
+    const val PUSH_CHECK_REPLY_PATH = "/bfg-watchfaces/push-check-reply"
+
     const val CATALOG_REQUEST_PATH = "/bfg-watchfaces/catalog"
 
     /** The watch's answer to [CATALOG_REQUEST_PATH]. */
