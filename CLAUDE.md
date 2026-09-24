@@ -374,8 +374,12 @@ On Google Play (2026-08-29):
   Families programme, which is the right side of the line while the community
   catalog accepts user-submitted faces.
 - `com.bfg.watchfaces` is live on **internal testing** in the BFG Solutions org
-  account. Opt-in:
-  `https://play.google.com/apps/internaltest/4701563329381059441`
+  account. **Each form factor has its OWN opt-in link** — a tester who takes
+  only the first one gets the phone app and no watch app:
+  phone `https://play.google.com/apps/internaltest/4701563329381059441`,
+  Wear OS `https://play.google.com/apps/internaltest/4699700513310768751`.
+  The Wear number is the `wear:internal` TRACK id, reached through the form
+  factor switcher at the top right of the Internal testing page.
   Read the live numbers from `edits.tracks.list` rather than from here — this
   line has been wrong before, twice. As of 2026-09-24: phone `99` on `internal`
   and `98` on `production`; watch `1045` on `wear:internal` and `1044` on
@@ -385,6 +389,11 @@ On Google Play (2026-08-29):
   that resource only carries Google Groups, and none is attached. So adding a
   tester is a Console action, and "is this person a tester?" cannot be answered
   from here at all — do not infer it from a successful publish.
+  The list itself is the account-level **Internal Testers** email list, and it
+  is already ticked on BOTH internal tracks, so adding someone once covers
+  phone and watch. Saving it warns that the list is shared across every app in
+  the developer account — that is about where the LIST can be used, not about
+  granting access; a track only admits it when that track has it ticked.
 - Publish with `scripts/play-release.py`, not the console. It reads the service
   account from 1Password, uploads and commits in one command. **A Wear bundle
   cannot go on the phone track** — Play rejects the commit — so phone and watch
