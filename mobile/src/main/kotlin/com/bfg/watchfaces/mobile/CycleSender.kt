@@ -3,6 +3,7 @@ package com.bfg.watchfaces.mobile
 import android.content.Context
 import android.util.Log
 import com.bfg.watchfaces.appcore.CycleDay
+import com.bfg.watchfaces.appcore.CycleSyncPlan
 import com.bfg.watchfaces.appcore.WatchLink
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.Wearable
@@ -139,18 +140,24 @@ object CycleSender {
      *
      * ## Why it does not always run
      *
-     * Skipped entirely when Health Connect is absent, and when she has neither
-     * granted the read nor got a cached date from a time she had. The second
-     * half of that matters: someone who granted and later REVOKED still has a
-     * stale date on her watch, and [sync] clearing it is the whole point. Only
-     * the person who never turned this on at all does nothing.
+     * Skipped when Health Connect is absent, and when [CycleSyncPlan] says this
+     * install has nothing to say. That used to be "not granted and no cached
+     * date", which silently excluded the one case where the two devices
+     * disagree: a REINSTALL revokes the grant and wipes `filesDir` while the
+     * watch keeps counting from the date it was last sent. The rule now spends
+     * one push per install to close that. See [CycleSyncPlan].
      *
      * Blocking; call it off the main thread.
      */
     fun syncOnLaunch(context: Context) {
         if (!CycleSource.isSupported(context)) return
         val granted = kotlinx.coroutines.runBlocking { CycleSource.isGranted(context) }
-        if (!granted && CycleDay.load(context.filesDir) == null) return
+        val decided = CycleSyncPlan.shouldSync(
+            granted = granted,
+            phoneRemembersDate = CycleDay.load(context.filesDir) != null,
+            watchToldThisInstall = CycleSyncPlan.wasTold(context.filesDir)
+        )
+        if (!decided) return
         sync(context)
     }
 
@@ -168,7 +175,10 @@ object CycleSender {
         val state = kotlinx.coroutines.runBlocking { CycleSource.read(context) }
         val facts = (state as? CycleSource.Availability.Ready)?.facts
         val date = facts?.start
-        send(context, date)
+        // ONLY on a send that a watch actually took. Marking it on a failure
+        // would retire the retry, and a phone launched once with the watch out
+        // of range would fall silent for the rest of the install.
+        if (send(context, date)) CycleSyncPlan.markTold(context.filesDir)
         sendDetail(context, facts)
         // Kept on the PHONE too, so a preview can draw the real day instead of
         // a stand-in. The operator's watch read "Day 18" while the phone's own
