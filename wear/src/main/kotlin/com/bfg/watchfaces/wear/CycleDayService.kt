@@ -44,15 +44,31 @@ import java.time.LocalDate
  * compute this itself. It is disclosed in the Data Safety declaration rather
  * than quietly true.
  *
- * ## UPDATE_PERIOD_SECONDS is 0, unlike everything else that shows a date
+ * ## UPDATE_PERIOD_SECONDS is an hour, and it used to be 0
  *
- * A day count changes at midnight, so the obvious thing is a timer. It is still
- * 0, for the same reason [PhoneNoteService] is: polling wakes the watch to
- * re-read a file that almost never differs. The system already re-requests
- * complication data when the date changes, and [notifyChanged] pushes at the
- * one moment there is genuinely something new. If a stale number is ever seen
- * across a midnight on a real wrist, that is the evidence that this was the
- * wrong call — and no test here can produce it.
+ * A day count changes at midnight, so the obvious thing is a timer. It shipped
+ * as 0 anyway, on the same reasoning as [PhoneNoteService]: polling wakes the
+ * watch to re-read a file that almost never differs, the system re-requests
+ * complication data when the date changes, and [notifyChanged] pushes when
+ * there is genuinely something new. That paragraph ended: "If a stale number is
+ * ever seen across a midnight on a real wrist, that is the evidence that this
+ * was the wrong call — and no test here can produce it."
+ *
+ * It was seen, on 2026-09-27, and in the clearest possible form. The wearer's
+ * TILE had moved on and her COMPLICATION had not — one watch, one date file,
+ * two refresh mechanisms, and only the one that asked for nothing was stale.
+ * The tile had been asking for an hour through `setFreshnessIntervalMillis`
+ * since it was written; this had no equivalent, so "the system re-requests on a
+ * date change" was load-bearing and untrue.
+ *
+ * It is now an hour, matching the tile, and an hour rather than a request for
+ * exactly midnight for the reason the tile already gives: a wake-up may be
+ * honoured late, and a value that is only right when one wake-up lands on time
+ * is sometimes a day out with nothing to show for it.
+ *
+ * **[PhoneNoteService] keeps 0 and should.** Its value changes when a person
+ * changes it and never on a clock. The distinction is the lesson: 0 is right
+ * for a value that is PUSHED, and wrong for a value DERIVED FROM THE DATE.
  */
 class CycleDayService : SuspendingComplicationDataSourceService() {
 

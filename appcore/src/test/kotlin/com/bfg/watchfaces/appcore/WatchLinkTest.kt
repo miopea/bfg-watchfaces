@@ -335,4 +335,49 @@ class WatchLinkTest {
         assertNull(WatchLink.Report.consentIn(raw))
     }
 
+
+    /**
+     * A complication whose value comes from the DATE must ask to be refreshed.
+     *
+     * The cycle day shipped with `UPDATE_PERIOD_SECONDS` 0, on the reasoning
+     * that the system re-requests complication data when the date rolls. On
+     * 2026-09-27 the wearer's tile had moved on and her complication had not --
+     * one watch, one date file, two refresh mechanisms, and only the one asking
+     * for nothing was stale.
+     *
+     * The tile had been asking for an hour through `setFreshnessIntervalMillis`
+     * all along, which is why the two diverged at all.
+     *
+     * PhoneNoteService deliberately keeps 0: its value is PUSHED, never
+     * derived from a clock, so notifyChanged covers it completely. Both halves
+     * are asserted, because a later tidy-up that made them consistent would
+     * reintroduce exactly this bug or waste exactly this battery.
+     */
+    @Test
+    fun `the cycle complication asks for a refresh and the pushed one does not`() {
+        val manifest = File("../wear/src/main/AndroidManifest.xml")
+        assertTrue(manifest.isFile) { "not where the test expected: ${manifest.absolutePath}" }
+        val xml = manifest.readText()
+
+        fun updatePeriodOf(service: String): Int {
+            val open = xml.indexOf("""android:name=".$service"""")
+            assertTrue(open > 0) { "no <service> for $service in the wear manifest" }
+            val close = xml.indexOf("</service>", open)
+            assertTrue(close > open) { "unterminated <service> for $service" }
+            val block = xml.substring(open, close)
+            val seconds = Regex(
+                """UPDATE_PERIOD_SECONDS"\s*\n?\s*android:value="(\d+)""""
+            ).find(block)?.groupValues?.get(1)
+            assertNotNull(seconds) { "$service declares no UPDATE_PERIOD_SECONDS" }
+            return seconds!!.toInt()
+        }
+
+        val cycle = updatePeriodOf("CycleDayService")
+        assertTrue(cycle in 1..3600) {
+            "the cycle day is derived from the date and must be re-requested; got $cycle"
+        }
+        assertEquals(0, updatePeriodOf("PhoneNoteService")) {
+            "the phone note is pushed, not clocked; polling for it only costs battery"
+        }
+    }
 }

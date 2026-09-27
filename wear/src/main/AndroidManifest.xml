@@ -273,9 +273,35 @@
       <meta-data
           android:name="android.support.wearable.complications.SUPPORTED_TYPES"
           android:value="SHORT_TEXT" />
+      <!--
+        AN HOUR, AND NOT 0, AND THIS IS THE ONE COMPLICATION HERE THAT DIFFERS.
+
+        It shipped as 0 on the reasoning that the system re-requests
+        complication data when the date rolls, so polling would only wake the
+        watch to re-read a file that is the same all day. CycleDayService wrote
+        down what would disprove that: "If a stale number is ever seen across a
+        midnight on a real wrist, that is the evidence that this was the wrong
+        call."
+
+        Seen 2026-09-27 on the wearer's watch. Her TILE had moved on and her
+        COMPLICATION had not, which is the cleanest possible form of the
+        evidence: same watch, same file, same date, two refresh mechanisms, and
+        only the one without a freshness request was stale. The tile asks for an
+        hour through setFreshnessIntervalMillis; this asked for nothing.
+
+        An hour rather than a request for exactly midnight, for the reason the
+        tile already records: the system is free to honour a wake-up late, and a
+        value that is only correct if one wake-up lands on time is sometimes a
+        day out with no way to tell.
+
+        PhoneNoteService KEEPS 0 and should. Its value changes when a person
+        changes it and never on a clock, so notifyChanged covers it completely.
+        The difference between these two is the whole point. 0 is right for a
+        value that is pushed, wrong for a value that is DERIVED FROM THE DATE.
+      -->
       <meta-data
           android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-          android:value="0" />
+          android:value="3600" />
     </service>
 
     <service
