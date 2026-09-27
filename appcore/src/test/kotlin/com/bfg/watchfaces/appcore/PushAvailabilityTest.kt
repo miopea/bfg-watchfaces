@@ -2,6 +2,8 @@ package com.bfg.watchfaces.appcore
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -104,22 +106,51 @@ class PushAvailabilityTest {
         val nasty = "ListWatchFacesException | Unknown error\n| <- ReceiverConnectionException"
         val w = PushAvailability(36, 0, PushAvailability.Probe.FAILED, nasty)
         val back = PushAvailability.decode(w.encode())
-        assertEquals(36, back.sdkInt)
+        assertNotNull(back) { "a real cause chain must still round-trip" }
+        assertEquals(36, back!!.sdkInt)
         assertEquals(0, back.receivers)
         assertEquals(PushAvailability.Probe.FAILED, back.probe)
         assertEquals(PushAvailability.Reason.NO_RECEIVER, back.reason)
     }
 
     /**
-     * Garbage must never decode to a usable watch.
+     * Garbage decodes to NULL: neither a usable watch nor a refusal.
      *
-     * A false OK puts the person straight back in front of the raw failure this
-     * whole type exists to prevent, which is worse than admitting we do not know.
+     * A false OK puts the person back in front of the raw failure this type
+     * exists to prevent. A false REFUSAL is the mirror of that and was the
+     * actual shipped bug: decode returned `unknown()`, whose `usable` is false,
+     * and the caller blocks any answer that is non-null and not usable. So an
+     * unreadable reply silently meant "this watch cannot take a face".
+     *
+     * Null is the third state. The caller already treats null as "go ahead",
+     * because silence is not a refusal, and an answer we cannot read is a kind
+     * of silence.
      */
     @Test
-    fun `nothing unreadable decodes as usable`() {
+    fun `nothing unreadable decodes to an answer at all`() {
         for (bad in listOf(null, "", "   ", "36", "36|1", "x|y|z", "36|1|NOT_A_PROBE", "|||")) {
-            assertFalse(PushAvailability.decode(bad).usable) { "decoded $bad as usable" }
+            assertNull(PushAvailability.decode(bad)) { "decoded $bad into an answer" }
+        }
+    }
+
+    /**
+     * The caller's rule, pinned here because it spans two modules.
+     *
+     * `MainActivity` refuses a send on `readiness != null && !readiness.usable`.
+     * That is correct ONLY while every value decode can return is an answer the
+     * watch actually gave and we actually understood. This asserts the two ends
+     * of that: a real FAILED answer is a refusal, and an unreadable one is not.
+     */
+    @Test
+    fun `only an answer we understood may stop a send`() {
+        val refused = PushAvailability.decode(
+            PushAvailability(36, 0, PushAvailability.Probe.FAILED, "boom").encode()
+        )
+        assertNotNull(refused)
+        assertFalse(refused!!.usable) { "a FAILED probe must still block the send" }
+
+        assertNull(PushAvailability.decode("total nonsense")) {
+            "an unreadable answer must not reach the caller as a refusal"
         }
     }
 

@@ -155,18 +155,33 @@ data class PushAvailability(
         const val PUSH_ACTION = "com.google.wear.ACTION_PUSH_WATCH_FACES"
 
         /**
-         * Parse a reply. Anything unreadable is [unknown], never a false OK.
+         * Parse a reply, or NULL when it cannot be read.
          *
-         * A malformed answer must not read as "the watch is fine" — that would
-         * put the person back in front of the failure this file exists to stop.
+         * ## Why null rather than [unknown]
+         *
+         * This used to return `unknown()` for anything malformed, reasoning
+         * that a bad answer "must not read as the watch is fine". That guarded
+         * the wrong end. `unknown()` has `usable == false`, and the caller
+         * blocks on any answer that is non-null and not usable — so an
+         * unreadable reply did not mean "I could not tell", it meant "this
+         * watch cannot take a face", and the send was refused.
+         *
+         * The two files disagreed in writing: [unknown]'s own note says "the
+         * phone must NOT refuse to send on this", while the type gave the
+         * caller no way to honour that. A boolean cannot hold three states.
+         *
+         * Null is the state the caller already handles correctly, and handles
+         * for exactly this reason: silence is not a refusal. An unreadable
+         * answer is a kind of silence. **Only an answer the watch actually
+         * gave, and which we actually understood, may stop a send.**
          */
-        fun decode(text: String?): PushAvailability {
-            val parts = text?.split("|") ?: return unknown()
-            if (parts.size < 3) return unknown()
-            val sdk = parts[0].trim().toIntOrNull() ?: return unknown()
+        fun decode(text: String?): PushAvailability? {
+            val parts = text?.split("|") ?: return null
+            if (parts.size < 3) return null
+            val sdk = parts[0].trim().toIntOrNull() ?: return null
             val recv = parts[1].trim().toIntOrNull() ?: -1
             val probe = runCatching { Probe.valueOf(parts[2].trim()) }.getOrNull()
-                ?: return unknown()
+                ?: return null
             return PushAvailability(sdk, recv, probe, parts.drop(3).joinToString("|"))
         }
 

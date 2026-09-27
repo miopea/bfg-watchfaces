@@ -106,7 +106,14 @@ object WatchReadiness {
                 Log.i(TAG, "asked, but no readiness answer; proceeding without one")
                 return null
             }
+            // Null when the reply could not be parsed, which is a kind of
+            // silence and must not stop a send. Only an answer the watch gave
+            // AND we understood may refuse one. See PushAvailability.decode.
             val availability = PushAvailability.decode(reply)
+            if (availability == null) {
+                Log.w(TAG, "readiness answer could not be read; proceeding without one")
+                return null
+            }
             Log.i(
                 TAG,
                 "watch readiness: usable=${availability.usable} reason=${availability.reason}"
