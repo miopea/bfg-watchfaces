@@ -1,5 +1,89 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-10-03 — A sent face will NOT carry its parameters, and package visibility is why
+
+Asked after `b368c68` shipped identity reconciliation: My faces can now say
+which saved design the watch is wearing, but when the phone has no saved design
+— a reinstall, or a face sent from another phone — all it can say is the slug.
+The design is gone. Could the parameters travel inside the face APK so it could
+be recovered?
+
+**No.** Not because of the artefact format, which was my first guess and was
+wrong, but because nothing on the watch is allowed to read them back.
+
+### What I proved can be done
+
+An APK carrying `res/raw/params.json` was built here on 2026-10-03, from a copy
+of `watchface-template`, and it passed every gate this project has:
+
+```text
+*** VALID against the WFF schema ***
+built: build/watchface.apk
+contents ok (Push allowlist)
+```
+
+`unzip -l` shows `res/raw/params.json` sitting beside `res/raw/watchface.xml`,
+`apksigner` reports `CN=BFG Watch Faces`, and `unzip -p` reads the JSON back out
+byte for byte. The Push allowlist is `/AndroidManifest.xml`, `/resources.arsc`,
+`/res/**`, `/META-INF/**`, so a raw resource is inside it by the stated rule
+rather than by luck. Google's on-device check is XSD 1.1 validation of the watch
+face definition, and a raw resource is not one of those files, so there is no
+mechanism by which it would see it.
+
+**So "the format forbids it" is not true, and nobody should kill this idea with
+that reason again.** I expected the four-path limit to settle this and it does
+not.
+
+### What cannot be done, and this is the decision
+
+The parameters would be inside a package the watch app is not permitted to see.
+
+`listWatchFaces()` returns `packageName` and `slotId`. Metadata, no bytes. So
+the phone cannot read the resource through the Push API at any point. Recovery
+would need the WATCH app to open the face package's own resources and send them
+back — and from Android 11 a package is invisible unless `<queries>` names it.
+This manifest already carries that lesson at length, from the day the slot
+picker could only offer our own complication.
+
+`<queries>` can match three things, and a face package offers none of them:
+
+| Match | Face APK has |
+| --- | --- |
+| `<intent>` | no activities, no services, no intent-filters at all |
+| `<provider>` | none |
+| `<package android:name>` | a LITERAL name only, and face packages are `…watchfacepush.<slug>` — one per design, per person |
+
+There is no wildcard in `<queries><package>`. The only key that opens this is
+`QUERY_ALL_PACKAGES`, which Play treats as a restricted permission needing its
+own declaration and justification — on an app that spent three review cycles on
+a Wear splash screen and waited from 2026-09-20 to 2026-09-24 on a health
+declaration. Spending that to recover a few hundred bytes we already had on the
+phone before we sent it is not a trade worth making.
+
+### And it would not have helped the case that prompted it
+
+Nothing already on a wrist carries parameters, so this recovers nothing
+installed before it ships — including the face the operator's wife was wearing
+when her phone app was reinstalled. Every version of this idea is a promise
+about the future only.
+
+### What was rejected, and what is right instead
+
+Rejected: embedding `params.json` in the sent APK; reading it back via the watch
+app; `QUERY_ALL_PACKAGES`.
+
+The loss this was meant to address is a PHONE problem and has a phone answer.
+`FaceLibrary` lives in `filesDir`, an uninstall wipes it, and that is the whole
+mechanism. An explicit export and import on the phone needs no format change, no
+watch, no Push verification and no new permission, and it covers designs that
+were never sent to a watch at all — which embedding never could. Android's own
+Auto Backup was ruled out of scope by the operator on 2026-09-21 and that ruling
+stands; this is a different thing, and it is not filed as work here because it
+has not been asked for.
+
+Worth noting what already exists: a SHARED face is in the community catalog and
+can be downloaded again. The gap is private designs only.
+
 ## 2026-09-24 — `isSupported()` answers the wrong question, and a wearer paid for it
 
 The operator's wife sent a face to her Pixel Watch 4 and, after a build and a
