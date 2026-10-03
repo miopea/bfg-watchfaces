@@ -161,6 +161,25 @@ object WatchLink {
     /** The watch's answer to [PUSH_CHECK_REQUEST_PATH]. */
     const val PUSH_CHECK_REPLY_PATH = "/bfg-watchfaces/push-check-reply"
 
+    /**
+     * Ask the watch which of OUR faces it is actually wearing.
+     *
+     * Distinct from everything the phone already knows. `CurrentFace` records
+     * what this phone last SENT, which is an intention; this is an observation,
+     * and the two part company exactly when it matters — a send that failed
+     * after the transfer, a face put there from another phone, or the phone app
+     * reinstalled with `filesDir` wiped while the watch carries on wearing
+     * something the phone no longer has any record of.
+     *
+     * Carries nothing. The reply carries [WornFace.encode], or an EMPTY payload
+     * when the watch is wearing none of ours — which is a real answer and not
+     * the same as not answering at all.
+     */
+    const val WORN_FACE_REQUEST_PATH = "/bfg-watchfaces/worn-face"
+
+    /** The watch's answer to [WORN_FACE_REQUEST_PATH]. */
+    const val WORN_FACE_REPLY_PATH = "/bfg-watchfaces/worn-face-reply"
+
     const val CATALOG_REQUEST_PATH = "/bfg-watchfaces/catalog"
 
     /** The watch's answer to [CATALOG_REQUEST_PATH]. */

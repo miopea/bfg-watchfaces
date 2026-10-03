@@ -1,5 +1,7 @@
 package com.bfg.watchfaces.wear
 
+import androidx.wear.watchfacepush.WatchFacePushManagerFactory
+import com.bfg.watchfaces.appcore.WornFace
 import android.util.Log
 import androidx.wear.watchfacepush.WatchFacePushManager
 import com.bfg.watchfaces.appcore.ActivationConsent
@@ -82,6 +84,13 @@ class FaceReceiverService : WearableListenerService() {
         // isSupported() is not the same question.
         if (event.path == WatchLink.PUSH_CHECK_REQUEST_PATH) {
             answerPushCheck(event.sourceNodeId)
+            return
+        }
+        // "What are you actually wearing?" The phone only knows what it last
+        // SENT, and the two part company exactly when it matters -- see
+        // WatchLink.WORN_FACE_REQUEST_PATH.
+        if (event.path == WatchLink.WORN_FACE_REQUEST_PATH) {
+            answerWornFace(event.sourceNodeId)
             return
         }
         // The date her most recent period started. A DATE, not a day number --
@@ -185,6 +194,65 @@ class FaceReceiverService : WearableListenerService() {
      * `runBlocking` because [PushCheck.observe] suspends and we are already on
      * a background thread -- the same shape the activation calls use.
      */
+    /**
+     * Tell the phone which of our faces is installed, and whether it is worn.
+     *
+     * ## An empty payload is an ANSWER
+     *
+     * It means "none of ours is installed", which is a fact the phone can act
+     * on. Not answering at all means the watch is out of range, asleep, or on a
+     * build that predates this, and the phone must treat those differently --
+     * `WornFacePlan` keeps `NoneOfOurs` and `NoAnswer` apart for exactly this
+     * reason. So the reply is always SENT, even when it carries nothing.
+     *
+     * ## Awaited, like every other reply in this file
+     *
+     * A `WearableListenerService` is torn down the moment its callback returns.
+     * The catalog reply was silently lost to that until it was awaited, and the
+     * push check was written awaited because of it. Same shape here.
+     *
+     * `listWatchFaces()` returns only the faces THIS app pushed, which is why
+     * `install` logs that count as `ours=`. So a null answer here says nothing
+     * about whether the wrist is bare.
+     */
+    private fun answerWornFace(nodeId: String) {
+        runCatching {
+            // runBlocking because listWatchFaces and isWatchFaceActive both
+            // suspend and we are already on a background thread -- the same
+            // shape answerPushCheck uses.
+            val worn = runCatching {
+                runBlocking {
+                    val manager =
+                        WatchFacePushManagerFactory.createWatchFacePushManager(applicationContext)
+                    manager.listWatchFaces().installedWatchFaceDetails.firstOrNull()?.let { d ->
+                        val active =
+                            runCatching { manager.isWatchFaceActive(d.packageName) }.getOrDefault(false)
+                        WornFace(d.packageName, d.slotId, active)
+                    }
+                }
+            }.getOrElse {
+                // Logged rather than swallowed. A watch that cannot bind Push
+                // at all is a different story from one wearing none of ours,
+                // and PushCheck is the thing that tells them apart -- but this
+                // must not crash a listener callback either way.
+                Log.w(TAG, "could not read the worn face", it)
+                null
+            }
+            // The count and whether it is active, never which design. A logcat
+            // line is readable by anything on the device.
+            Log.i(TAG, "worn face asked for by $nodeId; ours=${if (worn == null) 0 else 1} active=${worn?.active}")
+            Tasks.await(
+                Wearable.getMessageClient(this).sendMessage(
+                    nodeId,
+                    WatchLink.WORN_FACE_REPLY_PATH,
+                    (worn?.encode() ?: "").toByteArray(Charsets.UTF_8)
+                ),
+                WatchLink.REPLY_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS
+            )
+            Log.i(TAG, "worn face answer delivered")
+        }.onFailure { Log.w(TAG, "could not answer the worn face request", it) }
+    }
+
     private fun answerPushCheck(nodeId: String) {
         runCatching {
             val availability = runBlocking { PushCheck.observe(this@FaceReceiverService) }

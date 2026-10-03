@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.mobile.pack
 
+import com.bfg.watchfaces.appcore.FacePackage
 import android.content.Context
 import android.graphics.Bitmap
 import com.bfg.watchfaces.appcore.FaceLibrary
@@ -53,9 +54,17 @@ import java.io.File
  */
 object FaceBuilder {
 
-    /** Watch Face Push package rule: `<app package>.watchfacepush.<slug>`. */
+    /**
+     * Watch Face Push package rule: `<app package>.watchfacepush.<slug>`.
+     *
+     * The rule itself lives in [FacePackage], in `:appcore`, because it is now
+     * needed in BOTH directions — this builds the name, and reading a face back
+     * off a watch takes it apart again. Two copies would agree until somebody
+     * changed one, and the failure would be silent: a package the app did not
+     * recognise is indistinguishable from a face somebody else installed.
+     */
     fun packageNameFor(context: Context, slug: String) =
-        "${context.packageName}.watchfacepush.$slug"
+        FacePackage.nameFor(context.packageName, slug)
 
     data class Built(val apk: File, val packageName: String, val slug: String)
 

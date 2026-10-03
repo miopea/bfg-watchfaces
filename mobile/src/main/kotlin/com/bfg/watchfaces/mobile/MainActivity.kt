@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.mobile
 
+import com.bfg.watchfaces.appcore.WornFacePlan
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -199,6 +200,26 @@ class MainActivity : ComponentActivity() {
                 // trying to do when they were asked for one.
                 var nameThenSend by remember { mutableStateOf(false) }
                 var faces by remember { mutableStateOf(FaceStorage.list(context)) }
+                /**
+                 * What the WATCH says it is wearing.
+                 *
+                 * Starts as NoAnswer, which renders no card, so the screen
+                 * never flashes a claim about her watch before asking one.
+                 * Refreshed whenever My faces is opened rather than once at
+                 * launch: she may change the face on the watch itself, and the
+                 * answer is only interesting while she is looking at it.
+                 */
+                var wornFace by remember {
+                    mutableStateOf<WornFacePlan>(WornFacePlan.NoAnswer)
+                }
+                LaunchedEffect(tab, faces) {
+                    if (tab == Tab.MINE) {
+                        // Suspending and off the main thread inside; the Data
+                        // Layer calls block and Tasks.await THROWS on the main
+                        // thread. See WornFaceReader.
+                        wornFace = WornFaceReader.read(context)
+                    }
+                }
                 // What has been shared, and whether sharing is possible at all.
                 //
                 // `canShare` is asked of the SERVICE rather than assumed: it
@@ -596,6 +617,7 @@ class MainActivity : ComponentActivity() {
 
                         Tab.MINE -> MyFacesScreen(
                             faces = faces,
+                            worn = wornFace,
                             onOpen = {
                                 params = it.params
                                 openSlug = it.slug

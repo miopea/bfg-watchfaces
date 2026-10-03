@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.mobile
 
+import com.bfg.watchfaces.appcore.WornFacePlan
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -82,6 +83,13 @@ fun MyFacesScreen(
      * that is switched off.
      */
     canShare: Boolean,
+    /**
+     * What the WATCH says it is wearing, as opposed to what is saved here.
+     *
+     * Passed in rather than read here for the same reason `shared` is: the Data
+     * Layer round trip belongs to the screen's owner, not to a recomposition.
+     */
+    worn: WornFacePlan,
     modifier: Modifier = Modifier
 ) {
     var confirming by remember { mutableStateOf<FaceLibrary.StoredFace?>(null) }
@@ -96,10 +104,18 @@ fun MyFacesScreen(
     val knownApps = remember(faces) { MissingApps.known(context) }
 
     if (faces.isEmpty()) {
-        Box(
-            modifier = modifier.fillMaxSize().padding(32.dp),
-            contentAlignment = Alignment.Center
-        ) {
+        // THE CARD STILL SHOWS WITH AN EMPTY LIBRARY, and this is the case it
+        // was built for. A phone reinstall wipes filesDir, so "No faces yet" is
+        // literally true and completely unhelpful to somebody looking at a face
+        // on her wrist. Putting the card only above a non-empty list would have
+        // hidden it from exactly the person who needs it.
+        Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
+            WornFaceCard(worn)
+            Spacer(Modifier.height(16.dp))
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f).padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("No faces yet", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
@@ -110,11 +126,15 @@ fun MyFacesScreen(
                     textAlign = TextAlign.Center
                 )
             }
+            }
         }
         return
     }
 
     LazyColumn(modifier = modifier.fillMaxSize()) {
+        item(key = "worn") {
+            Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { WornFaceCard(worn) }
+        }
         items(faces, key = { it.slug }) { face ->
             FaceRow(
                 face,
