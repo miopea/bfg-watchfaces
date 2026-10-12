@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "currentGeneratorVersion": 15,
+  "currentGeneratorVersion": 16,
   "maxFaceBytes": 8192,
   "maxNameChars": 40,
   "maxAuthorChars": 40,

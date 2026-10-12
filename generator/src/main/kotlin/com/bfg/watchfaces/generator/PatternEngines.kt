@@ -66,6 +66,12 @@ object PatternEngines {
         // only grows on a face that asked for bars. The dial pattern is
         // untouched, so this delegates like the ten versions above it.
         15 -> v4(p)
+        // v16 stops the RAIN ring drawing an arc on a watch with no weather.
+        // It is a Condition around the ring's PartDraw and nothing else -- the
+        // same shape as v14 and in the place v14 missed. The dial pattern is
+        // untouched, so this delegates like the eleven versions above it. See
+        // WeatherFallback.
+        16 -> v4(p)
         else -> error("no engine implementation for generatorVersion=${p.generatorVersion}")
     }
 

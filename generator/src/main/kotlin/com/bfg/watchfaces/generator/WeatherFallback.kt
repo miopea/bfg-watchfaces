@@ -1,7 +1,12 @@
 package com.bfg.watchfaces.generator
 
 /**
- * What a drawn weather slot shows when the watch has no weather.
+ * What weather shows when the watch has none: a drawn slot, and the rain ring.
+ *
+ * Two bumps, two years apart in version numbers and the same idea. v14 gated
+ * the drawn TEXT slots and left [WffEmitter] emitting the rim ring
+ * unconditionally; v16 closes that, because an arc is the worse of the two
+ * places to state a figure nobody measured. See `DECISIONS.md` 2026-10-12.
  *
  * ## The hole this fills
  *
@@ -112,5 +117,50 @@ object WeatherFallback {
           </Text>
         </PartText>
       </Default>
+    </Condition>"""
+
+    /**
+     * The first version whose RAIN RING is gated on there being weather.
+     *
+     * Two versions after [SINCE_VERSION] because it is a second bump and not
+     * the same one: v14 wrapped the drawn text and left the ring out, and a
+     * face stored at v15 or earlier keeps the ring its author saw. Only
+     * [RingSource.RAIN] is affected -- steps and battery are always there to
+     * read, and gating them would withhold a reading that exists.
+     */
+    const val RING_SINCE_VERSION = 16
+
+    /** Whether this face's ring reads weather and is new enough to be gated. */
+    fun appliesToRing(p: DialParams): Boolean =
+        p.generatorVersion >= RING_SINCE_VERSION && p.ring == RingSource.RAIN
+
+    /**
+     * Wrap the rain ring so it is drawn only when there is weather to draw.
+     *
+     * **There is no `<Default>`, and that is the decision rather than an
+     * omission.** Operator ruling, 2026-10-12: draw nothing when there is no
+     * weather. `Default` is `minOccurs="0"` in `conditionElement.xsd` and the
+     * schema's own documentation says it is what shows when no `Compare`
+     * succeeds -- so leaving it out is legal and means precisely that: no
+     * track, no arc, nothing on the rim.
+     *
+     * Two alternatives were considered and declined. The faint TRACK alone
+     * keeps the composition, and is pixel for pixel what 0% looks like, so it
+     * would state a figure instead of withholding one -- the same bug, drawn
+     * quieter. A non-percentage MARK invents a vocabulary the dial has nowhere
+     * else. A drawn slot can say "no reading yet" with an em dash because text
+     * has words for absence; an arc reads as a measurement at every length,
+     * including zero.
+     *
+     * [ring] is the `PartDraw` exactly as it would have been emitted without
+     * this, so a watch that HAS weather renders what it rendered before.
+     */
+    fun wrapRing(ring: String): String = """
+    <Condition>
+      <Expressions>
+        <Expression name="hasWeather">[WEATHER.IS_AVAILABLE]</Expression>
+      </Expressions>
+      <Compare expression="hasWeather">${ring.trim()}
+      </Compare>
     </Condition>"""
 }

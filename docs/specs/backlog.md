@@ -58,7 +58,15 @@ expressible, because `ComplicationSlot` is a child of `Scene` and nothing else.
 A drawn slot now shows an em dash when `[WEATHER.IS_AVAILABLE]` is false. See
 `DECISIONS.md` 2026-09-03.
 
-**The RIM RING was left out of that, and it is still open.** `WffEmitter.ringElement`
+~~**The RIM RING was left out of that.**~~ — DONE 2026-10-12 as v16. The rain
+ring now emits a `Condition` on `[WEATHER.IS_AVAILABLE]` with **no `Default`**,
+so a watch with no weather draws nothing at all — not the faint track, which is
+pixel for pixel what 0% looks like. Only `RingSource.RAIN`; steps and battery
+emit a byte-identical face at v15 and v16. Still owed: a wrist with weather on
+and a wrist with weather off, and the Worker redeploy that any version bump
+carries. `DECISIONS.md` 2026-10-12.
+
+The original finding, kept because the reasoning still reads: `WffEmitter.ringElement`
 emits its `Transform` on `[WEATHER.CHANCE_OF_PRECIPITATION]` unconditionally, so
 a watch with no weather draws an arc from whatever that expression yields with no
 data — the exact state v14 retired for text. An arc is worse than an em dash

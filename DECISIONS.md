@@ -1,5 +1,95 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-10-12 — v16: the rain ring draws nothing when the watch has no weather
+
+Swarm task `01a131fd`, filed out of the investigation above and ruled on the
+same day. **Operator decision: draw nothing when there is no weather.**
+
+### What was wrong
+
+v14 gave a drawn weather SLOT an em dash when `[WEATHER.IS_AVAILABLE]` is false
+and left `WffEmitter.ringElement` emitting its `Transform` unconditionally. So
+with no location permission, no weather set up, or a first fetch that failed,
+the rim ring still drew an arc from whatever that expression yields with no
+data — undocumented, and never observed here. That is the exact sentence v14
+was written to retire, surviving one file away from the fix.
+
+### Why nothing, rather than the faint track
+
+The three candidates were nothing at all, the track with no arc over it, and
+the track plus some mark that is not a percentage.
+
+**The track alone is the bug drawn quieter.** With no arc on it, the track is
+pixel for pixel what 0% looks like, so it would state a figure instead of
+withholding one — and 0% is a perfectly ordinary reading on a dry day, which is
+what makes it indistinguishable. A mark invents a vocabulary the dial has
+nowhere else.
+
+A drawn slot can say "no reading yet" with an em dash because text has words
+for absence. **An arc has none: it reads as a measurement at every length.**
+So the ring is the one place where showing nothing is the honest option, and
+the em dash precedent does not transfer.
+
+### How, and the one line of schema that makes it free
+
+`<Default>` is `minOccurs="0"` in `conditionElement.xsd`, and the element's own
+documentation says it is what shows when no `Compare` succeeds. So the ring
+emits a `Condition` with a `Compare` holding the whole `PartDraw` and **no
+`Default` at all** — no track, no arc, nothing on the rim. There is no need for
+an empty branch, which would have been schema-invalid anyway: `Default`'s
+`xs:choice` requires at least one child.
+
+`Condition` is a legal child of `Scene` (`sceneElement.xsd`), and a `PartDraw`
+is a legal child of `Compare` — `_CompareChild` includes `PartElementGroup`,
+which is `{PartText, PartImage, PartAnimatedImage, PartDraw}`. Same reading
+that settled the v14 shape, now used for the other half of that group.
+
+### Only RAIN, and that is not a detail
+
+`STEPS` and `BATTERY` are always readable, so their sweep is always a reading.
+Gating them would withhold a figure that exists. `RainRingFallbackTest` asserts
+the other two emit a BYTE-IDENTICAL face at v15 and v16, and that a face with
+no ring gains nothing.
+
+### Gated at v16, and swept, which caught a hole in the test itself
+
+The gate is `generatorVersion >= 16 && ring == RAIN`. Verified by mutation:
+dropping the version check fails `v15 output is untouched(RAIN)`; adding a
+`Default` back fails `no weather draws nothing at all`.
+
+The sweep rule from 2026-09-18 applies — the branch is keyed on a parameter, so
+the parameter gets swept, and so do the ring's neighbours: clock mode (hands
+give up the chapter ring to the rim), seconds (`SecondsBand.crowdedByRing`
+reads `ring.enabled`), a dark ink (its own ambient branch, and the track's
+alpha comes off the ink), and a drawn date.
+
+**The drawn date was not in the first cut, and a mutation walked straight past
+it.** Changing the date element's alpha at v16 left every test green, because
+the default face has `dateStyle = NONE` and emits no date at all — the test was
+sweeping faces that could not show the difference. Adding `WEEKDAY_MONTH_DAY`
+to the sweep made the same mutation fail. A sweep is only as wide as the faces
+it builds, and "I mutated something and the test failed" is worth nothing until
+you check WHICH faces the mutation could reach.
+
+### What this does NOT prove
+
+`WffSchemaTest` is the device's whole check for STRUCTURE, so the arrangement
+is sound. **Nothing here says what the branch DOES on a wrist.** No expression
+is validated by anything (2026-09-19), and `[WEATHER.IS_AVAILABLE]` has shipped
+since v14 without once being observed resolving on a device. It needs seeing
+twice: on a watch WITH weather, where the ring must look exactly as it does
+today, and on one with weather off, where the rim must go empty.
+
+### The release order is the hazard, not the code
+
+A version bump obliges `./gradlew :workbench:contract` — done, and
+`params-contract.json` now says 16 — and then a **Worker redeploy**, because
+`validate.ts` refuses any face above the contract version it was built with.
+v10 shipped in the app while the Worker still said 9, which would have refused
+every submission the day sharing opened. So the Worker goes out BEFORE the app,
+not alongside it. Not deployed here: that is an outward action and it is the
+operator's to authorise.
+
 ## 2026-10-12 — The rain ring reports the watch's number faithfully; the number is a forecast, not an observation
 
 Reported by email on 2026-09-28, 6:53 AM: "The chance of precipitation ring

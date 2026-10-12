@@ -464,12 +464,23 @@ ${handPair("MinuteHand", "hand_minute")}$second
      * complete ring, not a sweep of 720 degrees. Seen on an emulator reporting
      * 107,300 steps. Hidden in ambient: it is decoration, and ambient is a black
      * screen with the time on it.
+     *
+     * ## The RAIN ring is drawn only when there is weather, from v16
+     *
+     * Steps and battery are always readable, so their sweep is always a
+     * reading. `[WEATHER.CHANCE_OF_PRECIPITATION]` is not: with no location
+     * permission, no weather set up, or a first fetch that failed, the watch
+     * does something with that expression which is undocumented and which this
+     * project has never observed -- and whatever it is, the arc drawn from it
+     * reads as a measurement. [WeatherFallback.wrapRing] puts a `Condition`
+     * around the whole `PartDraw` with no `Default`, so the rim is simply
+     * empty. See `DECISIONS.md` 2026-10-12.
      */
     private fun ringElement(p: DialParams, ink: String): String {
         val expression = p.ring.expression ?: return ""
         val b = StepRing.box()
         val track = argb(p.inkColor, StepRing.TRACK_ALPHA)
-        return """
+        val draw = """
     <PartDraw x="0" y="0" width="$DIAL_SIZE" height="$DIAL_SIZE" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="0"/>
       <Arc centerX="${DIAL_CENTER}" centerY="${DIAL_CENTER}" width="${b.w}" height="${b.h}"
@@ -482,6 +493,7 @@ ${handPair("MinuteHand", "hand_minute")}$second
         <Transform target="endAngle" value="clamp($expression, 0, 100) * ${StepRing.DEGREES_PER_PERCENT}"/>
       </Arc>
     </PartDraw>"""
+        return if (WeatherFallback.appliesToRing(p)) WeatherFallback.wrapRing(draw) else draw
     }
 
     private fun dateElement(p: DialParams): String {
