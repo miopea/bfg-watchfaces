@@ -204,15 +204,66 @@ justification stands.
 
 - The exact wording the tile uses below the minimum, and whether it names the
   number of periods still needed.
-- Whether the Console form's category list actually contains a period or
-  menstrual tracking option, or whether "Other" with an accurate justification
-  is the only shape available. That cannot be read from the API — there is no
-  health or app-content endpoint for your own package, enumerated across all 145
-  methods on 2026-09-23 — so it needs a Console look before filing.
+- ~~Whether the Console form's category list contains a period option.~~
+  **ANSWERED by driving the Console on 2026-10-12. It does.** See below.
 - Whether re-filing disturbs the live production release. CLAUDE.md records that
   App content declarations are a reviewed surface and that changing one while a
   review runs cancels and restarts it; no review is running now, but this should
   be checked again at the moment of filing.
+
+### What the form actually looks like, read 2026-10-12
+
+Driven in the Console, nothing changed and nothing submitted. Play Console →
+Monitor and improve → Policy and programs → App content → Actioned → Health
+apps → Manage. The declaration's last edit is recorded as Sep 23, 2026.
+
+It is **three steps**, not one: `1 Health features in your app`, `2 Health data
+permissions`, `3 Regional requirements`. Step 1 confirms the manifest permission
+it detected, shown verbatim as `android.permission.health.READ_MENSTRUATION`.
+
+**"Period tracking" EXISTS as a checkbox**, under the Health and fitness group:
+
+```text
+Health and fitness
+  [ ] Activity and fitness
+  [ ] Nutrition and weight management
+  [ ] Period tracking          <- exists, currently UNCHECKED
+  [ ] Sleep management
+  [ ] Stress management, relaxation, mental acuity
+Medical
+  [ ] Diseases and conditions management ...
+```
+
+So the 2026-09-20 note that this form is "a feature checklist" is still right
+about its shape, and the thing that has changed is that the app now holds the
+permission, so step 1 lists it and steps 2 and 3 exist.
+
+**The "Other" free-text box is 250 characters, and currently holds 226 of them.**
+Not the 10,000-character justification CLAUDE.md describes — that belongs to
+step 2, `Health data permissions`, which I did not open because reaching it
+means clicking Next and I was not willing to risk persisting step 1 on a
+published app. So the long replacement paragraph drafted above targets step 2
+and has NOT been confirmed to fit anywhere yet.
+
+### The question this raises, which was not asked before
+
+Is **Period tracking** the accurate box for the app AS IT IS TODAY, countdown or
+no countdown?
+
+The app already reads `MenstruationPeriodRecord` and displays the day of the
+cycle, the day of the period while one is running, the last period's length and
+the average interval. That is a reasonable description of period tracking. It
+was declared under "Other" instead, and Google approved that on 2026-09-23.
+
+If "Other" was simply the wrong box from the start, then ticking "Period
+tracking" is a CORRECTION to the app as it exists, not a declaration of a
+feature that does not exist — and the objection recorded on 2026-09-20 against
+filing first ("declaring a period-tracking feature the app did not have") would
+not apply to it, because the app does have one.
+
+That is a genuinely different question from the countdown and it is the
+operator's to answer. It is also the only part of this that could honestly be
+filed before any code is written.
 
 ### Permission requested
 
