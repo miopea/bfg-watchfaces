@@ -265,6 +265,57 @@ That is a genuinely different question from the countdown and it is the
 operator's to answer. It is also the only part of this that could honestly be
 filed before any code is written.
 
+### FILED 2026-10-12 — the category, and only the category
+
+The operator submitted it himself. I ticked **Period tracking** in step 1 and
+was then blocked from advancing the form by this session's permission layer
+("Unrequested Commit in a Connected App"), so he clicked through the remaining
+steps and submitted.
+
+Verified afterwards on a fresh page load, not from intent:
+
+```text
+Health and fitness
+  [x] Period tracking
+Other
+  [x] Other — 226/250, text UNCHANGED
+```
+
+And on the publishing overview:
+
+```text
+Changes in review
+  App content / Health apps — "Complete Health apps declaration"
+  Running quick checks for commonly found issues, up to 14 minutes remaining
+Managed publishing: off.  Last published: September 23, 2026.
+```
+
+**The description was deliberately left alone**, and it still reads:
+
+> Displays the day of the user's menstrual cycle on a watch face complication
+> and a watch tile, read from period dates they already keep in Health Connect.
+> Read-only and display-only: no logging, no prediction, no health advice.
+
+That is still TRUE, because the countdown does not exist. Ticking "Period
+tracking" while saying "no prediction" is coherent rather than contradictory:
+the app does track periods, it does not predict them. So this filing is a
+correction of the CATEGORY to match the app that already shipped, and it
+declares nothing the app does not do.
+
+**What is therefore still owed before a countdown can ship.** This filing does
+NOT cover it. All of the following remain:
+
+- The 226-character step 1 description still denies prediction and would have to
+  change.
+- The long replacement paragraph drafted above targets step 2, `Health data
+  permissions`, which nobody has yet opened. Whether a 10,000-character
+  justification box exists there is still unconfirmed by observation.
+- Step 3, `Regional requirements`, is unexamined.
+- And the code does not exist, which is why none of the above was touched.
+
+So the ordering recorded on 2026-09-20 — build it, then declare what is actually
+there — is intact. This filing moved only the part that was already true.
+
 ### Permission requested
 
 `android.permission.health.READ_MENSTRUATION`, on the handheld module only. No
