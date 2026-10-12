@@ -114,6 +114,106 @@ closest thing in the feature to an analysis.
 Google. The lesson is the ordering: this file has to be re-read at the moment of
 filing, not at the moment of drafting.
 
+## REVISION DRAFTED 2026-10-12 — the app would predict the next period
+
+**NOT FILED. This is a draft and the paragraphs below have not been submitted.**
+The approved declaration still stands as written, and the app still matches it,
+because no countdown code exists. Filing needs its own operator go at the moment
+of filing, with this file re-read then — which is the 2026-09-20 lesson directly
+above, applied to itself.
+
+### What changed and why
+
+The operator's wife asked, on 2026-10-12, for the cycle tile to show how many
+days until her next period. That is a reasonable request and her own health app
+does it. It is also the exact thing the approved justification denies twice:
+
+> It does not predict future periods ... no future date is shown or computed
+> anywhere in the app.
+
+So the filing has to change before the build does, not after.
+
+### The declared category
+
+Operator decision, 2026-10-12: **declare it accurately, whatever that costs.**
+If the form offers a period or menstrual tracking category, that is the one,
+rather than keeping the "Other" that submission 17 was approved under.
+
+The operator reasonably asked whether the category needs to change at all,
+"since we are NOT storing data, just doing a calculation". Two corrections, both
+of which belong in the filing rather than in a conversation:
+
+1. **Storage is not what the category turns on.** Google's permitted uses are
+   framed as journalling, reporting, monitoring and ANALYSING health data. A
+   projection is analysis whether or not anything is persisted, and the Data
+   Safety form asks about collection and sharing separately from retention.
+2. **The app does persist derived values, and always has.** `cycle-start.txt`
+   and `cycle-facts.txt` sit in the watch's own app storage, and `CycleState`
+   keeps the same on the phone. The raw `MenstruationPeriodRecord` never leaves
+   Health Connect — that part is true and stays true — but "we store nothing"
+   would be an inaccurate sentence to file, and inaccurate sentences in this
+   document are the whole reason this section exists.
+
+### Where it may appear
+
+**The tile only.** Operator decision, 2026-10-12. The dial complication stays a
+bare unlabelled number by decision `01a0ba48`, and a "4" read at a glance meaning
+"period due in 4 days" is indistinguishable from the cycle-day "4" already
+there. `cycle-complication.md` already rejected a ring design for inviting
+exactly that misreading; a bare future-date number on the same surface is worse.
+The tile has a whole screen and can say what the number means.
+
+### How much history before anything is shown
+
+**Three gaps, which is four logged periods.** Operator decision, 2026-10-12,
+with the condition that the tile **says clearly when there is not enough data
+yet** rather than going quiet.
+
+One gap more than the average requires, because a countdown is a stronger claim
+than an average: it names a date rather than describing the past. The average
+bar was itself raised to two gaps on 2026-10-03 after a watch showed "Average
+cycle 27 days" to someone who had just started logging, and the wearer's own
+reading was that it "doesn't make any sense".
+
+Already true and needing no change: `CycleSource` reads a year of records, so a
+year of her own logged history is already in scope. Four periods at a typical
+interval is about four months, comfortably inside it.
+
+### The replacement paragraph
+
+This replaces the "no prediction of any kind" paragraph. Everything else in the
+justification stands.
+
+> From the same records the app also projects the start of the next period, as a
+> number of days, and shows it on the watch tile. The projection is the mean
+> interval between the user's own recent logged period starts, added to her most
+> recent logged start. It is arithmetic on dates she entered herself and nothing
+> else: no model, no population data, no inference about her body.
+>
+> It is shown only when the user has logged at least four periods, giving three
+> intervals to average. Below that the tile states that there is not yet enough
+> logged history to estimate, and shows no number. The estimate appears on the
+> app's tile only, never on a watch face complication, so it is never displayed
+> as an unlabelled figure.
+>
+> The app still does not identify fertile windows or ovulation, does not state a
+> cycle phase, and offers no health guidance, diagnosis or medical
+> interpretation of any kind.
+
+### What is NOT settled
+
+- The exact wording the tile uses below the minimum, and whether it names the
+  number of periods still needed.
+- Whether the Console form's category list actually contains a period or
+  menstrual tracking option, or whether "Other" with an accurate justification
+  is the only shape available. That cannot be read from the API — there is no
+  health or app-content endpoint for your own package, enumerated across all 145
+  methods on 2026-09-23 — so it needs a Console look before filing.
+- Whether re-filing disturbs the live production release. CLAUDE.md records that
+  App content declarations are a reviewed surface and that changing one while a
+  review runs cancels and restarts it; no review is running now, but this should
+  be checked again at the moment of filing.
+
 ### Permission requested
 
 `android.permission.health.READ_MENSTRUATION`, on the handheld module only. No
