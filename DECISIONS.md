@@ -1,5 +1,104 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-10-12 — The rain ring reports the watch's number faithfully; the number is a forecast, not an observation
+
+Reported by email on 2026-09-28, 6:53 AM: "The chance of precipitation ring
+around the outside of the watch face doesn't seem to be accurate. It's showing
+50% right now even though the weather says it's raining."
+
+Investigated from the emitted face and Google's own reference, with no wrist.
+**Nothing in this app computes that number, and the one arithmetic step it does
+perform is correct.**
+
+### What the face actually asks for
+
+`WffEmitter.ringElement` emits one `PartDraw` holding a faint full circle and a
+bright arc, and binds the arc with
+
+```xml
+<Transform target="endAngle" value="clamp([WEATHER.CHANCE_OF_PRECIPITATION], 0, 100) * 3.6"/>
+```
+
+`StepRing.DEGREES_PER_PERCENT` is 3.6, which is 360/100. So the WATCH evaluates
+the source and sweeps the arc itself; nothing is recomputed here and nothing is
+re-sent. A ring at half a turn means the watch reported 50.
+
+### The source is the right one and it is supported
+
+Google's data-sources reference documents `WEATHER.CHANCE_OF_PRECIPITATION` as
+an Integer, "the current chance of precipitation. This is a value in the range
+`0` to `100`" — a current-weather member, not a forecast-day one, and introduced
+at WFF feature level 2. Every face this project builds declares
+`com.google.wear.watchface.format.version` = 2
+(`watchface-template/AndroidManifest.xml`, `FaceBuilder`), so the source is
+within the level the face asks for.
+
+Worth recording because the local schema copy is misleading on exactly this
+point: `common/attributes/sourceType.xsd` enumerates the bare source but also
+carries `WEATHER.WEATHER.UV_INDEX` and `WEATHER.WEATHER.LAST_UPDATED`, which are
+plainly typos, and it names `WEATHER.TEMPERATURE_LOW`/`_HIGH` where the published
+reference says `WEATHER.DAY_TEMPERATURE_LOW`/`_HIGH`. The XSD is not a reliable
+account of what a source MEANS, and it cannot be: an expression inside `[...]`
+is validated as `xs:string` and nothing checks it at all (2026-09-19).
+
+### So the discrepancy is in what the number means
+
+Chance of precipitation is a PROBABILITY. It does not go to 100 because rain has
+started — it is a provider's forecast for a place and a window, and 50 while
+rain falls is a value that provider can legitimately hold. The ring is accurate
+to what it measures and it does not measure what was being read off it.
+
+What answers "is it raining" is `[WEATHER.CONDITION]` / `[WEATHER.CONDITION_NAME]`
+— already offered as the **Conditions** slot, which renders "Rain" in words.
+That is the instrument for the question, and a ring cannot be: a ring is a
+proportion of a circle, so it can only ever carry a percentage
+(`RingSource`'s own note).
+
+### The second candidate, NOT established
+
+Staleness. `[WEATHER.LAST_UPDATED]` has been in the schema from the beginning
+and nothing here reads it, so a reading taken hours ago is drawn exactly like a
+current one. Google's guide states that `IS_AVAILABLE` and `IS_ERROR` can both
+be true at once, which means "stale data, refresh failed" — a state this app
+cannot see and cannot show. This is a real blind spot and it is NOT a claim
+about what happened on 2026-09-28; distinguishing it from the paragraph above
+needs a wrist, over hours, against the phone's weather app.
+
+### The gap this did find, and it is ours
+
+**v14 gave drawn weather slots a fallback and left the ring out.** `WeatherFallback`
+wraps a drawn weather `PartText` in a `Condition` on `[WEATHER.IS_AVAILABLE]`
+and shows an em dash when there is no weather. `ringElement` emits
+unconditionally. So on a watch with no location permission, no weather set up,
+or a failed first fetch, the rain ring still draws an arc from whatever that
+expression yields with no data — "undocumented, and never once observed by this
+project", which is the same sentence v14 was written to retire.
+
+A ring is worse than a text slot here, not better: an em dash reads as "no
+reading yet", and an arc reads as a measurement whatever its length.
+
+Filed rather than fixed, deliberately:
+
+- It changes the XML every face with the rain ring emits, so it takes a
+  `generatorVersion` branch like v14 did — v15 output must stay byte-identical.
+- A version bump obliges a `:workbench:contract` regeneration and a Worker
+  redeploy, or the catalog refuses every submission from the new build
+  (CLAUDE.md, 2026-08-31).
+- It needs a release of a published app.
+- And `<Condition>` around a `PartDraw` is legal by the schema — `_CompareChild`
+  includes `PartElementGroup` = {PartText, PartImage, PartAnimatedImage,
+  PartDraw} — but what the branch DOES on a wrist is runtime behaviour of an
+  expression, which `WffSchemaTest` cannot speak to.
+
+None of that is a reason not to do it. It is a reason it is not a line to slip
+into an investigation ticket.
+
+### What was NOT changed
+
+No code. The expression is right, the scale is right, the feature level is right,
+and the one thing that is wrong — the missing availability branch — would not
+have changed a 50% ring on a watch that had weather.
+
 ## 2026-10-03 — A sent face will NOT carry its parameters, and package visibility is why
 
 Asked after `b368c68` shipped identity reconciliation: My faces can now say

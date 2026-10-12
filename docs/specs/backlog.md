@@ -58,6 +58,18 @@ expressible, because `ComplicationSlot` is a child of `Scene` and nothing else.
 A drawn slot now shows an em dash when `[WEATHER.IS_AVAILABLE]` is false. See
 `DECISIONS.md` 2026-09-03.
 
+**The RIM RING was left out of that, and it is still open.** `WffEmitter.ringElement`
+emits its `Transform` on `[WEATHER.CHANCE_OF_PRECIPITATION]` unconditionally, so
+a watch with no weather draws an arc from whatever that expression yields with no
+data — the exact state v14 retired for text. An arc is worse than an em dash
+here: the em dash reads as "no reading yet" and an arc reads as a measurement at
+any length. Found while investigating a wrist report on 2026-10-12 that the ring
+"doesn't seem to be accurate"; it was not the cause of that report and is a real
+gap anyway. `<Condition>` around a `PartDraw` is legal — `_CompareChild` includes
+`PartElementGroup` — so the shape is the same as `WeatherFallback`, gated on a new
+`generatorVersion`, with a `:workbench:contract` regeneration and a Worker
+redeploy behind the bump. See `DECISIONS.md` 2026-10-12.
+
 The original wording, kept because the reasoning is still worth reading:
 `IS_AVAILABLE` / `IS_ERROR` are also unused — the decided behaviour when weather
 is unavailable is to fall back to the slot's system provider, and that is not
