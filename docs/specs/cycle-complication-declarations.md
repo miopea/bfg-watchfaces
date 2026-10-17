@@ -203,7 +203,20 @@ justification stands.
 ### What is NOT settled
 
 - The exact wording the tile uses below the minimum, and whether it names the
-  number of periods still needed.
+  number of periods still needed. **Drafted 2026-10-16, for the operator to
+  accept or reject rather than leaving it an open question:**
+
+  > Next period
+  > Log 2 more periods to see an estimate
+
+  with the number counting down as she logs, and the singular form "Log 1 more
+  period to see an estimate" at the last step. It names the number because the
+  operator's condition was that the tile is "clear when we don't have enough
+  data yet to calculate", and a bare "not enough yet" is not clear — it does not
+  say how much more, so it reads as broken rather than as waiting. It avoids
+  "data", "history", "logged entries" and "calculate" for the reason recorded
+  app-wide: these are strings a person reads on a wrist, not developer language.
+  This has NOT been checked against the tile's actual line width.
 - ~~Whether the Console form's category list contains a period option.~~
   **ANSWERED by driving the Console on 2026-10-12. It does.** See below.
 - Whether re-filing disturbs the live production release. CLAUDE.md records that
@@ -405,16 +418,82 @@ Other
   [x] Other — 226/250, text unchanged
 ```
 
-**`Reproductive and sexual health` is the box nobody has considered yet.** It
-sits under Medical, not under Health and fitness, and a countdown to a future
-period is closer to it than a day count is. Whether a prediction needs it in
-ADDITION to Period tracking is unanswered here and is not a guess worth making:
-the Help Center link beside the list is the place to settle it, before any box
-is ticked. Nothing about it is urgent, because the code does not exist.
+**`Reproductive and sexual health` is the box nobody had considered.** It sits
+under Medical, not under Health and fitness, and a countdown to a future period
+looked closer to it than a day count is. Settled below, 2026-10-16: it is not
+the right box.
 
 Steps 2 (`Health data permissions`) and 3 (`Regional requirements`) are still
 unopened, for the same reason as before: reaching them means clicking Next on a
 published app's live declaration.
+
+### SETTLED 2026-10-16 — the category needs no change, and the real constraint is 250 characters
+
+Read from Google's own Help Center page for this form — the one linked beside
+the checkbox list, Play Console Help answer `14738291`, "Provide information
+for the Health apps declaration form" — rather than reasoned from the category
+names.
+
+**Period tracking already covers prediction, in Google's own words:**
+
+> Tools that empower users to monitor and manage their menstrual health. These
+> apps provide features such as menstrual cycle tracking, ovulation tracking
+> and prediction, and fertility awareness.
+
+**Reproductive and sexual health is a different kind of app:**
+
+> Tools for managing reproductive health issues, fertility treatments or sexual
+> health disease management, and providing resources for sexual health
+> education.
+
+So the answer is **no second box.** Google names *ovulation prediction* inside
+Period tracking, and projecting the next period's start is a weaker claim than
+that — it is the same arithmetic on the same records, one step earlier in the
+cycle. Reproductive and sexual health describes conditions, treatments, disease
+management and education, and this app does none of the four.
+
+The form is all-that-apply, not pick-one — "Declare all the health features that
+your app offers to its users" — so the test is whether the app offers a feature
+in that category, and for Reproductive and sexual health it plainly does not.
+Ticking it anyway would not be cautious. It would be inaccurate, which is the
+one thing operator decision 2026-10-12 ruled out.
+
+**Which means the category half of the re-file is ALREADY DONE.** Submission 18
+ticked Period tracking on 2026-10-12 and Google approved it on 2026-10-16, and
+the category Google approved is one whose published definition includes
+prediction. Nothing about the countdown requires a category change.
+
+**What is left is one sentence, and it has 24 characters of headroom.** The step
+1 free-text box is 250 characters and currently holds 226. That is the whole
+remaining obstacle in step 1, and it had not been noticed as a constraint:
+
+> Displays the day of the user's menstrual cycle on a watch face complication
+> and a watch tile, read from period dates they already keep in Health Connect.
+> Read-only and display-only: no logging, no prediction, no health advice.
+
+Drafted replacement, **243 characters**, measured not estimated:
+
+> Shows the day of the user's menstrual cycle on a watch face and tile, from
+> period dates they keep in Health Connect. The tile also estimates the next
+> period's start by averaging their own logged cycles. Read-only: no logging,
+> no health advice.
+
+What each cut bought, since the budget is tight enough that the reasoning
+matters: `Displays` → `Shows`, `a watch face complication and a watch tile` →
+`a watch face and tile`, `read from period dates they already keep` → `from
+period dates they keep`, and `Read-only and display-only` → `Read-only`. What
+is deliberately KEPT: `by averaging their own logged cycles`, because that is
+the sentence that distinguishes arithmetic on her own entries from a model, and
+it is the single most load-bearing clause in the whole declaration; and `no
+health advice`, because that is the line the app must never cross. What is
+deliberately DROPPED: `no prediction`, which is the point.
+
+**Still unconfirmed, and it is the same gap as before:** the long replacement
+paragraph drafted earlier in this file targets step 2, `Health data
+permissions`, and nobody has opened step 2. Whether a 10,000-character
+justification box exists there is still a reading of CLAUDE.md rather than an
+observation. Step 1 can now be filed within budget regardless, which was not
+true an hour ago.
 
 ### Permission requested
 
