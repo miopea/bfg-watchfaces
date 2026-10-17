@@ -203,8 +203,9 @@ justification stands.
 ### What is NOT settled
 
 - The exact wording the tile uses below the minimum, and whether it names the
-  number of periods still needed. **Drafted 2026-10-16, for the operator to
-  accept or reject rather than leaving it an open question:**
+  number of periods still needed. **ACCEPTED 2026-10-17 as drafted** — operator
+  decision `01a147d8-e53c-7241-b73b-ee48fe6b6fb8`, "Accept both strings as
+  drafted". Drafted 2026-10-16:
 
   > Next period
   > Log 2 more periods to see an estimate
@@ -471,7 +472,9 @@ remaining obstacle in step 1, and it had not been noticed as a constraint:
 > and a watch tile, read from period dates they already keep in Health Connect.
 > Read-only and display-only: no logging, no prediction, no health advice.
 
-Drafted replacement, **243 characters**, measured not estimated:
+Drafted replacement, **243 characters**, measured not estimated. **ACCEPTED
+2026-10-17 as drafted**, decision `01a147d8-e53c-7241-b73b-ee48fe6b6fb8` —
+which accepts the wording and files nothing:
 
 > Shows the day of the user's menstrual cycle on a watch face and tile, from
 > period dates they keep in Health Connect. The tile also estimates the next
@@ -494,6 +497,69 @@ permissions`, and nobody has opened step 2. Whether a 10,000-character
 justification box exists there is still a reading of CLAUDE.md rather than an
 observation. Step 1 can now be filed within budget regardless, which was not
 true an hour ago.
+
+### BEFORE FILING, 2026-10-17 — the privacy policy denies prediction too
+
+**Read this before filing anything. Filing the accepted sentence on its own
+would put two contradictory documents in front of the same reviewer.**
+
+The privacy policy declared to Play is not in this repo. `docs/privacy.html`
+only redirects; the policy itself is
+`bfg-solutions/src/app/products/watchfaces/privacy/page.tsx`, served at
+`bfgsolutions.net/products/watchfaces/privacy`, "Last updated: September 2026".
+Two of its sentences stop being true the moment the countdown exists:
+
+1. Lines 90–91: "The app makes no predictions: it does not estimate a future
+   period, a fertile window or ovulation". The accepted step 1 sentence says
+   the tile estimates the next period's start. A reviewer reading both reads a
+   contradiction. Submission 16 was rejected over the privacy policy, and the
+   redirect comment in `docs/privacy.html` records how: the document a reviewer
+   read described a different app.
+2. Lines 100–102: "Your phone sends three values". `CycleFacts` carries exactly
+   three — the last start, its end, the average gap — and none of them is a
+   count of periods. The accepted below-minimum wording, "Log 2 more periods",
+   needs that count on the watch, so a fourth value has to cross, or the phone
+   has to send the shortfall itself. Either way the sentence becomes false.
+   Which of the two is a build-time choice; that the policy changes is not.
+
+The fertile-window and ovulation half of sentence 1 stays true and should stay
+in the policy: the app still estimates neither.
+
+**`CycleFacts` itself says the same thing in its KDoc** — "All of this is
+description, none of it is prediction", and "no change to the Play declaration".
+That is a code comment, not a public statement, so it changes when the code
+does, not before.
+
+### The order, and why it is this order
+
+Operator decision `01a1313f-675c-7fc0-a288-9a3e486f2307`, "Yes, re-file the
+declaration first", governs. The objection recorded on 2026-09-20 against filing
+first was about declaring health features for an app that had NONE, and putting
+"collects health data" on a public listing while it collected none. That is not
+this case: the app already reads period data, already declares Period tracking,
+and Google's definition of that category already includes prediction. Filing
+first here puts one clause of one description ahead of the code, in the
+direction of declaring more rather than less. An earlier line in this file
+saying the 2026-09-20 ordering is "intact" predates that reading and is
+superseded by it.
+
+1. **Submission 19 must leave review first.** Phone 104 and watch 1049 went to
+   production review on 2026-10-17. App content is a reviewed surface, and
+   changing it while a review runs cancels and restarts that review. Readable
+   only in the Console, under Publishing overview → Submission activity.
+2. **The policy and the declaration change together.** The policy is a public
+   page on the company site, in another repo; it should say the same thing the
+   declaration says on the day the reviewer reads both.
+3. **Then the code, then a release.** The live app is behind both documents
+   for that window. Both overstate rather than deny, which is the safer
+   direction, and both agree with each other, which is what a reviewer checks.
+
+**Who presses the buttons.** On 2026-10-12 this session's permission layer
+refused to advance the Health apps form ("Unrequested Commit in a Connected
+App") and the operator clicked through it himself. Plan on that again. Step 2,
+`Health data permissions`, has still never been opened; whoever files will see
+it for the first time then, and the long paragraph drafted above is ready for it
+if it has a box.
 
 ### Permission requested
 
