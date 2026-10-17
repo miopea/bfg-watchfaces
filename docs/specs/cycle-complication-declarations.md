@@ -326,13 +326,55 @@ caught up". The app dashboard says "You have no unpublished changes". Policy
 status reads "No issues found". The "Changes in review / running quick checks"
 banner recorded above, on the day of filing, is gone.
 
-**But the Console shows no approval state, so do not go looking for one.**
-Expanding the Actioned row gives exactly one sentence, "You told us about the
-health features in your app", with no date, status or verdict beside it. There
-is no "Approved", no "In review", nothing to read. Combined with the API having
-no review-state field either (enumerated 2026-09-23), the only readable signal
-that a declaration is in review is a banner on the publishing overview WHILE it
-is — which is absence-shaped and easy to miss.
+**The App content page shows no approval state — but Submission activity
+does, and that is where to look.** Corrected the same day, 2026-10-16, after
+the paragraph below was written from the wrong page.
+
+Expanding the Health apps **Actioned** row gives exactly one sentence, "You
+told us about the health features in your app", with no date, status or verdict
+beside it. That is true, and it is what made "no approval state anywhere" look
+right. It is the wrong page.
+
+`Publishing overview → Submission activity` carries a dated verdict per
+submission, declaration-only submissions included:
+
+```text
+Submission 18
+  Source             Play Console
+  Change             App content / Health apps
+                     "Complete Health apps declaration"
+  Changes submitted  Oct 12, 2026, 3:01 PM
+  Status             Published — On Oct 16, 2026, 4:57 AM
+```
+
+So the 2026-10-12 filing is not merely "actioned": it was **approved and
+published at 04:57 on 2026-10-16**, four days later, and the publishing
+overview's "Last published" moved from September 23 to October 16 to match.
+
+**What this corrects, and what it does not.** It corrects "the Console exposes
+no approval state", which was written from the App content page alone. It does
+NOT revive the health-gate measurement of 2026-10-12: that measurement was an
+`edits:commit` succeeding while submission 18 was pending, and submission 18
+being approved four days LATER confirms it was genuinely pending at the time
+rather than quietly already through. The three-condition rule in `CLAUDE.md`
+still stands, and is still not restated from one measurement.
+
+The API remains without a review-state field (enumerated 2026-09-23), so this
+is a Console-only reading.
+
+**And it makes the countdown HARDER to file, not easier.** Submission 18
+contained the Health apps declaration and nothing else, and the only thing that
+changed inside it was the category tick. The 226-character step 1 description
+was deliberately left alone on 2026-10-12 and still reads:
+
+> Displays the day of the user's menstrual cycle on a watch face complication
+> and a watch tile, read from period dates they already keep in Health Connect.
+> Read-only and display-only: no logging, no prediction, no health advice.
+
+So "no prediction" is now the Google-APPROVED text, as of 2026-10-16, rather
+than merely the filed one. A countdown contradicts it in as many words, and
+shipping one without re-filing would make an approved declaration false. The
+approval does not open the door to the countdown; it is the door.
 
 **The full checkbox list**, which was recorded truncated above and matters for
 the countdown question, because it is where a prediction feature would have to
