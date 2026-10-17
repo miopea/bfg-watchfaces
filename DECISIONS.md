@@ -1,5 +1,51 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-10-17 — Production goes through its own script, and it submits both form factors in one edit
+
+Phone 1.103 (104) and watch 1.56 (1049) were submitted to production together
+on 2026-10-17 as submission 19, "Production, Production (Wear OS)", one row, In
+review. Production had been five phone versions and four watch versions behind
+since 2026-09-23: everything from `6dd8931` onward went to the internal track
+and was never promoted.
+
+**`play-release.py` still refuses production, and that was left alone.** Its
+docstring and its `--track` help both say production is deliberately absent.
+The reason it gives — production needs App content declarations, a store
+listing and a privacy policy — has been satisfied since 2026-09-24, so the
+reason has expired. The refusal has not been removed anyway, because loosening
+it would turn every future `--track` typo into a public release. Production now
+lives in `scripts/play-production.py`, a file whose name is what it does.
+
+**Both form factors go in ONE edit with ONE commit, and that is the whole point
+of the script.** Adding a change to a running review cancels and restarts it;
+submission 1 was thrown away eighteen minutes in for exactly that. Two separate
+`play-release.py` runs would be two commits and therefore two submissions, the
+second cancelling the first. The Console has the same trap — it invites two
+releases and two submit buttons. One edit, two track updates, one commit is the
+only shape that cannot make this mistake, and submission 19 is the evidence it
+works: a single row naming both form factors.
+
+**The commit has two forms and they are not the same claim.** `play-release.py`
+falls back to `changesNotSentForReview=true` when Play's error demands it, which
+is harmless on a testing track because a testing track is exempt from review.
+On production it is not harmless: it means committed and NOT sent for review,
+which is a different thing from submitted and would otherwise be reported as a
+release. `play-production.py` therefore returns which form went through and says
+so. Submission 19 took the bare commit — sent for review.
+
+**What was deliberately NOT done: promoting the already-uploaded 103/1048.**
+There were no code changes between the commit that built 103 and HEAD — `git
+diff f4f94c7..HEAD` touches only `DECISIONS.md` and one spec file — so 104 is a
+rebuild of identical source, and 103 was the artifact the two rain-ring wrist
+observations were actually made on. Promoting it would have shipped the thing
+that had been worn. The operator was shown that trade and chose fresh binaries;
+this records the cost, which is that nothing in submission 19 has been seen on a
+wrist, even though the source behind it has.
+
+**Checked before submitting, because the failure is expensive and the check is
+one page load:** submission activity showed nothing In review, so there was no
+running review to cancel. Re-checked after: submission 19 and no second row.
+
 ## 2026-10-16 — A WFF expression has finally been seen resolving on a wrist
 
 `[WEATHER.IS_AVAILABLE]` was observed on a real watch, in both of its states,
