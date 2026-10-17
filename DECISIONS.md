@@ -1,5 +1,63 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-10-16 — A WFF expression has finally been seen resolving on a wrist
+
+`[WEATHER.IS_AVAILABLE]` was observed on a real watch, in both of its states,
+on build 1.102 (103) from the Play internal track. Operator decision
+`01a1359f-598d-7ee3-bf04-2a05906e68a4`, "Both checks passed": with weather
+working the rain ring rendered exactly as it did before v16; with weather off
+the rim was empty.
+
+### Why this is worth an entry rather than a line in a ticket
+
+**Nothing in this repo validates what is inside `[...]`.** That was established
+on 2026-09-19 and it has not changed: `arithmeticExpressionType` resolves to a
+union including plain `xs:string`, so a misspelled function, an unknown source
+or a stray bracket all pass `WffSchemaTest`, install, and raise no runtime
+error. Every expression this project emits has therefore been an unverified
+claim about a device.
+
+This is the first one confirmed. It also happens to be the one the v16 ring
+hangs on, and the failure it rules out was the serious one: if `IS_AVAILABLE`
+resolved false on a healthy watch, the `Condition` with no `Default` would make
+the ring vanish for everyone with weather working — worse than the bug it was
+written to fix, and invisible to all 679 generator tests.
+
+### What it licenses, and what it does not
+
+It licenses `[WEATHER.IS_AVAILABLE]` as a condition expression on Wear OS 6, on
+a Pixel Watch, where it resolves TRUE with weather and FALSE without it. That
+also retires the doubt hanging over v14's drawn weather slots, which have used
+the same source since September with no device ever confirming it.
+
+It licenses **nothing** about any other source or function. One expression
+working says only that the mechanism exists, and the 2026-09-19 rule stands
+unchanged for every expression written from here: a green build still says
+nothing about it, and the only gate is a wrist.
+
+### Also settled: the Health apps filing of 2026-10-12 cleared
+
+Read in the Console on 2026-10-16. The Health apps row sits under **Actioned**,
+last edited Oct 12; **Need attention** is empty; the app dashboard says "You
+have no unpublished changes"; Policy status reads "No issues found". The
+"Changes in review / running quick checks" banner seen on the day of filing is
+gone, so that filing is through.
+
+**The Console shows no approval state for a declaration, and this is the thing
+to remember.** Expanding the Actioned row gives one sentence — "You told us
+about the health features in your app" — and no date, status or verdict. So
+"Approved" versus "In review" cannot be read there at all; what is readable is
+whether a review banner is PRESENT on the publishing overview, which is a
+different and weaker signal. The API has no review-state field either
+(enumerated 2026-09-23), so neither surface answers it directly.
+
+This matters for the health 403 rule in CLAUDE.md, whose second condition is
+"the declaration must be UNAPPROVED". An `edits:commit` succeeded on 2026-10-12
+hours after that filing went in. Either it had already cleared, or an amendment
+to an already-approved declaration never re-arms the gate. **Both readings
+remain open and the rule is NOT being restated on this measurement** — that is
+exactly the mistake its own note warns about, three times over.
+
 ## 2026-10-12 — v16: the rain ring draws nothing when the watch has no weather
 
 Swarm task `01a131fd`, filed out of the investigation above and ruled on the

@@ -316,6 +316,64 @@ NOT cover it. All of the following remain:
 So the ordering recorded on 2026-09-20 — build it, then declare what is actually
 there — is intact. This filing moved only the part that was already true.
 
+### READ 2026-10-16 — the filing cleared, and the complete category list
+
+Read in the Console, nothing changed and nothing submitted.
+
+**The 2026-10-12 filing is through.** The Health apps row sits under
+**Actioned**, last edited Oct 12. **Need attention** is empty — "You're all
+caught up". The app dashboard says "You have no unpublished changes". Policy
+status reads "No issues found". The "Changes in review / running quick checks"
+banner recorded above, on the day of filing, is gone.
+
+**But the Console shows no approval state, so do not go looking for one.**
+Expanding the Actioned row gives exactly one sentence, "You told us about the
+health features in your app", with no date, status or verdict beside it. There
+is no "Approved", no "In review", nothing to read. Combined with the API having
+no review-state field either (enumerated 2026-09-23), the only readable signal
+that a declaration is in review is a banner on the publishing overview WHILE it
+is — which is absence-shaped and easy to miss.
+
+**The full checkbox list**, which was recorded truncated above and matters for
+the countdown question, because it is where a prediction feature would have to
+be declared:
+
+```text
+Health and fitness
+  [ ] Activity and fitness
+  [ ] Nutrition and weight management
+  [x] Period tracking                     <- ticked 2026-10-12
+  [ ] Sleep management
+  [ ] Stress management, relaxation, mental acuity
+Medical
+  [ ] Diseases and conditions management
+  [ ] Clinical decision support
+  [ ] Disease prevention and public health
+  [ ] Emergency and first aid
+  [ ] Healthcare services and management
+  [ ] Medical device apps
+  [ ] Mental and behavioral health
+  [ ] Medical reference and education
+  [ ] Medication and treatment management
+  [ ] Physical therapy and rehabilitation
+  [ ] Reproductive and sexual health      <- the one to think about
+Human subjects research
+  [ ] Research studies, clinical trials, and patient communities
+Other
+  [x] Other — 226/250, text unchanged
+```
+
+**`Reproductive and sexual health` is the box nobody has considered yet.** It
+sits under Medical, not under Health and fitness, and a countdown to a future
+period is closer to it than a day count is. Whether a prediction needs it in
+ADDITION to Period tracking is unanswered here and is not a guess worth making:
+the Help Center link beside the list is the place to settle it, before any box
+is ticked. Nothing about it is urgent, because the code does not exist.
+
+Steps 2 (`Health data permissions`) and 3 (`Regional requirements`) are still
+unopened, for the same reason as before: reaching them means clicking Next on a
+published app's live declaration.
+
 ### Permission requested
 
 `android.permission.health.READ_MENSTRUATION`, on the handheld module only. No
