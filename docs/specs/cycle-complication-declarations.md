@@ -200,6 +200,29 @@ justification stands.
 > cycle phase, and offers no health guidance, diagnosis or medical
 > interpretation of any kind.
 
+### The replacement for "Where the data goes", drafted 2026-10-19
+
+This replaces the first paragraph under "Where the data goes, stated plainly"
+below, which says three values and "no field other than those three". The tile
+cannot say "Log 2 more periods" from three values, so a fourth has to cross. Its
+second paragraph, about servers, the developer and the community feature, stands
+unchanged. **Not filed, and not yet put to the operator.**
+
+> The raw records never leave Health Connect. The handheld app reads them and
+> sends to the user's own paired watch, over the Wear OS Data Layer — a direct
+> device-to-device channel — only four values: the start date of the most recent
+> period, its end date, the average interval in days, and a count of periods, so
+> the watch can tell whether enough have been logged for an estimate. The watch
+> derives every displayed number from those locally, including the estimate. No
+> record, and no field other than those four, ever leaves the handheld device.
+
+The fourth value is worded as the live privacy policy words it, "a count of
+periods", on purpose. That wording holds whether the phone sends the logged
+total or the shortfall, so either build agrees with both documents. "Including
+the estimate" is a constraint on the build, not a description of it: if the
+phone computes the date and sends it, that is a fifth field, and this paragraph
+and the live policy both become false.
+
 ### What is NOT settled
 
 - The exact wording the tile uses below the minimum, and whether it names the
@@ -498,10 +521,22 @@ justification box exists there is still a reading of CLAUDE.md rather than an
 observation. Step 1 can now be filed within budget regardless, which was not
 true an hour ago.
 
-### BEFORE FILING, 2026-10-17 — the privacy policy denies prediction too
+### BEFORE FILING, 2026-10-17 — the privacy policy denied prediction too, until 2026-10-18
 
-**Read this before filing anything. Filing the accepted sentence on its own
-would put two contradictory documents in front of the same reviewer.**
+**Overtaken on 2026-10-18: both sentences quoted below are gone from the live
+policy.** Per the BFG Solutions worker's report, bfg-solutions `badace4` went
+live that day on the operator's instruction, "Deploy now regardless", given
+after being told submission 19 was in review. That instruction is relayed and
+has not been verified here. The page itself was read first-hand on 2026-10-19
+at 11:34Z (HTTP 200). It now says "The watch tile also estimates when your next
+period will start, by averaging your own logged cycles" and "Your phone sends
+four values", and it reads "Last updated: October 2026".
+
+So the contradiction this section warned about has changed sides rather than
+gone away. The policy now agrees with the accepted step 1 sentence, and
+disagrees with the step 1 text actually on file, which still says "no
+prediction". See "The order" below. What follows is the policy as it stood when
+this section was written, kept because it is why those two sentences changed.
 
 The privacy policy declared to Play is not in this repo. `docs/privacy.html`
 only redirects; the policy itself is
@@ -530,7 +565,7 @@ description, none of it is prediction", and "no change to the Play declaration".
 That is a code comment, not a public statement, so it changes when the code
 does, not before.
 
-### The order, and why it is this order
+### The order, and why it is this order — the policy went first, 2026-10-18
 
 Operator decision `01a1313f-675c-7fc0-a288-9a3e486f2307`, "Yes, re-file the
 declaration first", governs. The objection recorded on 2026-09-20 against filing
@@ -543,16 +578,33 @@ direction of declaring more rather than less. An earlier line in this file
 saying the 2026-09-20 ordering is "intact" predates that reading and is
 superseded by it.
 
+The order as first written had the policy and the declaration change together,
+so that a reviewer would read two documents that agree. **That step did not
+happen as written.** Per the BFG Solutions worker's report, the policy went
+live on 2026-10-18, ahead of both the filing and the build (see "BEFORE FILING"
+above). What is left, as of 2026-10-19:
+
 1. **Submission 19 must leave review first.** Phone 104 and watch 1049 went to
    production review on 2026-10-17. App content is a reviewed surface, and
    changing it while a review runs cancels and restarts that review. Readable
-   only in the Console, under Publishing overview → Submission activity.
-2. **The policy and the declaration change together.** The policy is a public
-   page on the company site, in another repo; it should say the same thing the
-   declaration says on the day the reviewer reads both.
-3. **Then the code, then a release.** The live app is behind both documents
-   for that window. Both overstate rather than deny, which is the safer
-   direction, and both agree with each other, which is what a reviewer checks.
+   only in the Console, under Publishing overview → Submission activity. Read
+   there on 2026-10-19 at 11:35Z: still `In review`, no newer row, nothing
+   cancelled. The policy deploy did not restart it, because changing what the
+   policy URL serves is not a Console or API change.
+2. **The declaration catches up to the policy.** That means the step 1
+   sentence accepted by `01a147d8`, plus the two step 2 replacements drafted
+   above if step 2 has boxes for them. Until it is filed, the live policy and
+   the filed step 1 text contradict each other, which is the one thing the
+   original order was meant to prevent. Whoever reviews submission 19 can read
+   both. A policy that says more than the app does is the lesser direction, but
+   a policy that contradicts the declaration is not, and nothing measures
+   whether a reviewer will notice.
+3. **Then the code, then a release.** For that window the app is behind both
+   documents: the live app and 104/1049 estimate nothing and send three values.
+   The live policy now also limits the build. The fourth value across the Data
+   Layer must be a count of periods, either the logged total or the shortfall,
+   and the estimate must be computed on the watch. Sending the estimated date,
+   or any other field, makes the live policy false again.
 
 **Who presses the buttons.** On 2026-10-12 this session's permission layer
 refused to advance the Health apps form ("Unrequested Commit in a Connected
