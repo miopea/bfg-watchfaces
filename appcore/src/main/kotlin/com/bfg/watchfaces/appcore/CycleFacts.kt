@@ -7,22 +7,25 @@ import java.time.temporal.ChronoUnit
 /**
  * What her own logged periods say, beyond the day count.
  *
- * ## All of this is description, none of it is prediction
+ * ## Description, plus exactly one estimate
  *
  * Every value here is arithmetic on dates she entered: how long her last period
  * ran, how far apart her recent periods started, whether today falls inside the
- * last one. Nothing here says when the next period will be, or when she is
- * fertile. That boundary is a Play policy line rather than a preference — see
- * `docs/specs/cycle-complication.md` — and it is easy to cross by accident,
- * because "average cycle 29 days" is one careless sentence away from "next
- * period in 11 days".
+ * last one. ONE thing looks forward, [nextPeriod], and it is the same arithmetic
+ * one step on: her most recent start plus her own average gap. Nothing here says
+ * when she is fertile, names a phase, or uses anybody's data but hers.
  *
- * ## Why it costs nothing extra
+ * That estimate was a Play policy line until 2026-10-22, when the Health apps
+ * declaration was re-filed to say it (submission 21). The filed text fixes its
+ * shape, so the shape is not a preference: the tile only, at least
+ * [MIN_PERIODS_FOR_ESTIMATE] logged periods, and computed ON THE WATCH from the
+ * four values below. See `docs/specs/cycle-complication-declarations.md`.
+ *
+ * ## Why it costs no new permission
  *
  * Every field is derived from `MenstruationPeriodRecord`, which the app already
- * reads under the one permission it already holds. No new Health Connect
- * permission, no change to the Play declaration, no second trip through review.
- * That is the whole reason this set of facts and not another.
+ * reads under the one permission it already holds. That is the whole reason
+ * this set of facts and not another.
  *
  * ## Why it is separate from [CycleDay]
  *
@@ -43,8 +46,53 @@ data class CycleFacts(
      * logged period says nothing about a cycle length, and inventing a
      * population average would be the app making something up about her.
      */
-    val averageCycleDays: Int? = null
+    val averageCycleDays: Int? = null,
+    /**
+     * How many periods she has logged in the window the phone reads.
+     *
+     * A COUNT, not a date, and that is the point: the watch needs it to know
+     * whether there is enough history for [nextPeriod], and sending the
+     * estimated date instead would be a fifth field the declaration and the
+     * privacy policy both say does not cross. Null when the phone did not send
+     * one, which is what an older phone build looks like.
+     */
+    val periodCount: Int? = null
 ) {
+
+    /** What the tile can say about the next period. See [nextPeriod]. */
+    sealed interface NextPeriod {
+        /** Not enough logged periods yet. [more] is how many it still needs, at least 1. */
+        data class NeedsMore(val more: Int) : NextPeriod
+
+        /**
+         * Her most recent start plus her average gap, and how far that is from
+         * today. [daysAway] is 0 on the day itself and negative once it has
+         * passed without a newer start reaching the watch.
+         */
+        data class Estimate(val date: LocalDate, val daysAway: Int) : NextPeriod
+    }
+
+    /**
+     * When the next period may start, by her own arithmetic, or what is missing.
+     *
+     * Called on the WATCH. The filed declaration says the watch derives every
+     * displayed number "including the estimate", so the phone sends [start],
+     * [averageCycleDays] and [periodCount] and never the date this returns.
+     *
+     * Null when there is nothing honest to say: no count (an older phone), or
+     * enough periods but no average, which happens when the gaps between them
+     * are logging holes rather than cycles. Saying less is always available and
+     * never misleading; "Log 0 more periods" would be neither.
+     */
+    fun nextPeriod(today: LocalDate): NextPeriod? {
+        val count = periodCount ?: return null
+        if (count < MIN_PERIODS_FOR_ESTIMATE) {
+            return NextPeriod.NeedsMore(MIN_PERIODS_FOR_ESTIMATE - count)
+        }
+        val average = averageCycleDays ?: return null
+        val date = start.plusDays(average.toLong())
+        return NextPeriod.Estimate(date, ChronoUnit.DAYS.between(today, date).toInt())
+    }
 
     /** How far into her cycle today is. Day 1 is the first day of the period. */
     fun dayOfCycle(today: LocalDate): Int? = CycleDay.dayNumber(start, today)
@@ -84,14 +132,18 @@ data class CycleFacts(
     /**
      * The wire and disk form.
      *
-     * Pipe-separated rather than JSON: three fields, no nesting, and it is read
+     * Pipe-separated rather than JSON: four fields, no nesting, and it is read
      * on a watch where every dependency is weight. Empty fields stay empty
      * rather than being dropped, so the positions never shift.
+     *
+     * The count went on the END, so a watch running an older build reads the
+     * first three exactly as before and never sees it.
      */
     fun encode(): String = listOf(
         start.toString(),
         periodEnd?.toString() ?: "",
-        averageCycleDays?.toString() ?: ""
+        averageCycleDays?.toString() ?: "",
+        periodCount?.toString() ?: ""
     ).joinToString("|")
 
     companion object {
@@ -102,8 +154,9 @@ data class CycleFacts(
          * Read the wire form back, or null when there is nothing usable.
          *
          * A missing or unparseable START is fatal — everything else is derived
-         * from it. A missing end or average is not: those are genuinely absent
-         * for a first period or an open one, and the card simply shows less.
+         * from it. A missing end, average or count is not: the first two are
+         * genuinely absent for a first period or an open one, the count is
+         * absent from an older phone, and the card simply shows less.
          */
         fun decode(text: String?): CycleFacts? {
             val parts = text?.trim().orEmpty().split("|")
@@ -111,7 +164,8 @@ data class CycleFacts(
             return CycleFacts(
                 start = start,
                 periodEnd = CycleDay.parse(parts.getOrNull(1)),
-                averageCycleDays = parts.getOrNull(2)?.trim()?.toIntOrNull()
+                averageCycleDays = parts.getOrNull(2)?.trim()?.toIntOrNull(),
+                periodCount = parts.getOrNull(3)?.trim()?.toIntOrNull()
             )
         }
 
@@ -139,6 +193,10 @@ data class CycleFacts(
          * from a year ago next to one from last month would otherwise drag the
          * average into nonsense. Anything outside 15..60 days is not a cycle
          * length, it is a gap in her logging.
+         *
+         * The count is of distinct START DATES. Two apps writing the same
+         * period into Health Connect is two records and one period, and
+         * counting both would show an estimate a period early.
          */
         fun from(periods: List<Pair<LocalDate, LocalDate?>>): CycleFacts? {
             if (periods.isEmpty()) return null
@@ -153,9 +211,21 @@ data class CycleFacts(
                 start = latest.first,
                 periodEnd = latest.second,
                 averageCycleDays =
-                    if (gaps.size < MIN_GAPS_FOR_AVERAGE) null else gaps.average().toInt()
+                    if (gaps.size < MIN_GAPS_FOR_AVERAGE) null else gaps.average().toInt(),
+                periodCount = sorted.map { it.first }.distinct().size
             )
         }
+
+        /**
+         * How many logged periods before [nextPeriod] estimates anything.
+         *
+         * Four, which is three gaps: one more than the average needs, because
+         * an estimate names a date and an average only describes the past.
+         * Operator decision 2026-10-12, and the filed declaration states it in
+         * as many words -- "at least four periods, giving three intervals to
+         * average" -- so changing this number makes the filing false.
+         */
+        const val MIN_PERIODS_FOR_ESTIMATE = 4
 
         /**
          * What counts as a cycle length rather than a logging gap.

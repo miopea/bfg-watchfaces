@@ -1,5 +1,53 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-10-22 — The card estimates the next period, worked out on the watch
+
+Asked for by the person the cycle card was built for, on 2026-10-12. The order
+was the point: the Health apps declaration was re-filed BEFORE any of this
+code existed, so the declaration says no more than the code does. It went in as
+submission 21. Submission 20 was cancelled, because it carried the new step 1
+sentence over a step 2 that still said "no prediction" and "three values".
+Building came only after that, on operator decision `01a1654c`: build now, no
+release until 21 is Published, and send the logged total.
+
+**What the filing fixes, and therefore what the code may not drift from:**
+
+- The CARD only. The dial keeps the bare day count.
+- At least four logged periods, three gaps, which is `MIN_PERIODS_FOR_ESTIMATE`.
+  Below that the card names how many more are needed.
+- The arithmetic is her latest start plus her average gap, nothing else.
+- FOUR values cross to the watch: start, end, average gap and a count of
+  periods. The watch derives the date.
+
+**The count, not the date, is the fourth value, and that was the choice.** The
+phone could have sent either the logged total or the shortfall; both agree with
+the filing and the live privacy policy. The total was chosen so the
+at-least-four rule lives in one place, on the watch, rather than being half on
+each device. It counts distinct start DATES, because two apps writing the same
+period into Health Connect would otherwise bring the estimate one period early.
+Sending the estimated date was never an option. It would be a fifth field, and
+both documents say it does not cross.
+
+**Rejected: rounding the average for the estimate.** `averageCycleDays` is a
+truncated mean, so the estimate can land up to a day earlier than a rounded mean
+would put it. It was kept, because the card shows "Average cycle 28 days" a line
+above, and an estimate that is not that number of days after the start is a
+contradiction she can see. Changing the average itself would restyle a figure
+every existing card already shows.
+
+**Known limit, not fixed:** a missed log inside 15..60 days, say 56 days for
+two cycles, counts as one cycle and pulls the average up. That was already true
+of the average, and the estimate inherits it.
+
+**The accepted below-minimum wording does not fit the card.** It was measured,
+not judged by eye. The fonts came from the Wear OS 6 system image: Roboto,
+Google Sans and Google Sans Flex. The screens are the SDK's round Wear profiles,
+192dp and 227dp. "Log 2 more periods to see an estimate" is 205–208dp at the
+card's 12sp in every one of the three. That is wider than a whole 192dp screen,
+and wider than the 159–167dp visible where the line sits on a 227dp one. "Next
+period" fits everywhere. This needs a wording or layout decision before release.
+`CycleFactsTest` cannot see it; only a wrist or this measurement can.
+
 ## 2026-10-17 — Production goes through its own script, and it submits both form factors in one edit
 
 Phone 1.103 (104) and watch 1.56 (1049) were submitted to production together

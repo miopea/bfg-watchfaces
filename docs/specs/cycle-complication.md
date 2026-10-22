@@ -26,6 +26,17 @@ after the count has survived one intact.
 The wording follows decision `01a0ba48`: a plain unlabelled number, like every
 other complication on the dial.
 
+**Amended 2026-10-22: the CARD now estimates the next period, and the dial still
+does not.** That is the "own review cycle" the paragraph above asked for: the
+Health apps declaration was re-filed first, as submission 21, and the estimate
+has exactly the shape that filing states. It appears on the carousel card only,
+after at least four logged periods. It is her last start plus her own average
+gap, and the watch works it out from the four values the phone sends. The dial
+keeps the bare day count, because a "4" there meaning "due in 4 days" would read
+as the cycle day already in that slot. Fertile window and phase are still out.
+See `docs/specs/cycle-complication-declarations.md` and `DECISIONS.md`
+2026-10-22.
+
 **Amended 2026-09-20 on the icon half.** The decision also said "no icon that
 announces what it is to anyone glancing over her shoulder", and that half no
 longer holds. The number itself shipped as "Day 18" rather than "18" — the rule

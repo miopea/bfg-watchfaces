@@ -1,6 +1,7 @@
 package com.bfg.watchfaces.appcore
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -217,5 +218,108 @@ class CycleFactsTest {
             periodEnd = LocalDate.of(2026, 9, 23)
         )
         assertEquals(2, facts.finishedPeriodLengthDays(LocalDate.of(2026, 9, 24)))
+    }
+
+    /** Four regular periods, 28 days apart: the smallest history that supports an estimate. */
+    private val fourPeriods = listOf(
+        d(7, 1) to d(7, 5),
+        d(7, 29) to d(8, 2),
+        d(8, 26) to d(8, 30),
+        d(9, 23) to d(9, 27)
+    )
+
+    @Test
+    fun `the count crosses the wire as a fourth field`() {
+        val f = CycleFacts(d(9, 3), d(9, 7), 29, 5)
+        assertEquals(4, f.encode().split("|").size)
+        assertEquals(f, CycleFacts.decode(f.encode()))
+    }
+
+    /**
+     * An older phone sends three fields. The watch must read them exactly as it
+     * did before and simply say nothing about the next period.
+     */
+    @Test
+    fun `an older phone's three fields still decode, with no count`() {
+        val f = CycleFacts.decode("2026-09-03|2026-09-07|29")!!
+        assertEquals(CycleFacts(d(9, 3), d(9, 7), 29), f)
+        assertNull(f.periodCount)
+        assertNull(f.nextPeriod(d(9, 20)))
+    }
+
+    /**
+     * The filed declaration names four values and says the watch works out the
+     * estimate itself. A fifth field, or the estimated date riding in one of
+     * the four, would make that filing false on a published app.
+     */
+    @Test
+    fun `the estimated date never crosses the wire`() {
+        val f = CycleFacts.from(fourPeriods)!!
+        val estimate = f.nextPeriod(d(10, 1)) as CycleFacts.NextPeriod.Estimate
+        val fields = f.encode().split("|")
+        assertEquals(listOf("2026-09-23", "2026-09-27", "28", "4"), fields)
+        assertFalse(fields.contains(estimate.date.toString()))
+    }
+
+    /** Two apps writing the same period is one period, not two. */
+    @Test
+    fun `the count is of distinct starts`() {
+        val f = CycleFacts.from(fourPeriods + (d(9, 23) to d(9, 27)) + (d(8, 26) to d(8, 29)))!!
+        assertEquals(4, f.periodCount)
+    }
+
+    /** Below four it says how many more, and never an estimate. */
+    @Test
+    fun `below four periods the tile is told how many more`() {
+        for (n in 1..3) {
+            val f = CycleFacts.from(fourPeriods.takeLast(n))!!
+            assertEquals(n, f.periodCount)
+            assertEquals(CycleFacts.NextPeriod.NeedsMore(4 - n), f.nextPeriod(d(10, 1)))
+        }
+    }
+
+    /** Her most recent start plus her own average gap, and nothing else. */
+    @Test
+    fun `four periods give an estimate from her own average`() {
+        val f = CycleFacts.from(fourPeriods)!!
+        assertEquals(28, f.averageCycleDays)
+        assertEquals(
+            CycleFacts.NextPeriod.Estimate(date = d(10, 21), daysAway = 20),
+            f.nextPeriod(d(10, 1))
+        )
+    }
+
+    /** Counts down to the day, then past it, without a jump or a blank. */
+    @Test
+    fun `the estimate counts down to zero and past it`() {
+        val f = CycleFacts.from(fourPeriods)!!
+        assertEquals(1, (f.nextPeriod(d(10, 20)) as CycleFacts.NextPeriod.Estimate).daysAway)
+        assertEquals(0, (f.nextPeriod(d(10, 21)) as CycleFacts.NextPeriod.Estimate).daysAway)
+        assertEquals(-3, (f.nextPeriod(d(10, 24)) as CycleFacts.NextPeriod.Estimate).daysAway)
+    }
+
+    /**
+     * Four periods with logging holes between them have a count and no average.
+     * "Log 0 more periods" would be false and an estimate would be invented, so
+     * the tile says nothing about the next period at all.
+     */
+    @Test
+    fun `enough periods but no average says nothing`() {
+        val holes = listOf(
+            d(1, 1) to d(1, 5),     // ->  73 days
+            d(3, 15) to d(3, 19),   // ->  78 days
+            d(6, 1) to d(6, 5),     // ->  92 days
+            d(9, 1) to d(9, 5)
+        )
+        val f = CycleFacts.from(holes)!!
+        assertEquals(4, f.periodCount)
+        assertNull(f.averageCycleDays)
+        assertNull(f.nextPeriod(d(9, 20)))
+    }
+
+    /** The filed declaration says "at least four periods". This pins it. */
+    @Test
+    fun `the minimum for an estimate is the filed four`() {
+        assertEquals(4, CycleFacts.MIN_PERIODS_FOR_ESTIMATE)
     }
 }

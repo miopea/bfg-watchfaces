@@ -13,14 +13,17 @@ import java.util.concurrent.TimeUnit
 /**
  * Send the watch the date to count from.
  *
- * ## One date, and nothing else
+ * ## Four values, and nothing else
  *
- * This is the only thing derived from health data that leaves the phone. Not
- * the records, not a count of them, not a flow or a symptom — one date, to the
- * wearer's own paired watch, over the Wear OS Data Layer, which is a direct
- * device-to-device channel and not a server.
+ * These are the only things derived from health data that leave the phone. Not
+ * the records, not a flow or a symptom: on [WatchLink.CYCLE_START_PATH] one
+ * date, and on [WatchLink.CYCLE_DETAIL_PATH] that date, its end, the average
+ * gap and a count of periods -- to the wearer's own paired watch, over the Wear
+ * OS Data Layer, which is a direct device-to-device channel and not a server.
  *
- * Keeping that literally true is what lets the Play declaration say it. See
+ * Keeping that literally true is what lets the Play declaration say it. The
+ * filed text names exactly those four, and says the watch works out the
+ * estimate itself, so the next period's date must never be added here. See
  * `docs/specs/cycle-complication-declarations.md`.
  *
  * ## Why a date rather than the number

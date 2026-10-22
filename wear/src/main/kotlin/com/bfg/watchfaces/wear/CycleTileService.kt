@@ -114,13 +114,20 @@ class CycleTileService : TileService() {
 
         // Only what her own records support. A first period has no average and
         // an open one has no length; inventing either would be the app making
-        // something up about her. Description only -- nothing here says when
-        // the next period is due.
+        // something up about her.
+        //
+        // The next period is the one line that looks forward, and it is worked
+        // out HERE, on the watch, from the four values the phone sent -- the
+        // filed declaration says so, so the phone must never send the date.
+        // THIS CARD ONLY: the dial stays a bare cycle day, because a "4" there
+        // meaning "due in 4 days" would read as the day count already in that
+        // slot. See CycleFacts.nextPeriod.
+        val next = facts?.nextPeriod(today)
         val detail = if (facts == null) emptyList() else listOfNotNull(
             facts.finishedPeriodLengthDays(today)
                 ?.let { "Last period ${CycleFacts.dayCount(it)}" },
             facts.averageCycleDays?.let { "Average cycle ${CycleFacts.dayCount(it)}" }
-        )
+        ) + nextPeriodLines(next)
 
         val layout = LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
@@ -149,7 +156,7 @@ class CycleTileService : TileService() {
                     )
                     .setSemantics(
                         ModifiersBuilders.Semantics.Builder()
-                            .setContentDescription(semantics(day, headline, caption))
+                            .setContentDescription(semantics(day, caption, next))
                             .build()
                     )
                     .build()
@@ -271,10 +278,46 @@ class CycleTileService : TileService() {
      * it in pieces. Read aloud it should be a sentence, and it should say what
      * the tap does, because a tap target that announces nothing is a tap target
      * nobody finds. Same reasoning as CycleDayService's contentDescription.
+     *
+     * The next period goes in as its own sentence, so somebody listening hears
+     * what a glance shows rather than a card that stops at the day.
      */
-    private fun semantics(day: Int?, headline: String, caption: String): String =
-        if (day == null) "Cycle day not available. $caption."
-        else "Cycle day $day, $caption. Opens Google Health on your phone."
+    private fun semantics(day: Int?, caption: String, next: CycleFacts.NextPeriod?): String {
+        if (day == null) return "Cycle day not available. $caption."
+        val lines = nextPeriodLines(next)
+        val nextSentence = if (lines.isEmpty()) "" else " ${lines.joinToString(": ")}."
+        return "Cycle day $day, $caption.$nextSentence Opens Google Health on your phone."
+    }
+
+    /**
+     * The next-period lines, in words, or none when there is nothing honest to say.
+     *
+     * Two lines rather than one sentence: "Next period" over a short answer.
+     * The below-minimum wording was accepted as drafted on 2026-10-17, decision
+     * 01a147d8, and names the number still needed because "not enough yet" does
+     * not say how much more and reads as broken rather than as waiting.
+     *
+     * Past the estimated day it says so plainly and keeps counting, the same
+     * choice CycleDay makes for a large day count: a growing number tells her
+     * the watch has not heard of a newer period, and a blank tells her nothing.
+     */
+    private fun nextPeriodLines(next: CycleFacts.NextPeriod?): List<String> = when (next) {
+        null -> emptyList()
+        is CycleFacts.NextPeriod.NeedsMore -> listOf(
+            "Next period",
+            if (next.more == 1) "Log 1 more period to see an estimate"
+            else "Log ${next.more} more periods to see an estimate"
+        )
+        is CycleFacts.NextPeriod.Estimate -> listOf(
+            "Next period",
+            when {
+                next.daysAway > 1 -> "In ${CycleFacts.dayCount(next.daysAway)}"
+                next.daysAway == 1 -> "Tomorrow"
+                next.daysAway == 0 -> "Expected today"
+                else -> "Expected ${CycleFacts.dayCount(-next.daysAway)} ago"
+            }
+        )
+    }
 
     override fun onTileResourcesRequest(
         requestParams: RequestBuilders.ResourcesRequest
