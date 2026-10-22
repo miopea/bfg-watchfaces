@@ -45,8 +45,31 @@ Google Sans and Google Sans Flex. The screens are the SDK's round Wear profiles,
 192dp and 227dp. "Log 2 more periods to see an estimate" is 205–208dp at the
 card's 12sp in every one of the three. That is wider than a whole 192dp screen,
 and wider than the 159–167dp visible where the line sits on a 227dp one. "Next
-period" fits everywhere. This needs a wording or layout decision before release.
-`CycleFactsTest` cannot see it; only a wrist or this measurement can.
+period" fits everywhere. `CycleFactsTest` cannot see it; only a wrist or this
+measurement can.
+
+**Settled the same day by the operator, with the measurements in front of
+them.** The card says "Next period" over "Log 2 more periods", and while those
+lines show, "Last period" gives up its row. The bottom row then has 128dp of
+visible width on a 192dp screen, against 105dp needed, where it had 103dp with
+every line present. "Average cycle" is the line kept, because the estimate is
+built from it. A screen reader still hears the full accepted sentence: speech
+has no width limit.
+
+Rejected, also measured:
+
+- A single row, "Next period: log 2 more". It fits with 1dp to spare, which
+  larger system text would erase.
+- Hiding "Average cycle" instead. It fits just as well, but the card would stop
+  showing the number the estimate comes from.
+
+The countdown reads "In 26 days", "Tomorrow" and "Expected today". Past the day
+it keeps counting, "Expected 3 days ago", for the reason `CycleDay` keeps
+counting a lapsed day number. Showing the date, or hiding the line, were both
+offered and declined.
+
+**Still not measured:** font scale above 1.0, which no option survives
+everywhere, and a real wrist.
 
 ## 2026-10-17 — Production goes through its own script, and it submits both form factors in one edit
 

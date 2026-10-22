@@ -122,12 +122,21 @@ class CycleTileService : TileService() {
         // THIS CARD ONLY: the dial stays a bare cycle day, because a "4" there
         // meaning "due in 4 days" would read as the day count already in that
         // slot. See CycleFacts.nextPeriod.
+        //
+        // While it shows, "Last period" gives up its row. Measured on
+        // 2026-10-22 in the Wear OS 6 fonts on a 192dp round screen: with every
+        // line present, the bottom row has 103dp of visible width, and
+        // "Log 2 more periods" needs 105. One row fewer gives it 128. Operator
+        // choice, 2026-10-22. "Average cycle" is the one kept, because the
+        // estimate is built from it.
         val next = facts?.nextPeriod(today)
+        val nextLines = nextPeriodLines(next, spoken = false)
         val detail = if (facts == null) emptyList() else listOfNotNull(
             facts.finishedPeriodLengthDays(today)
+                ?.takeIf { nextLines.isEmpty() }
                 ?.let { "Last period ${CycleFacts.dayCount(it)}" },
             facts.averageCycleDays?.let { "Average cycle ${CycleFacts.dayCount(it)}" }
-        ) + nextPeriodLines(next)
+        ) + nextLines
 
         val layout = LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
@@ -284,7 +293,7 @@ class CycleTileService : TileService() {
      */
     private fun semantics(day: Int?, caption: String, next: CycleFacts.NextPeriod?): String {
         if (day == null) return "Cycle day not available. $caption."
-        val lines = nextPeriodLines(next)
+        val lines = nextPeriodLines(next, spoken = true)
         val nextSentence = if (lines.isEmpty()) "" else " ${lines.joinToString(": ")}."
         return "Cycle day $day, $caption.$nextSentence Opens Google Health on your phone."
     }
@@ -293,20 +302,29 @@ class CycleTileService : TileService() {
      * The next-period lines, in words, or none when there is nothing honest to say.
      *
      * Two lines rather than one sentence: "Next period" over a short answer.
-     * The below-minimum wording was accepted as drafted on 2026-10-17, decision
-     * 01a147d8, and names the number still needed because "not enough yet" does
-     * not say how much more and reads as broken rather than as waiting.
+     * Below the minimum it names the number still needed, because "not enough
+     * yet" does not say how much more and reads as broken rather than waiting.
+     *
+     * The card says "Log 2 more periods" and a screen reader hears the full
+     * sentence accepted on 2026-10-17 (decision 01a147d8), "Log 2 more periods
+     * to see an estimate". The full sentence measured 205-208dp at 12sp in all
+     * three Wear OS 6 fonts. That is wider than a whole 192dp screen, and Text
+     * draws one line, so the card would have cut it off. Speech has no width,
+     * so [spoken] keeps the words the card had to drop. Operator choice,
+     * 2026-10-22.
      *
      * Past the estimated day it says so plainly and keeps counting, the same
      * choice CycleDay makes for a large day count: a growing number tells her
      * the watch has not heard of a newer period, and a blank tells her nothing.
+     * Also the operator's choice, 2026-10-22, over hiding the line or showing
+     * the date.
      */
-    private fun nextPeriodLines(next: CycleFacts.NextPeriod?): List<String> = when (next) {
+    private fun nextPeriodLines(next: CycleFacts.NextPeriod?, spoken: Boolean): List<String> = when (next) {
         null -> emptyList()
         is CycleFacts.NextPeriod.NeedsMore -> listOf(
             "Next period",
-            if (next.more == 1) "Log 1 more period to see an estimate"
-            else "Log ${next.more} more periods to see an estimate"
+            (if (next.more == 1) "Log 1 more period" else "Log ${next.more} more periods") +
+                (if (spoken) " to see an estimate" else "")
         )
         is CycleFacts.NextPeriod.Estimate -> listOf(
             "Next period",
