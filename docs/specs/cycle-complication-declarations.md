@@ -613,7 +613,16 @@ App") and the operator clicked through it himself. Plan on that again. Step 2,
 it for the first time then, and the long paragraph drafted above is ready for it
 if it has a box.
 
-### The background refresh, 2026-10-27 — NOT FILED, and not yet known to need it
+### The background refresh, 2026-10-27 — NOT FILED, and Play requires it
+
+**Measured the same night: Play refuses the build until this is declared.**
+Phone 105, carrying the new permission, was refused on `internal` through the
+API with `403 You must let us know whether your app includes any health
+features`, with submission 21 already Published. The paragraph below, titled
+"Unknown until the bundle is uploaded", is now answered: the form must cover
+the new permission before the API will take the build. The Console is exempt
+from that gate (CLAUDE.md), so uploading 105 through the Console is how the
+form gets to see it.
 
 Submission 21, filed 2026-10-22, read **Published** on 2026-10-27. On the same
 day the build gained a second Health Connect permission,

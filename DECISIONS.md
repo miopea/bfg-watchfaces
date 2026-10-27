@@ -73,8 +73,18 @@ merged debug manifest. The worker never calls `setForeground`.
 - That Health Connect's settings show a background toggle for an app that
   declares the permission but never requested it in-app. Expected from the
   platform's permission screen, not seen.
-- Whether Play's Health apps form will ask about the new permission. It lists
-  only what it detects in an uploaded bundle.
+- What exactly Play's Health apps form will ask about the new permission. It
+  lists only what it detects in an uploaded bundle.
+
+**Play does require it declared: measured the same night.** Phone 105 (1.104),
+built from `6a32e3a`, uploaded to `internal` through `play-release.py`, and the
+commit was refused: `403 You must let us know whether your app includes any
+health features.` That is with submission 21 Published, so the approved
+declaration covers READ_MENSTRUATION and not the new permission. A refused
+commit disturbs no review; every track read back unchanged (104/103, 1049/1048).
+The watch bundle, 1050, was deliberately NOT uploaded on its own. It is useless
+without the phone that sends the count. The way through is the declaration,
+through the Console, with the operator.
 
 Ships in the SAME release as the 2026-10-22 countdown, by the operator's choice
 on 2026-10-27: "these are both period things, let's fix both at one time".
