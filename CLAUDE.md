@@ -328,9 +328,9 @@ On Google Play (2026-08-29):
   After approval the API works normally again — **until a bundle adds a health
   permission the approved declaration does not cover.** Measured 2026-10-27:
   with submission 21 `Published`, phone 105 carrying a NEW
-  `READ_HEALTH_DATA_IN_BACKGROUND` was refused on `internal` with the same
-  403. So "approved" means approved for what the bundle asks for, not approved
-  once. Tracks were unchanged after the refusal.
+  `READ_HEALTH_DATA_IN_BACKGROUND` was refused on `internal` with the same 403.
+  So "approved" means approved for what the bundle asks for, not approved once.
+  Tracks were unchanged after the refusal.
   **Four statements, and the first three were each written from one
   measurement**: "wait for approval" (right, but incomplete — missed that the
   Console bypasses it), "the gate follows the bundle's permissions" (wrong),
