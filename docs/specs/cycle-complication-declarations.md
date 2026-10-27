@@ -613,16 +613,12 @@ App") and the operator clicked through it himself. Plan on that again. Step 2,
 it for the first time then, and the long paragraph drafted above is ready for it
 if it has a box.
 
-### The background refresh, 2026-10-27 — NOT FILED, and Play requires it
+### The background refresh, 2026-10-27 — FILED as submission 22
 
-**Measured the same night: Play refuses the build until this is declared.**
-Phone 105, carrying the new permission, was refused on `internal` through the
-API with `403 You must let us know whether your app includes any health
-features`, with submission 21 already Published. The paragraph below, titled
-"Unknown until the bundle is uploaded", is now answered: the form must cover
-the new permission before the API will take the build. The Console is exempt
-from that gate (CLAUDE.md), so uploading 105 through the Console is how the
-form gets to see it.
+**Filed 2026-10-27, 6:50 AM, as submission 22.** It went into one review
+with production phone 1.104 (105) and Wear 1.57 (1050), and read `In review`
+at filing. The paragraph below went into step 2 word for word, and the privacy
+policy was not changed. Both were the operator's decision.
 
 Submission 21, filed 2026-10-22, read **Published** on 2026-10-27. On the same
 day the build gained a second Health Connect permission,
@@ -632,19 +628,27 @@ reads no other record type and sends the same four values.
 
 **What is already filed stays true.** Neither the step 1 sentence nor the step
 2 text says WHEN the app reads. Both describe what it reads and where the
-result goes, and neither changes.
+result goes, and neither changed.
 
-**Unknown until the bundle is uploaded:** whether the Health apps form asks for
-the new permission. Step 1 lists the permissions Play DETECTED in the uploaded
-bundle (read 2026-10-12), so it can only show this one after a build carrying
-it has been uploaded. Google's read-data page (developer.android.com,
-health-connect/develop/read-data, read 2026-10-27) names the permission and
-says nothing about a declaration. The operator's instruction for that night
-was to assume it is not needed, and to add the declaration at release time if
-it is.
+**What the form asked.** Step 1 listed both permissions once 105 was uploaded,
+and needed no edit. Step 2 grew a second group, "Miscellaneous", with one box:
+"Describe your app's use of the
+android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND permission", 10,000
+characters. The cycle tracking text was left as it was. Step 3 asked nothing.
 
-**If step 2 asks for a justification, this is the draft.** It is not
-approved and not filed:
+**Where Play gated it**, all measured that day:
+
+- An API commit putting 105 on `internal` was refused with `403 You must let
+  us know whether your app includes any health features`.
+- An API commit adding 105 and 1050 to the library, on NO track, was accepted.
+  No submission row appeared.
+- A Console rollout of 105 to `internal` was accepted without asking for the
+  declaration. After it, App content flagged Health apps "Declaration overdue".
+- A Console production release of 105 was refused at preview with "You must
+  complete the health declaration". That cleared once the declaration was
+  SAVED, before anyone approved it.
+
+**The step 2 text, as filed:**
 
 > With the user's separate permission, the handheld app repeats this same read
 > every two hours in the background, so that the watch shows a newly logged
@@ -653,12 +657,12 @@ approved and not filed:
 > user's own watch. Without this permission the app reads only while it is
 > open.
 
-**The live privacy policy needs one look first.** It says "The permission is
-asked for on the screen where the feature is set up". The background grant is
-given in Health Connect's own settings, not on that screen. A sentence such as
-"A second, optional permission lets the app repeat this read every two hours
-in the background, so the watch stays current; you can turn it on or off in
-Health Connect" would keep the policy describing the app. The policy lives in
+**The privacy policy is one sentence behind, by choice.** It says "The
+permission is asked for on the screen where the feature is set up". The
+background grant is given in Health Connect's own settings, not on that screen.
+A sentence such as "A second, optional permission lets the app repeat this read
+every two hours in the background, so the watch stays current; you can turn it
+on or off in Health Connect" would close that. The policy lives in
 `bfg-solutions` (`src/app/products/watchfaces/privacy/page.tsx`), not here.
 
 ### Permission requested

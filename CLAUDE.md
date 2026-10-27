@@ -289,6 +289,12 @@ On Google Play (2026-08-29):
   save, never an API commit; and if a human is meant to press the button, do
   the listing FIRST and the release last. `--dry-run` stages and then deletes
   the edit, changing nothing.
+- **A Console Save STAGES. Only the Publishing overview submits.** Measured
+  2026-10-27, managed publishing off: saving the Health apps declaration and
+  saving each production release each said "saved in Publishing overview,
+  ready for you to send for review". "Submit 3 changes for review" then made
+  ONE submission (22) out of all three, with nothing cancelled. Testing tracks
+  are different: their button is "Save and publish", and it is live at once.
 - **`--dry-run` does NOT prove Play will accept a release.** It stages and
   deletes without ever committing, and the COMMIT is where Play's policy gates
   live. Measured 2026-09-20: a dry run of phone bundle 97 reported "staged 97 on
@@ -331,6 +337,13 @@ On Google Play (2026-08-29):
   `READ_HEALTH_DATA_IN_BACKGROUND` was refused on `internal` with the same 403.
   So "approved" means approved for what the bundle asks for, not approved once.
   Tracks were unchanged after the refusal.
+  **The gate is on the TRACK, not on the upload.** Same day: an API edit that
+  added 105 and 1050 to the library and PUT no track committed fine, with no
+  submission row. From there the Console's "Add from library" rolled 105 out
+  to `internal` with no declaration. That is also the way round the
+  file-upload tool's 10 MB limit. The Console DOES gate production: "You
+  must complete the health declaration", which cleared once the declaration
+  was SAVED, not approved.
   **Four statements, and the first three were each written from one
   measurement**: "wait for approval" (right, but incomplete — missed that the
   Console bypasses it), "the gate follows the bundle's permissions" (wrong),
