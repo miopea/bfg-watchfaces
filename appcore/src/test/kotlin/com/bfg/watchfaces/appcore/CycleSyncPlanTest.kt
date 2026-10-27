@@ -1,5 +1,6 @@
 package com.bfg.watchfaces.appcore
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -104,5 +105,69 @@ class CycleSyncPlanTest {
         assertTrue(dir.listFiles().orEmpty().any { it.isFile })
         dir.listFiles().orEmpty().forEach { it.delete() }
         assertFalse(CycleSyncPlan.wasTold(dir))
+    }
+
+    private val read = "android.permission.health.READ_MENSTRUATION"
+    private val background = "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+    private val needed = setOf(read, background)
+
+    /** Both grants, on a device that can do it: the only yes. */
+    @Test
+    fun `a background read needs the read, the background grant and the device`() {
+        assertTrue(CycleSyncPlan.mayReadInBackground(true, needed, needed))
+    }
+
+    /**
+     * Her phone today: the read granted, the background grant not yet.
+     *
+     * The case that matters most, because it is how every existing user starts
+     * after the update. Reading anyway would fail, the failure would read as
+     * "no records", and "no records" clears the watch.
+     */
+    @Test
+    fun `the read alone is not enough in the background`() {
+        assertFalse(CycleSyncPlan.mayReadInBackground(true, setOf(read), needed))
+    }
+
+    @Test
+    fun `the background grant alone is not enough either`() {
+        assertFalse(CycleSyncPlan.mayReadInBackground(true, setOf(background), needed))
+    }
+
+    /** A Health Connect too old for background reads says so, whatever is granted. */
+    @Test
+    fun `a device without the feature never reads in the background`() {
+        assertFalse(CycleSyncPlan.mayReadInBackground(false, needed, needed))
+    }
+
+    /** An empty requirement would make `containsAll` say yes to anything. */
+    @Test
+    fun `an empty requirement is refused rather than trivially met`() {
+        assertFalse(CycleSyncPlan.mayReadInBackground(true, needed, emptySet()))
+    }
+
+    @Test
+    fun `a background run sends a positive read`() {
+        val facts = CycleFacts(java.time.LocalDate.of(2026, 10, 26), null, 28, 5)
+        assertTrue(CycleSyncPlan.backgroundSends(facts))
+    }
+
+    /**
+     * And never a clear.
+     *
+     * A read that failed in the background, rate-limited or mid-update, comes
+     * back looking exactly like "no records". On a launch that is sent as a
+     * clear. Here it must send nothing, or a bad read at 3am blanks her watch
+     * until she next opens the phone.
+     */
+    @Test
+    fun `a background run that read nothing sends nothing, not a clear`() {
+        assertFalse(CycleSyncPlan.backgroundSends(null))
+    }
+
+    /** Pinned so a change to it is a decision, not an edit. */
+    @Test
+    fun `the background interval is two hours`() {
+        assertEquals(2L, CycleSyncPlan.BACKGROUND_INTERVAL_HOURS)
     }
 }

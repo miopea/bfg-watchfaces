@@ -3,11 +3,13 @@ package com.bfg.watchfaces.mobile
 import android.content.Context
 import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.MenstruationPeriodRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.bfg.watchfaces.appcore.CycleFacts
+import com.bfg.watchfaces.appcore.CycleSyncPlan
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -46,6 +48,19 @@ object CycleSource {
 
     /** The single permission this app asks for, and the only one it will accept. */
     val PERMISSIONS: Set<String> = setOf(HealthPermission.getReadPermission(MenstruationPeriodRecord::class))
+
+    /**
+     * What a read from the BACKGROUND needs: the same read, plus Health
+     * Connect's separate background grant.
+     *
+     * Not added to [PERMISSIONS], on purpose. That set is what "granted" means
+     * everywhere else, and every user who granted the read before this existed
+     * would suddenly read as not granted. The background grant is optional:
+     * without it the app behaves exactly as it did before, refreshing the watch
+     * when it is opened. She grants it in Health Connect's settings.
+     */
+    val BACKGROUND_PERMISSIONS: Set<String> =
+        PERMISSIONS + HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
 
     /**
      * How far back to look for a period.
@@ -93,6 +108,27 @@ object CycleSource {
         val c = client(context) ?: return false
         return runCatching {
             c.permissionController.getGrantedPermissions().containsAll(PERMISSIONS)
+        }.getOrElse { false }
+    }
+
+    /**
+     * Whether this app may read Health Connect while it is not on screen.
+     *
+     * The device has to support it, and she has to have granted both the read
+     * and the background permission. See [CycleSyncPlan.mayReadInBackground]
+     * for why anything less must not even try.
+     */
+    suspend fun canReadInBackground(context: Context): Boolean {
+        val c = client(context) ?: return false
+        return runCatching {
+            val featureAvailable = c.features.getFeatureStatus(
+                HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND
+            ) == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+            CycleSyncPlan.mayReadInBackground(
+                featureAvailable = featureAvailable,
+                granted = c.permissionController.getGrantedPermissions(),
+                needed = BACKGROUND_PERMISSIONS
+            )
         }.getOrElse { false }
     }
 

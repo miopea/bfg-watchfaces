@@ -141,6 +141,9 @@ dependencies {
     // writes. See docs/specs/cycle-complication.md and the Play declaration
     // that describes exactly this.
     implementation(libs.androidx.health.connect)
+    // Re-reads that same record every two hours, only with her background
+    // grant. See CycleRefreshWorker.
+    implementation(libs.androidx.work.runtime)
     // Lets the phone OPEN the watch app. The activation permission can only be
     // asked for on the watch, and a wearer has no reason to know that.
     implementation(libs.wear.remote.interactions)

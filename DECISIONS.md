@@ -1,5 +1,84 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-10-27 — The phone re-reads every two hours, and a background read never clears the watch
+
+**Reverses the 2026-09-20 "Rejected: a background schedule".** That entry
+judged a schedule not worth "a whole new permission story" because she picks
+the phone up anyway. She did not, and she did not have to. On 2026-10-27 she
+logged the start of a period in her health app and her tile did not change.
+It changed that evening, the moment the operator opened BFG Watch Faces on her
+phone.
+
+That observation settled the cause before any code was written. Two
+explanations were on the table:
+
+- the refresh only fires when the app is opened;
+- her health app records a new period in a form `CycleSource` does not read
+  (it reads only `MenstruationPeriodRecord`).
+
+Opening the app picked the new period up through the same read, so the second
+is ruled out and the first is the whole bug.
+
+### What was built
+
+`CycleRefreshWorker`: a `WorkManager` periodic job, every two hours (the
+operator's number), scheduled from `MainActivity.onResume` with
+`ExistingPeriodicWorkPolicy.KEEP`. It reads only when
+`CycleSource.canReadInBackground` says so: Health Connect reports
+`FEATURE_READ_HEALTH_DATA_IN_BACKGROUND` available, AND she has granted both the
+read and `READ_HEALTH_DATA_IN_BACKGROUND`. It sends through the same
+`CycleSender.push` a launch uses, so it cannot say anything a launch cannot.
+
+**A background read never clears the watch.** This is the one rule the obvious
+version gets wrong, and it is in `CycleSyncPlan.backgroundSends`.
+`CycleSource.read` reports every failure as `NoRecords`, and `sync` sends
+`NoRecords` as a clear, which is right on a launch. In the background it would
+be a disaster: without the background grant Health Connect refuses the read,
+the refusal reads as "no records", and her watch goes blank every two hours.
+With the grant, a rate-limited or mid-update read would do the same at 3am. So
+the worker gates on the grant first and sends only a positive read. Its worst
+case is the behaviour from before it existed.
+
+**The background permission is kept out of `CycleSource.PERMISSIONS`.** That
+set is what "granted" means everywhere else. Adding the new permission there
+would turn every existing user into "not granted".
+
+### Rejected
+
+- **Asking for the background grant on the setup screen.** The operator chose
+  to grant it with her in Health Connect's settings. The live privacy policy
+  says the permission "is asked for on the screen where the feature is set up",
+  so a line about the second permission belongs in the policy before release.
+  See `docs/specs/cycle-complication-declarations.md`, 2026-10-27.
+- **Sending only when the facts changed.** Twelve small messages a day cost
+  nothing measurable, and sending every time heals a send that failed while the
+  watch was out of range, with no new state to keep.
+- **Hourly, as Google's own sample does.** A new period starts at most once a
+  day. Two hours was the operator's call.
+
+### What it costs
+
+`WorkManager` merges four ordinary permissions into the phone app: `WAKE_LOCK`,
+`ACCESS_NETWORK_STATE`, `RECEIVE_BOOT_COMPLETED` and the untyped
+`FOREGROUND_SERVICE`. It merges no typed `FOREGROUND_SERVICE_*` permission, and
+`SystemForegroundService` carries no `foregroundServiceType`. Read from the
+merged debug manifest. The worker never calls `setForeground`.
+
+### Not proven
+
+- Nothing here has run on a phone. This machine cannot run an emulator, and
+  WorkManager plus a Health Connect background read cannot be exercised on the
+  JVM. The 8 new `CycleSyncPlanTest` cases cover the two rules, not the
+  scheduling.
+- That Health Connect's settings show a background toggle for an app that
+  declares the permission but never requested it in-app. Expected from the
+  platform's permission screen, not seen.
+- Whether Play's Health apps form will ask about the new permission. It lists
+  only what it detects in an uploaded bundle.
+
+Ships in the SAME release as the 2026-10-22 countdown, by the operator's choice
+on 2026-10-27: "these are both period things, let's fix both at one time".
+
 ## 2026-10-22 — The card estimates the next period, worked out on the watch
 
 Asked for by the person the cycle card was built for, on 2026-10-12. The order

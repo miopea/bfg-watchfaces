@@ -122,7 +122,12 @@ class MainActivity : ComponentActivity() {
         // Health Connect reads and the Data Layer send both block, and
         // Tasks.await THROWS on the main thread. lifecycleScope so a resume
         // that is immediately backgrounded does not leak the work.
-        lifecycleScope.launch(Dispatchers.IO) { CycleSender.syncOnLaunch(this@MainActivity) }
+        lifecycleScope.launch(Dispatchers.IO) {
+            CycleSender.syncOnLaunch(this@MainActivity)
+            // The two-hourly refresh between launches. Repeating this is free;
+            // see CycleRefreshWorker.schedule.
+            CycleRefreshWorker.schedule(this@MainActivity)
+        }
     }
 
     @OptIn(ExperimentalMaterial3Api::class)

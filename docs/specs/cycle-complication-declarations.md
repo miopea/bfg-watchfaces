@@ -613,6 +613,45 @@ App") and the operator clicked through it himself. Plan on that again. Step 2,
 it for the first time then, and the long paragraph drafted above is ready for it
 if it has a box.
 
+### The background refresh, 2026-10-27 — NOT FILED, and not yet known to need it
+
+Submission 21, filed 2026-10-22, read **Published** on 2026-10-27. On the same
+day the build gained a second Health Connect permission,
+`android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND`. It lets the phone
+repeat the same read every two hours while closed (`CycleRefreshWorker`). It
+reads no other record type and sends the same four values.
+
+**What is already filed stays true.** Neither the step 1 sentence nor the step
+2 text says WHEN the app reads. Both describe what it reads and where the
+result goes, and neither changes.
+
+**Unknown until the bundle is uploaded:** whether the Health apps form asks for
+the new permission. Step 1 lists the permissions Play DETECTED in the uploaded
+bundle (read 2026-10-12), so it can only show this one after a build carrying
+it has been uploaded. Google's read-data page (developer.android.com,
+health-connect/develop/read-data, read 2026-10-27) names the permission and
+says nothing about a declaration. The operator's instruction for that night
+was to assume it is not needed, and to add the declaration at release time if
+it is.
+
+**If step 2 asks for a justification, this is the draft.** It is not
+approved and not filed:
+
+> With the user's separate permission, the handheld app repeats this same read
+> every two hours in the background, so that the watch shows a newly logged
+> period without the user having to open the app. It reads the same single
+> record type over the same window, and sends the same four values to the
+> user's own watch. Without this permission the app reads only while it is
+> open.
+
+**The live privacy policy needs one look first.** It says "The permission is
+asked for on the screen where the feature is set up". The background grant is
+given in Health Connect's own settings, not on that screen. A sentence such as
+"A second, optional permission lets the app repeat this read every two hours
+in the background, so the watch stays current; you can turn it on or off in
+Health Connect" would keep the policy describing the app. The policy lives in
+`bfg-solutions` (`src/app/products/watchfaces/privacy/page.tsx`), not here.
+
 ### Permission requested
 
 `android.permission.health.READ_MENSTRUATION`, on the handheld module only. No

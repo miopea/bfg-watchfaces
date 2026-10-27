@@ -124,6 +124,14 @@ correct forever without anything waking up, so the number cannot go stale when
 she stops opening the app — which, for a watch face, is most days. It also means
 no background job and no reliance on the phone being reachable at midnight.
 
+**Amended 2026-10-27.** The date keeps the DAY COUNT right, but it cannot bring
+a NEW period to the watch: that needs a fresh read. She logged one and her tile
+kept counting from the previous period until the phone app was opened. So
+`:mobile` now also re-reads every two hours through `WorkManager`
+(`CycleRefreshWorker`), when she grants Health Connect's separate background
+permission. It sends the same four values, never a clear, and without that
+grant nothing changes. See `DECISIONS.md` 2026-10-27.
+
 > The declarations doc previously said "the watch receives a number". It
 > receives a date. Everything else in that document is unaffected: the watch
 > still never touches Health Connect, and the raw records still never leave the

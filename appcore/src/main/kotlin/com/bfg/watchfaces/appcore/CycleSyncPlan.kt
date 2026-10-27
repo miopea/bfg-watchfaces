@@ -93,4 +93,48 @@ object CycleSyncPlan {
     fun markTold(root: File) {
         runCatching { file(root).writeText("1") }
     }
+
+    /**
+     * How often the phone re-reads Health Connect without being opened.
+     *
+     * Chosen by the operator on 2026-10-27. A new period starts at most once a
+     * day, so two hours means the watch is at most two hours behind her
+     * logging it, at a cost of twelve small reads a day.
+     */
+    const val BACKGROUND_INTERVAL_HOURS = 2L
+
+    /**
+     * Whether a background run may read Health Connect at all.
+     *
+     * Both halves are needed. Health Connect refuses a read from an app that
+     * is not in the foreground unless the device supports background reads
+     * AND she has granted the separate background permission on top of the
+     * read itself. [needed] is that whole set: the read and the background
+     * grant.
+     *
+     * This is not a politeness check. The phone reports a failed read as "no
+     * records", and "no records" CLEARS the watch. A background run that tried
+     * its luck without the grant would wipe her watch every two hours.
+     */
+    fun mayReadInBackground(featureAvailable: Boolean, granted: Set<String>, needed: Set<String>): Boolean =
+        featureAvailable && needed.isNotEmpty() && granted.containsAll(needed)
+
+    /**
+     * Whether a background run sends what it read: only a positive read.
+     *
+     * [read] is null when the read found nothing OR failed; the phone cannot
+     * tell those apart from here. On a launch, null is sent as a clear. In the
+     * background it is sent as nothing at all.
+     *
+     * Never a clear. Clearing is right when she has revoked the permission or
+     * deleted her records, and it is the phone being OPENED that decides that,
+     * because only then can it tell a real absence from a read that failed
+     * while nobody was looking. Health Connect limits background reads and can
+     * be mid-update. A failure at 3am must leave her watch exactly as it was,
+     * not blank it until she next picks up the phone.
+     *
+     * So the worst case of the background refresh is the behaviour from before
+     * it existed: the watch waits for the app to be opened.
+     */
+    fun backgroundSends(read: CycleFacts?): Boolean = read != null
 }

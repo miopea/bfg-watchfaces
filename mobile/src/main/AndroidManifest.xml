@@ -30,6 +30,15 @@
   <uses-permission android:name="android.permission.health.READ_MENSTRUATION" />
 
   <!--
+    The SAME read, done every two hours while the app is not open, so a newly
+    logged period reaches the watch without her opening the phone app. Health
+    Connect grants it separately and she can leave it off; the app then
+    refreshes the watch only when opened, as before. It reads nothing new.
+    See CycleRefreshWorker.
+  -->
+  <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
+
+  <!--
     Health Connect shipped as an installable app before Android 14 and as part
     of the platform from 14 onward. On API 28 to 33 it is a separate package,
     and package visibility means we cannot see it, ask it for permissions, or

@@ -137,9 +137,11 @@ object CycleSender {
      * card is worse, because "day 9 of your period" stays on screen after the
      * period it refers to has ended.
      *
-     * Once per launch is the right frequency: the value changes at most once a
-     * day, a background schedule would be a new permission story for one
-     * integer, and she has to pick the phone up for anything else anyway.
+     * Once per launch is the right frequency for a launch. It was meant to be
+     * enough on its own, on the theory that she picks the phone up anyway. It
+     * was not: on 2026-10-27 she logged a new period and her tile did not
+     * change until someone opened this app. [CycleRefreshWorker] now covers the
+     * hours between, when she has granted the background read.
      *
      * ## Why it does not always run
      *
@@ -176,7 +178,20 @@ object CycleSender {
      */
     fun sync(context: Context): CycleSource.Availability {
         val state = kotlinx.coroutines.runBlocking { CycleSource.read(context) }
-        val facts = (state as? CycleSource.Availability.Ready)?.facts
+        push(context, (state as? CycleSource.Availability.Ready)?.facts)
+        return state
+    }
+
+    /**
+     * Send [facts] to every watch and keep them on the phone; null clears.
+     *
+     * Split out of [sync] so [CycleRefreshWorker] can send what it read without
+     * reading twice, and so the two callers cannot drift in what "sent" means.
+     * The worker never passes null: see [CycleSyncPlan.backgroundSends].
+     *
+     * Blocking; callers are off the main thread.
+     */
+    fun push(context: Context, facts: com.bfg.watchfaces.appcore.CycleFacts?) {
         val date = facts?.start
         // ONLY on a send that a watch actually took. Marking it on a failure
         // would retire the retry, and a phone launched once with the watch out
@@ -192,6 +207,5 @@ object CycleSender {
         // alone lost a race with the preview, which had already run and had no
         // key that would change. See CycleState.
         CycleState.set(context, facts)
-        return state
     }
 }
