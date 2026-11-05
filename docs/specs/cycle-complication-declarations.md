@@ -613,12 +613,32 @@ App") and the operator clicked through it himself. Plan on that again. Step 2,
 it for the first time then, and the long paragraph drafted above is ready for it
 if it has a box.
 
-### The background refresh, 2026-10-27 — FILED as submission 22
+### The background refresh, 2026-10-27 — PUBLISHED as submission 22
 
 **Filed 2026-10-27, 6:50 AM, as submission 22.** It went into one review
 with production phone 1.104 (105) and Wear 1.57 (1050), and read `In review`
 at filing. The paragraph below went into step 2 word for word, and the privacy
 policy was not changed. Both were the operator's decision.
+
+**Approved: published 2026-11-03**, read in the Console on 2026-11-05.
+Submission activity has 22 at `Published`, and the publishing overview reads
+"Last published on November 3, 2026". The Wear production track reads
+"Available on Google Play" with 1.57. The phone production track is Active with
+1.104 as its latest release. `edits.tracks.list` agrees: `production` 105,
+`wear:production` 1050. The public store page moved from "Updated on Oct 17"
+to "Updated on Oct 27", which is the date the release was made, not the date it
+was approved.
+
+It took seven days, the longest of the approvals whose dates are recorded
+here. Submission 17 took one day, 18 four days and 21 three days. It still read `In review` on 2026-11-02
+with no request from Google, and nothing was touched while it waited, because a
+change to production or App content mid-review cancels the review and restarts
+it.
+
+Published is not the same as working on her watch. Three things are still
+unobserved: her phone taking 1.104 from Play, her background grant in Health
+Connect's settings, and a newly logged period reaching her tile without the app
+being opened.
 
 Submission 21, filed 2026-10-22, read **Published** on 2026-10-27. On the same
 day the build gained a second Health Connect permission,
