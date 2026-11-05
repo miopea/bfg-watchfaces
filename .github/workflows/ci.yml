@@ -108,6 +108,15 @@ jobs:
 
       - run: ./gradlew :wear:assembleDebug :mobile:assembleDebug
 
+      # Android lint, for its ERRORS -- it aborts on one and passes warnings.
+      # The phone app's minSdk is 28, and a call to a newer API compiles,
+      # installs and runs; on an older phone it throws. CycleSource called
+      # LocalDate.ofInstant (API 34) inside a runCatching, so Android 9-13 read
+      # "no period records" with records present and permission granted, and
+      # nothing else here could see it. Checked 2026-11-05: this step fails on
+      # that code. :wear is minSdk 36, which is also its compileSdk.
+      - run: ./gradlew :mobile:lintDebug
+
       - name: the APKs contain what they must, and nothing they must not
         run: |
           set -euo pipefail

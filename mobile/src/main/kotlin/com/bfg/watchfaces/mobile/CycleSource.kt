@@ -172,8 +172,11 @@ object CycleSource {
                 // invisible here and obvious to her.
                 val startZone = r.startZoneOffset ?: ZoneId.systemDefault()
                 val endZone = r.endZoneOffset ?: startZone
-                LocalDate.ofInstant(r.startTime, startZone) to
-                    LocalDate.ofInstant(r.endTime, endZone)
+                // atZone().toLocalDate(), not LocalDate.ofInstant: that one is
+                // API 34, and below it the call throws inside runCatching and
+                // reads as "no records" on every Android 9-13 phone.
+                r.startTime.atZone(startZone).toLocalDate() to
+                    r.endTime.atZone(endZone).toLocalDate()
             }
             CycleFacts.from(periods)?.let { Availability.Ready(it) } ?: Availability.NoRecords
         }.getOrElse {
