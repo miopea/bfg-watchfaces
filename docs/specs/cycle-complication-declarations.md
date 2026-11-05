@@ -677,12 +677,21 @@ characters. The cycle tracking text was left as it was. Step 3 asked nothing.
 > user's own watch. Without this permission the app reads only while it is
 > open.
 
-**The privacy policy is one sentence behind, by choice.** It says "The
-permission is asked for on the screen where the feature is set up". The
-background grant is given in Health Connect's own settings, not on that screen.
-A sentence such as "A second, optional permission lets the app repeat this read
-every two hours in the background, so the watch stays current; you can turn it
-on or off in Health Connect" would close that. The policy lives in
+**The privacy policy caught up on 2026-11-05.** It was filed unchanged, by
+the operator's choice, while it still said only "The permission is asked for
+on the screen where the feature is set up". The background grant is given in
+Health Connect's own settings, not on that screen. After 22 was approved the
+operator asked for the sentence, and `bfg-solutions` 828b3fb added it right
+after that one:
+
+> A second permission, also optional, lets the app repeat the same read every
+> two hours in the background, so your watch stays up to date without you
+> opening the app. You turn it on or off in Health Connect's settings. Without
+> it, the app reads only while it is open.
+
+Its Azure deploy succeeded, and the live page at
+`https://bfgsolutions.net/products/watchfaces/privacy` carried the sentence and
+"Last updated: November 2026" when fetched the same day. The policy lives in
 `bfg-solutions` (`src/app/products/watchfaces/privacy/page.tsx`), not here.
 
 ### Permission requested
