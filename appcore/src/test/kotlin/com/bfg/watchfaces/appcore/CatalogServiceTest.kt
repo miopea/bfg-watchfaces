@@ -39,6 +39,15 @@ class CatalogServiceTest {
             if (unreachable) throw CatalogTransport.Unreachable("no network")
             return replies[url] ?: CatalogTransport.Reply(201, """{"id":"an-id","slug":"a_slug","state":"pending"}""")
         }
+
+        val deletes = mutableListOf<String>()
+
+        override fun delete(url: String, bearer: String): CatalogTransport.Reply {
+            deletes += url
+            bearers += bearer
+            if (unreachable) throw CatalogTransport.Unreachable("no network")
+            return replies[url] ?: CatalogTransport.Reply(200, """{"deleted":true}""")
+        }
     }
 
     private val base = CatalogService.DEFAULT_BASE_URL
@@ -282,6 +291,33 @@ class CatalogServiceTest {
         assertEquals("$base/submissions/sub-1/withdraw", url)
         assertEquals("google-id-token", fake.bearers.single())
         assertFalse(body.contains("google-id-token")) { "the token was put in the body as well" }
+    }
+
+    /**
+     * Deleting the gallery account is the one DELETE the app makes, and it is
+     * proven the same way taking a face back is: the account's own token, in
+     * the header, used once.
+     */
+    @Test
+    fun `deleting the gallery account sends the account and nothing else`() {
+        val fake = Fake()
+        val result = CatalogService(fake, base).deleteAccount("google-id-token")
+        assertTrue(result is CatalogService.Result.Ok)
+        assertEquals("$base/me", fake.deletes.single())
+        assertEquals("google-id-token", fake.bearers.single())
+        assertTrue(fake.posts.isEmpty()) { "deleting the account also posted something" }
+    }
+
+    @Test
+    fun `a refused account deletion says why, and an unreachable one says so`() {
+        val refused = Fake(
+            mapOf("$base/me" to CatalogTransport.Reply(401, """{"error":"sign-in expired"}"""))
+        )
+        val no = CatalogService(refused, base).deleteAccount("t")
+        assertEquals("sign-in expired", (no as CatalogService.Result.Failed).message)
+
+        val offline = CatalogService(Fake(unreachable = true), base).deleteAccount("t")
+        assertEquals(CatalogService.UNREACHABLE, (offline as CatalogService.Result.Failed).message)
     }
 
     /**

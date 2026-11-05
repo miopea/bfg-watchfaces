@@ -272,6 +272,12 @@ class MainActivity : ComponentActivity() {
                 // already reads "Shared" and the sheet opens on the taken-back
                 // state rather than offering to send it twice.
                 var shareBusy by remember { mutableStateOf(false) }
+                // Deleting the gallery account, asked for from About. Not saved
+                // for the same reason as shareBusy: the work does not survive
+                // the Activity, so a restored "busy" could never finish.
+                var accountBusy by remember { mutableStateOf(false) }
+                var accountNote by rememberSaveable { mutableStateOf<String?>(null) }
+                var deleteAccountAsked by remember { mutableStateOf(false) }
                 /**
                  * Ask the catalog what happened to anything still waiting.
                  *
@@ -641,7 +647,12 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.padding(inner)
                         )
 
-                        Tab.ABOUT -> AboutScreen(Modifier.padding(inner))
+                        Tab.ABOUT -> AboutScreen(
+                            accountBusy = accountBusy,
+                            accountNote = accountNote,
+                            onDeleteGalleryAccount = { deleteAccountAsked = true },
+                            modifier = Modifier.padding(inner)
+                        )
                     }
                 }
 
@@ -749,10 +760,17 @@ class MainActivity : ComponentActivity() {
                  * The token is used for this one call and never stored: the
                  * account is a way to prove the same person is taking a face
                  * back, not a session the app keeps.
+                 *
+                 * [setBusy] and [setError] default to the share sheet's; deleting
+                 * the account from About reports to its own.
                  */
-                fun withAccount(action: suspend (String) -> Unit) {
-                    shareBusy = true
-                    shareError = null
+                fun withAccount(
+                    setBusy: (Boolean) -> Unit = { shareBusy = it },
+                    setError: (String?) -> Unit = { shareError = it },
+                    action: suspend (String) -> Unit
+                ) {
+                    setBusy(true)
+                    setError(null)
                     scope.launch {
                         try {
                             val config = withContext(Dispatchers.IO) {
@@ -777,11 +795,34 @@ class MainActivity : ComponentActivity() {
                                     // an error, so this is a plain line rather
                                     // than a red one. But it says SOMETHING, and
                                     // it carries what Credential Manager said.
-                                    shareError = "Sign-in did not finish: ${outcome.why}"
-                                is GoogleSignIn.Outcome.Failed -> shareError = outcome.message
+                                    setError("Sign-in did not finish: ${outcome.why}")
+                                is GoogleSignIn.Outcome.Failed -> setError(outcome.message)
                             }
                         } finally {
-                            shareBusy = false
+                            setBusy(false)
+                        }
+                    }
+                }
+
+                // About asks; this answers. Here rather than in About's own
+                // callback because the sign-in it needs is declared below the
+                // screens.
+                LaunchedEffect(deleteAccountAsked) {
+                    if (!deleteAccountAsked) return@LaunchedEffect
+                    deleteAccountAsked = false
+                    withAccount(setBusy = { accountBusy = it }, setError = { accountNote = it }) { token ->
+                        val result = withContext(Dispatchers.IO) {
+                            CatalogAccess.service(context).deleteAccount(token)
+                        }
+                        when (result) {
+                            is CatalogService.Result.Ok -> {
+                                // The service no longer knows which faces were
+                                // this person's, so no row may offer to take one back.
+                                SubmissionStore.forgetAll(context)
+                                shared = SubmissionStore.all(context).associateBy { it.slug }
+                                accountNote = "Your gallery account is deleted."
+                            }
+                            is CatalogService.Result.Failed -> accountNote = result.message
                         }
                     }
                 }

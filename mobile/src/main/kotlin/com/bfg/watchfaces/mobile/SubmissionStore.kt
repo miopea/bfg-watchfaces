@@ -26,4 +26,7 @@ object SubmissionStore {
 
     fun forget(context: Context, id: String) =
         SubmissionLog.forget(context.filesDir, id)
+
+    fun forgetAll(context: Context) =
+        SubmissionLog.forgetAll(context.filesDir)
 }

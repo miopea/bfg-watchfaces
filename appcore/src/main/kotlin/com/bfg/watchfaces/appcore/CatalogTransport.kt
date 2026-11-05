@@ -31,6 +31,9 @@ interface CatalogTransport {
     /** [bearer] is only ever the moderator token, and only from tooling. */
     fun post(url: String, body: String, bearer: String? = null): Reply
 
+    /** A DELETE with no body. Only ever deleting your own gallery account. */
+    fun delete(url: String, bearer: String): Reply
+
     /** Thrown for a failure to REACH the service, as opposed to a reply from it. */
     class Unreachable(message: String, cause: Throwable? = null) : IOException(message, cause)
 }
@@ -54,6 +57,9 @@ class HttpTransport(
 
     override fun post(url: String, body: String, bearer: String?): CatalogTransport.Reply =
         send(url, "POST", body, bearer)
+
+    override fun delete(url: String, bearer: String): CatalogTransport.Reply =
+        send(url, "DELETE", null, bearer)
 
     private fun send(
         url: String,

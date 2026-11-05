@@ -66,6 +66,18 @@ class SubmissionLogTest {
     }
 
     @Test
+    fun `deleting the gallery account forgets every submission`(@TempDir dir: File) {
+        // The service no longer knows which faces were this person's, so any
+        // record kept here would offer a "Take it back" it would refuse.
+        SubmissionLog.record(dir, "one", "id-1")
+        SubmissionLog.record(dir, "two", "id-2")
+        SubmissionLog.forgetAll(dir)
+        assertTrue(SubmissionLog.list(dir).isEmpty())
+        SubmissionLog.forgetAll(dir) // and again, on nothing, without complaint
+        assertTrue(SubmissionLog.list(dir).isEmpty())
+    }
+
+    @Test
     fun `withdrawing forgets the submission`(@TempDir dir: File) {
         SubmissionLog.record(dir, "one", "id-1")
         SubmissionLog.forget(dir, "id-1")

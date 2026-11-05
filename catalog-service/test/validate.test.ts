@@ -126,6 +126,35 @@ describe("validateFace", () => {
     expect(validateFace(bad).some((p) => p.field.includes("launcher"))).toBe(true);
   });
 
+  /**
+   * Naming the cycle provider tells everyone who downloads the face that its
+   * author tracks a menstrual cycle. The app keeps such a face on the phone;
+   * the service refuses it too, or the privacy policy's "the service refuses
+   * it" is only true of requests the app chose to make.
+   */
+  it("refuses a face whose slot names the cycle provider, in either place", () => {
+    const viaMap = submission();
+    (viaMap["params"] as Record<string, unknown>)["providers"] = {
+      LEFT: "com.bfg.watchfaces/com.bfg.watchfaces.wear.CycleDayService",
+    };
+    expect(validateFace(viaMap).some((p) => p.field === "providers.LEFT")).toBe(true);
+
+    const viaToken = submission();
+    (viaToken["params"] as Record<string, unknown>)["complications"] = [
+      "STEP_COUNT+app:com.bfg.watchfaces/com.bfg.watchfaces.wear.CycleDayService",
+    ];
+    expect(validateFace(viaToken).some((p) => p.field === "complications[0] provider")).toBe(true);
+  });
+
+  it("matches the cycle provider on its class, whatever the package", () => {
+    // DialParams.isLocalOnly matches on the class, so a face hand-edited to
+    // name it under another package is refused there; it must be here too.
+    const moved = submission();
+    (moved["params"] as Record<string, unknown>)["providers"] = { LEFT: "com.example.other/.CycleDayService" };
+    expect(validateFace(moved).some((p) => p.field === "providers.LEFT")).toBe(true);
+    expect(CONTRACT.privateProviderClasses).toContain("CycleDayService");
+  });
+
   it("accepts all three complication token shapes", () => {
     // Plain, +app: (the provider filling the slot) and +open: (what pressing it
     // launches). The fixture already carries one of each; this pins that they

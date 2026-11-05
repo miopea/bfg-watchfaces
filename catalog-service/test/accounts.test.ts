@@ -121,30 +121,52 @@ describe("deleting an account", () => {
     expect(gone.status).toBe(200);
 
     await caches.default.delete("https://catalog.test/index.json");
-    const after = (await (await SELF.fetch(get("/index.json"))).json()) as { count: number };
+    const after = (await (await SELF.fetch(get("/index.json"))).json()) as {
+      count: number;
+      faces: { author: string }[];
+    };
     expect(after.count).toBe(1) // still there, still installable
+    // ...but no longer with their name on it. The typed name is the one thing
+    // on a kept face that is about a person rather than a drawing.
+    expect(after.faces[0]?.author).toBe("");
 
-    const row = await env.DB.prepare("SELECT author_key, state FROM faces WHERE id = ?")
+    const row = await env.DB.prepare("SELECT author_key, author, state FROM faces WHERE id = ?")
       .bind(published.id)
-      .first<{ author_key: string | null; state: string }>();
+      .first<{ author_key: string | null; author: string; state: string }>();
     expect(row?.author_key).toBeNull();
+    expect(row?.author).toBe("");
     expect(row?.state).toBe("published");
   });
 
   /**
-   * A pending face is withdrawn instead. Nobody has it yet, and leaving it
-   * would ask a moderator to review something with nobody to answer for it.
+   * A pending face is deleted instead, exactly as withdrawing it would. Nobody
+   * has it yet, and leaving it would ask a moderator to review something with
+   * nobody to answer for it.
    */
-  it("withdraws a pending face rather than leaving it in the queue", async () => {
+  it("deletes a pending face rather than leaving it in the queue", async () => {
     const pending = await submitAs("leaver-2", 30);
+    await passReview(pending.id);
     await SELF.fetch(
       new Request("https://catalog.test/me", { method: "DELETE", headers: await signedIn("leaver-2") })
     );
-    const row = await env.DB.prepare("SELECT author_key, state FROM faces WHERE id = ?")
-      .bind(pending.id)
-      .first<{ author_key: string | null; state: string }>();
-    expect(row?.state).toBe("withdrawn");
-    expect(row?.author_key).toBeNull();
+    expect(await env.DB.prepare("SELECT 1 FROM faces WHERE id = ?").bind(pending.id).first()).toBeNull();
+    expect(
+      await env.DB.prepare("SELECT 1 FROM face_reviews WHERE face_id = ?").bind(pending.id).first()
+    ).toBeNull();
+  });
+
+  it("keeps a block, so deleting the account is not the way round one", async () => {
+    const face = await submitAs("blocked-leaver", 26);
+    const row = await env.DB.prepare("SELECT author_key FROM faces WHERE id = ?")
+      .bind(face.id)
+      .first<{ author_key: string }>();
+    const key = row?.author_key ?? "";
+    await SELF.fetch(post(`/admin/authors/${key}/block`, { reason: "repeatedly submitting slurs" }, MODERATOR));
+    await SELF.fetch(
+      new Request("https://catalog.test/me", { method: "DELETE", headers: await signedIn("blocked-leaver") })
+    );
+    const again = await SELF.fetch(post("/faces", submission(), await signedIn("blocked-leaver")));
+    expect(again.status).toBe(403);
   });
 
   it("leaves other people's faces alone", async () => {

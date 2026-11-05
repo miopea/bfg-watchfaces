@@ -1,5 +1,50 @@
 # DECISIONS.md — BFG Watch Faces
 
+## 2026-11-05 — Withdrawing deletes, account deletion takes the name, and the service refuses a cycle face
+
+An audit of bfgsolutions.net against this repo found the published privacy
+policy promising three things the code did not do:
+
+- "Withdrawing deletes it and the anonymous code." `postWithdraw` set
+  `state = 'withdrawn'` and kept the row: the account code, the typed name, the
+  settings, the preview and the AI review.
+- In-app account deletion. `DELETE /me` existed, but nothing in `:mobile` called
+  it, and Play requires it inside the app once an app has accounts.
+- "The service refuses" a face using cycle data. Only the app did.
+  `validate.ts` checked a provider's shape, never which provider it was.
+
+**The operator chose code first: make the code do what was promised, then
+correct the pages.** Decided in chat on 2026-11-05:
+
+- **Withdrawing deletes the record completely.** The face, its preview, AI
+  review, moderation job and automatic-publication row go in one batch.
+  `automatic_publications` has no `ON DELETE CASCADE`. A probe with it left out
+  of the batch got `FOREIGN KEY constraint failed` and a 500, so it is deleted
+  explicitly. Reports stay. They are moderation records, they hold nothing about
+  the reporter, and they name the face only by slug.
+  **Rejected: keep the row, anonymised.** That kept moderation history, at the
+  cost of a policy that says settings outlive "Take it back".
+- **Account deletion keeps published faces, as decided on 2026-08-31, but blanks
+  the typed name.** The August reasoning was that the account id is the personal
+  data and the face is not. The name the person typed is personal data by the
+  same reasoning, and it was being left public on a face whose account no
+  longer existed. A pending face is now deleted rather than marked withdrawn.
+  **Rejected: remove every face on account deletion.** That would reverse the
+  August decision and pull faces other people chose.
+- **The web deletion route stays as it is**, by the operator's call: "This has
+  never come up in all our submissions and this functionality is live, so leave
+  it." It is still an email to `info@bfgsolutions.net`. That route cannot be
+  matched to an account, because the service stores only
+  `sha256(salt:author:sub)`. So the policy page must not promise that it can.
+
+The cycle refusal reads `privateProviderClasses` from the generated contract,
+which is `DialParams.PRIVATE_PROVIDER_CLASSES`. It is not a second list, and it
+matches on the class after the slash, as `isLocalOnly` does. It also checks the
+`+app:` half of a complication token as well as the `providers` map, because
+`FaceCodec` reads the token first. The contract gained a section, so its version
+went from 1 to 2. The app parses `contractVersion` from `/config` and does
+nothing with it, so nothing on a phone moves.
+
 ## 2026-10-27 — The phone re-reads every two hours, and a background read never clears the watch
 
 **Reverses the 2026-09-20 "Rejected: a background schedule".** That entry

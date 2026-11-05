@@ -197,6 +197,18 @@ object SubmissionLog {
         write(root, all.filterNot { it.id == id })
     }
 
+    /**
+     * Forget every submission. For a deleted gallery account.
+     *
+     * Once the account is gone the service no longer knows which faces were
+     * this person's, so a record here could only offer a "Take it back" that
+     * the service would refuse.
+     */
+    fun forgetAll(root: File) {
+        if (list(root).isEmpty()) return
+        write(root, emptyList())
+    }
+
     private fun write(root: File, records: List<Record>) {
         // Written whole to a temp file and moved, so an interrupted write
         // cannot leave the one file holding every record half-parsed.

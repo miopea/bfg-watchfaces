@@ -505,26 +505,57 @@ async function postInstalled(env: Env, request: Request, slug: string): Promise<
 }
 
 /**
- * An author taking their own face back.
+ * Every table that holds a row about one face, keyed on `face_id`.
  *
- * Proven by the random per-install id, which is deliberately weak: reinstalling
- * makes a new one and the old face can then only be withdrawn by reporting it.
- * That is stated at submit rather than discovered.
+ * Deleting a face means deleting these first. Three of them cascade, but
+ * `automatic_publications` does not, and a foreign key that refuses the delete
+ * would leave the face exactly where it was.
+ */
+const FACE_DEPENDENTS = ["face_reviews", "face_ai_reviews", "moderation_jobs", "automatic_publications"] as const;
+
+/**
+ * Delete every face matching [where], and everything stored about it.
+ *
+ * One batch, so a face is never left half-deleted, and every statement carries
+ * the same condition, so a face that does not match loses nothing. Reports are
+ * NOT deleted: they are moderation records, they hold nothing about the person
+ * who reported, and they name the face only by its slug.
+ *
+ * Returns how many faces went.
+ */
+async function deleteFaces(env: Env, where: string, binds: string[]): Promise<number> {
+  const matching = `SELECT id FROM faces WHERE ${where}`;
+  const results = await env.DB.batch([
+    ...FACE_DEPENDENTS.map((table) =>
+      env.DB.prepare(`DELETE FROM ${table} WHERE face_id IN (${matching})`).bind(...binds),
+    ),
+    env.DB.prepare(`DELETE FROM faces WHERE ${where}`).bind(...binds),
+  ]);
+  return results[results.length - 1]?.meta.changes ?? 0;
+}
+
+/**
+ * An author taking their own face back, which DELETES it.
+ *
+ * The design, the name typed on it, the account code, the moderation preview
+ * and the AI review all go, because that is what the privacy policy says
+ * withdrawing does and what somebody pressing "Take it back" expects. It used
+ * to mark the row `withdrawn` and keep every bit of it. Decided by the operator
+ * on 2026-11-05; see DECISIONS.md.
  */
 async function postWithdraw(request: Request, env: Env, id: string): Promise<Response> {
   const who = await identify(env, request.headers.get("authorization"));
   if (!who.ok) return json({ error: who.reason }, 401);
 
-  const result = await env.DB.prepare(
-    `UPDATE faces SET state = 'withdrawn', reviewed = ?
-      WHERE id = ? AND author_key = ? AND state IN ('pending','published')`,
-  )
-    .bind(new Date().toISOString(), id, who.identity.authorKey)
-    .run();
+  const deleted = await deleteFaces(
+    env,
+    `id = ? AND author_key = ? AND state IN ('pending','published')`,
+    [id, who.identity.authorKey],
+  );
 
   // Withdrawing somebody else's face and withdrawing one that does not exist
   // are the same answer, so this cannot be used to find out who wrote what.
-  if (result.meta.changes === 0) {
+  if (deleted === 0) {
     return json({ error: "that is not one of your submissions" }, 403);
   }
   return json({ id, state: "withdrawn" });
@@ -561,31 +592,34 @@ async function getMine(request: Request, env: Env): Promise<Response> {
  * is what goes. Faces other people are already using stay where they are;
  * nothing should pull one off a wrist because its author left.
  *
- * A PENDING face is withdrawn rather than abandoned, because nobody has it yet
- * and leaving it would ask a moderator to review something with no one to
- * answer for it.
+ * The NAME goes with it. "Your name on it" is the one thing on a kept face that
+ * is about a person rather than a drawing, and leaving it would publish a
+ * deleted account's name indefinitely. Added 2026-11-05, operator's decision.
+ *
+ * A PENDING face is deleted outright, exactly as withdrawing it would, because
+ * nobody has it yet and leaving it would ask a moderator to review something
+ * with no one to answer for it.
+ *
+ * A block in `blocked_authors` survives this on purpose. It is the account
+ * code and nothing else, and deleting it would make deleting the account the
+ * way round a block.
  */
 async function deleteMe(request: Request, env: Env): Promise<Response> {
   const who = await identify(env, request.headers.get("authorization"));
   if (!who.ok) return json({ error: who.reason }, 401);
   const key = who.identity.authorKey;
 
-  const withdrawn = await env.DB.prepare(
-    `UPDATE faces SET state = 'withdrawn', author_key = NULL, reviewed = ?
-      WHERE author_key = ? AND state = 'pending'`,
-  )
-    .bind(new Date().toISOString(), key)
-    .run();
+  const pendingDeleted = await deleteFaces(env, `author_key = ? AND state = 'pending'`, [key]);
 
   const abandoned = await env.DB.prepare(
-    `UPDATE faces SET author_key = NULL WHERE author_key = ?`,
+    `UPDATE faces SET author_key = NULL, author = '' WHERE author_key = ?`,
   )
     .bind(key)
     .run();
 
   return json({
     deleted: true,
-    pendingWithdrawn: withdrawn.meta.changes,
+    pendingDeleted,
     facesKept: abandoned.meta.changes,
   });
 }

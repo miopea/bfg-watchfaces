@@ -135,6 +135,10 @@ class TextureStoreTest {
                 posted = true
                 return CatalogTransport.Reply(200, "{}")
             }
+            override fun delete(url: String, bearer: String): CatalogTransport.Reply {
+                posted = true
+                return CatalogTransport.Reply(200, "{}")
+            }
         }
         val service = CatalogService(transport)
         val photo = com.bfg.watchfaces.generator.DialParams(

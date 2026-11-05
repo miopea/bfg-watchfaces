@@ -50,7 +50,7 @@ object CatalogContract {
      * and moves when the file is laid out differently. They were briefly the
      * same number and it read as though bumping one should bump the other.
      */
-    const val CONTRACT_VERSION = 1
+    const val CONTRACT_VERSION = 2
 
     /**
      * A face is parameters. Anything much larger than this is not a face.
@@ -236,6 +236,14 @@ object CatalogContract {
         // face would be rejected on submission. See BuiltInDial.
         sb.append(
             """  "builtInDials": [${BuiltInDial.IDS.joinToString(", ") { q(it) }}],${'\n'}"""
+        )
+        // Provider classes whose presence in a face discloses something about
+        // its author -- the cycle complication. The app already refuses to
+        // share such a face; the Worker refuses it too, so the privacy policy's
+        // "the service refuses it" is true of a request the app did not make.
+        // Matched on the class, as DialParams.isLocalOnly matches it.
+        sb.append(
+            """  "privateProviderClasses": [${DialParams.PRIVATE_PROVIDER_CLASSES.joinToString(", ") { q(it) }}],${'\n'}"""
         )
 
         sb.append("""  "controls": [${'\n'}""")

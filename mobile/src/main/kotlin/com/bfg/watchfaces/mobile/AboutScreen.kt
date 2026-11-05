@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -130,8 +131,20 @@ private val PRODUCTS = listOf(
     )
 )
 
+/**
+ * About.
+ *
+ * [accountBusy] and [accountNote] belong to deleting the gallery account, which
+ * signs in first; the sign-in lives in `MainActivity`, so this screen asks and
+ * shows the answer rather than doing the work.
+ */
 @Composable
-fun AboutScreen(modifier: Modifier = Modifier) {
+fun AboutScreen(
+    accountBusy: Boolean,
+    accountNote: String?,
+    onDeleteGalleryAccount: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
     fun open(url: String) = runCatching {
         context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
@@ -162,6 +175,7 @@ fun AboutScreen(modifier: Modifier = Modifier) {
                 .clickable { open("https://bfgsolutions.net") }
                 .padding(vertical = 8.dp)
         )
+        GalleryAccountSection(accountBusy, accountNote, onDeleteGalleryAccount)
         // Last, below the links, where nobody arrives by accident.
         DiagnosticsSection()
         Spacer(Modifier.height(28.dp))
@@ -214,7 +228,7 @@ private fun FreeHero() {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "No ads. No account. No subscription, no trial, nothing held back for a " +
+                "No ads. No account needed. No subscription, no trial, nothing held back for a " +
                     "paid tier. Design as many watch faces as you like and keep them.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -348,6 +362,68 @@ private fun ProductLogo(product: Product) {
         contentDescription = null,
         modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
     )
+}
+
+/**
+ * Deleting the community gallery account, from inside the app.
+ *
+ * Play requires this once an app has accounts, and until 2026-11-05 the service
+ * could do it and nothing in the app asked it to. Shown to everyone: whether
+ * this person ever shared is not something the phone can know for certain, and
+ * deleting an account that has nothing in it is harmless.
+ *
+ * The dialog says what is KEPT as plainly as what goes, because a shared design
+ * staying in the gallery is the part somebody would not expect.
+ */
+@Composable
+private fun GalleryAccountSection(busy: Boolean, note: String?, onDelete: () -> Unit) {
+    var confirming by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth()) {
+        HorizontalDivider(Modifier.padding(vertical = 16.dp))
+        Text(
+            "Community gallery account",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Sharing a design to the gallery signs you in with Google. You can delete " +
+                "that account here at any time.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        TextButton(onClick = { confirming = true }, enabled = !busy) {
+            Text(if (busy) "Deleting…" else "Delete my gallery account")
+        }
+        note?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text("Delete your gallery account?") },
+            text = {
+                Text(
+                    "Designs still waiting to be checked are deleted. Designs already in " +
+                        "the gallery stay there without your name, because other people may " +
+                        "be using them, and you won't be able to take them back afterwards. " +
+                        "To remove one, take it back from My faces first. This can't be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { confirming = false; onDelete() }) { Text("Delete account") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirming = false }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 /**

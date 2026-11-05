@@ -442,6 +442,46 @@ describe("what a submitter can find out", () => {
     ).toBe(200);
   });
 
+  /**
+   * Withdrawing DELETES. The privacy policy says it does, and "Take it back"
+   * means it; it used to mark the row withdrawn and keep the account code, the
+   * typed name, the preview and the AI review.
+   */
+  it("deletes a withdrawn face and everything stored about it", async () => {
+    const { id, slug } = await submit();
+    await passReview(id);
+    await publish(id);
+    // automatic_publications has no ON DELETE CASCADE, so a withdrawal that
+    // forgot it would be refused by the foreign key and delete nothing.
+    await env.DB.prepare(
+      `INSERT INTO automatic_publications(id, face_id, params_hash, generator_version, model, policy, created)
+       SELECT 'auto-1', id, params_hash, generator_version, 'test-model', '{}', '2026-11-05T00:00:00Z'
+         FROM faces WHERE id = ?`,
+    )
+      .bind(id)
+      .run();
+
+    expect((await SELF.fetch(post(`/submissions/${id}/withdraw`, {}, await signedIn()))).status).toBe(200);
+
+    expect(await env.DB.prepare("SELECT 1 FROM faces WHERE id = ?").bind(id).first()).toBeNull();
+    for (const table of ["face_reviews", "face_ai_reviews", "moderation_jobs", "automatic_publications"]) {
+      expect(await env.DB.prepare(`SELECT 1 FROM ${table} WHERE face_id = ?`).bind(id).first()).toBeNull();
+    }
+    expect((await SELF.fetch(get(`/faces/${slug}`))).status).toBe(404);
+  });
+
+  it("deletes nothing when the face is somebody else's", async () => {
+    const { id } = await submit();
+    await passReview(id);
+    expect(
+      (await SELF.fetch(post(`/submissions/${id}/withdraw`, {}, await signedIn("someone-else")))).status
+    ).toBe(403);
+    expect(await env.DB.prepare("SELECT state FROM faces WHERE id = ?").bind(id).first()).toEqual({
+      state: "pending",
+    });
+    expect(await env.DB.prepare("SELECT 1 FROM face_reviews WHERE face_id = ?").bind(id).first()).not.toBeNull();
+  });
+
   it("frees the parameters again once a face is withdrawn", async () => {
     // Taking your own face back has to leave you able to submit it again --
     // which is why the byte-identical index excludes withdrawn rows.

@@ -125,6 +125,22 @@ function checkPattern(field: string, value: unknown, source: string, problems: P
   }
 }
 
+/**
+ * A slot's provider: a ComponentName, and not one of the private ones.
+ *
+ * Matched on the class after the slash, as `DialParams.isLocalOnly` matches it,
+ * so a face hand-edited to name the cycle provider under another package is
+ * refused too.
+ */
+function checkProvider(field: string, component: unknown, problems: Problem[]): void {
+  checkPattern(field, component, CONTRACT.componentPattern, problems);
+  if (typeof component !== "string") return;
+  const cls = component.slice(component.indexOf("/") + 1);
+  if (CONTRACT.privateProviderClasses.some((c) => cls.endsWith(c))) {
+    problems.push({ field, message: "uses cycle data, so this face can only be kept on your phone" });
+  }
+}
+
 function checkBoolean(field: string, value: unknown, problems: Problem[]): void {
   if (typeof value !== "boolean") {
     problems.push({ field, message: `must be true or false, got ${describe(value)}` });
@@ -163,7 +179,7 @@ function checkComplicationToken(index: number, token: unknown, problems: Problem
   const provider = app === -1 ? null : head.slice(app + "+app:".length);
 
   checkEnum(field, source, "complicationSource", problems);
-  if (provider !== null) checkPattern(`${field} provider`, provider, CONTRACT.componentPattern, problems);
+  if (provider !== null) checkProvider(`${field} provider`, provider, problems);
   if (launcher !== null) checkPattern(`${field} launcher`, launcher, CONTRACT.componentPattern, problems);
 }
 
@@ -333,7 +349,7 @@ export function validateFace(submission: unknown): Problem[] {
   } else {
     for (const [pos, component] of Object.entries(providers)) {
       checkEnum(`providers.${pos}`, pos, "slotPosition", problems);
-      checkPattern(`providers.${pos}`, component, CONTRACT.componentPattern, problems);
+      checkProvider(`providers.${pos}`, component, problems);
     }
   }
 

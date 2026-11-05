@@ -316,6 +316,24 @@ class CatalogService(
         return Result.Ok("withdrawn")
     }
 
+    /**
+     * Delete the gallery account of whoever [idToken] belongs to.
+     *
+     * Play requires this inside the app once an app has accounts. The service
+     * deletes faces still waiting to be checked, and keeps published ones
+     * without the account code or the typed name -- other people may be using
+     * them. See `deleteMe` in the catalog service.
+     */
+    fun deleteAccount(idToken: String): Result<String> {
+        val reply = try {
+            transport.delete("$baseUrl/me", bearer = idToken)
+        } catch (_: CatalogTransport.Unreachable) {
+            return Result.Failed(UNREACHABLE)
+        }
+        if (!reply.ok) return Result.Failed(errorIn(reply.body, reply.status))
+        return Result.Ok("deleted")
+    }
+
     // ---- parsing and cache --------------------------------------------------
 
     private fun parseIndex(text: String): Index {

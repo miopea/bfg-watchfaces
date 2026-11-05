@@ -898,6 +898,21 @@ are in the same commit range and must ship together.
   The ACCOUNT ID is the personal data here; the face is not. So deleting an
   account drops the link and leaves the face, which people may already be using
   and which nothing should pull off their wrists.
+  **Extended 2026-11-05: the typed author name goes too.** It is the one thing
+  on a kept face that is about a person rather than a drawing. A pending face
+  is DELETED, as withdrawing it would be. A block in `blocked_authors` is kept,
+  so deleting the account is not the way round a block. The app calls it from
+  About ("Delete my gallery account").
+- ~~What withdrawing does to the record~~ **SETTLED 2026-11-05: it deletes it.**
+  The face row and everything keyed on it go: preview, AI review, moderation
+  job, automatic-publication record. Reports stay, as moderation records that
+  name the face only by slug. Until then the row was marked `withdrawn` and kept
+  the account code, the name and the settings, while the privacy policy said
+  withdrawing deletes it.
+- ~~Whether the service refuses a cycle face~~ **SETTLED 2026-11-05: it does.**
+  The contract (version 2) carries `privateProviderClasses`, and a provider
+  naming one is refused in `providers` and in a `+app:` token alike. Before
+  that only the app refused, and the policy said the service did too.
 - ~~Whether reporting stays anonymous~~ **SETTLED: yes**, on R2's original
   reasoning.
 - **Turnstile.** `TURNSTILE_SECRET` is unset, so submit and report answer 403.

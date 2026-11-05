@@ -51,6 +51,14 @@ export interface Contract {
    * only the sender has, which is why `texture` is otherwise refused outright.
    */
   readonly builtInDials: readonly string[];
+  /**
+   * Complication provider classes a face may not name.
+   *
+   * Naming the cycle provider tells everyone who downloads the face that its
+   * author tracks a menstrual cycle, so the app keeps such a face on the phone
+   * and this service refuses it as well.
+   */
+  readonly privateProviderClasses: readonly string[];
   readonly fields: readonly string[];
 }
 
@@ -64,7 +72,7 @@ export const CONTRACT: Contract = raw;
  * when a face's geometry changes. A mismatch means this Worker would read half
  * the file and silently skip the rest, so it refuses to start instead.
  */
-export const SUPPORTED_CONTRACT_VERSION = 1;
+export const SUPPORTED_CONTRACT_VERSION = 2;
 
 if (CONTRACT.contractVersion !== SUPPORTED_CONTRACT_VERSION) {
   throw new Error(
